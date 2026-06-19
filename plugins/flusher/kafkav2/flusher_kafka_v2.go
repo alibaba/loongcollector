@@ -33,6 +33,7 @@ import (
 	converter "github.com/alibaba/ilogtail/pkg/protocol/converter"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pkg/util"
+	flushercheckpoint "github.com/alibaba/ilogtail/plugins/flusher/checkpoint"
 )
 
 const (
@@ -40,6 +41,16 @@ const (
 	PartitionerTypeRoundRobin = "roundrobin"
 	PartitionerTypeRoundHash  = "hash"
 )
+
+// msgCheckpointInfo carries the file-checkpoint context for a single Kafka message.
+// It is attached to each sarama.ProducerMessage.Metadata and consumed in the
+// success/error callback goroutine to advance the file-server checkpoint after the
+// whole source group has been acknowledged. All messages of one source group share
+// the same *offsetGroup so the checkpoint only advances once the group is delivered.
+type msgCheckpointInfo struct {
+	sourceID string
+	group    *flushercheckpoint.Group
+}
 
 type FlusherKafka struct {
 	context   pipeline.Context
@@ -115,6 +126,10 @@ type FlusherKafka struct {
 	defaultHashKey string
 	selectFields   []string
 	recordHeaders  []sarama.RecordHeader
+	// offsets turns out-of-order Kafka acknowledgements into a gap-free file
+	// checkpoint. It is only used by the V2 (Export) path for file sources.
+	offsets           *flushercheckpoint.Tracker
+	checkpointCommits *flushercheckpoint.Committer
 }
 
 type backoffConfig struct {
@@ -258,6 +273,8 @@ func (k *FlusherKafka) Init(context pipeline.Context) error {
 	}
 
 	SIGTERM := make(chan bool)
+	k.checkpointCommits = flushercheckpoint.NewCommitter(flushercheckpoint.UpdateFileCheckpoint)
+	k.offsets = flushercheckpoint.NewTracker(k.checkpointCommits.Add)
 	go func(p sarama.AsyncProducer, SIGTERM chan bool) {
 		errors := p.Errors()
 		success := p.Successes()
@@ -265,10 +282,17 @@ func (k *FlusherKafka) Init(context pipeline.Context) error {
 			select {
 			case err := <-errors:
 				if err != nil {
+					if info, ok := err.Msg.Metadata.(*msgCheckpointInfo); ok && info != nil {
+						k.offsets.Fail(info.sourceID, info.group)
+					}
 					logger.Warning(k.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "flush kafka write data fail, error", err)
 				}
-			case <-success:
-				// Do Nothing
+			case msg := <-success:
+				if msg != nil {
+					if info, ok := msg.Metadata.(*msgCheckpointInfo); ok && info != nil {
+						k.offsets.Ack(info.sourceID, info.group)
+					}
+				}
 			case <-SIGTERM:
 				return
 			}
@@ -292,28 +316,50 @@ func (k *FlusherKafka) Flush(projectName string, logstoreName string, configName
 			logger.Warning(k.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "flush kafka convert log fail, error", err)
 		}
 		for index, log := range logs.([][]byte) {
-			k.flush(log, values[index])
+			k.flush(log, values[index], nil)
 		}
 	}
 	return nil
 }
 
 func (k *FlusherKafka) Export(groupEventsArray []*models.PipelineGroupEvents, ctx pipeline.PipelineContext) error {
+	configName := k.context.GetConfigName()
 	for _, groupEvents := range groupEventsArray {
 		logger.Debug(k.context.GetRuntimeContext(), "[GroupEvents] events count", len(groupEvents.Events),
 			"tags", groupEvents.Group.GetTags().Iterator())
+		logPath := groupEvents.Group.GetMetadata().Get(flushercheckpoint.MetaKeyLogFilePath)
+		sourceID := groupEvents.Group.GetMetadata().Get(flushercheckpoint.MetaKeySourceID)
 		logs, values, err := k.converter.ToByteStreamWithSelectedFieldsV2(groupEvents, k.selectFields)
 		if err != nil {
 			logger.Warning(k.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "flush kafka convert log fail, error", err)
 		}
-		for index, log := range logs.([][]byte) {
-			k.flush(log, values[index])
+		byteLogs := logs.([][]byte)
+		// Build one checkpoint group per source event group. The file offset that
+		// becomes safe once the whole group is delivered is the maximum end offset
+		// (start offset + raw size) of all Log events in the group. This avoids any
+		// fragile positional mapping between converted records and source events:
+		// converters may collapse N events into one record (separator mode) or emit
+		// non-Log event types, so we never index groupEvents.Events by output index.
+		group := k.buildCheckpointGroup(sourceID, configName, logPath, groupEvents, len(byteLogs))
+		var cptInfo *msgCheckpointInfo
+		if group != nil {
+			cptInfo = &msgCheckpointInfo{sourceID: sourceID, group: group}
+		}
+		for index, log := range byteLogs {
+			k.flush(log, values[index], cptInfo)
 		}
 	}
 	return nil
 }
 
-func (k *FlusherKafka) flush(log []byte, valueMap map[string]string) {
+// buildCheckpointGroup registers a checkpoint group for the messages produced
+// from groupEvents, or returns nil when checkpoint tracking does not apply
+// (non-file source, no Log events carrying an offset, or no messages produced).
+func (k *FlusherKafka) buildCheckpointGroup(sourceID, configName, logPath string, groupEvents *models.PipelineGroupEvents, msgCount int) *flushercheckpoint.Group {
+	return flushercheckpoint.BuildGroup(k.offsets, sourceID, configName, logPath, groupEvents, msgCount)
+}
+
+func (k *FlusherKafka) flush(log []byte, valueMap map[string]string, cptInfo *msgCheckpointInfo) {
 	topic := k.Topic
 	if len(k.topicKeys) > 0 {
 		formattedTopic, err := fmtstr.FormatTopic(valueMap, k.Topic)
@@ -324,9 +370,10 @@ func (k *FlusherKafka) flush(log []byte, valueMap map[string]string) {
 		}
 	}
 	m := &sarama.ProducerMessage{
-		Topic:   topic,
-		Value:   sarama.ByteEncoder(log),
-		Headers: k.recordHeaders,
+		Topic:    topic,
+		Value:    sarama.ByteEncoder(log),
+		Headers:  k.recordHeaders,
+		Metadata: cptInfo,
 	}
 	// set key when partition type is hash
 	if k.PartitionerType == PartitionerTypeRoundHash {
@@ -368,6 +415,7 @@ func (k *FlusherKafka) IsReady(projectName string, logstoreName string, logstore
 func (k *FlusherKafka) Stop() error {
 	err := k.producer.Close()
 	close(k.isTerminal)
+	k.checkpointCommits.Stop()
 	return err
 }
 

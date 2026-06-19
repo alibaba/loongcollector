@@ -26,6 +26,7 @@
 #include "collection_pipeline/serializer/JsonSerializer.h"
 #include "common/FormattedString.h"
 #include "common/StringView.h"
+#include "file_server/checkpoint/FileSendCheckpoint.h"
 #include "models/PipelineEventGroup.h"
 #include "models/PipelineEventPtr.h"
 #include "monitor/MetricManager.h"
@@ -55,8 +56,17 @@ public:
 #endif
 
 private:
+    // tracks delivery of all messages produced for one file-input group, so the committed file
+    // offset is advanced only after every message of the group is durably sent
+    struct GroupAck {
+        std::atomic<int> mRemaining{0};
+        std::atomic<bool> mAllOk{true};
+        FileSendCheckpointPtr mFileSendCheckpoint;
+    };
+
     bool SerializeAndSend(PipelineEventGroup&& group);
     void HandleDeliveryResult(bool success, const KafkaProducer::ErrorInfo& errorInfo);
+    void FinalizeGroupAck(const std::shared_ptr<GroupAck>& ack);
     std::string GeneratePartitionKey(const PipelineEventPtr& event) const;
 
     KafkaConfig mKafkaConfig;

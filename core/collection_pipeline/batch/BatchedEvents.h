@@ -31,6 +31,9 @@ struct BatchedEvents {
     size_t mSizeBytes = 0; // only set on completion
     // for flusher_sls only
     RangeCheckpointPtr mExactlyOnceCheckpoint;
+    // threads the file send checkpoint (input_static_file) to the flusher so that the
+    // committed file offset is advanced only after the data is successfully sent
+    FileSendCheckpointPtr mFileSendCheckpoint;
     StringView mPackIdPrefix;
 
     BatchedEvents() = default;
@@ -42,6 +45,7 @@ struct BatchedEvents {
           mSourceBuffers(std::move(other.mSourceBuffers)),
           mSizeBytes(other.mSizeBytes),
           mExactlyOnceCheckpoint(std::move(other.mExactlyOnceCheckpoint)),
+          mFileSendCheckpoint(std::move(other.mFileSendCheckpoint)),
           mPackIdPrefix(other.mPackIdPrefix) {}
     BatchedEvents& operator=(BatchedEvents&&) noexcept = delete;
     ~BatchedEvents();

@@ -26,10 +26,12 @@ import (
 	"github.com/prometheus/common/model"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	converter "github.com/alibaba/ilogtail/pkg/protocol/converter"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
+	flushercheckpoint "github.com/alibaba/ilogtail/plugins/flusher/checkpoint"
 )
 
 type FlusherLoki struct {
@@ -61,6 +63,9 @@ type FlusherLoki struct {
 	context    pipeline.Context
 	converter  *converter.Converter
 	lokiClient *loki.Client
+
+	offsets           *flushercheckpoint.Tracker
+	checkpointCommits *flushercheckpoint.Committer
 }
 
 type convertConfig struct {
@@ -126,6 +131,8 @@ func (f *FlusherLoki) Init(context pipeline.Context) error {
 		return err
 	}
 	f.lokiClient = client
+	f.checkpointCommits = flushercheckpoint.NewCommitter(flushercheckpoint.UpdateFileCheckpoint)
+	f.offsets = flushercheckpoint.NewTracker(f.checkpointCommits.Add)
 	return nil
 }
 
@@ -171,10 +178,39 @@ func (f *FlusherLoki) Flush(projectName string, logstoreName string, configName 
 	return nil
 }
 
+func (f *FlusherLoki) Export(groupEventsArray []*models.PipelineGroupEvents, ctx pipeline.PipelineContext) error {
+	configName := f.context.GetConfigName()
+	for _, groupEvents := range groupEventsArray {
+		logger.Debug(f.context.GetRuntimeContext(), "[GroupEvents] events count", len(groupEvents.Events),
+			"tags", groupEvents.Group.GetTags().Iterator())
+		serializedLogs, values, err := f.converter.ToByteStreamWithSelectedFieldsV2(groupEvents, f.DynamicLabels)
+		if err != nil {
+			logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "flush loki convert log fail, error", err)
+			return err
+		}
+		rows := serializedLogs.([][]byte)
+		sourceID := groupEvents.Group.GetMetadata().Get(flushercheckpoint.MetaKeySourceID)
+		logPath := groupEvents.Group.GetMetadata().Get(flushercheckpoint.MetaKeyLogFilePath)
+		group := flushercheckpoint.BuildGroup(f.offsets, sourceID, configName, logPath, groupEvents, len(rows))
+		for i, log := range rows {
+			labels := f.buildLokiLabels(values[i])
+			err = f.lokiClient.Handle(labels, eventTimestamp(groupEvents, i), string(log))
+			if err != nil {
+				f.offsets.Fail(sourceID, group)
+				logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "flush loki convert log fail, error", err)
+				return err
+			}
+			f.offsets.Ack(sourceID, group)
+		}
+	}
+	return nil
+}
+
 func (f *FlusherLoki) SetUrgent(flag bool) {}
 
 func (f *FlusherLoki) Stop() error {
 	f.lokiClient.Stop()
+	f.checkpointCommits.Stop()
 	return nil
 }
 
@@ -225,6 +261,17 @@ func (f *FlusherLoki) buildLokiLabels(value map[string]string) model.LabelSet {
 		labels[model.LabelName(key)] = model.LabelValue(val)
 	}
 	return labels
+}
+
+func eventTimestamp(groupEvents *models.PipelineGroupEvents, index int) time.Time {
+	if groupEvents == nil || index >= len(groupEvents.Events) {
+		return time.Now()
+	}
+	ts := groupEvents.Events[index].GetTimestamp()
+	if ts == 0 {
+		return time.Now()
+	}
+	return time.Unix(0, int64(ts))
 }
 
 func init() {

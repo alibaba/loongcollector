@@ -45,6 +45,7 @@ struct CollectionConfig : public PipelineConfig {
     bool mHasGoProcessor = false;
     bool mHasNativeFlusher = false;
     bool mHasGoFlusher = false;
+    bool mHasSelfMonitorInput = false;
     bool mIsFirstProcessorJson = false;
     // for alarm only
     std::string mProject;
@@ -81,8 +82,6 @@ struct CollectionConfig : public PipelineConfig {
     // }
 
     bool HasGoPlugin() const { return mHasGoFlusher || mHasGoProcessor || mHasGoInput; }
-
-    bool IsOnetime() const { return mOnetimeExpireTime.has_value(); }
 
     bool ReplaceEnvVar();
 };

@@ -16,6 +16,7 @@
 
 #include "collection_pipeline/queue/SenderQueueManager.h"
 #include "common/FileSystemUtil.h"
+#include "file_server/checkpoint/FileSendCheckpoint.h"
 
 using namespace std;
 
@@ -83,6 +84,7 @@ bool FlusherFile::FlushAll() {
 bool FlusherFile::SerializeAndPush(PipelineEventGroup&& group) {
     string serializedData;
     string errorMsg;
+    auto fileCpt = group.GetFileSendCheckpoint();
     BatchedEvents g(std::move(group.MutableEvents()),
                     std::move(group.GetSizedTags()),
                     std::move(group.GetSourceBuffer()),
@@ -100,6 +102,11 @@ bool FlusherFile::SerializeAndPush(PipelineEventGroup&& group) {
         mFileWriter->flush();
     } else {
         LOG_ERROR(sLogger, ("serialize pipeline event group error", errorMsg));
+    }
+    // file input with deferred commit: data is written (or discarded on serialize error), advance
+    // the committed offset so it is not blocked forever
+    if (fileCpt) {
+        ConfirmFileSendCheckpoint(fileCpt);
     }
     return true;
 }

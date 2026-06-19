@@ -156,8 +156,7 @@ typedef void (*StopBuiltInModulesFun)();
 typedef void (*StartFun)(GoString);
 typedef GoInt (*InitPluginBaseFun)();
 typedef GoInt (*InitPluginBaseV2Fun)(GoString cfg);
-typedef GoInt (*ProcessLogsFun)(GoString c, GoSlice l, GoString p, GoString t, GoSlice tags);
-typedef GoInt (*ProcessLogGroupFun)(GoString c, GoSlice l, GoString p);
+typedef GoInt (*ProcessPipelineEventGroupFun)(GoString c, GoSlice l, GoString p);
 typedef struct innerContainerMeta* (*GetContainerMetaFun)(GoString containerID);
 typedef char* (*GetAllContainerMetaFun)();
 typedef char* (*GetDiffContainerMetaFun)();
@@ -187,6 +186,17 @@ typedef int (*SendPbV2Fun)(const char* configName,
 
 typedef void (*RegisterLogtailCallBack)(IsValidToSendFun checkFun, SendPbFun sendFun);
 typedef void (*RegisterLogtailCallBackV2)(IsValidToSendFun checkFun, SendPbFun sendFun, SendPbV2Fun sendV2Fun);
+typedef int (*UpdateCheckpointFun)(const char* configName,
+                                   int configNameSize,
+                                   const char* sourceId,
+                                   int sourceIdSize,
+                                   const char* logPath,
+                                   int logPathSize,
+                                   int64_t offset);
+typedef void (*RegisterLogtailCallBackV3)(IsValidToSendFun checkFun,
+                                         SendPbFun sendFun,
+                                         SendPbV2Fun sendV2Fun,
+                                         UpdateCheckpointFun updateCheckpointFun);
 
 typedef int (*PluginAdapterVersion)();
 }
@@ -226,13 +236,9 @@ public:
 
     bool IsPluginOpened() { return mPluginValid; }
 
-    void ProcessLog(const std::string& configName,
-                    sls_logs::Log& log,
-                    const std::string& packId,
-                    const std::string& topic,
-                    const std::string& tags);
-
-    void ProcessLogGroup(const std::string& configName, const std::string& logGroup, const std::string& packId);
+    void ProcessPipelineEventGroup(const std::string& configName,
+                                   const std::string& pipelineEventGroup,
+                                   const std::string& packId);
 
     static int IsValidToSend(long long logstoreKey);
 
@@ -256,6 +262,14 @@ public:
                         const char* shardHash,
                         int shardHashSize);
 
+    static int UpdateCheckpoint(const char* configName,
+                                int32_t configNameSize,
+                                const char* sourceId,
+                                int32_t sourceIdSize,
+                                const char* logPath,
+                                int32_t logPathSize,
+                                int64_t offset);
+
     K8sContainerMeta GetContainerMeta(logtail::StringView containerID);
     K8sContainerMeta GetContainerMeta(const std::string& containerID);
 
@@ -278,8 +292,7 @@ private:
     StartFun mStartFun;
     volatile bool mPluginValid;
     logtail::FlusherSLS mPluginContainerConfig;
-    ProcessLogsFun mProcessLogsFun;
-    ProcessLogGroupFun mProcessLogGroupFun;
+    ProcessPipelineEventGroupFun mProcessPipelineEventGroupFun;
     GetContainerMetaFun mGetContainerMetaFun;
     GetAllContainerMetaFun mGetAllContainerMetaFun;
     GetDiffContainerMetaFun mGetDiffContainerMetaFun;

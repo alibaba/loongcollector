@@ -27,10 +27,12 @@ import (
 	"github.com/elastic/go-elasticsearch/v8/esapi"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	converter "github.com/alibaba/ilogtail/pkg/protocol/converter"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
+	flushercheckpoint "github.com/alibaba/ilogtail/plugins/flusher/checkpoint"
 )
 
 type FlusherElasticSearch struct {
@@ -50,6 +52,9 @@ type FlusherElasticSearch struct {
 	context        pipeline.Context
 	converter      *converter.Converter
 	esClient       *elasticsearch.Client
+
+	offsets           *flushercheckpoint.Tracker
+	checkpointCommits *flushercheckpoint.Committer
 }
 
 type HTTPConfig struct {
@@ -131,6 +136,8 @@ func (f *FlusherElasticSearch) Init(context pipeline.Context) error {
 		logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherInitAlarm, "create elasticsearch client error", err)
 		return err
 	}
+	f.checkpointCommits = flushercheckpoint.NewCommitter(flushercheckpoint.UpdateFileCheckpoint)
+	f.offsets = flushercheckpoint.NewTracker(f.checkpointCommits.Add)
 	return nil
 }
 
@@ -183,6 +190,7 @@ func (f *FlusherElasticSearch) IsReady(projectName string, logstoreName string, 
 func (f *FlusherElasticSearch) SetUrgent(flag bool) {}
 
 func (f *FlusherElasticSearch) Stop() error {
+	f.checkpointCommits.Stop()
 	return nil
 }
 
@@ -235,6 +243,62 @@ func (f *FlusherElasticSearch) Flush(projectName string, logstoreName string, co
 		logger.Debug(f.context.GetRuntimeContext(), "elasticsearch success send events: messageID")
 	}
 
+	return nil
+}
+
+func (f *FlusherElasticSearch) Export(groupEventsArray []*models.PipelineGroupEvents, ctx pipeline.PipelineContext) error {
+	nowTime := time.Now().Local()
+	configName := f.context.GetConfigName()
+	for _, groupEvents := range groupEventsArray {
+		logger.Debug(f.context.GetRuntimeContext(), "[GroupEvents] events count", len(groupEvents.Events),
+			"tags", groupEvents.Group.GetTags().Iterator())
+		serializedLogs, values, err := f.converter.ToByteStreamWithSelectedFieldsV2(groupEvents, f.indexKeys)
+		if err != nil {
+			logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "flush elasticsearch convert log fail, error", err)
+			return err
+		}
+		rows := serializedLogs.([][]byte)
+		sourceID := groupEvents.Group.GetMetadata().Get(flushercheckpoint.MetaKeySourceID)
+		logPath := groupEvents.Group.GetMetadata().Get(flushercheckpoint.MetaKeyLogFilePath)
+		group := flushercheckpoint.BuildGroup(f.offsets, sourceID, configName, logPath, groupEvents, 1)
+		var buffer []string
+		for index, log := range rows {
+			esIndex := &f.Index
+			if f.isDynamicIndex {
+				valueMap := values[index]
+				esIndex, err = fmtstr.FormatIndex(valueMap, f.Index, uint32(nowTime.Unix()))
+				if err != nil {
+					f.offsets.Fail(sourceID, group)
+					logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "flush elasticsearch format index fail, error", err)
+					return err
+				}
+			}
+			var builder strings.Builder
+			builder.WriteString(`{"index": {"_index": "`)
+			builder.WriteString(*esIndex)
+			builder.WriteString(`"}}`)
+			buffer = append(buffer, builder.String())
+			buffer = append(buffer, string(log))
+		}
+		body := strings.Join(buffer, "\n")
+		req := esapi.BulkRequest{
+			Body: strings.NewReader(body + "\n"),
+		}
+		res, err := req.Do(context.Background(), f.esClient)
+		if err != nil {
+			f.offsets.Fail(sourceID, group)
+			logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "flush elasticsearch request fail, error", err)
+			return err
+		}
+		defer res.Body.Close()
+		if res.StatusCode >= 400 && res.StatusCode <= 599 {
+			f.offsets.Fail(sourceID, group)
+			logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "flush elasticsearch request error", res)
+			return fmt.Errorf("err status returned: %v", res.Status())
+		}
+		f.offsets.Ack(sourceID, group)
+		logger.Debug(f.context.GetRuntimeContext(), "elasticsearch success send events: messageID")
+	}
 	return nil
 }
 

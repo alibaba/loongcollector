@@ -16,22 +16,19 @@
 
 关于具体指标的详情，请参见[自监控指标说明](../../../developer-guide/self-monitor/metrics/internal-metrics-description.md)。
 
-|  **参数**  |  **类型**  |  **是否必填**  |  **默认值**  |  **说明**  |
-| --- | --- | --- | --- | --- |
-|  Type  |  string  |  是  |  /  |  插件类型。固定为input\_internal\_metrics。  |
-|  Agent  |  InternalMetricRule  |  否  |  /  |  进程级指标（LoongCollector的基本信息、资源占用率等进程级别信息）的采集规则  |
-|  Runner  |  InternalMetricRule  |  否  |  /  |  Runner级指标（LoongCollector内重要单例的运行状态）的采集规则  |
-|  Pipeline  |  InternalMetricRule  |  否  |  /  |  Pipeline级指标（单个采集配置的状态）的采集规则  |
-|  PluginSource  |  InternalMetricRule  |  否  |  /  |  数据源级（例如被采集的文件的信息）的采集规则  |
-|  Plugin  |  InternalMetricRule  |  否  |  /  |  插件级指标（单个插件的状态、吞吐量等信息）的采集规则  |
-|  Component  |  InternalMetricRule  |  否  |  /  |  组件级指标（为了辅助Pipeline等运行的组件的状态）的采集规则  |
+* `Type`（string，必填）：插件类型。固定为`input_internal_metrics`。
+* `Agent`（InternalMetricRule，可选）：进程级指标（LoongCollector的基本信息、资源占用率等进程级别信息）的采集规则。
+* `Runner`（InternalMetricRule，可选）：Runner级指标（LoongCollector内重要单例的运行状态）的采集规则。
+* `Pipeline`（InternalMetricRule，可选）：Pipeline级指标（单个采集配置的状态）的采集规则。
+* `PluginSource`（InternalMetricRule，可选）：数据源级（例如被采集的文件的信息）的采集规则。
+* `Plugin`（InternalMetricRule，可选）：插件级指标（单个插件的状态、吞吐量等信息）的采集规则。
+* `Component`（InternalMetricRule，可选）：组件级指标（为了辅助Pipeline等运行的组件的状态）的采集规则。
 
 InternalMetricRule 的结构如下：
 
-|  **参数**  |  **类型**  |  **是否必填**  |  **默认值**  |  **说明**  |
-| --- | --- | --- | --- | --- |
-|  Enable  |  bool  |  否  |  true  |  是否开启。默认开启。  |
-|  Interval  |  int  |  否  |  10  |  统计间隔，单位为分钟，表示每隔指定时间输出一次该类型的指标。  |
+* `Enable`（bool，可选，默认`true`）：是否开启。
+* `Interval`（int，可选，默认`10`）：统计间隔，单位为分钟，表示每隔指定时间输出一次该类型的指标。为兼容旧配置保留。
+* `IntervalSeconds`（int，可选）：统计间隔，单位为秒，优先级高于`Interval`，最小值为15。
 
 ## 样例
 
@@ -43,13 +40,13 @@ inputs:
   - Type: input_internal_metrics
     Agent:
       Enable: true
-      Interval: 1
+      IntervalSeconds: 15
     Runner:
       Enable: true
-      Interval: 1
+      IntervalSeconds: 15
     Pipeline:
       Enable: true
-      Interval: 1
+      IntervalSeconds: 15
     Plugin:
       Enable: true
       Interval: 10

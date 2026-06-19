@@ -237,39 +237,18 @@ func (lc *LogstoreConfig) ProcessRawLogV2(rawLog []byte, packID string, topic st
 	return 0
 }
 
-func (lc *LogstoreConfig) ProcessLog(logByte []byte, packID string, topic string, tags []byte) int {
-	log := &protocol.Log{}
-	err := log.Unmarshal(logByte)
-	if err != nil {
-		logger.Error(lc.Context.GetRuntimeContext(), selfmonitor.WrongProtobufAlarm, "cannot process logs passed by core, err", err)
+func (lc *LogstoreConfig) ProcessPipelineEventGroup(pbBytes []byte, packID string) int {
+	pbGroup := &protocol.PipelineEventGroup{}
+	if err := pbGroup.Unmarshal(pbBytes); err != nil {
+		logger.Error(lc.Context.GetRuntimeContext(), selfmonitor.WrongProtobufAlarm, "cannot process pipeline event group passed by core, err", err)
 		return -1
 	}
-	if len(topic) > 0 {
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "__log_topic__", Value: topic})
+	if runner, ok := lc.PluginRunner.(*pluginv2Runner); ok {
+		runner.ReceivePipelineEventGroup(pbGroup, map[string]interface{}{ctxKeySource: packID})
+		return 0
 	}
-	// When UsingOldContentTag is set to false, the tag is now put into the context during cgo.
-	if !lc.GlobalConfig.UsingOldContentTag {
-		logTags := extractTagsToLogTags(tags)
-		lc.PluginRunner.ReceiveRawLog(&pipeline.LogWithContext{Log: log, Context: map[string]interface{}{"source": packID, "topic": topic, "tags": logTags}})
-	} else {
-		extractTags(tags, log)
-		lc.PluginRunner.ReceiveRawLog(&pipeline.LogWithContext{Log: log, Context: map[string]interface{}{"source": packID, "topic": topic}})
-	}
-	return 0
-}
-
-func (lc *LogstoreConfig) ProcessLogGroup(logByte []byte, packID string) int {
-	logGroup := &protocol.LogGroup{}
-	err := logGroup.Unmarshal(logByte)
-	if err != nil {
-		logger.Error(lc.Context.GetRuntimeContext(), selfmonitor.WrongProtobufAlarm, "cannot process log group passed by core, err", err)
-		return -1
-	}
-	lc.PluginRunner.ReceiveLogGroup(pipeline.LogGroupWithContext{
-		LogGroup: logGroup,
-		Context:  map[string]interface{}{ctxKeySource: packID}},
-	)
-	return 0
+	logger.Warning(lc.Context.GetRuntimeContext(), selfmonitor.ReceiveLogGroupAlarm, "pipeline event group requires v2 plugin runner", lc.ConfigName)
+	return -1
 }
 
 func hasDockerStdoutInput(plugins map[string]interface{}) bool {
@@ -606,7 +585,78 @@ func fetchPluginVersion(config map[string]interface{}) ConfigVersion {
 			}
 		}
 	}
+	if shouldUsePluginV2Runner(config) {
+		return v2
+	}
 	return v1
+}
+
+func shouldUsePluginV2Runner(config map[string]interface{}) bool {
+	if hasPluginConfig(config, "inputs") {
+		return false
+	}
+	if !pluginSectionSupportsV2(config, "processors", func(pluginType string) bool {
+		creator, exists := pipeline.Processors[pluginType]
+		if !exists || creator == nil {
+			return false
+		}
+		_, ok := creator().(pipeline.ProcessorV2)
+		return ok
+	}) {
+		return false
+	}
+	if !pluginSectionSupportsV2(config, "aggregators", func(pluginType string) bool {
+		creator, exists := pipeline.Aggregators[pluginType]
+		if !exists || creator == nil {
+			return false
+		}
+		_, ok := creator().(pipeline.AggregatorV2)
+		return ok
+	}) {
+		return false
+	}
+	return pluginSectionSupportsV2(config, "flushers", func(pluginType string) bool {
+		creator, exists := pipeline.Flushers[pluginType]
+		if !exists || creator == nil {
+			return false
+		}
+		_, ok := creator().(pipeline.FlusherV2)
+		return ok
+	})
+}
+
+func hasPluginConfig(config map[string]interface{}, section string) bool {
+	pluginConfig, exists := config[section]
+	if !exists {
+		return false
+	}
+	plugins, ok := pluginConfig.([]interface{})
+	return ok && len(plugins) > 0
+}
+
+func pluginSectionSupportsV2(config map[string]interface{}, section string, supportsV2 func(string) bool) bool {
+	pluginConfig, exists := config[section]
+	if !exists {
+		return section != "flushers"
+	}
+	plugins, ok := pluginConfig.([]interface{})
+	if !ok || len(plugins) == 0 {
+		return section != "flushers"
+	}
+	for _, pluginInterface := range plugins {
+		plugin, ok := pluginInterface.(map[string]interface{})
+		if !ok {
+			return false
+		}
+		pluginTypeWithID, ok := plugin["type"].(string)
+		if !ok {
+			return false
+		}
+		if !supportsV2(getPluginType(pluginTypeWithID)) {
+			return false
+		}
+	}
+	return true
 }
 
 func initPluginRunner(lc *LogstoreConfig) (PluginRunner, error) {

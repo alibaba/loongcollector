@@ -28,12 +28,12 @@ extern "C" {
 #include <coolbpf/security/bpf_process_event_type.h>
 #include <coolbpf/security/data_msg.h>
 #include <coolbpf/security/msg_type.h>
-#include <sys/resource.h>
 
 #include "ebpf/driver/eBPFDriver.h"
 }
 
 #include "BPFWrapper.h"
+#include "CpuProfiler.h"
 #include "FileFilter.h"
 #include "Log.h"
 #include "NetworkFilter.h"
@@ -54,19 +54,6 @@ int set_logger(logtail::ebpf::eBPFLogHandler fn) {
     return 0;
 }
 
-int bump_memlock_rlimit(void) {
-    struct rlimit rlim_new = {
-        .rlim_cur = RLIM_INFINITY,
-        .rlim_max = RLIM_INFINITY,
-    };
-
-    if (0 != setrlimit(RLIMIT_MEMLOCK, &rlim_new)) {
-        EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN, "Failed to increase RLIMIT_MEMLOCK limit!\n");
-        return -1;
-    }
-    return 0;
-}
-
 std::array<std::vector<void*>, size_t(logtail::ebpf::PluginType::MAX)> gPluginPbs;
 
 std::array<std::vector<std::string>, size_t(logtail::ebpf::PluginType::MAX)> gPluginCallNames;
@@ -76,6 +63,8 @@ void UpdatePluginPerfBuffers(logtail::ebpf::PluginType type, std::vector<void*> 
 }
 
 std::shared_ptr<logtail::ebpf::BPFWrapper<security_bpf>> gWrapper = logtail::ebpf::BPFWrapper<security_bpf>::Create();
+std::shared_ptr<logtail::ebpf::CpuProfiler> gCpuProfiler = std::make_shared<logtail::ebpf::CpuProfiler>();
+
 void SetCoolBpfConfig(int32_t opt, int32_t value) {
     int32_t* params[] = {&value};
     int32_t paramsLen[] = {4};
@@ -171,10 +160,8 @@ int start_plugin(logtail::ebpf::PluginConfig* arg) {
     // 1. load skeleton
     // 2. start consumer
     // 3. attach prog
+    // plugin start paths no longer need to call setrlimit themselves.
     EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG, "enter start_plugin, arg is null: %d \n", arg == nullptr);
-    if (0 != bump_memlock_rlimit()) {
-        return -1;
-    }
 
     // TODO: The coolbpf_set_loglevel API isn't ideal anyway
     libbpf_set_print(libbpf_printf);
@@ -401,6 +388,12 @@ int start_plugin(logtail::ebpf::PluginConfig* arg) {
         }
         case logtail::ebpf::PluginType::AGENTSIGHT_OBSERVE:
             break;
+        case logtail::ebpf::PluginType::CPU_PROFILING: {
+            auto* config = std::get_if<logtail::ebpf::CpuProfilingConfig>(&arg->mConfig);
+            gCpuProfiler->Start(config->mHandler, config->mCtx, std::move(config->mHostRootPath));
+            EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG, "cpu profiling: profiler started\n");
+            break;
+        }
         default: {
             EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
                      "[start plugin] unknown plugin type, please check. \n");
@@ -412,6 +405,10 @@ int start_plugin(logtail::ebpf::PluginConfig* arg) {
 int poll_plugin_pbs(logtail::ebpf::PluginType type, int32_t max_events, int32_t* stop_flag, int timeout_ms) {
     if (type == logtail::ebpf::PluginType::NETWORK_OBSERVE) {
         return ebpf_poll_events(max_events, stop_flag, timeout_ms);
+    }
+    if (type == logtail::ebpf::PluginType::CPU_PROFILING) {
+        gCpuProfiler->Poll();
+        return 0;
     }
     if (type == logtail::ebpf::PluginType::AGENTSIGHT_OBSERVE) {
         return 0;
@@ -489,6 +486,9 @@ int resume_plugin(logtail::ebpf::PluginConfig* arg) {
         }
         case logtail::ebpf::PluginType::AGENTSIGHT_OBSERVE:
             break;
+        case logtail::ebpf::PluginType::CPU_PROFILING: {
+            break;
+        }
         default: {
             EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
                      "[resume plugin] unknown plugin type, please check. \n");
@@ -550,6 +550,12 @@ int update_plugin(logtail::ebpf::PluginConfig* arg) {
                     }
                 }
             }
+            break;
+        }
+        case logtail::ebpf::PluginType::CPU_PROFILING: {
+            auto* config = std::get_if<logtail::ebpf::CpuProfilingConfig>(&arg->mConfig);
+            gCpuProfiler->UpdatePids(std::move(config->mPids));
+            EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG, "cpu profiling: profiler pids updated\n");
             break;
         }
         default:
@@ -644,6 +650,11 @@ int stop_plugin(logtail::ebpf::PluginType pluginType) {
 
             // 3. delete perf buffer
             DeletePerfBuffers(pluginType);
+            break;
+        }
+        case logtail::ebpf::PluginType::CPU_PROFILING: {
+            gCpuProfiler->Stop();
+            EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG, "cpu profiling: profiler stopped\n");
             break;
         }
         default: {

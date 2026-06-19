@@ -241,8 +241,6 @@ func (p *pluginv2Runner) runMetricInput(control *pipeline.AsyncControl) {
 					return metric.Read(p.InputPipeContext)
 				}, cc)
 			})
-		} else {
-			logger.Error(p.LogstoreConfig.Context.GetRuntimeContext(), selfmonitor.MetricInputV2StartFailureAlarm, "type assertion", "failure")
 		}
 	}
 }
@@ -431,6 +429,25 @@ func (p *pluginv2Runner) Stop(exit bool) error {
 	logger.Info(p.LogstoreConfig.Context.GetRuntimeContext(), "extension plugins stop", "done")
 
 	return nil
+}
+
+func (p *pluginv2Runner) ReceivePipelineEventGroup(pbGroup *protocol.PipelineEventGroup, ctx map[string]interface{}) {
+	groupEvents, err := helper.TransferPBToPipelineGroupEvents(pbGroup)
+	if err != nil {
+		logger.Warningf(p.LogstoreConfig.Context.GetRuntimeContext(), selfmonitor.ReceiveLogGroupAlarm, "transfer pipeline event group failed, err: %s", err.Error())
+		return
+	}
+	if ctx != nil {
+		for k, v := range ctx {
+			value, ok := v.(string)
+			if !ok {
+				logger.Warningf(p.LogstoreConfig.Context.GetRuntimeContext(), selfmonitor.ReceiveLogGroupAlarm, "unknown values found in context, type is %T", v)
+				continue
+			}
+			groupEvents.Group.Metadata.Add(k, value)
+		}
+	}
+	p.InputPipeContext.Collector().Collect(groupEvents.Group, groupEvents.Events...)
 }
 
 func (p *pluginv2Runner) ReceiveLogGroup(in pipeline.LogGroupWithContext) {

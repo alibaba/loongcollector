@@ -37,6 +37,7 @@ public:
     void HandleInvalidFlushers() const;
     void HandleInvalidExtensions() const;
     void TestReplaceEnvVarRef() const;
+    void SelfMonitorInputWithGoFlusher() const;
 
 protected:
     static void SetUpTestCase() { PluginRegistry::GetInstance()->LoadPlugins(); }
@@ -2250,6 +2251,62 @@ void CollectionConfigUnittest::HandleInvalidExtensions() const {
     APSARA_TEST_FALSE(config->Parse());
 }
 
+void CollectionConfigUnittest::SelfMonitorInputWithGoFlusher() const {
+    unique_ptr<Json::Value> configJson;
+    string configStr, errorMsg;
+    unique_ptr<CollectionConfig> config;
+
+    // input_internal_metrics + go flusher: should succeed (hasSelfMonitorInput bypasses restriction)
+    configStr = R"(
+        {
+            "inputs": [
+                {
+                    "Type": "input_internal_metrics"
+                }
+            ],
+            "flushers": [
+                {
+                    "Type": "flusher_prometheus"
+                }
+            ]
+        }
+    )";
+    configJson.reset(new Json::Value());
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
+    config.reset(new CollectionConfig(configName, std::move(configJson), filepath));
+    APSARA_TEST_TRUE(config->Parse());
+    APSARA_TEST_EQUAL(1U, config->mInputs.size());
+    APSARA_TEST_EQUAL(1U, config->mFlushers.size());
+    APSARA_TEST_TRUE(config->mHasNativeInput);
+    APSARA_TEST_TRUE(config->mHasGoFlusher);
+    APSARA_TEST_TRUE(config->mHasSelfMonitorInput);
+
+    // input_internal_alarms + go flusher: should succeed (hasSelfMonitorInput bypasses restriction)
+    configStr = R"(
+        {
+            "inputs": [
+                {
+                    "Type": "input_internal_alarms"
+                }
+            ],
+            "flushers": [
+                {
+                    "Type": "flusher_prometheus"
+                }
+            ]
+        }
+    )";
+    configJson.reset(new Json::Value());
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
+    config.reset(new CollectionConfig(configName, std::move(configJson), filepath));
+    APSARA_TEST_TRUE(config->Parse());
+    APSARA_TEST_EQUAL(1U, config->mInputs.size());
+    APSARA_TEST_EQUAL(1U, config->mFlushers.size());
+    APSARA_TEST_TRUE(config->mHasNativeInput);
+    APSARA_TEST_TRUE(config->mHasGoFlusher);
+    APSARA_TEST_TRUE(config->mHasSelfMonitorInput);
+}
+
 void CollectionConfigUnittest::TestReplaceEnvVarRef() const {
 #if defined(__linux__)
     setenv("__path4ut", "_home/$work", 1);
@@ -2372,6 +2429,7 @@ UNIT_TEST_CASE(CollectionConfigUnittest, HandleInvalidAggregators)
 UNIT_TEST_CASE(CollectionConfigUnittest, HandleInvalidFlushers)
 UNIT_TEST_CASE(CollectionConfigUnittest, HandleInvalidExtensions)
 UNIT_TEST_CASE(CollectionConfigUnittest, TestReplaceEnvVarRef)
+UNIT_TEST_CASE(CollectionConfigUnittest, SelfMonitorInputWithGoFlusher)
 
 } // namespace logtail
 

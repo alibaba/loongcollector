@@ -567,8 +567,26 @@ void CommonConfigProvider::UpdateRemoteOnetimePipelineConfig(
     }
     // expire_time is a Unix timestamp in seconds; the config server populates it using
     // time.Now().Unix() (see config_server/internal/server/agent/handler.go).
+    // expire_time == -1 is the server-side cancellation/delete sentinel.
     int64_t now = static_cast<int64_t>(time(nullptr));
     for (const auto& cmd : commands) {
+        // expire_time == -1: server explicitly cancelled this onetime config.
+        if (cmd.expire_time() == -1) {
+            const string& name = cmd.name();
+            LOG_INFO(sLogger, ("onetime config cancelled by server, removing", name));
+            filesystem::path filePath = mOnetimePipelineConfigDir / (name + ".json");
+            {
+                lock_guard<mutex> lock(mOnetimePipelineMux);
+                error_code ec;
+                filesystem::remove(filePath, ec);
+            }
+            {
+                lock_guard<mutex> lockInfoMap(mInfoMapMux);
+                mOnetimePipelineConfigInfoMap.erase(name);
+            }
+            ConfigFeedbackReceiver::GetInstance().UnregisterOnetimePipelineConfig(name);
+            continue;
+        }
         if (cmd.expire_time() > 0 && cmd.expire_time() <= now) {
             // Downgrade to DEBUG: an expired command may be re-sent on every heartbeat
             // (e.g. clock skew or a stuck server queue), and a WARNING per heartbeat
@@ -615,20 +633,40 @@ void CommonConfigProvider::UpdateRemoteOnetimePipelineConfig(
         // concurrent readers with status=APPLYING.  This is intentional: it signals
         // "in-flight" to the server and prevents duplicate delivery within the same batch.
         // On rollback the entry is removed, allowing a retry on the next heartbeat.
+        // Compute the incoming content hash before acquiring the lock so the
+        // critical section stays short.
+        int64_t incomingVersion = ComputeOnetimeConfigVersion(cmd.detail());
+        bool needUnregister = false;
         {
             lock_guard<mutex> lockInfoMap(mInfoMapMux);
             // Onetime configs are one-shot per-name within this process lifetime.
             // On startup, LoadConfigFile() pre-populates the map from disk so that
             // configs delivered before a restart are not re-applied.
-            if (mOnetimePipelineConfigInfoMap.count(name)) {
-                LOG_DEBUG(sLogger, ("onetime config already delivered, skipping", name));
-                continue;
+            // Exception: if the server re-issues the same name with different content
+            // (same-name recreation), the incoming version will differ — clear the
+            // stale entry so the new command can be accepted and re-run.
+            auto existingIt = mOnetimePipelineConfigInfoMap.find(name);
+            if (existingIt != mOnetimePipelineConfigInfoMap.end()) {
+                if (existingIt->second.version == incomingVersion) {
+                    LOG_DEBUG(sLogger, ("onetime config already delivered, skipping", name));
+                    continue;
+                }
+                // Different version: server re-issued this config with new content.
+                LOG_INFO(sLogger, ("onetime config re-issued by server with new content, replacing stale entry", name)
+                                      ("old_version", existingIt->second.version)("new_version", incomingVersion));
+                mOnetimePipelineConfigInfoMap.erase(existingIt);
+                needUnregister = true;
             }
             ConfigInfo placeholder;
             placeholder.name = name;
             placeholder.version = 0;
             placeholder.status = ConfigFeedbackStatus::APPLYING;
             mOnetimePipelineConfigInfoMap.emplace(name, std::move(placeholder));
+        }
+        // Unregister outside the lock to maintain the lock hierarchy
+        // (mInfoMapMux → ConfigFeedbackReceiver::mMutex).
+        if (needUnregister) {
+            ConfigFeedbackReceiver::GetInstance().UnregisterOnetimePipelineConfig(name);
         }
         filesystem::path filePath = mOnetimePipelineConfigDir / (name + ".json");
         filesystem::path tmpFilePath = mOnetimePipelineConfigDir / (name + ".json.new");
@@ -682,8 +720,9 @@ void CommonConfigProvider::UpdateRemoteOnetimePipelineConfig(
             mOnetimePipelineConfigInfoMap.erase(name);
             continue;
         }
-        // Compute the FNV-1a content hash outside the lock to keep the critical section short.
-        int64_t version = ComputeOnetimeConfigVersion(cmd.detail());
+        // incomingVersion was already computed before the de-duplication guard above;
+        // reuse it here to avoid a redundant hash computation.
+        int64_t version = incomingVersion;
         {
             // The placeholder already has name and APPLYING status; only update version.
             // In-place update avoids field-divergence if ConfigInfo gains new fields later.
@@ -773,7 +812,28 @@ void CommonConfigProvider::FeedbackOnetimePipelineConfigStatus(const std::string
     lock_guard<mutex> lockInfoMap(mInfoMapMux);
     auto info = mOnetimePipelineConfigInfoMap.find(name);
     if (info != mOnetimePipelineConfigInfoMap.end()) {
-        info->second.status = status;
+        // A DELETED feedback for an onetime config that is STILL present in the map
+        // always denotes a natural completion (execution timeout / OBSOLETE on init):
+        // genuine server cancellation (expire_time == -1) erases the map entry
+        // synchronously in UpdateRemoteOnetimePipelineConfig BEFORE removing the file,
+        // so by the time the resulting mRemoved feedback arrives the entry is already gone.
+        //
+        // Reporting DELETED here would make addConfigInfoToRequest emit version=-1 with
+        // proto status UNSET(0). The server then (a) records the status as "0 (UNKNOWN)"
+        // and (b) re-delivers the command on every heartbeat (because version=-1 never
+        // matches the content hash), producing unbounded heartbeat churn for commands
+        // with no delivery deadline (expire_time == 0).
+        //
+        // Instead, collapse a completion (DELETED) into the terminal APPLIED status while
+        // keeping the content-hash version. This makes the agent keep reporting
+        // {name, version=<hash>, status=APPLIED}, so the server records a meaningful
+        // terminal status and stops re-delivering. A prior FAILED status is preserved
+        // (a failed onetime must not be reported as successfully applied).
+        if (status == ConfigFeedbackStatus::DELETED && info->second.status != ConfigFeedbackStatus::FAILED) {
+            info->second.status = ConfigFeedbackStatus::APPLIED;
+        } else {
+            info->second.status = status;
+        }
     }
     LOG_DEBUG(
         sLogger,

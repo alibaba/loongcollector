@@ -96,6 +96,7 @@ void BatchedEvents::Clear() {
     mSourceBuffers.clear();
     mSizeBytes = 0;
     mExactlyOnceCheckpoint.reset();
+    mFileSendCheckpoint.reset();
     mPackIdPrefix = StringView();
 }
 

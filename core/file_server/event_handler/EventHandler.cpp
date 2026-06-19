@@ -28,6 +28,7 @@
 #include "file_server/ConfigManager.h"
 #include "file_server/EventDispatcher.h"
 #include "file_server/FileServer.h"
+#include "file_server/checkpoint/FileSendCheckpoint.h"
 #include "file_server/event/BlockEventManager.h"
 #include "file_server/event_handler/LogInput.h"
 #include "logger/Logger.h"
@@ -816,6 +817,9 @@ void ModifyHandler::Handle(const Event& event) {
 
         bool hasMoreData;
         do {
+            // If a flusher reported a terminal send failure for this file, rewind the read cursor to
+            // the last committed offset so the read-but-unconfirmed range is re-read (deferred commit).
+            reader->ConsumeCommitRollbackAndRewind();
             if (!ProcessQueueManager::GetInstance()->IsValidToPush(reader->GetQueueKey())) {
                 static int32_t s_lastOutPutTime = 0;
                 int32_t curTime = time(NULL);
@@ -1197,10 +1201,13 @@ bool ModifyHandler::RemoveReaderFromArrayAndMap(LogFileReaderPtr expectedReader,
 }
 
 void ModifyHandler::ForceReadLogAndPush(LogFileReaderPtr reader) {
-    auto logBuffer = make_unique<LogBuffer>();
-    auto pEvent = reader->CreateFlushTimeoutEvent();
-    reader->ReadLog(*logBuffer, pEvent.get());
-    PushLogToProcessor(reader, logBuffer.get(), true);
+    bool moreData;
+    do {
+        auto logBuffer = make_unique<LogBuffer>();
+        auto pEvent = reader->CreateFlushTimeoutEvent();
+        moreData = reader->ReadLog(*logBuffer, pEvent.get());
+        PushLogToProcessor(reader, logBuffer.get(), true);
+    } while (moreData);
 }
 
 int32_t ModifyHandler::PushLogToProcessor(LogFileReaderPtr reader, LogBuffer* logBuffer, bool dropIfBlocked) {
@@ -1208,6 +1215,19 @@ int32_t ModifyHandler::PushLogToProcessor(LogFileReaderPtr reader, LogBuffer* lo
     if (!logBuffer->rawBuffer.empty()) {
         reader->ReportMetrics(logBuffer->readLength);
         PipelineEventGroup group = LogFileReader::GenerateEventGroup(reader, logBuffer);
+        // Deferred (send-confirmed) commit: attach a send token carrying the read unit's end offset
+        // so the file checkpoint is advanced only after the flusher confirms delivery. Readers with
+        // deferred commit disabled (Go pipeline / exactly-once) keep the legacy read-time commit.
+        FileSendCheckpointPtr fileCpt;
+        if (reader->IsDeferCommit()) {
+            const auto& tracker = reader->GetCommitTracker();
+            uint64_t seq = tracker->RegisterInflight(reader->GetLastFilePos());
+            fileCpt = std::make_shared<FileSendCheckpoint>();
+            fileCpt->mSeq = seq;
+            fileCpt->mEndOffset = static_cast<uint64_t>(reader->GetLastFilePos());
+            fileCpt->mTracker = tracker;
+            group.SetFileSendCheckpoint(fileCpt);
+        }
         auto startTime = dropIfBlocked ? TimeKeeper::GetInstance()->NowSec() : 0;
         static int32_t lastAlarmTime = 0;
 
@@ -1234,6 +1254,11 @@ int32_t ModifyHandler::PushLogToProcessor(LogFileReaderPtr reader, LogBuffer* lo
                                                                    reader->GetProject(),
                                                                    reader->GetConfigName(),
                                                                    reader->GetLogstore());
+                }
+                // the data is intentionally dropped here; confirm the token so the committed offset
+                // advances past it (matching the legacy drop semantics) instead of stalling the file
+                if (fileCpt) {
+                    ConfirmFileSendCheckpoint(fileCpt);
                 }
                 break;
             }

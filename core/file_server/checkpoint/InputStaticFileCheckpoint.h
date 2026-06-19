@@ -54,6 +54,7 @@ public:
 
     const std::string& GetConfigName() const { return mConfigName; }
     size_t GetInputIndex() const { return mInputIdx; }
+    size_t GetCurrentFileIndex() const { return mCurrentFileIndex; }
 
 private:
     std::string mConfigName;

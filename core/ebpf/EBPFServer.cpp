@@ -15,6 +15,8 @@
 #include "ebpf/EBPFServer.h"
 
 #include <cerrno>
+#include <cstring>
+#include <sys/resource.h>
 
 #include <future>
 #include <shared_mutex>
@@ -35,6 +37,7 @@
 #include "logger/Logger.h"
 #include "monitor/metric_models/ReentrantMetricsRecord.h"
 #include "plugin/agentsight/AgentsightManager.h"
+#include "plugin/cpu_profiling/CpuProfilingManager.h"
 #include "plugin/file_security/FileSecurityManager.h"
 #include "plugin/network_observer/NetworkObserverManager.h"
 #include "plugin/network_security/NetworkSecurityManager.h"
@@ -49,6 +52,41 @@ namespace logtail::ebpf {
 static const uint16_t kKernelVersion310 = 3010; // for centos7
 static const std::string kKernelNameCentos = "CentOS";
 static const uint16_t kKernelCentosMinVersion = 7006;
+
+namespace {
+
+// Raise RLIMIT_MEMLOCK to RLIM_INFINITY for the whole process before any eBPF map / program is
+// created. Centralised here so every eBPF plugin (driver-based ones via start_plugin and
+// AgentSight via libagentsight FFI) shares the same one-shot setup. setrlimit is per-process, so
+// a single successful call covers all subsequent BPF loads regardless of which plugin triggers
+// them.
+//
+// Notes:
+// - Idempotent: extra calls are cheap and have no side effects.
+// - Requires CAP_SYS_RESOURCE to raise the hard limit above what the container runtime / systemd
+//   inherited; failure (EPERM) is logged but not fatal — modern kernels (>= 5.11) account BPF
+//   memory via memcg, so a low memlock hard limit alone usually does not block BPF loading.
+// - Diagnostic: success path also logs the effective rlim_cur/rlim_max via getrlimit so operators
+//   can tell whether the bump was clamped by an upper limit (e.g. dockerd default ulimit).
+void BumpMemlockRlimit() {
+    struct rlimit rlimNew = {RLIM_INFINITY, RLIM_INFINITY};
+    if (setrlimit(RLIMIT_MEMLOCK, &rlimNew) != 0) {
+        const int err = errno;
+        LOG_WARNING(
+            sLogger,
+            ("eBPF",
+             "setrlimit(RLIMIT_MEMLOCK, INFINITY) failed; BPF map creation may "
+             "fail on older kernels or memlock-constrained containers")("errno", err)("errstr", std::strerror(err)));
+        return;
+    }
+    struct rlimit rlimCur {};
+    if (getrlimit(RLIMIT_MEMLOCK, &rlimCur) == 0) {
+        LOG_INFO(sLogger,
+                 ("eBPF", "setrlimit(RLIMIT_MEMLOCK) ok")("rlim_cur", rlimCur.rlim_cur)("rlim_max", rlimCur.rlim_max));
+    }
+}
+
+} // namespace
 
 bool EnvManager::IsSupportedEnv(PluginType type) {
     if (!mInited) {
@@ -65,7 +103,8 @@ bool EnvManager::IsSupportedEnv(PluginType type) {
             break;
         case PluginType::FILE_SECURITY:
         case PluginType::NETWORK_SECURITY:
-        case PluginType::PROCESS_SECURITY: {
+        case PluginType::PROCESS_SECURITY:
+        case PluginType::CPU_PROFILING: {
             status = mArchSupport && mBTFSupport;
             break;
         }
@@ -187,6 +226,8 @@ EBPFServer::EBPFServer()
     mLossKernelEventsTotal = mMetricsRecordRef.CreateCounter(METRIC_RUNNER_EBPF_LOST_KERNEL_EVENTS_TOTAL);
     mConnectionCacheSize = mMetricsRecordRef.CreateIntGauge(METRIC_RUNNER_EBPF_CONNECTION_CACHE_SIZE);
     mPushLogFailedTotal = mMetricsRecordRef.CreateCounter(METRIC_RUNNER_EBPF_LOST_LOG_EVENTS_TOTAL);
+    mCpuProfilingPidMatchCacheSize
+        = mMetricsRecordRef.CreateIntGauge(METRIC_RUNNER_EBPF_CPU_PROFILING_PID_MATCH_CACHE_SIZE);
 
     mProcessCacheManager = std::make_shared<ProcessCacheManager>(mEBPFAdapter,
                                                                  mHostName,
@@ -220,6 +261,12 @@ void EBPFServer::Init() {
     }
     mInited = true;
     mRunning = true;
+
+    // Raise RLIMIT_MEMLOCK once for the whole process before any plugin starts loading BPF
+    // programs/maps. Previously this was duplicated inside eBPFDriver::start_plugin (which the
+    // AgentSight path bypasses) and AgentsightManager::Init; centralising it here covers every
+    // eBPF plugin, driver-based or FFI-based.
+    BumpMemlockRlimit();
 
     AsynCurlRunner::GetInstance()->Init();
     mEBPFAdapter->Init(); // Idempotent; loads optional AgentSight symbols before poller threads run.
@@ -288,10 +335,11 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
                                      uint32_t pluginIndex,
                                      PluginType type,
                                      const logtail::CollectionPipelineContext* ctx,
-                                     const std::variant<SecurityOptions*, ObserverNetworkOption*>& options,
+                                     const PluginOptions& options,
                                      const PluginMetricManagerPtr& metricManager) {
     bool isNeedProcessCache = true;
-    if (type == PluginType::NETWORK_OBSERVE || type == PluginType::AGENTSIGHT_OBSERVE) {
+    if (type == PluginType::NETWORK_OBSERVE || type == PluginType::AGENTSIGHT_OBSERVE
+        || type == PluginType::CPU_PROFILING) {
         isNeedProcessCache = false;
     }
     auto& pluginMgr = getPluginState(type).mManager;
@@ -361,6 +409,15 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
                 }
                 break;
             }
+            case PluginType::CPU_PROFILING: {
+                if (!pluginMgr) {
+                    auto mgr = CpuProfilingManager::Create(
+                        mProcessCacheManager, mEBPFAdapter, mCommonEventQueue, &mEventPool, mHostPathPrefix.string());
+                    mgr->SetMetrics(mRecvKernelEventsTotal, mPushLogFailedTotal, mCpuProfilingPidMatchCacheSize);
+                    pluginMgr = mgr;
+                }
+                break;
+            }
             default:
                 LOG_ERROR(sLogger, ("Unknown plugin type", int(type)));
                 return false;
@@ -388,7 +445,7 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
 
     updatePluginState(type, pipelineName, ctx->GetProjectName(), PluginStateOperation::kAddPipeline, pluginMgr);
     if (type != PluginType::PROCESS_SECURITY && type != PluginType::NETWORK_OBSERVE
-        && type != PluginType::AGENTSIGHT_OBSERVE) {
+        && type != PluginType::AGENTSIGHT_OBSERVE && type != PluginType::CPU_PROFILING) {
         RegisterPluginPerfBuffers(type);
     }
 
@@ -408,7 +465,7 @@ bool EBPFServer::EnablePlugin(const std::string& pipelineName,
                               uint32_t pluginIndex,
                               PluginType type,
                               const CollectionPipelineContext* ctx,
-                              const std::variant<SecurityOptions*, ObserverNetworkOption*>& options,
+                              const PluginOptions& options,
                               const PluginMetricManagerPtr& mgr) {
     if (!IsSupportedEnv(type)) {
         return false;
@@ -583,12 +640,16 @@ void EBPFServer::pollPerfBuffers() {
 
         // TODO (@qianlu.kk) adapt to ConsumePerfBufferData
         {
-            auto& pluginState = getPluginState(PluginType::NETWORK_OBSERVE);
-            if (pluginState.mValid.load(std::memory_order_acquire)) {
+            std::vector<PluginState*> pluginStatePtrs
+                = {&getPluginState(PluginType::NETWORK_OBSERVE), &getPluginState(PluginType::CPU_PROFILING)};
+            for (auto& pluginStatePtr : pluginStatePtrs) {
+                auto& pluginState = *pluginStatePtr;
+                if (!pluginState.mValid.load(std::memory_order_acquire)) {
+                    continue;
+                }
                 std::shared_lock<std::shared_mutex> lock(pluginState.mMtx);
                 if (pluginState.mManager) {
-                    auto* mgr = static_cast<NetworkObserverManager*>(pluginState.mManager.get());
-                    mgr->PollPerfBuffer(0); // 0 means non-blocking
+                    pluginState.mManager->PollPerfBuffer(0); // 0 means non-blocking
                 }
             }
         }

@@ -23,8 +23,8 @@
 namespace logtail {
 
 struct SelfMonitorMetricRule {
-    bool mEnable;
-    size_t mInterval;
+    bool mEnable = true;
+    size_t mIntervalSeconds = 600;
 };
 
 struct SelfMonitorMetricRules {
@@ -45,7 +45,7 @@ public:
     explicit SelfMonitorMetricEvent(MetricsRecord* metricRecord);
     explicit SelfMonitorMetricEvent(const std::map<std::string, std::string>& metricRecord);
 
-    void SetInterval(size_t interval);
+    void SetIntervalSeconds(size_t intervalSeconds);
     void Merge(const SelfMonitorMetricEvent& event);
 
     bool ShouldSend();
@@ -65,8 +65,8 @@ private:
     std::unordered_map<std::string, std::string> mLabels;
     std::unordered_map<std::string, uint64_t> mCounters;
     std::unordered_map<std::string, double> mGauges;
-    int32_t mSendInterval = 0;
-    int32_t mIntervalsSinceLastSend = 0;
+    int32_t mSendIntervalSeconds = 600;
+    int32_t mSecondsSinceLastSend = 0;
     bool mUpdatedFlag = false;
 
 #ifdef APSARA_UNIT_TEST_MAIN

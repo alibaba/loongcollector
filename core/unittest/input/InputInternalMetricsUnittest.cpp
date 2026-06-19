@@ -71,11 +71,11 @@ void InputInternalMetricsUnittest::OnInit() {
             "Type": "input_internal_metrics",
             "Agent": {
                 "Enable": true,
-                "Interval": 1
+                "IntervalSeconds": 15
             },
             "Runner": {
                 "Enable": false,
-                "Interval": 2
+                "IntervalSeconds": 1
             },
             "Pipeline": {
                 "Enable": true,
@@ -103,17 +103,17 @@ void InputInternalMetricsUnittest::OnInit() {
     input->CommitMetricsRecordRef();
     APSARA_TEST_TRUE(input->Start());
     APSARA_TEST_EQUAL(input->mSelfMonitorMetricRules.mAgentMetricsRule.mEnable, true);
-    APSARA_TEST_EQUAL(input->mSelfMonitorMetricRules.mAgentMetricsRule.mInterval, 1);
+    APSARA_TEST_EQUAL(input->mSelfMonitorMetricRules.mAgentMetricsRule.mIntervalSeconds, 15);
     APSARA_TEST_EQUAL(input->mSelfMonitorMetricRules.mComponentMetricsRule.mEnable, false);
-    APSARA_TEST_EQUAL(input->mSelfMonitorMetricRules.mComponentMetricsRule.mInterval, 6);
+    APSARA_TEST_EQUAL(input->mSelfMonitorMetricRules.mComponentMetricsRule.mIntervalSeconds, 360);
     APSARA_TEST_EQUAL(input->mSelfMonitorMetricRules.mPipelineMetricsRule.mEnable, true);
-    APSARA_TEST_EQUAL(input->mSelfMonitorMetricRules.mPipelineMetricsRule.mInterval, 3);
+    APSARA_TEST_EQUAL(input->mSelfMonitorMetricRules.mPipelineMetricsRule.mIntervalSeconds, 180);
     APSARA_TEST_EQUAL(input->mSelfMonitorMetricRules.mPluginMetricsRule.mEnable, true);
-    APSARA_TEST_EQUAL(input->mSelfMonitorMetricRules.mPluginMetricsRule.mInterval, 5);
+    APSARA_TEST_EQUAL(input->mSelfMonitorMetricRules.mPluginMetricsRule.mIntervalSeconds, 300);
     APSARA_TEST_EQUAL(input->mSelfMonitorMetricRules.mPluginSourceMetricsRule.mEnable, true);
-    APSARA_TEST_EQUAL(input->mSelfMonitorMetricRules.mPluginSourceMetricsRule.mInterval, 4);
+    APSARA_TEST_EQUAL(input->mSelfMonitorMetricRules.mPluginSourceMetricsRule.mIntervalSeconds, 240);
     APSARA_TEST_EQUAL(input->mSelfMonitorMetricRules.mRunnerMetricsRule.mEnable, false);
-    APSARA_TEST_EQUAL(input->mSelfMonitorMetricRules.mRunnerMetricsRule.mInterval, 2);
+    APSARA_TEST_EQUAL(input->mSelfMonitorMetricRules.mRunnerMetricsRule.mIntervalSeconds, 15);
     APSARA_TEST_TRUE(input->Stop(true));
 }
 
@@ -161,19 +161,24 @@ void InputInternalMetricsUnittest::OnPipelineUpdate() {
     APSARA_TEST_TRUE(input.Start());
     APSARA_TEST_NOT_EQUAL(nullptr, SelfMonitorServer::GetInstance()->mSelfMonitorMetricRules);
     APSARA_TEST_EQUAL(SelfMonitorServer::GetInstance()->mSelfMonitorMetricRules->mAgentMetricsRule.mEnable, false);
-    APSARA_TEST_EQUAL(SelfMonitorServer::GetInstance()->mSelfMonitorMetricRules->mAgentMetricsRule.mInterval, 7);
+    APSARA_TEST_EQUAL(SelfMonitorServer::GetInstance()->mSelfMonitorMetricRules->mAgentMetricsRule.mIntervalSeconds,
+                      420);
     APSARA_TEST_EQUAL(SelfMonitorServer::GetInstance()->mSelfMonitorMetricRules->mComponentMetricsRule.mEnable, true);
-    APSARA_TEST_EQUAL(SelfMonitorServer::GetInstance()->mSelfMonitorMetricRules->mComponentMetricsRule.mInterval, 12);
+    APSARA_TEST_EQUAL(SelfMonitorServer::GetInstance()->mSelfMonitorMetricRules->mComponentMetricsRule.mIntervalSeconds,
+                      720);
     APSARA_TEST_EQUAL(SelfMonitorServer::GetInstance()->mSelfMonitorMetricRules->mPipelineMetricsRule.mEnable, false);
-    APSARA_TEST_EQUAL(SelfMonitorServer::GetInstance()->mSelfMonitorMetricRules->mPipelineMetricsRule.mInterval, 9);
+    APSARA_TEST_EQUAL(SelfMonitorServer::GetInstance()->mSelfMonitorMetricRules->mPipelineMetricsRule.mIntervalSeconds,
+                      540);
     APSARA_TEST_EQUAL(SelfMonitorServer::GetInstance()->mSelfMonitorMetricRules->mPluginMetricsRule.mEnable, false);
-    APSARA_TEST_EQUAL(SelfMonitorServer::GetInstance()->mSelfMonitorMetricRules->mPluginMetricsRule.mInterval, 11);
+    APSARA_TEST_EQUAL(SelfMonitorServer::GetInstance()->mSelfMonitorMetricRules->mPluginMetricsRule.mIntervalSeconds,
+                      660);
     APSARA_TEST_EQUAL(SelfMonitorServer::GetInstance()->mSelfMonitorMetricRules->mPluginSourceMetricsRule.mEnable,
                       false);
-    APSARA_TEST_EQUAL(SelfMonitorServer::GetInstance()->mSelfMonitorMetricRules->mPluginSourceMetricsRule.mInterval,
-                      10);
+    APSARA_TEST_EQUAL(
+        SelfMonitorServer::GetInstance()->mSelfMonitorMetricRules->mPluginSourceMetricsRule.mIntervalSeconds, 600);
     APSARA_TEST_EQUAL(SelfMonitorServer::GetInstance()->mSelfMonitorMetricRules->mRunnerMetricsRule.mEnable, true);
-    APSARA_TEST_EQUAL(SelfMonitorServer::GetInstance()->mSelfMonitorMetricRules->mRunnerMetricsRule.mInterval, 8);
+    APSARA_TEST_EQUAL(SelfMonitorServer::GetInstance()->mSelfMonitorMetricRules->mRunnerMetricsRule.mIntervalSeconds,
+                      480);
 
     APSARA_TEST_TRUE(input.Stop(true));
     APSARA_TEST_EQUAL(nullptr, SelfMonitorServer::GetInstance()->mSelfMonitorMetricRules);

@@ -21,9 +21,13 @@ target_link_libraries(checkpoint_manager_unittest ${UT_BASE_TARGET})
 add_executable(input_static_file_checkpoint_manager_unittest InputStaticFileCheckpointManagerUnittest.cpp)
 target_link_libraries(input_static_file_checkpoint_manager_unittest ${UT_BASE_TARGET})
 
+add_executable(file_reader_commit_tracker_unittest FileReaderCommitTrackerUnittest.cpp)
+target_link_libraries(file_reader_commit_tracker_unittest ${UT_BASE_TARGET})
+
 # add_executable(checkpoint_manager_v2_unittest CheckpointManagerV2Unittest.cpp)
 # target_link_libraries(checkpoint_manager_v2_unittest ${UT_BASE_TARGET})
 
 include(GoogleTest)
 gtest_discover_tests(checkpoint_manager_unittest)
 gtest_discover_tests(input_static_file_checkpoint_manager_unittest)
+gtest_discover_tests(file_reader_commit_tracker_unittest)

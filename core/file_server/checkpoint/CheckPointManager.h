@@ -18,6 +18,7 @@
 #include <ctime>
 
 #include <memory>
+#include <mutex>
 #include <set>
 #include <string>
 #include <unordered_map>
@@ -53,6 +54,10 @@ public:
     std::string mFileName;
     std::string mResolvedFileName;
     std::string mRealFileName;
+    // Rotation-stable reader source id (embeds a per-reader random UUID). Used to
+    // match Go-plugin confirmed offsets. In-memory only, never persisted, since it
+    // is regenerated on every reader creation.
+    std::string mSourceId;
     int32_t mIdxInReaderArray = LogFileReader::CHECKPOINT_IDX_UNDEFINED;
 
     CheckPoint() {}
@@ -125,6 +130,13 @@ private:
     int32_t mLastDumpTime;
     int32_t mLoadVersion;
     int32_t mReaderCount;
+    std::mutex mGoCheckpointMutex;
+    // key: reader source id (rotation-stable), value: highest confirmed byte offset.
+    // Keyed by source id rather than path so that offsets of different files (and of
+    // a file before/after rotation) never alias. Stale entries are garbage-collected
+    // in ApplyGoConfirmedOffsets when no live checkpoint references them.
+    std::unordered_map<std::string, int64_t> mGoConfirmedOffsets;
+    std::unordered_map<std::string, CheckPoint*> mGoCheckpointSourceIndex;
     CheckPointManager()
         : mLastCheckTime(time(NULL)), mLastDumpTime(time(NULL)), mLoadVersion(NO_CHECKPOINT_VERSION), mReaderCount(0) {}
 
@@ -146,6 +158,14 @@ public:
     bool NeedDump(int32_t curTime);
     void ResetLastDumpTime();
     DevInodeCheckPointHashMap& GetAllFileCheckPoint();
+
+    // Thread-safe: called from Go goroutines after Kafka ACK.
+    void UpdateGoConfirmedOffset(const std::string& sourceId,
+                                const std::string& configName,
+                                const std::string& logPath,
+                                int64_t offset);
+    // Called from file-server thread during checkpoint dump, before writing to disk.
+    void ApplyGoConfirmedOffsets();
 
     static CheckPointManager* Instance() {
         static CheckPointManager checkPointManager;

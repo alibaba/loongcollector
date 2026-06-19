@@ -1,6 +1,6 @@
 syntax = "proto3";
 package configserver.proto.v2;
-option go_package = "/config_server/service/protov2;configserver_proto_v2";
+option go_package = "github.com/alibaba/ilogtail/config_server/proto/v2;protov2";
 
 message AgentGroupTag {
     string name = 1;

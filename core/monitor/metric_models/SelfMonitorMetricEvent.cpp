@@ -127,15 +127,15 @@ void SelfMonitorMetricEvent::CreateKey() {
     mUpdatedFlag = true;
 }
 
-void SelfMonitorMetricEvent::SetInterval(size_t interval) {
-    mIntervalsSinceLastSend = 0;
-    mSendInterval = interval;
+void SelfMonitorMetricEvent::SetIntervalSeconds(size_t intervalSeconds) {
+    mSecondsSinceLastSend = 0;
+    mSendIntervalSeconds = intervalSeconds;
 }
 
 void SelfMonitorMetricEvent::Merge(const SelfMonitorMetricEvent& event) {
-    if (mSendInterval != event.mSendInterval) {
-        mSendInterval = event.mSendInterval;
-        mIntervalsSinceLastSend = 0;
+    if (mSendIntervalSeconds != event.mSendIntervalSeconds) {
+        mSendIntervalSeconds = event.mSendIntervalSeconds;
+        mSecondsSinceLastSend = 0;
     }
     for (auto counter = event.mCounters.begin(); counter != event.mCounters.end(); counter++) {
         if (mCounters.find(counter->first) != mCounters.end()) {
@@ -151,12 +151,12 @@ void SelfMonitorMetricEvent::Merge(const SelfMonitorMetricEvent& event) {
 }
 
 bool SelfMonitorMetricEvent::ShouldSend() {
-    mIntervalsSinceLastSend++;
-    return (mIntervalsSinceLastSend >= mSendInterval) && mUpdatedFlag;
+    mSecondsSinceLastSend += 15;
+    return (mSecondsSinceLastSend >= mSendIntervalSeconds) && mUpdatedFlag;
 }
 
 bool SelfMonitorMetricEvent::ShouldDelete() {
-    return (mIntervalsSinceLastSend >= mSendInterval) && !mUpdatedFlag;
+    return (mSecondsSinceLastSend >= mSendIntervalSeconds) && !mUpdatedFlag;
 }
 
 void SelfMonitorMetricEvent::ReadAsMetricEvent(MetricEvent* metricEventPtr) {
@@ -180,7 +180,7 @@ void SelfMonitorMetricEvent::ReadAsMetricEvent(MetricEvent* metricEventPtr) {
             gauge->first, {UntypedValueMetricType::MetricTypeGauge, gauge->second});
     }
     // set flags
-    mIntervalsSinceLastSend = 0;
+    mSecondsSinceLastSend = 0;
     mUpdatedFlag = false;
 }
 

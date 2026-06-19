@@ -52,3 +52,12 @@ func SendPbV2(configName string, logstore string, pbBuffer []byte, lines int, ha
 func IsValidToSend(logstoreKey int64) bool {
 	return C.LogtailIsValidToSend(C.longlong(logstoreKey)) == 0
 }
+
+func UpdateCheckpoint(configName string, sourceID string, logPath string, offset int64) int {
+	rstVal := C.LogtailUpdateCheckpoint(
+		(*C.char)(util.StringPointer(configName)), C.int(len(configName)),
+		(*C.char)(util.StringPointer(sourceID)), C.int(len(sourceID)),
+		(*C.char)(util.StringPointer(logPath)), C.int(len(logPath)),
+		C.int64_t(offset))
+	return int(rstVal)
+}

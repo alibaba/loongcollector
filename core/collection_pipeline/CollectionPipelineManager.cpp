@@ -58,7 +58,15 @@ void CollectionPipelineManager::UpdatePipelines(CollectionConfigDiff& diff) {
     // other threads only read mPipelineNameEntityMap, so we don't need to lock read here
     for (const auto& name : diff.mRemoved) {
         auto iter = mPipelineNameEntityMap.find(name);
-        bool isOnetime = iter->second->IsOnetime();
+        // Guard against a name in mRemoved that is no longer present in the map
+        // (e.g. it was already erased by a concurrent update path). Dereferencing
+        // iter->second without this check is undefined behavior. This mirrors the
+        // defensive check already present in TaskPipelineManager::UpdatePipelines.
+        if (iter == mPipelineNameEntityMap.end()) {
+            continue;
+        }
+        bool isOnetime = iter->second->IsOnetime()
+            || ConfigFeedbackReceiver::GetInstance().IsOnetimePipelineConfigRegistered(name);
         iter->second->Stop(true);
         iter->second->RemoveProcessQueue();
         {
@@ -76,7 +84,8 @@ void CollectionPipelineManager::UpdatePipelines(CollectionConfigDiff& diff) {
     for (auto& config : diff.mModified) {
         // Save config name and collect input types before BuildPipeline moves config
         const string configName = config.mName;
-        const bool isOnetimeConfig = config.IsOnetime();
+        const bool isOnetimeConfig = config.IsOnetime()
+            || ConfigFeedbackReceiver::GetInstance().IsOnetimePipelineConfigRegistered(configName);
         std::set<std::string> newInputTypes;
         for (const auto& input : config.mInputs) {
             newInputTypes.insert((*input)["Type"].asString());
@@ -133,7 +142,7 @@ void CollectionPipelineManager::UpdatePipelines(CollectionConfigDiff& diff) {
             mPipelineNameEntityMap[configName] = p;
         }
         p->Start();
-        if (p->IsOnetime()) {
+        if (p->IsOnetime() || ConfigFeedbackReceiver::GetInstance().IsOnetimePipelineConfigRegistered(configName)) {
             ConfigFeedbackReceiver::GetInstance().FeedbackOnetimePipelineConfigStatus(configName,
                                                                                       ConfigFeedbackStatus::APPLIED);
         } else {
@@ -143,7 +152,8 @@ void CollectionPipelineManager::UpdatePipelines(CollectionConfigDiff& diff) {
     }
     for (auto& config : diff.mAdded) {
         const string configName = config.mName;
-        const bool isOnetimeConfig = config.IsOnetime();
+        const bool isOnetimeConfig = config.IsOnetime()
+            || ConfigFeedbackReceiver::GetInstance().IsOnetimePipelineConfigRegistered(configName);
         auto p = BuildPipeline(std::move(config));
         if (!p) {
             LOG_WARNING(sLogger,
@@ -171,7 +181,7 @@ void CollectionPipelineManager::UpdatePipelines(CollectionConfigDiff& diff) {
             mPipelineNameEntityMap[configName] = p;
         }
         p->Start();
-        if (p->IsOnetime()) {
+        if (p->IsOnetime() || ConfigFeedbackReceiver::GetInstance().IsOnetimePipelineConfigRegistered(configName)) {
             ConfigFeedbackReceiver::GetInstance().FeedbackOnetimePipelineConfigStatus(configName,
                                                                                       ConfigFeedbackStatus::APPLIED);
         } else {

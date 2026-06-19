@@ -17,6 +17,7 @@
 #pragma once
 
 #include "collection_pipeline/queue/SenderQueueItem.h"
+#include "file_server/checkpoint/FileSendCheckpoint.h"
 #include "file_server/checkpoint/RangeCheckpoint.h"
 
 namespace logtail {
@@ -31,6 +32,8 @@ struct SLSSenderQueueItem : public SenderQueueItem {
     // 2. self telemetry data from C++ pipelines
     std::string mLogstore;
     RangeCheckpointPtr mExactlyOnceCheckpoint;
+    // set for data from the file input with deferred commit; committed on send success
+    FileSendCheckpointPtr mFileSendCheckpoint;
 
     std::string mCurrentDomain;
     std::string mCurrentIP;

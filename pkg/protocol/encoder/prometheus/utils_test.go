@@ -20,6 +20,8 @@ import (
 
 	pb "github.com/VictoriaMetrics/VictoriaMetrics/lib/prompbmarshal"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/alibaba/ilogtail/pkg/models"
 )
 
 // 场景：Prometheus label names 字典序排序
@@ -93,4 +95,33 @@ func BenchmarkLexicographicalSort(b *testing.B) {
 			sort.Strings(stringLabels)
 		}
 	})
+}
+
+// 场景：多值 Metric 展开为多条 Prometheus TimeSeries
+// 因子：包含两个字段 cpu/memory_used_mb 的多值 Metric
+// 预期：genPromRemoteWriteTimeseries 返回两条 TimeSeries，name 分别为 system_cpu / system_memory_used_mb
+func TestGenPromRemoteWriteTimeseries_MultiValue(t *testing.T) {
+	// given
+	multiValues := models.NewMetricMultiValueWithMap(map[string]float64{
+		"cpu":            0.1,
+		"memory_used_mb": 25,
+	})
+	metric := models.NewMultiValuesMetric("system", models.MetricTypeUntyped, models.NewTags(), 1234567890000000, multiValues.Values)
+
+	// when
+	series := genPromRemoteWriteTimeseries(metric)
+
+	// then
+	assert.Equal(t, 2, len(series))
+
+	names := make([]string, 0, len(series))
+	for _, s := range series {
+		for _, l := range s.Labels {
+			if l.Name == metricNameKey {
+				names = append(names, l.Value)
+			}
+		}
+	}
+	sort.Strings(names)
+	assert.Equal(t, []string{"system_cpu", "system_memory_used_mb"}, names)
 }

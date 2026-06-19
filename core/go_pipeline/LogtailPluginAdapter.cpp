@@ -19,6 +19,7 @@
 IsValidToSendFun gAdapterIsValidToSendFun = NULL;
 SendPbFun gAdapterSendPbFun = NULL;
 SendPbV2Fun gAdapterSendPbV2Fun = NULL;
+UpdateCheckpointFun gAdapterUpdateCheckpointFun = NULL;
 
 void RegisterLogtailCallBack(IsValidToSendFun checkFun, SendPbFun sendFun) {
     fprintf(stderr, "[GoPluginAdapter] register fun %p %p\n", checkFun, sendFun);
@@ -31,6 +32,17 @@ void RegisterLogtailCallBackV2(IsValidToSendFun checkFun, SendPbFun sendV1Fun, S
     gAdapterIsValidToSendFun = checkFun;
     gAdapterSendPbFun = sendV1Fun;
     gAdapterSendPbV2Fun = sendV2Fun;
+}
+
+void RegisterLogtailCallBackV3(IsValidToSendFun checkFun,
+                               SendPbFun sendV1Fun,
+                               SendPbV2Fun sendV2Fun,
+                               UpdateCheckpointFun updateCheckpointFun) {
+    fprintf(stderr, "register fun v3 %p %p %p %p\n", checkFun, sendV1Fun, sendV2Fun, updateCheckpointFun);
+    gAdapterIsValidToSendFun = checkFun;
+    gAdapterSendPbFun = sendV1Fun;
+    gAdapterSendPbV2Fun = sendV2Fun;
+    gAdapterUpdateCheckpointFun = updateCheckpointFun;
 }
 
 int LogtailIsValidToSend(long long logstoreKey) {
@@ -69,9 +81,26 @@ int LogtailSendPbV2(const char* configName,
         configName, configNameSize, logstore, logstoreSize, pbBuffer, pbSize, lines, shardHash, shardHashSize);
 }
 
+int LogtailUpdateCheckpoint(const char* configName,
+                            int configNameSize,
+                            const char* sourceId,
+                            int sourceIdSize,
+                            const char* logPath,
+                            int logPathSize,
+                            int64_t offset) {
+    if (gAdapterUpdateCheckpointFun == NULL) {
+        return -1;
+    }
+    return gAdapterUpdateCheckpointFun(
+        configName, configNameSize, sourceId, sourceIdSize, logPath, logPathSize, offset);
+}
+
 // # 300
 //   - Add LogtailSendPbV2.
 //   - Update RegisterLogtailCallBack to register LogtailSendPBV2.
+// # 400
+//   - Add LogtailUpdateCheckpoint.
+//   - Add RegisterLogtailCallBackV3 to register LogtailUpdateCheckpoint.
 int PluginAdapterVersion() {
-    return 300;
+    return 400;
 }

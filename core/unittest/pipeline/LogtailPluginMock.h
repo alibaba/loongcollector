@@ -85,6 +85,25 @@ public:
                                                                                           logGroup)("packId", packId));
     }
 
+    void ProcessPipelineEventGroup(const std::string& configName,
+                                   const std::string& pipelineEventGroup,
+                                   const std::string& packId) {
+        while (processBlockFlag) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+        mLastPipelineEventGroup = pipelineEventGroup;
+        ++mProcessPipelineEventGroupCallCount;
+        LOG_INFO(sLogger,
+                 ("LogtailPluginMock ProcessPipelineEventGroup", "success")("config", configName)("packId", packId));
+    }
+
+    const std::string& GetLastPipelineEventGroup() const { return mLastPipelineEventGroup; }
+    int GetProcessPipelineEventGroupCallCount() const { return mProcessPipelineEventGroupCallCount; }
+    void ResetPipelineEventGroupCounters() {
+        mProcessPipelineEventGroupCallCount = 0;
+        mLastPipelineEventGroup.clear();
+    }
+
     std::string GetAllContainersMeta() const { return mMockContainersMeta; }
     std::string GetDiffContainersMeta() const { return mMockDiffContainersMeta; }
 
@@ -98,6 +117,8 @@ private:
 
     std::string mMockContainersMeta;
     std::string mMockDiffContainersMeta;
+    std::string mLastPipelineEventGroup;
+    std::atomic_int mProcessPipelineEventGroupCallCount{0};
 };
 
 } // namespace logtail

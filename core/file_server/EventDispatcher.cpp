@@ -1025,6 +1025,7 @@ void EventDispatcher::DumpCheckPoint() {
     LOG_INFO(sLogger, ("checkpoint dump", "starts"));
     FileServer::GetInstance()->Pause(false);
     DumpAllHandlersMeta(false);
+    CheckPointManager::Instance()->ApplyGoConfirmedOffsets();
 
     if (!(CheckPointManager::Instance()->DumpCheckPointToLocal()))
         LOG_WARNING(sLogger, ("dump checkpoint to local", "failed"));

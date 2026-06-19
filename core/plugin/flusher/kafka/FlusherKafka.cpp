@@ -25,6 +25,7 @@
 #include "collection_pipeline/queue/SenderQueueManager.h"
 #include "common/ParamExtractor.h"
 #include "common/StringView.h"
+#include "file_server/checkpoint/FileSendCheckpoint.h"
 #include "logger/Logger.h"
 #include "models/LogEvent.h"
 #include "models/PipelineEvent.h"
@@ -169,6 +170,17 @@ bool FlusherKafka::SerializeAndSend(PipelineEventGroup&& group) {
     auto& sourceBuffer = group.GetSourceBuffer();
     auto& checkpoint = group.GetExactlyOnceCheckpoint();
 
+    // file input with deferred commit: track delivery of every message produced for this group;
+    // the sentinel count (1) is released after the produce loop so callbacks that fire early do
+    // not finalize the group prematurely
+    auto fileCpt = group.GetFileSendCheckpoint();
+    std::shared_ptr<GroupAck> ack;
+    if (fileCpt) {
+        ack = std::make_shared<GroupAck>();
+        ack->mFileSendCheckpoint = fileCpt;
+        ack->mRemaining.store(1);
+    }
+
     bool allSuccess = true;
     std::string serializedData;
     std::string errorMsg;
@@ -214,18 +226,48 @@ bool FlusherKafka::SerializeAndSend(PipelineEventGroup&& group) {
         mSendCnt->Add(1);
 
         size_t bytes = serializedData.size();
+        if (ack) {
+            ack->mRemaining.fetch_add(1);
+        }
         mProducer->ProduceAsync(
             topic,
             std::move(serializedData),
-            [this, bytes](bool success, const KafkaProducer::ErrorInfo& errorInfo) {
+            [this, bytes, ack](bool success, const KafkaProducer::ErrorInfo& errorInfo) {
                 if (success) {
                     LOG_DEBUG(mContext->GetLogger(), ("kafka message queued", bytes));
                 }
                 HandleDeliveryResult(success, errorInfo);
+                if (ack) {
+                    if (!success) {
+                        ack->mAllOk.store(false);
+                    }
+                    if (ack->mRemaining.fetch_sub(1) == 1) {
+                        FinalizeGroupAck(ack);
+                    }
+                }
             },
             partitionKey);
     }
+    // release the sentinel; if all callbacks already fired, this finalizes the group
+    if (ack && ack->mRemaining.fetch_sub(1) == 1) {
+        FinalizeGroupAck(ack);
+    }
     return allSuccess;
+}
+
+void FlusherKafka::FinalizeGroupAck(const std::shared_ptr<GroupAck>& ack) {
+    if (!ack || !ack->mFileSendCheckpoint) {
+        return;
+    }
+    const auto& cp = ack->mFileSendCheckpoint;
+    if (ack->mAllOk.load()) {
+        // every message of this group was durably delivered, advance the committed file offset
+        ConfirmFileSendCheckpoint(cp);
+    } else {
+        // a message could not be delivered; request a runtime rewind so the reader re-reads this
+        // unit's offset range from the last committed position (recovered without a restart)
+        ReportFileSendCheckpointFailure(cp);
+    }
 }
 
 void FlusherKafka::HandleDeliveryResult(bool success, const KafkaProducer::ErrorInfo& errorInfo) {

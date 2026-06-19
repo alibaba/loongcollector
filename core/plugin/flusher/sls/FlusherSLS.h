@@ -124,6 +124,9 @@ private:
     bool SerializeAndPush(std::vector<BatchedEventsList>&& groupLists);
     bool SerializeAndPush(BatchedEventsList&& groupList);
     bool SerializeAndPush(PipelineEventGroup&& g); // for exactly once only
+    // for the file input with deferred commit; keeps the group 1:1 with the send item so the
+    // committed file offset can be advanced only after the send succeeds
+    bool SerializeAndPushFileGroup(PipelineEventGroup&& g);
     bool PushToQueue(QueueKey key, std::unique_ptr<SenderQueueItem>&& item, uint32_t retryTimes = 500);
     std::string GetShardHashKey(const BatchedEvents& g) const;
     void AddPackId(BatchedEvents& g) const;

@@ -41,6 +41,8 @@ struct PipelineConfig {
     bool mIsRunningBeforeStart = false;
     bool mForceRerunWhenUpdate = false;
 
+    bool IsOnetime() const { return mOnetimeExpireTime.has_value(); }
+
     PipelineConfig(const std::string& name,
                    std::unique_ptr<Json::Value>&& detail,
                    const std::filesystem::path& filepath);

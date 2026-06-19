@@ -107,6 +107,17 @@ AGENTSIGHT_BUILD_DEPS_EOF
   elif [ $CATEGORY = "e2e" ]; then
     echo "mkdir -p core/build && cd core/build && cmake -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DLOGTAIL_VERSION=${VERSION} -DBUILD_LOGTAIL_UT=${BUILD_LOGTAIL_UT} -DENABLE_COMPATIBLE_MODE=${ENABLE_COMPATIBLE_MODE} -DENABLE_STATIC_LINK_CRT=${ENABLE_STATIC_LINK_CRT} -DWITHOUTGDB=${WITHOUTGDB} -DENABLE_AGENTSIGHT=${ENABLE_AGENTSIGHT} .. && make -sj\$nproc && cd - && ./scripts/plugin_build.sh mod c-shared ${OUT_DIR} ${VERSION} ${PLUGINS_CONFIG_FILE} ${GO_MOD_FILE}" >>$BUILD_SCRIPT_FILE
   fi
+
+  # When BUILD_LOGTAIL_UT=ON, gen_copy_docker.sh copies the entire core/build tree for UT binaries,
+  # so skip cleanup. Otherwise, remove C++ intermediate artifacts (*.o, CMakeFiles) before Docker
+  # commits the layer — this is the main cause of the slow "COMMIT镜像" step at the end of docker build.
+  if [[ "${CATEGORY}" != "plugin" ]] && [[ "${BUILD_LOGTAIL_UT}" != "ON" ]]; then
+    cat >>"$BUILD_SCRIPT_FILE" <<'CLEANUP_EOF'
+# Remove C++ intermediate build artifacts to reduce Docker layer commit size
+find core/build -name "*.o" -delete 2>/dev/null || true
+find core/build -type d -name "CMakeFiles" | xargs rm -rf 2>/dev/null || true
+CLEANUP_EOF
+  fi
 }
 
 function generateCopyScript() {
@@ -126,6 +137,7 @@ function generateCopyScript() {
       if [ "${ENABLE_AGENTSIGHT}" = "ON" ]; then
         echo 'docker cp "$id":/opt/logtail/deps/lib/libagentsight.so $BINDIR' >>$COPY_SCRIPT_FILE
       fi
+      echo 'docker cp "$id":'${PATH_IN_DOCKER}'/core/build/_thirdparty/coolbpf/src/profiler/release/libprofiler.so $BINDIR' >>$COPY_SCRIPT_FILE
     fi
     if [ $BUILD_LOGTAIL_UT = "ON" ]; then
       echo 'docker cp "$id":'${PATH_IN_DOCKER}'/core/build core/build' >>$COPY_SCRIPT_FILE
@@ -142,6 +154,7 @@ function generateCopyScript() {
     if [ "${ENABLE_AGENTSIGHT}" = "ON" ]; then
       echo 'docker cp "$id":/opt/logtail/deps/lib/libagentsight.so $BINDIR' >>$COPY_SCRIPT_FILE
     fi
+    echo 'docker cp "$id":'${PATH_IN_DOCKER}'/core/build/_thirdparty/coolbpf/src/profiler/release/libprofiler.so $BINDIR' >>$COPY_SCRIPT_FILE
     if [ $BUILD_LOGTAIL_UT = "ON" ]; then
       echo 'docker cp "$id":'${PATH_IN_DOCKER}'/core/build core/build' >>$COPY_SCRIPT_FILE
       echo 'rm -rf core/protobuf/sls && docker cp "$id":'${PATH_IN_DOCKER}'/core/protobuf/sls core/protobuf/sls' >>$COPY_SCRIPT_FILE

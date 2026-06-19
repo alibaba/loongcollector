@@ -270,6 +270,9 @@ bool CollectionConfig::Parse() {
         if (pluginType.find("_security") != string::npos) {
             hasSecurityInput = true;
         }
+        if (pluginType == "input_internal_metrics" || pluginType == "input_internal_alarms") {
+            mHasSelfMonitorInput = true;
+        }
     }
     // TODO: remove these special restrictions
     if (hasFileInput && (*mDetail)["inputs"].size() > 1) {
@@ -358,11 +361,12 @@ bool CollectionConfig::Parse() {
                 if (isCurrentPluginNative) {
                     if (PluginRegistry::GetInstance()->IsValidGoPlugin(pluginType)) {
                         // TODO: remove these special restrictions
-                        if (!hasFileInput && !hasSecurityInput) {
+                        if (!hasFileInput && !hasSecurityInput && !mHasSelfMonitorInput) {
                             PARAM_ERROR_RETURN(sLogger,
                                                alarm,
                                                "extended processor plugins coexist with native input plugins other "
-                                               "than input_file or input_container_stdio or input_*_security",
+                                               "than input_file or input_container_stdio or input_*_security "
+                                               "or input_internal_*",
                                                noModule,
                                                mName,
                                                mProject,
@@ -487,11 +491,12 @@ bool CollectionConfig::Parse() {
         const string pluginType = it->asString();
         if (PluginRegistry::GetInstance()->IsValidGoPlugin(pluginType)) {
             // TODO: remove these special restrictions
-            if (mHasNativeInput && !hasFileInput && !hasSecurityInput) {
+            if (mHasNativeInput && !hasFileInput && !hasSecurityInput && !mHasSelfMonitorInput) {
                 PARAM_ERROR_RETURN(sLogger,
                                    alarm,
                                    "extended flusher plugins coexist with native input plugins other than "
-                                   "input_file or input_container_stdio or input_*_security",
+                                   "input_file or input_container_stdio or input_*_security "
+                                   "or input_internal_*",
                                    noModule,
                                    mName,
                                    mProject,

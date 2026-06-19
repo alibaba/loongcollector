@@ -38,6 +38,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	converter "github.com/alibaba/ilogtail/pkg/protocol/converter"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
+	flushercheckpoint "github.com/alibaba/ilogtail/plugins/flusher/checkpoint"
 )
 
 const (
@@ -102,6 +103,9 @@ type FlusherHTTP struct {
 
 	queue   chan interface{}
 	counter sync.WaitGroup
+
+	offsets           *flushercheckpoint.Tracker
+	checkpointCommits *flushercheckpoint.Committer
 }
 
 func NewHTTPFlusher() *FlusherHTTP {
@@ -174,6 +178,9 @@ func (f *FlusherHTTP) Init(context pipeline.Context) error {
 		return err
 	}
 
+	f.checkpointCommits = flushercheckpoint.NewCommitter(flushercheckpoint.UpdateFileCheckpoint)
+	f.offsets = flushercheckpoint.NewTracker(f.checkpointCommits.Add)
+
 	if f.QueueCapacity <= 0 {
 		f.QueueCapacity = 1024
 	}
@@ -222,6 +229,7 @@ func (f *FlusherHTTP) IsReady(projectName string, logstoreName string, logstoreK
 
 func (f *FlusherHTTP) Stop() error {
 	f.counter.Wait()
+	f.checkpointCommits.Stop()
 	close(f.queue)
 	return nil
 }
@@ -416,6 +424,8 @@ func (f *FlusherHTTP) convertAndFlush(data interface{}) error {
 	defer f.countDownTask()
 	var logs interface{}
 	var varValues []map[string]string
+	var sourceID, logPath string
+	var checkpointGroup *flushercheckpoint.Group
 	var err error
 	switch v := data.(type) {
 	case *protocol.LogGroup:
@@ -427,7 +437,13 @@ func (f *FlusherHTTP) convertAndFlush(data interface{}) error {
 				return nil
 			}
 		}
+		sourceID = v.Group.GetMetadata().Get(flushercheckpoint.MetaKeySourceID)
+		logPath = v.Group.GetMetadata().Get(flushercheckpoint.MetaKeyLogFilePath)
 		logs, varValues, err = f.converter.ToByteStreamWithSelectedFieldsV2(v, f.varKeys)
+		if rows, ok := logs.([][]byte); ok {
+			checkpointGroup = flushercheckpoint.BuildGroup(
+				f.offsets, sourceID, f.context.GetConfigName(), logPath, v, len(rows))
+		}
 	default:
 		return fmt.Errorf("unsupport data type")
 	}
@@ -442,14 +458,20 @@ func (f *FlusherHTTP) convertAndFlush(data interface{}) error {
 			body, values := data, varValues[idx]
 			err = f.flushWithRetry(body, values)
 			if err != nil {
+				f.offsets.Fail(sourceID, checkpointGroup)
 				logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "http flusher failed flush data after retry, data dropped, error", err)
+			} else {
+				f.offsets.Ack(sourceID, checkpointGroup)
 			}
 		}
 		return nil
 	case []byte:
 		err = f.flushWithRetry(rows, nil)
 		if err != nil {
+			f.offsets.Fail(sourceID, checkpointGroup)
 			logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "http flusher failed flush data after retry, error", err)
+		} else {
+			f.offsets.Ack(sourceID, checkpointGroup)
 		}
 		return err
 	default:

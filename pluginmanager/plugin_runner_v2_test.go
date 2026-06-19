@@ -78,3 +78,104 @@ type mockPipelineCollector struct {
 func (m *mockPipelineCollector) Collect(groupInfo *models.GroupInfo, eventList ...models.PipelineEvent) {
 	m.ctx.logs = append(m.ctx.logs, models.PipelineGroupEvents{Group: groupInfo, Events: eventList})
 }
+
+func TestPluginV2Runner_ReceivePipelineEventGroup_MetricMultiValue(t *testing.T) {
+	src := &protocol.PipelineEventGroup{
+		Tags: map[string][]byte{"env": []byte("test")},
+		PipelineEvents: &protocol.PipelineEventGroup_Metrics{
+			Metrics: &protocol.PipelineEventGroup_MetricEvents{
+				Events: []*protocol.MetricEvent{
+					{
+						Timestamp: 1700000001,
+						Name:      []byte("system_metrics"),
+						Value: &protocol.MetricEvent_UntypedMultiDoubleValues{
+							UntypedMultiDoubleValues: &protocol.UntypedMultiDoubleValues{
+								Values: map[string]*protocol.UntypedMultiDoubleValue{
+									"cpu": {Value: 0.6},
+									"mem": {Value: 1024.0},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	ctx := &mockContect{}
+	p := &pluginv2Runner{
+		InputPipeContext: ctx,
+	}
+
+	p.ReceivePipelineEventGroup(src, nil)
+
+	assert.Len(t, ctx.logs, 1)
+	assert.Len(t, ctx.logs[0].Events, 1)
+	metric, ok := ctx.logs[0].Events[0].(*models.Metric)
+	assert.True(t, ok)
+	assert.Equal(t, "system_metrics", metric.GetName())
+	assert.Equal(t, "test", ctx.logs[0].Group.Tags.Get("env"))
+}
+
+func TestPluginV2Runner_ReceivePipelineEventGroup_Span(t *testing.T) {
+	src := &protocol.PipelineEventGroup{
+		PipelineEvents: &protocol.PipelineEventGroup_Spans{
+			Spans: &protocol.PipelineEventGroup_SpanEvents{
+				Events: []*protocol.SpanEvent{
+					{
+						Name:      []byte("http.request"),
+						TraceID:   []byte("trace-001"),
+						SpanID:    []byte("span-001"),
+						StartTime: 1700000003000000000,
+						EndTime:   1700000003500000000,
+					},
+				},
+			},
+		},
+	}
+
+	ctx := &mockContect{}
+	p := &pluginv2Runner{
+		InputPipeContext: ctx,
+	}
+
+	p.ReceivePipelineEventGroup(src, nil)
+
+	assert.Len(t, ctx.logs, 1)
+	assert.Len(t, ctx.logs[0].Events, 1)
+	span, ok := ctx.logs[0].Events[0].(*models.Span)
+	assert.True(t, ok)
+	assert.Equal(t, "http.request", span.GetName())
+	assert.Equal(t, "trace-001", span.GetTraceID())
+}
+
+func TestPluginV2Runner_ReceivePipelineEventGroup_Log(t *testing.T) {
+	src := &protocol.PipelineEventGroup{
+		PipelineEvents: &protocol.PipelineEventGroup_Logs{
+			Logs: &protocol.PipelineEventGroup_LogEvents{
+				Events: []*protocol.LogEvent{
+					{
+						Timestamp: 1700000004,
+						Contents: []*protocol.LogEvent_Content{
+							{Key: []byte("level"), Value: []byte("INFO")},
+							{Key: []byte("msg"), Value: []byte("startup complete")},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	ctx := &mockContect{}
+	p := &pluginv2Runner{
+		InputPipeContext: ctx,
+	}
+
+	p.ReceivePipelineEventGroup(src, nil)
+
+	assert.Len(t, ctx.logs, 1)
+	assert.Len(t, ctx.logs[0].Events, 1)
+	log, ok := ctx.logs[0].Events[0].(*models.Log)
+	assert.True(t, ok)
+	assert.Equal(t, "startup complete", log.Contents.Get("msg"))
+}

@@ -19,7 +19,6 @@
 #include <fstream>
 #include <string>
 #include <thread>
-
 #include "app_config/AppConfig.h"
 #include "common/FileSystemUtil.h"
 #include "common/Flags.h"
@@ -50,16 +49,27 @@ bool CheckPointManager::CheckVersion() {
 void CheckPointManager::AddCheckPoint(CheckPoint* checkPointPtr) {
     DevInodeCheckPointHashMap::iterator it
         = mDevInodeCheckPointPtrMap.find(CheckPointKey(checkPointPtr->mDevInode, checkPointPtr->mConfigName));
-    if (it != mDevInodeCheckPointPtrMap.end())
+    if (it != mDevInodeCheckPointPtrMap.end()) {
+        if (!it->second->mSourceId.empty()) {
+            mGoCheckpointSourceIndex.erase(it->second->mSourceId);
+        }
         mDevInodeCheckPointPtrMap.erase(it);
+    }
+    if (!checkPointPtr->mSourceId.empty()) {
+        mGoCheckpointSourceIndex[checkPointPtr->mSourceId] = checkPointPtr;
+    }
     mDevInodeCheckPointPtrMap.insert(std::make_pair<CheckPointKey, CheckPointPtr>(
         CheckPointKey(checkPointPtr->mDevInode, checkPointPtr->mConfigName), CheckPointPtr(checkPointPtr)));
 }
 
 void CheckPointManager::DeleteCheckPoint(DevInode devInode, const std::string& configName) {
     DevInodeCheckPointHashMap::iterator it = mDevInodeCheckPointPtrMap.find(CheckPointKey(devInode, configName));
-    if (it != mDevInodeCheckPointPtrMap.end())
+    if (it != mDevInodeCheckPointPtrMap.end()) {
+        if (!it->second->mSourceId.empty()) {
+            mGoCheckpointSourceIndex.erase(it->second->mSourceId);
+        }
         mDevInodeCheckPointPtrMap.erase(it);
+    }
 }
 
 bool CheckPointManager::GetCheckPoint(DevInode devInode, const std::string& configName, CheckPointPtr& checkPointPtr) {
@@ -502,6 +512,46 @@ void CheckPointManager::CheckTimeoutCheckPoint() {
 void CheckPointManager::RemoveAllCheckPoint() {
     mDirNameMap.clear();
     mDevInodeCheckPointPtrMap.clear();
+    mGoCheckpointSourceIndex.clear();
+}
+
+void CheckPointManager::UpdateGoConfirmedOffset(const std::string& sourceId,
+                                                const std::string& configName,
+                                                const std::string& logPath,
+                                                int64_t offset) {
+    if (sourceId.empty()) {
+        return;
+    }
+    std::lock_guard<std::mutex> lock(mGoCheckpointMutex);
+    auto it = mGoConfirmedOffsets.find(sourceId);
+    // Go already reports a monotonically increasing contiguous low-water mark per
+    // source; the max guard only defends against reordered cgo calls.
+    if (it == mGoConfirmedOffsets.end() || it->second < offset) {
+        mGoConfirmedOffsets[sourceId] = offset;
+    }
+}
+
+void CheckPointManager::ApplyGoConfirmedOffsets() {
+    std::lock_guard<std::mutex> lock(mGoCheckpointMutex);
+    if (mGoConfirmedOffsets.empty()) {
+        return;
+    }
+    // Clamp only sources that Go reported, using the source index built while
+    // dumping handler metadata. This avoids scanning every checkpoint on each dump.
+    for (auto it = mGoConfirmedOffsets.begin(); it != mGoConfirmedOffsets.end();) {
+        auto sourceIt = mGoCheckpointSourceIndex.find(it->first);
+        if (sourceIt == mGoCheckpointSourceIndex.end()) {
+            it = mGoConfirmedOffsets.erase(it);
+            continue;
+        }
+        auto* cpt = sourceIt->second;
+        // Never read past data that Kafka has not confirmed: pull the read position
+        // back to the confirmed offset when it is ahead of it.
+        if (it->second < cpt->mOffset) {
+            cpt->mOffset = it->second;
+        }
+        ++it;
+    }
 }
 
 boost::optional<std::string> SearchFilePathByDevInodeInDirectory(const std::string& baseDirPath,

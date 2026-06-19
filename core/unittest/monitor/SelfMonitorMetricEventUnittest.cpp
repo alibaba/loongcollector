@@ -161,8 +161,8 @@ void SelfMonitorMetricEventUnittest::TestMerge() {
         SelfMonitorMetricEvent event1;
         SelfMonitorMetricEvent event2;
 
-        event1.SetInterval(5);
-        event2.SetInterval(10);
+        event1.SetIntervalSeconds(75);
+        event2.SetIntervalSeconds(150);
 
         event1.mCounters["counter1"] = 100;
         event2.mCounters["counter1"] = 200;
@@ -170,8 +170,8 @@ void SelfMonitorMetricEventUnittest::TestMerge() {
         event1.Merge(event2);
 
         // 检验间隔是否被设置为 event2 的间隔
-        APSARA_TEST_EQUAL(0, event1.mIntervalsSinceLastSend);
-        APSARA_TEST_EQUAL(10, event1.mSendInterval);
+        APSARA_TEST_EQUAL(0, event1.mSecondsSinceLastSend);
+        APSARA_TEST_EQUAL(150, event1.mSendIntervalSeconds);
         // 检验计数器是否正确合并
         APSARA_TEST_EQUAL(300, event1.mCounters["counter1"]);
     }
@@ -184,7 +184,7 @@ void SelfMonitorMetricEventUnittest::TestSendInterval() {
     mMetricEvent = mEventGroup->CreateMetricEvent();
 
     event.mUpdatedFlag = true;
-    event.SetInterval(3);
+    event.SetIntervalSeconds(45);
     APSARA_TEST_FALSE(event.ShouldSend());
     APSARA_TEST_FALSE(event.ShouldDelete());
     APSARA_TEST_FALSE(event.ShouldSend()); // 模拟两次调用，间隔计数为2

@@ -28,6 +28,8 @@ public:
     void TestDumpCheckpoints() const;
     void TestInvalidCheckpointFile() const;
     void TestSizeRemainsConstant() const;
+    void TestDeferredCommit() const;
+    void TestRollbackOnSendFailure() const;
 
 protected:
     void SetUp() override {
@@ -39,6 +41,7 @@ protected:
     void TearDown() override {
         sManager->ClearUnusedCheckpoints();
         sManager->mInputCheckpointMap.clear();
+        sManager->mInflightMap.clear();
         filesystem::remove_all(sManager->mCheckpointRootPath);
     }
 
@@ -678,12 +681,121 @@ void InputStaticFileCheckpointManagerUnittest::TestSizeRemainsConstant() const {
     filesystem::remove_all("test_logs");
 }
 
+void InputStaticFileCheckpointManagerUnittest::TestDeferredCommit() const {
+    filesystem::create_directories("test_logs");
+    vector<filesystem::path> files{"./test_logs/test_file_1.log", "./test_logs/test_file_2.log"};
+    // file 0 size = 2001, file 1 size = 201
+    vector<string> contents{string(2000, 'a') + "\n", string(200, 'b') + "\n"};
+    for (size_t i = 0; i < files.size(); ++i) {
+        ofstream fout(files[i], std::ios_base::binary);
+        fout << contents[i];
+    }
+
+    optional<vector<filesystem::path>> filesOpt({files[0], files[1]});
+    APSARA_TEST_TRUE(sManager->CreateCheckpoint("test_config", 0, filesOpt));
+    const auto& cpt = sManager->mInputCheckpointMap.at(make_pair("test_config", 0));
+
+    // initial committed file index is 0
+    size_t committedIdx = 99;
+    APSARA_TEST_TRUE(sManager->GetCommittedFileIndex("test_config", 0, &committedIdx));
+    APSARA_TEST_EQUAL(0U, committedIdx);
+
+    // register three read units within file 0
+    uint64_t seq0 = sManager->RegisterInflight("test_config", 0, 500);
+    uint64_t seq1 = sManager->RegisterInflight("test_config", 0, 1000);
+    uint64_t seq2 = sManager->RegisterInflight("test_config", 0, 2001); // EOF of file 0
+    APSARA_TEST_EQUAL(0U, seq0);
+    APSARA_TEST_EQUAL(1U, seq1);
+    APSARA_TEST_EQUAL(2U, seq2);
+
+    // confirming out of order must not advance past an unconfirmed earlier unit
+    sManager->ConfirmSent("test_config", 0, seq1);
+    APSARA_TEST_EQUAL(0U, cpt.mFileCheckpoints[0].mOffset);
+
+    // confirming the first unit flushes both consecutively-confirmed units
+    sManager->ConfirmSent("test_config", 0, seq0);
+    APSARA_TEST_EQUAL(1000U, cpt.mFileCheckpoints[0].mOffset);
+    APSARA_TEST_EQUAL(0U, cpt.mCurrentFileIndex); // still reading file 0
+
+    // confirming the EOF unit finishes file 0 and advances the committed file index
+    sManager->ConfirmSent("test_config", 0, seq2);
+    APSARA_TEST_EQUAL(1U, cpt.mCurrentFileIndex);
+    APSARA_TEST_TRUE(sManager->GetCommittedFileIndex("test_config", 0, &committedIdx));
+    APSARA_TEST_EQUAL(1U, committedIdx);
+
+    // confirming an unknown / already-committed seq is a no-op
+    sManager->ConfirmSent("test_config", 0, seq0);
+    APSARA_TEST_EQUAL(1U, cpt.mCurrentFileIndex);
+
+    filesystem::remove_all("test_logs");
+}
+
+void InputStaticFileCheckpointManagerUnittest::TestRollbackOnSendFailure() const {
+    filesystem::create_directories("test_logs");
+    vector<filesystem::path> files{"./test_logs/test_file_1.log"};
+    vector<string> contents{string(2000, 'a') + "\n"}; // file 0 size = 2001
+    for (size_t i = 0; i < files.size(); ++i) {
+        ofstream fout(files[i], std::ios_base::binary);
+        fout << contents[i];
+    }
+
+    optional<vector<filesystem::path>> filesOpt({files[0]});
+    APSARA_TEST_TRUE(sManager->CreateCheckpoint("test_config", 0, filesOpt));
+    const auto& cpt = sManager->mInputCheckpointMap.at(make_pair("test_config", 0));
+
+    // register three read units within file 0
+    uint64_t seq0 = sManager->RegisterInflight("test_config", 0, 500);
+    uint64_t seq1 = sManager->RegisterInflight("test_config", 0, 1000);
+    uint64_t seq2 = sManager->RegisterInflight("test_config", 0, 1500);
+    APSARA_TEST_EQUAL(0U, seq0);
+    APSARA_TEST_EQUAL(1U, seq1);
+    APSARA_TEST_EQUAL(2U, seq2);
+
+    // commit the first unit, then the second unit's send fails
+    sManager->ConfirmSent("test_config", 0, seq0);
+    APSARA_TEST_EQUAL(500U, cpt.mFileCheckpoints[0].mOffset);
+    sManager->ReportSendFailure("test_config", 0, seq1);
+
+    // the reader thread consumes the rollback: all in-flight units are dropped and the committed
+    // offset is left at the last confirmed position (500)
+    APSARA_TEST_TRUE(sManager->ConsumeRollback("test_config", 0));
+    APSARA_TEST_EQUAL(500U, cpt.mFileCheckpoints[0].mOffset);
+    {
+        const auto& state = sManager->mInflightMap.at(make_pair("test_config", 0));
+        APSARA_TEST_TRUE(state.pending.empty());
+        // nextSeq stays monotonic; commitSeq jumps to nextSeq so post-rollback units start fresh
+        APSARA_TEST_EQUAL(3U, state.nextSeq);
+        APSARA_TEST_EQUAL(3U, state.commitSeq);
+    }
+
+    // a second ConsumeRollback without a new failure is a no-op
+    APSARA_TEST_FALSE(sManager->ConsumeRollback("test_config", 0));
+
+    // a stale confirm for an abandoned pre-rollback seq must not advance the committed offset
+    sManager->ConfirmSent("test_config", 0, seq2);
+    APSARA_TEST_EQUAL(500U, cpt.mFileCheckpoints[0].mOffset);
+
+    // re-read after rollback: the first new unit re-covers offset 500 and commits normally
+    uint64_t seq3 = sManager->RegisterInflight("test_config", 0, 1000);
+    APSARA_TEST_EQUAL(3U, seq3);
+    sManager->ConfirmSent("test_config", 0, seq3);
+    APSARA_TEST_EQUAL(1000U, cpt.mFileCheckpoints[0].mOffset);
+
+    // reporting a failure for an already-committed seq is a stale no-op (no rollback requested)
+    sManager->ReportSendFailure("test_config", 0, seq3);
+    APSARA_TEST_FALSE(sManager->ConsumeRollback("test_config", 0));
+
+    filesystem::remove_all("test_logs");
+}
+
 UNIT_TEST_CASE(InputStaticFileCheckpointManagerUnittest, TestUpdateCheckpointMap)
 UNIT_TEST_CASE(InputStaticFileCheckpointManagerUnittest, TestUpdateCheckpoint)
 UNIT_TEST_CASE(InputStaticFileCheckpointManagerUnittest, TestCheckpointFileNames)
 UNIT_TEST_CASE(InputStaticFileCheckpointManagerUnittest, TestDumpCheckpoints)
 UNIT_TEST_CASE(InputStaticFileCheckpointManagerUnittest, TestInvalidCheckpointFile)
 UNIT_TEST_CASE(InputStaticFileCheckpointManagerUnittest, TestSizeRemainsConstant)
+UNIT_TEST_CASE(InputStaticFileCheckpointManagerUnittest, TestDeferredCommit)
+UNIT_TEST_CASE(InputStaticFileCheckpointManagerUnittest, TestRollbackOnSendFailure)
 
 } // namespace logtail
 

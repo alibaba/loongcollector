@@ -168,6 +168,7 @@ bool InputStaticFileCheckpointManager::DeleteCheckpoint(const string& configName
         it->second.SetAbort();
         mInputCheckpointMap.erase(it);
     }
+    mInflightMap.erase(make_pair(configName, idx));
 
     error_code ec;
     if (!filesystem::remove(mCheckpointRootPath / GetCheckpointFileName(configName, idx), ec)) {
@@ -188,6 +189,12 @@ bool InputStaticFileCheckpointManager::UpdateCurrentFileCheckpoint(const string&
                                                                    size_t idx,
                                                                    uint64_t offset) {
     lock_guard<mutex> lock(mUpdateMux);
+    return UpdateCurrentFileCheckpointLocked(configName, idx, offset);
+}
+
+bool InputStaticFileCheckpointManager::UpdateCurrentFileCheckpointLocked(const string& configName,
+                                                                         size_t idx,
+                                                                         uint64_t offset) {
     auto it = mInputCheckpointMap.find(make_pair(configName, idx));
     if (it == mInputCheckpointMap.end()) {
         // should not happen
@@ -208,6 +215,95 @@ bool InputStaticFileCheckpointManager::UpdateCurrentFileCheckpoint(const string&
     }
     return true;
 }
+
+uint64_t InputStaticFileCheckpointManager::RegisterInflight(const string& configName, size_t idx, uint64_t endOffset) {
+    lock_guard<mutex> lock(mUpdateMux);
+    auto& state = mInflightMap[make_pair(configName, idx)];
+    uint64_t seq = state.nextSeq++;
+    state.pending.emplace(seq, make_pair(endOffset, false));
+    return seq;
+}
+
+void InputStaticFileCheckpointManager::ConfirmSent(const string& configName, size_t idx, uint64_t seq) {
+    lock_guard<mutex> lock(mUpdateMux);
+    auto stateIt = mInflightMap.find(make_pair(configName, idx));
+    if (stateIt == mInflightMap.end()) {
+        // input may have been deleted; nothing to commit
+        return;
+    }
+    auto& state = stateIt->second;
+    auto pendingIt = state.pending.find(seq);
+    if (pendingIt == state.pending.end()) {
+        // already committed or unknown seq, ignore
+        return;
+    }
+    pendingIt->second.second = true; // mark confirmed
+    // advance the committed offset through consecutively confirmed read units, so the
+    // persisted offset never jumps over data whose delivery has not been acknowledged
+    while (true) {
+        auto it = state.pending.find(state.commitSeq);
+        if (it == state.pending.end() || !it->second.second) {
+            break;
+        }
+        UpdateCurrentFileCheckpointLocked(configName, idx, it->second.first);
+        state.pending.erase(it);
+        ++state.commitSeq;
+    }
+}
+
+void InputStaticFileCheckpointManager::ReportSendFailure(const string& configName, size_t idx, uint64_t seq) {
+    lock_guard<mutex> lock(mUpdateMux);
+    auto stateIt = mInflightMap.find(make_pair(configName, idx));
+    if (stateIt == mInflightMap.end()) {
+        // input may have been deleted; nothing to roll back
+        return;
+    }
+    auto& state = stateIt->second;
+    if (state.pending.find(seq) == state.pending.end()) {
+        // the unit was already committed (or cleared by a previous rollback); this is a stale
+        // failure report, ignore it
+        return;
+    }
+    state.rollbackRequested = true;
+    LOG_WARNING(sLogger,
+                ("send finally failed, will rewind reader to last committed offset",
+                 "")("config", configName)("input idx", idx)("failed seq", seq));
+}
+
+bool InputStaticFileCheckpointManager::ConsumeRollback(const string& configName, size_t idx) {
+    lock_guard<mutex> lock(mUpdateMux);
+    auto stateIt = mInflightMap.find(make_pair(configName, idx));
+    if (stateIt == mInflightMap.end()) {
+        return false;
+    }
+    auto& state = stateIt->second;
+    if (!state.rollbackRequested) {
+        return false;
+    }
+    // Drop every in-flight unit so its offset range is re-read. We do NOT reset nextSeq: keeping
+    // it monotonic guarantees that read units registered after the rollback receive sequence
+    // numbers strictly greater than any pre-rollback unit, so a late-arriving (stale) ConfirmSent
+    // for an abandoned seq can never collide with a post-rollback unit. commitSeq jumps to nextSeq
+    // because the next unit to be committed is the first one registered after this rollback.
+    state.pending.clear();
+    state.commitSeq = state.nextSeq;
+    state.rollbackRequested = false;
+    return true;
+}
+
+bool InputStaticFileCheckpointManager::GetCommittedFileIndex(const string& configName, size_t idx, size_t* fileIndex) {
+    if (!fileIndex) {
+        return false;
+    }
+    lock_guard<mutex> lock(mUpdateMux);
+    auto it = mInputCheckpointMap.find(make_pair(configName, idx));
+    if (it == mInputCheckpointMap.end()) {
+        return false;
+    }
+    *fileIndex = it->second.GetCurrentFileIndex();
+    return true;
+}
+
 
 bool InputStaticFileCheckpointManager::InvalidateCurrentFileCheckpoint(const string& configName, size_t idx) {
     lock_guard<mutex> lock(mUpdateMux);

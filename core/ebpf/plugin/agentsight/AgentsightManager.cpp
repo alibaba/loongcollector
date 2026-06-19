@@ -15,16 +15,19 @@
 #include "ebpf/plugin/agentsight/AgentsightManager.h"
 
 #include <algorithm>
+#include <functional>
 #include <utility>
 #include <vector>
 
 #include "collection_pipeline/queue/ProcessQueueItem.h"
 #include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "common/StringView.h"
+#include "common/UUIDUtil.h"
 #include "common/magic_enum.hpp"
 #include "ebpf/Config.h"
 #include "ebpf/EBPFServer.h"
 #include "ebpf/plugin/agentsight/AgentsightEvents.h"
+#include "ebpf/plugin/agentsight/AgentsightMessageUtil.h"
 #include "ebpf/type/table/BaseElements.h"
 #include "logger/Logger.h"
 #include "models/LogEvent.h"
@@ -125,7 +128,7 @@ static const std::vector<BuiltinCmdlineAllowRule>& GetBuiltinCmdlineAllowRules()
     return kRules;
 }
 
-static const std::vector<const char*>& GetBuiltinDomainAllowRules() {
+static const std::vector<const char*>& GetBuiltinHttpsAllowRules() {
     static const std::vector<const char*> kRules = {
         "api.openai.com",
         "api.anthropic.com",
@@ -141,9 +144,10 @@ void ApplyAgentsightRulesToConfig(AgentsightConfigHandle* cfg,
     // Built-in cmdline rules are injected only when the user did not supply either whitelist
     // or blacklist. Once any user rule is present, we use the user configuration verbatim so
     // strict matching scenarios are not silently broadened.
+    // Http 目标列表为空时不注入默认值，等价于明文 HTTP 采集关闭。
     const bool injectBuiltinCmdlineAllow
         = opts.mAgentsightCmdlineWhitelist.empty() && opts.mAgentsightCmdlineBlacklist.empty();
-    const bool injectBuiltinDomainAllow = opts.mAgentsightDomainWhitelist.empty();
+    const bool injectBuiltinHttpsAllow = opts.mAgentsightHttps.empty();
 
     if (!sym || !sym->config_add_cmdline_rule) {
         LOG_WARNING(sLogger,
@@ -153,12 +157,18 @@ void ApplyAgentsightRulesToConfig(AgentsightConfigHandle* cfg,
                         "user_blacklist_rows", opts.mAgentsightCmdlineBlacklist.size())("builtin_cmdline_injected",
                                                                                         injectBuiltinCmdlineAllow));
     }
-    if (!sym || !sym->config_add_domain_rule) {
+    if (!sym || !sym->config_add_https) {
         LOG_WARNING(
             sLogger,
-            ("AgentSight", "domain rules configured but agentsight_config_add_domain_rule symbol not found; skipping")(
-                "user_domain_rows", opts.mAgentsightDomainWhitelist.size())("builtin_domain_injected",
-                                                                            injectBuiltinDomainAllow));
+            ("AgentSight",
+             "AgentSight https rules configured but agentsight_config_add_https symbol not found; skipping")(
+                "user_https_rows", opts.mAgentsightHttps.size())("builtin_https_injected", injectBuiltinHttpsAllow));
+    }
+    if (!sym || !sym->config_add_http) {
+        LOG_WARNING(sLogger,
+                    ("AgentSight",
+                     "AgentSight http targets configured but agentsight_config_add_http symbol not found; skipping")(
+                        "user_http_rows", opts.mAgentsightHttp.size()));
     }
 
     std::vector<std::pair<std::string, std::vector<std::string>>> allowRowsToApply;
@@ -197,29 +207,225 @@ void ApplyAgentsightRulesToConfig(AgentsightConfigHandle* cfg,
         }
     }
 
-    size_t domainRowsApplied = 0;
-    if (sym && sym->config_add_domain_rule) {
-        if (injectBuiltinDomainAllow) {
-            for (const char* d : GetBuiltinDomainAllowRules()) {
-                sym->config_add_domain_rule(cfg, d);
-                ++domainRowsApplied;
+    size_t httpsRowsApplied = 0;
+    if (sym && sym->config_add_https) {
+        if (injectBuiltinHttpsAllow) {
+            for (const char* d : GetBuiltinHttpsAllowRules()) {
+                sym->config_add_https(cfg, d);
+                ++httpsRowsApplied;
             }
         } else {
-            for (const auto& d : opts.mAgentsightDomainWhitelist) {
-                sym->config_add_domain_rule(cfg, d.c_str());
-                ++domainRowsApplied;
+            for (const auto& d : opts.mAgentsightHttps) {
+                sym->config_add_https(cfg, d.c_str());
+                ++httpsRowsApplied;
             }
         }
     }
 
-    LOG_INFO(sLogger,
-             ("AgentSight", "applied config rules")("user_cmdline_whitelist", opts.mAgentsightCmdlineWhitelist.size())(
-                 "user_cmdline_blacklist", opts.mAgentsightCmdlineBlacklist.size())("builtin_cmdline_allow_injected",
-                                                                                    injectBuiltinCmdlineAllow)(
-                 "cmdline_allow_rows_applied", allowRowsToApply.size())("user_domain_whitelist",
-                                                                        opts.mAgentsightDomainWhitelist.size())(
-                 "builtin_domain_allow_injected", injectBuiltinDomainAllow)("domain_rows_applied", domainRowsApplied)(
-                 "cmdline_api", sym && sym->config_add_cmdline_rule)("domain_api", sym && sym->config_add_domain_rule));
+    size_t httpRowsApplied = 0;
+    if (sym && sym->config_add_http) {
+        for (const auto& t : opts.mAgentsightHttp) {
+            const int rc = sym->config_add_http(cfg, t.c_str());
+            if (rc < 0) {
+                const char* err = sym->last_error ? sym->last_error() : nullptr;
+                LOG_WARNING(sLogger, ("AgentSight http target rejected", t)("last_error", err ? err : ""));
+            } else {
+                ++httpRowsApplied;
+            }
+        }
+    }
+
+    LOG_INFO(
+        sLogger,
+        ("AgentSight", "applied config rules")("user_cmdline_whitelist", opts.mAgentsightCmdlineWhitelist.size())(
+            "user_cmdline_blacklist", opts.mAgentsightCmdlineBlacklist.size())("builtin_cmdline_allow_injected",
+                                                                               injectBuiltinCmdlineAllow)(
+            "cmdline_allow_rows_applied", allowRowsToApply.size())("user_https_rows", opts.mAgentsightHttps.size())(
+            "builtin_https_allow_injected", injectBuiltinHttpsAllow)("https_rows_applied", httpsRowsApplied)(
+            "user_http_rows", opts.mAgentsightHttp.size())("http_rows_applied", httpRowsApplied)(
+            "cmdline_api", sym && sym->config_add_cmdline_rule)("https_api", sym && sym->config_add_https)(
+            "http_api", sym && sym->config_add_http));
+}
+
+using SetLogStrFn = std::function<void(StringView, const std::string&)>;
+
+struct AgentsightLlmEmitPayload {
+    std::string precomputedDelta;
+    std::string systemInstructionsJson;
+    std::string systemInstructionsHash;
+    bool emitSystemInstructions = false;
+    std::string toolDefinitionsHash;
+    bool emitToolDefinitions = false;
+    std::string stepId;
+    size_t eventSequenceRequest = 0;
+    size_t eventSequenceResponse = 0;
+};
+
+void SetLogTimestampFromNs(logtail::LogEvent* log, uint64_t timestampNs) {
+    const auto sec = static_cast<int64_t>(timestampNs / 1000000000ULL);
+    const auto nsec = static_cast<int64_t>(timestampNs % 1000000000ULL);
+    log->SetTimestamp(sec, nsec);
+}
+
+void FillAgentsightOtlpTimeFields(logtail::LogEvent* log, uint64_t timestampNs) {
+    const std::string timestampStr = std::to_string(timestampNs);
+    log->SetContent("time_unix_nano", timestampStr);
+    log->SetContent("observed_time_unix_nano", timestampStr);
+}
+
+void FillAgentsightCommonCorrelation(const AgentsightLlmRecord& rec,
+                                     SetLogStrFn setStr,
+                                     logtail::LogEvent* log,
+                                     const std::string& eventId = {}) {
+    if (!eventId.empty()) {
+        setStr(StringView("event.id"), eventId);
+    }
+    setStr(StringView("gen_ai.session.id"), rec.mSessionId);
+    setStr(StringView("gen_ai.turn.id"), rec.mConversationId);
+    if (rec.mPid != 0) {
+        log->SetContent("pid", std::to_string(rec.mPid));
+    }
+    setStr(StringView("comm"), rec.mProcessName);
+    setStr(StringView("gen_ai.agent.type"), rec.mAgentType);
+}
+
+void FillAgentsightServerFromUrl(const AgentsightLlmRecord& rec, SetLogStrFn setStr) {
+    if (rec.mRequestUrl.empty()) {
+        return;
+    }
+    std::string host;
+    std::string port;
+    if (ParseHostAndPortFromRequestUrl(rec.mRequestUrl, host, port)) {
+        setStr(StringView("server.address"), host);
+        setStr(StringView("server.port"), port);
+    }
+}
+
+void FillAgentsightRequestInputFields(const AgentsightLlmRecord& rec,
+                                      SetLogStrFn setStr,
+                                      bool messageDeltaOnly,
+                                      const AgentsightLlmEmitPayload& payload) {
+    if (!messageDeltaOnly) {
+        setStr(StringView("gen_ai.input.messages"), rec.mRequestMessagesJson);
+    }
+    if (!payload.systemInstructionsHash.empty()) {
+        setStr(StringView("gen_ai.system_instructions_hash"), payload.systemInstructionsHash);
+    }
+    if (payload.emitSystemInstructions) {
+        setStr(StringView("gen_ai.system_instructions"), payload.systemInstructionsJson);
+    }
+    if (!payload.toolDefinitionsHash.empty()) {
+        setStr(StringView("gen_ai.tool.definitions_hash"), payload.toolDefinitionsHash);
+    }
+    if (payload.emitToolDefinitions) {
+        setStr(StringView("gen_ai.tool.definitions"), rec.mToolDefinitionsJson);
+    }
+    setStr(StringView("gen_ai.input.messages_delta"), payload.precomputedDelta);
+}
+
+void FillAgentsightCombinedLlmLog(const AgentsightLlmRecord& rec,
+                                  logtail::LogEvent* log,
+                                  bool messageDeltaOnly,
+                                  const AgentsightLlmEmitPayload& payload) {
+    auto setStr = [&](StringView k, const std::string& v) {
+        if (!v.empty()) {
+            log->SetContent(k, StringView(v.data(), v.size()));
+        }
+    };
+
+    SetLogTimestampFromNs(log, rec.mTimestampNs);
+    FillAgentsightOtlpTimeFields(log, rec.mTimestampNs);
+    FillAgentsightCommonCorrelation(rec, setStr, log);
+    setStr(StringView("gen_ai.response.id"), rec.mResponseId);
+
+    log->SetContent("gen_ai.response.duration", std::to_string(rec.mDurationNs / 1000000ULL));
+
+    FillAgentsightServerFromUrl(rec, setStr);
+
+    log->SetContent("gen_ai.provider.name", rec.mProvider);
+    log->SetContent("gen_ai.request.model", rec.mModel);
+    log->SetContent("status_code", std::to_string(rec.mStatusCode));
+    log->SetContent(StringView("is_sse"), StringView(rec.mIsSse ? "1" : "0"));
+    setStr(StringView("gen_ai.response.finish_reasons"),
+           FormatFinishReasonsJson(rec.mResponseMessagesJson, rec.mFinishReason));
+    log->SetContent(std::string("is_usage_from_api"), std::string(rec.mLlmUsage ? "true" : "false"));
+
+    log->SetContent("gen_ai.usage.input_tokens", std::to_string(rec.mInputTokens));
+    log->SetContent("gen_ai.usage.output_tokens", std::to_string(rec.mOutputTokens));
+    log->SetContent("gen_ai.usage.total_tokens", std::to_string(rec.mTotalTokens));
+    log->SetContent("gen_ai.usage.cache_creation.input_tokens", std::to_string(rec.mCacheCreationInputTokens));
+    log->SetContent("gen_ai.usage.cache_read.input_tokens", std::to_string(rec.mCacheReadInputTokens));
+
+    FillAgentsightRequestInputFields(rec, setStr, messageDeltaOnly, payload);
+    setStr(StringView("gen_ai.output.messages"), rec.mResponseMessagesJson);
+}
+
+void FillAgentsightModelRequestLog(const AgentsightLlmRecord& rec,
+                                   logtail::LogEvent* log,
+                                   bool messageDeltaOnly,
+                                   const AgentsightLlmEmitPayload& payload,
+                                   const std::string& eventId) {
+    auto setStr = [&](StringView k, const std::string& v) {
+        if (!v.empty()) {
+            log->SetContent(k, StringView(v.data(), v.size()));
+        }
+    };
+
+    SetLogTimestampFromNs(log, rec.mTimestampNs);
+    FillAgentsightOtlpTimeFields(log, rec.mTimestampNs);
+    log->SetContent(StringView("event.name"), StringView("gen_ai.model.request"));
+    FillAgentsightCommonCorrelation(rec, setStr, log, eventId);
+
+    FillAgentsightServerFromUrl(rec, setStr);
+
+    log->SetContent("gen_ai.provider.name", rec.mProvider);
+    log->SetContent("gen_ai.request.model", rec.mModel);
+    setStr(StringView("gen_ai.step.id"), payload.stepId);
+    if (payload.eventSequenceRequest > 0) {
+        log->SetContent("gen_ai.event.sequence", std::to_string(payload.eventSequenceRequest));
+    }
+    FillAgentsightRequestInputFields(rec, setStr, messageDeltaOnly, payload);
+}
+
+void FillAgentsightModelResponseLog(const AgentsightLlmRecord& rec,
+                                    logtail::LogEvent* log,
+                                    const AgentsightLlmEmitPayload& payload,
+                                    const std::string& eventId) {
+    auto setStr = [&](StringView k, const std::string& v) {
+        if (!v.empty()) {
+            log->SetContent(k, StringView(v.data(), v.size()));
+        }
+    };
+
+    const uint64_t responseEndNs = rec.mTimestampNs + rec.mDurationNs;
+    SetLogTimestampFromNs(log, responseEndNs);
+    FillAgentsightOtlpTimeFields(log, responseEndNs);
+    log->SetContent(StringView("event.name"), StringView("gen_ai.model.response"));
+    FillAgentsightCommonCorrelation(rec, setStr, log, eventId);
+    setStr(StringView("gen_ai.response.id"), rec.mResponseId);
+    setStr(StringView("gen_ai.step.id"), payload.stepId);
+    if (payload.eventSequenceResponse > 0) {
+        log->SetContent("gen_ai.event.sequence", std::to_string(payload.eventSequenceResponse));
+    }
+
+    log->SetContent("gen_ai.response.duration", std::to_string(rec.mDurationNs / 1000000ULL));
+    log->SetContent("gen_ai.provider.name", rec.mProvider);
+    if (!rec.mModel.empty()) {
+        log->SetContent("gen_ai.response.model", rec.mModel);
+    }
+    log->SetContent("status_code", std::to_string(rec.mStatusCode));
+    log->SetContent(StringView("is_sse"), StringView(rec.mIsSse ? "1" : "0"));
+    setStr(StringView("gen_ai.response.finish_reasons"),
+           FormatFinishReasonsJson(rec.mResponseMessagesJson, rec.mFinishReason));
+    log->SetContent(std::string("is_usage_from_api"), std::string(rec.mLlmUsage ? "true" : "false"));
+
+    log->SetContent("gen_ai.usage.input_tokens", std::to_string(rec.mInputTokens));
+    log->SetContent("gen_ai.usage.output_tokens", std::to_string(rec.mOutputTokens));
+    log->SetContent("gen_ai.usage.total_tokens", std::to_string(rec.mTotalTokens));
+    log->SetContent("gen_ai.usage.cache_creation.input_tokens", std::to_string(rec.mCacheCreationInputTokens));
+    log->SetContent("gen_ai.usage.cache_read.input_tokens", std::to_string(rec.mCacheReadInputTokens));
+
+    setStr(StringView("gen_ai.output.messages"), rec.mResponseMessagesJson);
 }
 
 } // namespace
@@ -227,8 +433,9 @@ void ApplyAgentsightRulesToConfig(AgentsightConfigHandle* cfg,
 AgentsightManager::AgentsightManager(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
                                      const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
                                      moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
-                                     EventPool* pool)
-    : AbstractManager(processCacheManager, eBPFAdapter, queue, pool) {
+                                     EventPool* pool,
+                                     const size_t sessionInputCacheMaxSize)
+    : AbstractManager(processCacheManager, eBPFAdapter, queue, pool), mSessionInputCache(sessionInputCacheMaxSize, 0) {
 }
 
 int AgentsightManager::Init() {
@@ -243,6 +450,10 @@ void AgentsightManager::LogAgentSightError(const char* what) {
     const auto* sym = mEBPFAdapter->GetAgentSightSymbols();
     const char* err = sym && sym->last_error ? sym->last_error() : nullptr;
     LOG_ERROR(sLogger, ("AgentSight", what)("last_error", err ? err : ""));
+}
+
+void AgentsightManager::clearSessionInputState() {
+    mSessionInputCache.clear();
 }
 
 void AgentsightManager::releaseMetricRefs() {
@@ -376,7 +587,7 @@ void AgentsightManager::OnLlmCallback(const AgentsightLLMData* data, void* user_
 int AgentsightManager::AddOrUpdateConfig(const CollectionPipelineContext* ctx,
                                          uint32_t index,
                                          const PluginMetricManagerPtr& metricMgr,
-                                         const std::variant<SecurityOptions*, ObserverNetworkOption*>& opt) {
+                                         const PluginOptions& opt) {
     const auto* secPtr = std::get_if<SecurityOptions*>(&opt);
     if (!secPtr || !*secPtr) {
         LOG_ERROR(sLogger, ("AgentsightManager AddOrUpdateConfig", "invalid options variant"));
@@ -431,6 +642,8 @@ int AgentsightManager::AddOrUpdateConfig(const CollectionPipelineContext* ctx,
     mPluginIndex = index;
     mPipelineCtx = ctx;
     mQueueKey = ctx->GetProcessQueueKey();
+    mEventStreamFormat = sec->mAgentsightEventStreamFormat;
+    mMessageDeltaOnly = sec->mAgentsightMessageDeltaOnly;
 
     if (!RestartAgentSightLocked(*sec)) {
         releaseMetricRefs();
@@ -445,6 +658,7 @@ int AgentsightManager::AddOrUpdateConfig(const CollectionPipelineContext* ctx,
 }
 
 int AgentsightManager::RemoveConfig(const std::string&) {
+    clearSessionInputState();
     std::lock_guard<std::mutex> lock(mLibMutex);
     releaseMetricRefs();
     mRegisteredConfigCount = 0;
@@ -452,11 +666,14 @@ int AgentsightManager::RemoveConfig(const std::string&) {
     mPipelineCtx = nullptr;
     mQueueKey = 0;
     mPluginIndex = 0;
+    mEventStreamFormat = true;
+    mMessageDeltaOnly = true;
     StopAgentSightLocked();
     return 0;
 }
 
 int AgentsightManager::Destroy() {
+    clearSessionInputState();
     std::lock_guard<std::mutex> lock(mLibMutex);
     releaseMetricRefs();
     StopAgentSightLocked();
@@ -465,6 +682,8 @@ int AgentsightManager::Destroy() {
     mPipelineCtx = nullptr;
     mQueueKey = 0;
     mPluginIndex = 0;
+    mEventStreamFormat = true;
+    mMessageDeltaOnly = true;
     mInited = false;
     return 0;
 }
@@ -479,11 +698,18 @@ int AgentsightManager::Suspend() {
     return 0;
 }
 
-int AgentsightManager::update(const std::variant<SecurityOptions*, ObserverNetworkOption*>&) {
+int AgentsightManager::update(const PluginOptions& opt) {
+    const auto* secPtr = std::get_if<SecurityOptions*>(&opt);
+    if (!secPtr || !*secPtr) {
+        return 1;
+    }
+    std::lock_guard<std::mutex> lock(mLibMutex);
+    mEventStreamFormat = (*secPtr)->mAgentsightEventStreamFormat;
+    mMessageDeltaOnly = (*secPtr)->mAgentsightMessageDeltaOnly;
     return 0;
 }
 
-int AgentsightManager::resume(const std::variant<SecurityOptions*, ObserverNetworkOption*>& opt) {
+int AgentsightManager::resume(const PluginOptions& opt) {
     const auto* secPtr = std::get_if<SecurityOptions*>(&opt);
     if (!secPtr || !*secPtr) {
         return 1;
@@ -496,14 +722,15 @@ int AgentsightManager::resume(const std::variant<SecurityOptions*, ObserverNetwo
     if (mRegisteredConfigCount == 0) {
         return 0;
     }
+    mEventStreamFormat = (*secPtr)->mAgentsightEventStreamFormat;
+    mMessageDeltaOnly = (*secPtr)->mAgentsightMessageDeltaOnly;
     if (!RestartAgentSightLocked(**secPtr)) {
         return 1;
     }
     return 0;
 }
 
-std::unique_ptr<PluginConfig>
-AgentsightManager::GeneratePluginConfig(const std::variant<SecurityOptions*, ObserverNetworkOption*>&) {
+std::unique_ptr<PluginConfig> AgentsightManager::GeneratePluginConfig(const PluginOptions&) {
     auto c = std::make_unique<PluginConfig>();
     c->mPluginType = PluginType::AGENTSIGHT_OBSERVE;
     c->mConfig = ProcessConfig{};
@@ -521,6 +748,8 @@ int AgentsightManager::HandleEvent(const std::shared_ptr<CommonEvent>& event) {
 
     logtail::QueueKey queueKey;
     uint32_t pluginIndex;
+    bool eventStreamFormat = true;
+    bool messageDeltaOnly = true;
     {
         std::lock_guard<std::mutex> lock(mLibMutex);
         if (mPipelineCtx == nullptr) {
@@ -528,63 +757,69 @@ int AgentsightManager::HandleEvent(const std::shared_ptr<CommonEvent>& event) {
         }
         queueKey = mQueueKey;
         pluginIndex = mPluginIndex;
+        eventStreamFormat = mEventStreamFormat;
+        messageDeltaOnly = mMessageDeltaOnly;
+    }
+
+    AgentsightLlmEmitPayload emitPayload;
+    const std::string sessionKey = ResolveSessionStateKey(rec->mSessionId, rec->mConversationId);
+
+    AgentsightSessionInputState previousCopy;
+    const AgentsightSessionInputState* previous = nullptr;
+    if (!sessionKey.empty() && mSessionInputCache.tryGetCopy(sessionKey, previousCopy)) {
+        previous = &previousCopy;
+    }
+
+    emitPayload.precomputedDelta = ComputeInputMessagesDelta(rec->mRequestMessagesJson, previous);
+
+    emitPayload.systemInstructionsJson = ExtractSystemInstructionsJson(rec->mRequestMessagesJson);
+    emitPayload.systemInstructionsHash = ComputeSystemInstructionsHash(rec->mRequestMessagesJson);
+    emitPayload.toolDefinitionsHash = ComputeToolDefinitionsHash(rec->mToolDefinitionsJson);
+    const bool firstRoundInSession = previous == nullptr;
+    emitPayload.emitSystemInstructions = !emitPayload.systemInstructionsHash.empty()
+        && (firstRoundInSession || previousCopy.systemInstructionsHash != emitPayload.systemInstructionsHash);
+    emitPayload.emitToolDefinitions = !emitPayload.toolDefinitionsHash.empty()
+        && (firstRoundInSession || previousCopy.toolDefinitionsHash != emitPayload.toolDefinitionsHash);
+
+    if (!sessionKey.empty()) {
+        AgentsightSessionInputState sessionState = previous ? previousCopy : AgentsightSessionInputState{};
+        if (rec->mConversationId != sessionState.lastTurnId) {
+            sessionState.lastTurnId = rec->mConversationId;
+            sessionState.nextStepNumber = 1;
+            sessionState.nextEventSequence = 1;
+        }
+        emitPayload.stepId = FormatGenAiStepId(rec->mConversationId, sessionState.nextStepNumber++);
+        if (eventStreamFormat) {
+            emitPayload.eventSequenceRequest = sessionState.nextEventSequence++;
+            emitPayload.eventSequenceResponse = sessionState.nextEventSequence++;
+        }
+        // Session/step state is committed before PushQueue. A queue failure drops delta
+        // state for this round; use MessageDeltaOnly=false when full input fidelity is required.
+        CommitSessionStateAfterEmit(
+            rec->mRequestMessagesJson, rec->mResponseMessagesJson, rec->mToolDefinitionsJson, sessionState);
+        mSessionInputCache.insert(sessionKey, std::move(sessionState));
     }
 
     auto sourceBuffer = std::make_shared<SourceBuffer>();
     PipelineEventGroup eventGroup(sourceBuffer);
-    auto* log = eventGroup.AddLogEvent(true, mEventPool);
-    const auto sec = static_cast<int64_t>(rec->mTimestampNs / 1000000000ULL);
-    const auto nsec = static_cast<int64_t>(rec->mTimestampNs % 1000000000ULL);
-    log->SetTimestamp(sec, nsec);
-
-    auto setStr = [&](StringView k, const std::string& v) {
-        if (!v.empty()) {
-            log->SetContent(k, StringView(v.data(), v.size()));
-        }
-    };
-
-    setStr(StringView("gen_ai.session.id"), rec->mSessionId);
-    setStr(StringView("gen_ai.turn.id"), rec->mConversationId);
-    setStr(StringView("gen_ai.response.id"), rec->mResponseId);
-
-    if (rec->mPid != 0) {
-        log->SetContent("pid", std::to_string(rec->mPid));
-    }
-    setStr(StringView("comm"), rec->mProcessName);
-    setStr(StringView("gen_ai.agent.type"), rec->mAgentType);
-
-    log->SetContent("gen_ai.request.timestamp", std::to_string(rec->mTimestampNs / 1000000ULL));
-    log->SetContent("gen_ai.response.duration", std::to_string(rec->mDurationNs / 1000000ULL));
-
-    if (!rec->mRequestUrl.empty()) {
-        std::string host;
-        std::string port;
-        if (ParseHostAndPortFromRequestUrl(rec->mRequestUrl, host, port)) {
-            setStr(StringView("server.address"), host);
-            setStr(StringView("server.port"), port);
+    const size_t logCount = eventStreamFormat ? 2U : 1U;
+    for (size_t i = 0; i < logCount; ++i) {
+        auto* log = eventGroup.AddLogEvent(true, mEventPool);
+        if (eventStreamFormat) {
+            const std::string eventId = CalculateRandomUUID();
+            if (i == 0) {
+                FillAgentsightModelRequestLog(*rec, log, messageDeltaOnly, emitPayload, eventId);
+            } else {
+                FillAgentsightModelResponseLog(*rec, log, emitPayload, eventId);
+            }
+        } else {
+            FillAgentsightCombinedLlmLog(*rec, log, messageDeltaOnly, emitPayload);
         }
     }
-
-    log->SetContent("gen_ai.provider.name", rec->mProvider);
-    log->SetContent("gen_ai.request.model", rec->mModel);
-    log->SetContent("status_code", std::to_string(rec->mStatusCode));
-    log->SetContent(StringView("is_sse"), StringView(rec->mIsSse ? "1" : "0"));
-    setStr(StringView("gen_ai.response.finish_reasons"), rec->mFinishReason);
-    log->SetContent(std::string("is_usage_from_api"), std::string(rec->mLlmUsage ? "true" : "false"));
-
-    log->SetContent("gen_ai.usage.input_tokens", std::to_string(rec->mInputTokens));
-    log->SetContent("gen_ai.usage.output_tokens", std::to_string(rec->mOutputTokens));
-    log->SetContent("gen_ai.usage.total_tokens", std::to_string(rec->mTotalTokens));
-    log->SetContent("gen_ai.usage.cache_creation.input_tokens", std::to_string(rec->mCacheCreationInputTokens));
-    log->SetContent("gen_ai.usage.cache_read.input_tokens", std::to_string(rec->mCacheReadInputTokens));
-
-    setStr(StringView("gen_ai.input.messages"), rec->mRequestMessagesJson);
-    setStr(StringView("gen_ai.output.messages"), rec->mResponseMessagesJson);
-    setStr(StringView("gen_ai.tool.definitions"), rec->mToolDefinitionsJson);
 
     std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(eventGroup), pluginIndex);
     if (QueueStatus::OK == ProcessQueueManager::GetInstance()->PushQueue(queueKey, std::move(item))) {
-        ADD_COUNTER(mPushLogsTotal, 1);
+        ADD_COUNTER(mPushLogsTotal, logCount);
         ADD_COUNTER(mPushLogGroupTotal, 1);
     } else {
         if (mPushLogFailedTotal) {

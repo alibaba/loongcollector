@@ -24,10 +24,12 @@ import (
 	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	converter "github.com/alibaba/ilogtail/pkg/protocol/converter"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
+	flushercheckpoint "github.com/alibaba/ilogtail/plugins/flusher/checkpoint"
 )
 
 type FlusherClickHouse struct {
@@ -71,6 +73,9 @@ type FlusherClickHouse struct {
 	converter *converter.Converter
 	conn      driver.Conn
 	flusher   FlusherFunc
+
+	offsets           *flushercheckpoint.Tracker
+	checkpointCommits *flushercheckpoint.Committer
 }
 
 type convertConfig struct {
@@ -151,6 +156,8 @@ func (f *FlusherClickHouse) Init(context pipeline.Context) error {
 		logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherInitAlarm, "init clickhouse flusher error", err)
 		return err
 	}
+	f.checkpointCommits = flushercheckpoint.NewCommitter(flushercheckpoint.UpdateFileCheckpoint)
+	f.offsets = flushercheckpoint.NewTracker(f.checkpointCommits.Add)
 	return nil
 }
 
@@ -182,6 +189,36 @@ func (f *FlusherClickHouse) Flush(projectName string, logstoreName string, confi
 	return f.flusher(projectName, logstoreName, configName, logGroupList)
 }
 
+func (f *FlusherClickHouse) Export(groupEventsArray []*models.PipelineGroupEvents, ctx pipeline.PipelineContext) error {
+	ctxBg := context.Background()
+	configName := f.context.GetConfigName()
+	for _, groupEvents := range groupEventsArray {
+		logger.Debug(f.context.GetRuntimeContext(), "[GroupEvents] events count", len(groupEvents.Events),
+			"tags", groupEvents.Group.GetTags().Iterator())
+		serializedLogs, _, err := f.converter.ToByteStreamWithSelectedFieldsV2(groupEvents, nil)
+		if err != nil {
+			logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "flush clickhouse convert log fail, error", err)
+			return err
+		}
+		rows := serializedLogs.([][]byte)
+		sourceID := groupEvents.Group.GetMetadata().Get(flushercheckpoint.MetaKeySourceID)
+		logPath := groupEvents.Group.GetMetadata().Get(flushercheckpoint.MetaKeyLogFilePath)
+		group := flushercheckpoint.BuildGroup(f.offsets, sourceID, configName, logPath, groupEvents, len(rows))
+		for _, log := range rows {
+			sql := fmt.Sprintf("INSERT INTO %s.ilogtail_%s_buffer (_timestamp, _log) VALUES (%d, '%s')", f.Authentication.PlainText.Database, f.Table, time.Now().Unix(), string(log))
+			err = f.conn.AsyncInsert(ctxBg, sql, false)
+			if err != nil {
+				f.offsets.Fail(sourceID, group)
+				logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "flush clickhouse AsyncInsert fail, error", err)
+				return err
+			}
+			f.offsets.Ack(sourceID, group)
+		}
+		logger.Debug(f.context.GetRuntimeContext(), "ClickHouse success send events: messageID")
+	}
+	return nil
+}
+
 func (f *FlusherClickHouse) BufferFlush(projectName string, logstoreName string, configName string, logGroupList []*protocol.LogGroup) error {
 	ctx := context.Background()
 	for _, logGroup := range logGroupList {
@@ -210,7 +247,9 @@ func (f *FlusherClickHouse) IsReady(projectName string, logstoreName string, log
 }
 
 func (f *FlusherClickHouse) Stop() error {
-	return f.conn.Close()
+	err := f.conn.Close()
+	f.checkpointCommits.Stop()
+	return err
 }
 
 func init() {

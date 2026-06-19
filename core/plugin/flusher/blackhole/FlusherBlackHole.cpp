@@ -15,6 +15,7 @@
 #include "plugin/flusher/blackhole/FlusherBlackHole.h"
 
 #include "collection_pipeline/queue/SenderQueueManager.h"
+#include "file_server/checkpoint/FileSendCheckpoint.h"
 
 using namespace std;
 
@@ -31,6 +32,11 @@ bool FlusherBlackHole::Init(const Json::Value& config, Json::Value& optionalGoPi
 }
 
 bool FlusherBlackHole::Send(PipelineEventGroup&& g) {
+    // The data is intentionally discarded, which for static-file inputs still counts as a
+    // successful "send": confirm the send checkpoint so the committed offset is not stalled.
+    if (auto cpt = g.GetFileSendCheckpoint()) {
+        ConfirmFileSendCheckpoint(cpt);
+    }
     return PushToQueue(make_unique<SenderQueueItem>("", 0, this, mQueueKey));
 }
 

@@ -63,6 +63,7 @@ AgentsightLlmRecord::AgentsightLlmRecord(std::string pipelineConfigName, const A
     mModel = CopyCStr(d.model);
     mFinishReason = CopyCStr(d.finish_reason);
     mRequestMessagesJson = CopyBuffer(d.request_messages, d.request_messages_len);
+    mInputMessageDeltaJson = CopyBuffer(d.input_message_delta, d.input_message_delta_len);
     mResponseMessagesJson = CopyBuffer(d.response_messages, d.response_messages_len);
     mToolDefinitionsJson = CopyBuffer(d.tools, d.tools_len);
 }

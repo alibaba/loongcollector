@@ -83,9 +83,18 @@ func TransferLogEventToPB(log *models.Log) (*protocol.LogEvent, error) {
 	logEvent.Timestamp = log.GetTimestamp()
 	logEvent.Contents = make([]*protocol.LogEvent_Content, 0, log.Contents.Len())
 	for k, v := range log.Contents.Iterator() {
+		var val string
+		switch tv := v.(type) {
+		case string:
+			val = tv
+		case []byte:
+			val = string(tv)
+		default:
+			return nil, fmt.Errorf("unsupported log content type for key %s: %T", k, v)
+		}
 		cont := &protocol.LogEvent_Content{
 			Key:   util.ZeroCopyStringToBytes(k),
-			Value: util.ZeroCopyStringToBytes(v.(string)),
+			Value: util.ZeroCopyStringToBytes(val),
 		}
 		logEvent.Contents = append(logEvent.Contents, cont)
 	}
@@ -99,9 +108,21 @@ func TransferMetricEventToPB(metric *models.Metric) (*protocol.MetricEvent, erro
 	var metricEvent protocol.MetricEvent
 	metricEvent.Timestamp = metric.GetTimestamp()
 	metricEvent.Name = util.ZeroCopyStringToBytes(metric.GetName())
-	if metric.GetValue().IsSingleValue() {
-		metricEvent.Value = &protocol.MetricEvent_UntypedSingleValue{UntypedSingleValue: &protocol.UntypedSingleValue{Value: metric.Value.GetSingleValue()}}
-	} else {
+	switch {
+	case metric.GetValue().IsSingleValue():
+		metricEvent.Value = &protocol.MetricEvent_UntypedSingleValue{
+			UntypedSingleValue: &protocol.UntypedSingleValue{Value: metric.Value.GetSingleValue()},
+		}
+	case metric.GetValue().IsMultiValues():
+		multiPb := &protocol.UntypedMultiDoubleValues{Values: make(map[string]*protocol.UntypedMultiDoubleValue)}
+		for k, v := range metric.GetValue().GetMultiValues().Iterator() {
+			multiPb.Values[k] = &protocol.UntypedMultiDoubleValue{
+				MetricType: toPBMetricType(models.MetricTypeUntyped),
+				Value:      v,
+			}
+		}
+		metricEvent.Value = &protocol.MetricEvent_UntypedMultiDoubleValues{UntypedMultiDoubleValues: multiPb}
+	default:
 		return nil, fmt.Errorf("unsupported metric value type")
 	}
 	metricEvent.Tags = make(map[string][]byte, metric.GetTags().Len())
@@ -109,6 +130,160 @@ func TransferMetricEventToPB(metric *models.Metric) (*protocol.MetricEvent, erro
 		metricEvent.Tags[k] = util.ZeroCopyStringToBytes(v)
 	}
 	return &metricEvent, nil
+}
+
+func toPBMetricType(metricType models.MetricType) protocol.UntypedValueMetricType {
+	if metricType == models.MetricTypeGauge {
+		return protocol.UntypedValueMetricType_METRIC_TYPE_GAUGE
+	}
+	return protocol.UntypedValueMetricType_METRIC_TYPE_COUNTER
+}
+
+func TransferPBToLogEvent(src *protocol.LogEvent) (*models.Log, error) {
+	if src == nil {
+		return nil, fmt.Errorf("nil log event")
+	}
+	log := &models.Log{
+		Timestamp: src.Timestamp,
+		Tags:      models.NewTags(),
+		Offset:    src.FileOffset,
+		RawSize:   src.RawSize,
+	}
+	if len(src.Level) > 0 {
+		log.Level = string(src.Level)
+	}
+	contents := models.NewKeyValues[any]()
+	for _, c := range src.Contents {
+		contents.Add(string(c.Key), string(c.Value))
+	}
+	log.Contents = contents
+	return log, nil
+}
+
+func TransferPBToMetricEvent(src *protocol.MetricEvent) (*models.Metric, error) {
+	if src == nil {
+		return nil, fmt.Errorf("nil metric event")
+	}
+	tags := models.NewTags()
+	for k, v := range src.Tags {
+		tags.Add(k, string(v))
+	}
+	switch value := src.Value.(type) {
+	case *protocol.MetricEvent_UntypedSingleValue:
+		return models.NewSingleValueMetric(string(src.Name), models.MetricTypeUntyped, tags, int64(src.Timestamp), value.UntypedSingleValue.Value), nil
+	case *protocol.MetricEvent_UntypedMultiDoubleValues:
+		multiValue := models.NewMetricMultiValue()
+		for k, v := range value.UntypedMultiDoubleValues.Values {
+			multiValue.Add(k, v.Value)
+		}
+		return models.NewMultiValuesMetric(string(src.Name), models.MetricTypeUntyped, tags, int64(src.Timestamp), multiValue.Values), nil
+	default:
+		return nil, fmt.Errorf("unsupported metric value type")
+	}
+}
+
+func TransferPBToPipelineGroupEvents(src *protocol.PipelineEventGroup) (*models.PipelineGroupEvents, error) {
+	if src == nil {
+		return nil, fmt.Errorf("nil pipeline event group")
+	}
+	group := models.NewGroup(models.NewMetadata(), models.NewTags())
+	for k, v := range src.Tags {
+		group.Tags.Add(k, string(v))
+	}
+	for k, v := range src.Metadata {
+		group.Metadata.Add(k, string(v))
+	}
+
+	var events []models.PipelineEvent
+	switch pipelineEvents := src.PipelineEvents.(type) {
+	case *protocol.PipelineEventGroup_Logs:
+		events = make([]models.PipelineEvent, 0, len(pipelineEvents.Logs.Events))
+		for _, logEvent := range pipelineEvents.Logs.Events {
+			log, err := TransferPBToLogEvent(logEvent)
+			if err != nil {
+				return nil, err
+			}
+			events = append(events, log)
+		}
+	case *protocol.PipelineEventGroup_Metrics:
+		events = make([]models.PipelineEvent, 0, len(pipelineEvents.Metrics.Events))
+		for _, metricEvent := range pipelineEvents.Metrics.Events {
+			metric, err := TransferPBToMetricEvent(metricEvent)
+			if err != nil {
+				return nil, err
+			}
+			events = append(events, metric)
+		}
+	case *protocol.PipelineEventGroup_Spans:
+		events = make([]models.PipelineEvent, 0, len(pipelineEvents.Spans.Events))
+		for _, spanEvent := range pipelineEvents.Spans.Events {
+			span, err := TransferPBToSpanEvent(spanEvent)
+			if err != nil {
+				return nil, err
+			}
+			events = append(events, span)
+		}
+	default:
+		return nil, fmt.Errorf("unsupported pipeline event group type")
+	}
+
+	return &models.PipelineGroupEvents{
+		Group:  group,
+		Events: events,
+	}, nil
+}
+
+func TransferPBToSpanEvent(src *protocol.SpanEvent) (*models.Span, error) {
+	if src == nil {
+		return nil, fmt.Errorf("nil span event")
+	}
+	tags := models.NewTags()
+	for k, v := range src.Tags {
+		tags.Add(k, string(v))
+	}
+	innerEvents := make([]*models.SpanEvent, 0, len(src.Events))
+	for _, e := range src.Events {
+		eventTags := models.NewTags()
+		for k, v := range e.Tags {
+			eventTags.Add(k, string(v))
+		}
+		innerEvents = append(innerEvents, &models.SpanEvent{
+			Timestamp: int64(e.Timestamp),
+			Name:      string(e.Name),
+			Tags:      eventTags,
+		})
+	}
+	links := make([]*models.SpanLink, 0, len(src.Links))
+	for _, l := range src.Links {
+		linkTags := models.NewTags()
+		for k, v := range l.Tags {
+			linkTags.Add(k, string(v))
+		}
+		links = append(links, &models.SpanLink{
+			TraceID:    string(l.TraceID),
+			SpanID:     string(l.SpanID),
+			TraceState: string(l.TraceState),
+			Tags:       linkTags,
+		})
+	}
+	span := models.NewSpan(
+		string(src.Name),
+		string(src.TraceID),
+		string(src.SpanID),
+		models.SpanKind(src.Kind),
+		src.StartTime,
+		src.EndTime,
+		tags,
+		innerEvents,
+		links,
+	)
+	span.ParentSpanID = string(src.ParentSpanID)
+	span.TraceState = string(src.TraceState)
+	span.Status = models.StatusCode(src.Status)
+	if src.Timestamp != 0 {
+		span.ObservedTimestamp = src.Timestamp
+	}
+	return span, nil
 }
 
 func TransferSpanEventToPB(span *models.Span) (*protocol.SpanEvent, error) {

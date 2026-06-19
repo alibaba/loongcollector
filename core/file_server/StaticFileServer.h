@@ -98,6 +98,12 @@ private:
     bool mIsUnusedCheckpointsCleared = false;
 
     std::multimap<std::string, std::pair<size_t, LogFileReaderPtr>> mPipelineNameReadersMap;
+    // file index currently being read per input (in-memory read cursor); the committed file
+    // index lives in the checkpoint and only advances after the data is successfully sent
+    std::map<std::pair<std::string, size_t>, size_t> mReadingFileIndexMap;
+    // a file whose reading has reached EOF but whose data is not yet fully committed; the
+    // reader must not advance to the next file until the committed index passes this value
+    std::map<std::pair<std::string, size_t>, size_t> mPendingCommitFileIndexMap;
 
     // accessed by main thread and input runner thread (includes mDeletedInputs; access only while holding mUpdateMux).
     mutable std::mutex mUpdateMux;

@@ -22,6 +22,7 @@
 #include "models/EventPool.h"
 #include "monitor/AlarmManager.h"
 #include "monitor/metric_constants/MetricConstants.h"
+#include "protobuf/models/ProtocolConversion.h"
 #include "queue/ProcessQueueManager.h"
 #include "queue/QueueKeyManager.h"
 
@@ -134,8 +135,6 @@ void ProcessorRunner::Run(uint32_t threadNo) {
             continue;
         }
 
-        bool isLog = !item->mEventGroup.GetEvents().empty() && item->mEventGroup.GetEvents()[0].Is<LogEvent>();
-
         vector<PipelineEventGroup> eventGroupList;
         eventGroupList.emplace_back(std::move(item->mEventGroup));
         // TODO: use old pipeline input index to find inner processor in new pipeline, maybe cause some issues when
@@ -143,35 +142,35 @@ void ProcessorRunner::Run(uint32_t threadNo) {
         pipeline->Process(eventGroupList, item->mInputIndex);
 
         if (pipeline->IsFlushingThroughGoPipeline()) {
-            // TODO:
-            // 1. allow all event types to be sent to Go pipelines
-            // 2. use event group protobuf instead
-            if (isLog) {
-                for (auto& group : eventGroupList) {
-                    string res, errorMsg;
-                    if (!Serialize(group,
-                                   pipeline->GetContext().GetGlobalConfig().mEnableTimestampNanosecond,
-                                   pipeline->GetContext().GetLogstoreName(),
-                                   res,
-                                   errorMsg)) {
-                        LOG_WARNING(pipeline->GetContext().GetLogger(),
-                                    ("failed to serialize event group",
-                                     errorMsg)("action", "discard data")("config", configName));
-                        pipeline->GetContext().GetAlarm().SendAlarmWarning(
-                            SERIALIZE_FAIL_ALARM,
-                            "failed to serialize event group: " + errorMsg
-                                + "\taction: discard data\tconfig: " + configName,
-                            pipeline->GetContext().GetRegion(),
-                            pipeline->GetContext().GetProjectName(),
-                            configName,
-                            pipeline->GetContext().GetLogstoreName());
-                        continue;
-                    }
-                    LogtailPlugin::GetInstance()->ProcessLogGroup(
-                        pipeline->GetContext().GetConfigName(),
-                        res,
-                        group.GetMetadata(EventGroupMetaKey::SOURCE_ID).to_string());
+            for (auto& group : eventGroupList) {
+                if (group.GetEvents().empty()) {
+                    continue;
                 }
+                const auto eventType = group.GetEvents()[0]->GetType();
+                if (eventType != PipelineEvent::Type::LOG && eventType != PipelineEvent::Type::METRIC
+                    && eventType != PipelineEvent::Type::SPAN) {
+                    LOG_WARNING(pipeline->GetContext().GetLogger(),
+                                ("unsupported event type in go pipeline", "discard data")("config", configName));
+                    continue;
+                }
+                models::PipelineEventGroup pbGroup;
+                string errorMsg;
+                if (!TransferPipelineEventGroupToPB(group, pbGroup, errorMsg)) {
+                    LOG_WARNING(pipeline->GetContext().GetLogger(),
+                                ("failed to transfer pipeline event group to pb",
+                                 errorMsg)("discard data", "")("config", configName));
+                    continue;
+                }
+                string res;
+                if (!pbGroup.SerializeToString(&res)) {
+                    LOG_WARNING(pipeline->GetContext().GetLogger(),
+                                ("failed to serialize pipeline event group pb", "discard data")("config", configName));
+                    continue;
+                }
+                LogtailPlugin::GetInstance()->ProcessPipelineEventGroup(
+                    pipeline->GetContext().GetConfigName(),
+                    res,
+                    group.GetMetadata(EventGroupMetaKey::SOURCE_ID).to_string());
             }
         } else {
             pipeline->Send(std::move(eventGroupList));
@@ -180,47 +179,6 @@ void ProcessorRunner::Run(uint32_t threadNo) {
 
         gThreadedEventPool.CheckGC();
     }
-}
-
-bool ProcessorRunner::Serialize(
-    const PipelineEventGroup& group, bool enableNanosecond, const string& logstore, string& res, string& errorMsg) {
-    sls_logs::LogGroup logGroup;
-    for (const auto& e : group.GetEvents()) {
-        if (e.Is<LogEvent>()) {
-            const auto& logEvent = e.Cast<LogEvent>();
-            auto log = logGroup.add_logs();
-            for (const auto& kv : logEvent) {
-                auto contPtr = log->add_contents();
-                contPtr->set_key(kv.first.to_string());
-                contPtr->set_value(kv.second.to_string());
-            }
-            log->set_time(logEvent.GetTimestamp());
-            if (enableNanosecond && logEvent.GetTimestampNanosecond()) {
-                log->set_time_ns(logEvent.GetTimestampNanosecond().value());
-            }
-        } else {
-            errorMsg = "unsupported event type in event group";
-            return false;
-        }
-    }
-    for (const auto& tag : group.GetTags()) {
-        if (tag.first == LOG_RESERVED_KEY_TOPIC) {
-            logGroup.set_topic(tag.second.to_string());
-        } else {
-            auto logTag = logGroup.add_logtags();
-            logTag->set_key(tag.first.to_string());
-            logTag->set_value(tag.second.to_string());
-        }
-    }
-    logGroup.set_category(logstore);
-    size_t size = logGroup.ByteSizeLong();
-    if (static_cast<int32_t>(size) > INT32_FLAG(max_send_log_group_size)) {
-        errorMsg = "log group exceeds size limit\tgroup size: " + ToString(size)
-            + "\tsize limit: " + ToString(INT32_FLAG(max_send_log_group_size));
-        return false;
-    }
-    res = logGroup.SerializeAsString();
-    return true;
 }
 
 } // namespace logtail

@@ -45,6 +45,8 @@ public:
     void FeedbackContinuousPipelineConfigStatus(const std::string& name, ConfigFeedbackStatus status);
     void FeedbackInstanceConfigStatus(const std::string& name, ConfigFeedbackStatus status);
 
+    bool IsOnetimePipelineConfigRegistered(const std::string& name);
+
 private:
     ConfigFeedbackReceiver() = default;
     ~ConfigFeedbackReceiver() = default;

@@ -29,6 +29,7 @@
 #include "common/compression/CompressorFactory.h"
 #include "common/http/Constant.h"
 #include "common/http/HttpRequest.h"
+#include "file_server/checkpoint/FileSendCheckpoint.h"
 #include "plugin/flusher/sls/DiskBufferWriter.h"
 #include "plugin/flusher/sls/PackIdManager.h"
 #include "plugin/flusher/sls/SLSClientManager.h"
@@ -631,6 +632,10 @@ bool FlusherSLS::Stop(bool isPipelineRemoving) {
 bool FlusherSLS::Send(PipelineEventGroup&& g) {
     if (g.IsReplay()) {
         return SerializeAndPush(std::move(g));
+    } else if (g.GetFileSendCheckpoint()) {
+        // file input with deferred commit: keep the group 1:1 with the send item (bypass
+        // batching/packaging) so the committed file offset can be advanced on send success
+        return SerializeAndPushFileGroup(std::move(g));
     } else {
         vector<BatchedEventsList> res;
         mBatcher.Add(std::move(g), res);
@@ -739,6 +744,10 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
         if (cpt) {
             cpt->Commit();
             cpt->IncreaseSequenceID();
+        }
+        // file input with deferred commit: data is durably sent, advance the committed offset
+        if (data->mFileSendCheckpoint) {
+            ConfirmFileSendCheckpoint(data->mFileSendCheckpoint);
         }
         LOG_DEBUG(
             sLogger,
@@ -925,6 +934,11 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
                         mContext ? mContext->GetConfigName() : "",
                         data->mLogstore);
                 }
+                // file input with deferred commit: the data is dropped after exhausting retries;
+                // request a runtime rewind so the reader re-reads this unit instead of leaving a gap
+                if (data->mFileSendCheckpoint) {
+                    ReportFileSendCheckpointFailure(data->mFileSendCheckpoint);
+                }
                 SenderQueueManager::GetInstance()->DecreaseConcurrencyLimiterInSendingCnt(item->mQueueKey);
                 DealSenderQueueItemAfterSend(item, false);
                 break;
@@ -1056,6 +1070,65 @@ bool FlusherSLS::SerializeAndPush(PipelineEventGroup&& group) {
                                                        g.mExactlyOnceCheckpoint->data.hash_key(),
                                                        std::move(g.mExactlyOnceCheckpoint),
                                                        false));
+}
+
+bool FlusherSLS::SerializeAndPushFileGroup(PipelineEventGroup&& group) {
+    auto fileCpt = group.GetFileSendCheckpoint();
+    BatchedEvents g(std::move(group.MutableEvents()),
+                    std::move(group.GetSizedTags()),
+                    std::move(group.GetSourceBuffer()),
+                    group.GetMetadata(EventGroupMetaKey::SOURCE_ID),
+                    RangeCheckpointPtr());
+    for (const auto& extraSourceBuffer : group.GetExtraSourceBuffers()) {
+        g.mSourceBuffers.emplace_back(extraSourceBuffer);
+    }
+    AddPackId(g);
+
+    string serializedData, compressedData, errorMsg;
+    if (!mGroupSerializer->DoSerialize(std::move(g), serializedData, errorMsg)) {
+        LOG_WARNING(mContext->GetLogger(),
+                    ("failed to serialize event group",
+                     errorMsg)("action", "discard data")("plugin", sName)("config", mContext->GetConfigName()));
+        mContext->GetAlarm().SendAlarmWarning(SERIALIZE_FAIL_ALARM,
+                                              "failed to serialize event group: " + errorMsg
+                                                  + "\taction: discard data\tplugin: " + sName
+                                                  + "\tconfig: " + mContext->GetConfigName(),
+                                              mContext->GetRegion(),
+                                              mContext->GetProjectName(),
+                                              mContext->GetConfigName(),
+                                              mContext->GetLogstoreName());
+        // data is discarded; confirm so the committed offset is not blocked forever
+        if (fileCpt) {
+            ConfirmFileSendCheckpoint(fileCpt);
+        }
+        return false;
+    }
+    if (mCompressor) {
+        if (!mCompressor->DoCompress(serializedData, compressedData, errorMsg)) {
+            LOG_WARNING(mContext->GetLogger(),
+                        ("failed to compress event group",
+                         errorMsg)("action", "discard data")("plugin", sName)("config", mContext->GetConfigName()));
+            mContext->GetAlarm().SendAlarmWarning(COMPRESS_FAIL_ALARM,
+                                                  "failed to compress event group: " + errorMsg
+                                                      + "\taction: discard data\tplugin: " + sName
+                                                      + "\tconfig: " + mContext->GetConfigName(),
+                                                  mContext->GetRegion(),
+                                                  mContext->GetProjectName(),
+                                                  mContext->GetConfigName(),
+                                                  mContext->GetLogstoreName());
+            if (fileCpt) {
+                ConfirmFileSendCheckpoint(fileCpt);
+            }
+            return false;
+        }
+    } else {
+        compressedData = serializedData;
+    }
+
+    auto item = make_unique<SLSSenderQueueItem>(
+        std::move(compressedData), serializedData.size(), this, mQueueKey, mLogstore, RawDataType::EVENT_GROUP);
+    item->mFileSendCheckpoint = fileCpt;
+    return Flusher::PushToQueue(std::move(item));
 }
 
 bool FlusherSLS::SerializeAndPush(BatchedEventsList&& groupList) {

@@ -23,6 +23,7 @@
 #include <unordered_set>
 
 #include "common/memory/SourceBuffer.h"
+#include "file_server/checkpoint/FileSendCheckpoint.h"
 #include "file_server/checkpoint/RangeCheckpoint.h"
 #include "models/PipelineEventPtr.h"
 
@@ -135,6 +136,9 @@ public:
     RangeCheckpointPtr& GetExactlyOnceCheckpoint() { return mExactlyOnceCheckpoint; }
     bool IsReplay() const;
 
+    void SetFileSendCheckpoint(const FileSendCheckpointPtr& checkpoint) { mFileSendCheckpoint = checkpoint; }
+    const FileSendCheckpointPtr& GetFileSendCheckpoint() const { return mFileSendCheckpoint; }
+
     size_t DataSize() const;
 
 #ifdef APSARA_UNIT_TEST_MAIN
@@ -153,6 +157,7 @@ private:
     EventsContainer mEvents;
     std::shared_ptr<SourceBuffer> mSourceBuffer;
     RangeCheckpointPtr mExactlyOnceCheckpoint;
+    FileSendCheckpointPtr mFileSendCheckpoint;
 
     SourceBufferSet mExtraSourceBuffers;
 };

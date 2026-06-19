@@ -24,11 +24,13 @@ import (
 
 	"github.com/alibaba/ilogtail/pkg/fmtstr"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	converter "github.com/alibaba/ilogtail/pkg/protocol/converter"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pkg/util"
+	flushercheckpoint "github.com/alibaba/ilogtail/plugins/flusher/checkpoint"
 )
 
 type FlusherPulsar struct {
@@ -83,6 +85,14 @@ type FlusherPulsar struct {
 	producerOptions pulsar.ProducerOptions
 	hashKeyMap      map[string]interface{}
 	selectFields    []string
+
+	offsets           *flushercheckpoint.Tracker
+	checkpointCommits *flushercheckpoint.Committer
+}
+
+type msgCheckpointInfo struct {
+	sourceID string
+	group    *flushercheckpoint.Group
 }
 type convertConfig struct {
 	// Rename one or more fields from tags.
@@ -153,6 +163,8 @@ func (f *FlusherPulsar) Init(context pipeline.Context) error {
 	}
 	// Merge topicKeys and HashKeys,Only one convert after merge
 	f.selectFields = util.UniqueStrings(f.topicKeys, f.PartitionKeys)
+	f.checkpointCommits = flushercheckpoint.NewCommitter(flushercheckpoint.UpdateFileCheckpoint)
+	f.offsets = flushercheckpoint.NewTracker(f.checkpointCommits.Add)
 	return nil
 }
 
@@ -184,7 +196,6 @@ func (f *FlusherPulsar) Validate() error {
 }
 
 func (f *FlusherPulsar) Flush(projectName string, logstoreName string, configName string, logGroupList []*protocol.LogGroup) error {
-	topic := f.Topic
 	for _, logGroup := range logGroupList {
 		logger.Debug(f.context.GetRuntimeContext(), "[LogGroup] topic", logGroup.Topic, "logstore", logGroup.Category, "logcount", len(logGroup.Logs), "tags", logGroup.LogTags)
 		logs, values, err := f.converter.ToByteStreamWithSelectedFields(logGroup, f.selectFields)
@@ -192,36 +203,76 @@ func (f *FlusherPulsar) Flush(projectName string, logstoreName string, configNam
 			logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "flush pulsar convert log fail, error", err)
 		}
 		for index, log := range logs.([][]byte) {
-			valueMap := values[index]
-			if len(f.topicKeys) > 0 {
-				formattedTopic, err := fmtstr.FormatTopic(valueMap, f.Topic)
-				if err != nil {
-					logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "flush pulsar format topic fail, error", err)
-				} else {
-					topic = *formattedTopic
-				}
-			}
-			producer, err := f.producers.GetProducer(topic, f.pulsarClient, f.producerOptions)
-			if err != nil {
-				logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "load pulsar producer fail,topic", topic, "err", err)
+			if err := f.send(log, values[index], logstoreName, nil); err != nil {
 				return err
 			}
-
-			message := &pulsar.ProducerMessage{
-				Payload: log,
-			}
-			if f.PartitionKeys != nil {
-				message.Key = f.hashPartitionKey(valueMap, logstoreName)
-			}
-			producer.SendAsync(f.context.GetRuntimeContext(), message, func(msgId pulsar.MessageID, prodMsg *pulsar.ProducerMessage, err error) {
-				if err != nil {
-					logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "send message to pulsar fail,error", err)
-				} else {
-					logger.Debug(f.context.GetRuntimeContext(), "Pulsar success send events: messageID: %s ", msgId)
-				}
-			})
 		}
 	}
+	return nil
+}
+
+func (f *FlusherPulsar) Export(groupEventsArray []*models.PipelineGroupEvents, ctx pipeline.PipelineContext) error {
+	configName := f.context.GetConfigName()
+	defaultKey := f.context.GetLogstore()
+	for _, groupEvents := range groupEventsArray {
+		logger.Debug(f.context.GetRuntimeContext(), "[GroupEvents] events count", len(groupEvents.Events),
+			"tags", groupEvents.Group.GetTags().Iterator())
+		logPath := groupEvents.Group.GetMetadata().Get(flushercheckpoint.MetaKeyLogFilePath)
+		sourceID := groupEvents.Group.GetMetadata().Get(flushercheckpoint.MetaKeySourceID)
+		logs, values, err := f.converter.ToByteStreamWithSelectedFieldsV2(groupEvents, f.selectFields)
+		if err != nil {
+			logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "flush pulsar convert log fail, error", err)
+			return err
+		}
+		byteLogs := logs.([][]byte)
+		group := flushercheckpoint.BuildGroup(f.offsets, sourceID, configName, logPath, groupEvents, len(byteLogs))
+		var cptInfo *msgCheckpointInfo
+		if group != nil {
+			cptInfo = &msgCheckpointInfo{sourceID: sourceID, group: group}
+		}
+		for index, log := range byteLogs {
+			if err := f.send(log, values[index], defaultKey, cptInfo); err != nil {
+				f.offsets.Fail(sourceID, group)
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (f *FlusherPulsar) send(log []byte, valueMap map[string]string, defaultKey string, cptInfo *msgCheckpointInfo) error {
+	topic := f.Topic
+	if len(f.topicKeys) > 0 {
+		formattedTopic, err := fmtstr.FormatTopic(valueMap, f.Topic)
+		if err != nil {
+			logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "flush pulsar format topic fail, error", err)
+		} else {
+			topic = *formattedTopic
+		}
+	}
+	producer, err := f.producers.GetProducer(topic, f.pulsarClient, f.producerOptions)
+	if err != nil {
+		logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "load pulsar producer fail,topic", topic, "err", err)
+		return err
+	}
+
+	message := &pulsar.ProducerMessage{Payload: log}
+	if f.PartitionKeys != nil {
+		message.Key = f.hashPartitionKey(valueMap, defaultKey)
+	}
+	producer.SendAsync(f.context.GetRuntimeContext(), message, func(msgId pulsar.MessageID, prodMsg *pulsar.ProducerMessage, err error) {
+		if err != nil {
+			if cptInfo != nil {
+				f.offsets.Fail(cptInfo.sourceID, cptInfo.group)
+			}
+			logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "send message to pulsar fail,error", err)
+		} else {
+			if cptInfo != nil {
+				f.offsets.Ack(cptInfo.sourceID, cptInfo.group)
+			}
+			logger.Debug(f.context.GetRuntimeContext(), "Pulsar success send events: messageID: %s ", msgId)
+		}
+	})
 	return nil
 }
 
@@ -242,6 +293,7 @@ func (f *FlusherPulsar) Stop() error {
 		logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherStopAlarm, "stop pulsar flusher fail, error", err)
 	}
 	f.pulsarClient.Close()
+	f.checkpointCommits.Stop()
 	return err
 }
 

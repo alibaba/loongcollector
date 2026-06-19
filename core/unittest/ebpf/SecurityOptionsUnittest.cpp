@@ -32,7 +32,10 @@ public:
     void TestAgentsightAcceptsAnyAgentTypeShape();
     void TestAgentsightRejectsLegacyLowercaseKeys();
     void TestAgentsightRejectsEmptyCmdlineWhitelistArray();
-    void TestAgentsightIgnoresLegacyCmdlineRulesAndDomainRules();
+    void TestAgentsightProbeConfigParsesHttpsAndHttp();
+    void TestAgentsightProbeConfigHttpsHttpInvalidTypes();
+    void TestAgentsightEventStreamFormatParse();
+    void TestAgentsightMessageDeltaOnlyDefaultAndParse();
 };
 
 void SecurityOptionsUnittest::TestAgentsightNoProbeConfigFallsBackToBuiltin() {
@@ -42,6 +45,23 @@ void SecurityOptionsUnittest::TestAgentsightNoProbeConfigFallsBackToBuiltin() {
     Json::Value config;
     APSARA_TEST_TRUE(opt.Init(SecurityProbeType::AGENTSIGHT_OBSERVE, config, &ctx, "input_agentsight"));
     APSARA_TEST_TRUE(opt.mAgentsightCmdlineWhitelist.empty());
+    APSARA_TEST_TRUE(opt.mAgentsightMessageDeltaOnly);
+    APSARA_TEST_TRUE(opt.mAgentsightEventStreamFormat);
+}
+
+void SecurityOptionsUnittest::TestAgentsightMessageDeltaOnlyDefaultAndParse() {
+    CollectionPipelineContext ctx;
+    ctx.SetConfigName("cfg1");
+    SecurityOptions opt;
+    std::string err;
+    Json::Value config;
+    APSARA_TEST_TRUE(ParseJsonTable(R"({"ProbeConfig":{"MessageDeltaOnly":false}})", config, err));
+    APSARA_TEST_TRUE(opt.Init(SecurityProbeType::AGENTSIGHT_OBSERVE, config, &ctx, "input_agentsight"));
+    APSARA_TEST_FALSE(opt.mAgentsightMessageDeltaOnly);
+
+    APSARA_TEST_TRUE(ParseJsonTable(R"({"ProbeConfig":{"MessageDeltaOnly":true}})", config, err));
+    APSARA_TEST_TRUE(opt.Init(SecurityProbeType::AGENTSIGHT_OBSERVE, config, &ctx, "input_agentsight"));
+    APSARA_TEST_TRUE(opt.mAgentsightMessageDeltaOnly);
 }
 
 void SecurityOptionsUnittest::TestAgentsightProbeConfigWrongTypeFallsBackToBuiltin() {
@@ -169,20 +189,58 @@ void SecurityOptionsUnittest::TestAgentsightRejectsLegacyLowercaseKeys() {
     APSARA_TEST_FALSE(opt.Init(SecurityProbeType::AGENTSIGHT_OBSERVE, config, &ctx, "input_agentsight"));
 }
 
-void SecurityOptionsUnittest::TestAgentsightIgnoresLegacyCmdlineRulesAndDomainRules() {
+void SecurityOptionsUnittest::TestAgentsightProbeConfigParsesHttpsAndHttp() {
     CollectionPipelineContext ctx;
     ctx.SetConfigName("cfg1");
     SecurityOptions opt;
     std::string err;
     Json::Value config;
     APSARA_TEST_TRUE(ParseJsonTable(
-        R"({"ProbeConfig":{"CmdlineRules":{"whitelist":[["a","b"]],"blacklist":[["c","d"]]},"DomainRules":["x.y"]}})",
+        R"({"ProbeConfig":{"Https":["*.openai.com","api.anthropic.com"],"Http":[":8080","10.0.0.1:9090","model-svc.default.svc","*.internal.svc"]}})",
         config,
         err));
     APSARA_TEST_TRUE(opt.Init(SecurityProbeType::AGENTSIGHT_OBSERVE, config, &ctx, "input_agentsight"));
-    APSARA_TEST_TRUE(opt.mAgentsightCmdlineWhitelist.empty());
-    APSARA_TEST_TRUE(opt.mAgentsightCmdlineBlacklist.empty());
-    APSARA_TEST_TRUE(opt.mAgentsightDomainWhitelist.empty());
+    APSARA_TEST_EQUAL(2UL, opt.mAgentsightHttps.size());
+    APSARA_TEST_EQUAL("*.openai.com", opt.mAgentsightHttps[0]);
+    APSARA_TEST_EQUAL("api.anthropic.com", opt.mAgentsightHttps[1]);
+    APSARA_TEST_EQUAL(4UL, opt.mAgentsightHttp.size());
+    APSARA_TEST_EQUAL(":8080", opt.mAgentsightHttp[0]);
+    APSARA_TEST_EQUAL("10.0.0.1:9090", opt.mAgentsightHttp[1]);
+    APSARA_TEST_EQUAL("model-svc.default.svc", opt.mAgentsightHttp[2]);
+    APSARA_TEST_EQUAL("*.internal.svc", opt.mAgentsightHttp[3]);
+}
+
+void SecurityOptionsUnittest::TestAgentsightProbeConfigHttpsHttpInvalidTypes() {
+    CollectionPipelineContext ctx;
+    ctx.SetConfigName("cfg1");
+    SecurityOptions opt;
+    std::string err;
+    Json::Value config;
+    APSARA_TEST_TRUE(ParseJsonTable(R"({"ProbeConfig":{"Https":"not-array","Http":[123,":80"]}})", config, err));
+    APSARA_TEST_TRUE(opt.Init(SecurityProbeType::AGENTSIGHT_OBSERVE, config, &ctx, "input_agentsight"));
+    APSARA_TEST_TRUE(opt.mAgentsightHttps.empty());
+    APSARA_TEST_EQUAL(1UL, opt.mAgentsightHttp.size());
+    APSARA_TEST_EQUAL(":80", opt.mAgentsightHttp[0]);
+}
+
+void SecurityOptionsUnittest::TestAgentsightEventStreamFormatParse() {
+    CollectionPipelineContext ctx;
+    ctx.SetConfigName("cfg1");
+    Json::Value config;
+    std::string err;
+    SecurityOptions opt;
+
+    APSARA_TEST_TRUE(ParseJsonTable(R"({"ProbeConfig":{"EventStreamFormat":true}})", config, err));
+    APSARA_TEST_TRUE(opt.Init(SecurityProbeType::AGENTSIGHT_OBSERVE, config, &ctx, "input_agentsight"));
+    APSARA_TEST_TRUE(opt.mAgentsightEventStreamFormat);
+
+    APSARA_TEST_TRUE(ParseJsonTable(R"({"ProbeConfig":{"EventStreamFormat":false}})", config, err));
+    APSARA_TEST_TRUE(opt.Init(SecurityProbeType::AGENTSIGHT_OBSERVE, config, &ctx, "input_agentsight"));
+    APSARA_TEST_FALSE(opt.mAgentsightEventStreamFormat);
+
+    APSARA_TEST_TRUE(ParseJsonTable(R"({"ProbeConfig":{}})", config, err));
+    APSARA_TEST_TRUE(opt.Init(SecurityProbeType::AGENTSIGHT_OBSERVE, config, &ctx, "input_agentsight"));
+    APSARA_TEST_TRUE(opt.mAgentsightEventStreamFormat);
 }
 
 UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightNoProbeConfigFallsBackToBuiltin)
@@ -195,6 +253,9 @@ UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightParsesCmdlineWhitelistWith
 UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightAcceptsAnyAgentTypeShape)
 UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightRejectsLegacyLowercaseKeys)
 UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightRejectsEmptyCmdlineWhitelistArray)
-UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightIgnoresLegacyCmdlineRulesAndDomainRules)
+UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightProbeConfigParsesHttpsAndHttp)
+UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightProbeConfigHttpsHttpInvalidTypes)
+UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightEventStreamFormatParse)
+UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightMessageDeltaOnlyDefaultAndParse)
 
 UNIT_TEST_MAIN

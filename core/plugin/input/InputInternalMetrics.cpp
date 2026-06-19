@@ -20,22 +20,30 @@ namespace logtail {
 
 const std::string InputInternalMetrics::sName = "input_internal_metrics";
 
+constexpr int kDefaultIntervalSeconds = 600;
+constexpr int kMinIntervalSeconds = 15;
+constexpr int kSecondsPerMinute = 60;
+
 bool GetEnabled(const Json::Value& rule) {
     if (rule.isMember("Enable") && rule["Enable"].isBool())
         return rule["Enable"].asBool();
     return true;
 }
 
-int GetInterval(const Json::Value& rule) {
-    if (rule.isMember("Interval") && rule["Interval"].isInt())
-        return rule["Interval"].asInt();
-    return 10;
+int GetIntervalSeconds(const Json::Value& rule) {
+    int intervalSeconds = kDefaultIntervalSeconds;
+    if (rule.isMember("IntervalSeconds") && rule["IntervalSeconds"].isInt()) {
+        intervalSeconds = rule["IntervalSeconds"].asInt();
+    } else if (rule.isMember("Interval") && rule["Interval"].isInt()) {
+        intervalSeconds = rule["Interval"].asInt() * kSecondsPerMinute;
+    }
+    return intervalSeconds < kMinIntervalSeconds ? kMinIntervalSeconds : intervalSeconds;
 }
 
 void ParseSelfMonitorMetricRule(std::string&& ruleKey, const Json::Value& ruleJson, SelfMonitorMetricRule& rule) {
     if (ruleJson.isMember(ruleKey) && ruleJson[ruleKey].isObject()) {
         rule.mEnable = GetEnabled(ruleJson[ruleKey]);
-        rule.mInterval = GetInterval(ruleJson[ruleKey]);
+        rule.mIntervalSeconds = GetIntervalSeconds(ruleJson[ruleKey]);
     }
 }
 

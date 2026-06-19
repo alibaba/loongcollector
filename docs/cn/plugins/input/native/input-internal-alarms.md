@@ -34,3 +34,5 @@ flushers:
 ```
 
 输出到 LoongCollector 的 `self_monitor/self_alarms.log` 文件中，每行均为一条json格式的告警。
+
+> **提示**：`input_internal_alarms` 亦支持与 Go Flusher 插件（如 `flusher_prometheus`）组合使用，详见[如何将自监控数据发送到Go Pipeline](../../../developer-guide/self-monitor/how-to-export-self-monitor-data.md)。

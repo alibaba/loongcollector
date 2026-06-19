@@ -18,6 +18,7 @@
 #include <string>
 #include <unordered_set>
 
+#include "app_config/AppConfig.h"
 #include "common/Flags.h"
 #include "common/ParamExtractor.h"
 #include "logger/Logger.h"
@@ -644,12 +645,12 @@ void ParseAgentsightCmdlineFromOptionalKey(const Json::Value& innerConfig,
     ParseAgentsightCmdlineRowArray(innerConfig[key], contextLabel, dest, errorMsg, warn);
 }
 
-void ParseAgentsightDomainStringList(const Json::Value& innerConfig,
-                                     const char* key,
-                                     const std::string& contextLabel,
-                                     std::vector<std::string>& dest,
-                                     std::string& errorMsg,
-                                     const std::function<void()>& warn) {
+void ParseAgentsightOptionalStringList(const Json::Value& innerConfig,
+                                       const char* key,
+                                       const std::string& contextLabel,
+                                       std::vector<std::string>& dest,
+                                       std::string& errorMsg,
+                                       const std::function<void()>& warn) {
     if (!innerConfig.isMember(key)) {
         return;
     }
@@ -685,7 +686,10 @@ bool SecurityOptions::Init(SecurityProbeType probeType,
         mLogPath.clear();
         mAgentsightCmdlineWhitelist.clear();
         mAgentsightCmdlineBlacklist.clear();
-        mAgentsightDomainWhitelist.clear();
+        mAgentsightHttps.clear();
+        mAgentsightHttp.clear();
+        mAgentsightEventStreamFormat = true;
+        mAgentsightMessageDeltaOnly = true;
     }
 
     SecurityOption thisSecurityOption;
@@ -732,12 +736,21 @@ bool SecurityOptions::Init(SecurityProbeType probeType,
                                                       mAgentsightCmdlineBlacklist,
                                                       errorMsg,
                                                       warnOptionalParse);
-                ParseAgentsightDomainStringList(innerConfig,
-                                                "DomainWhitelist",
-                                                "ProbeConfig.DomainWhitelist",
-                                                mAgentsightDomainWhitelist,
-                                                errorMsg,
-                                                warnOptionalParse);
+                ParseAgentsightOptionalStringList(
+                    innerConfig, "Https", "ProbeConfig.Https", mAgentsightHttps, errorMsg, warnOptionalParse);
+                ParseAgentsightOptionalStringList(
+                    innerConfig, "Http", "ProbeConfig.Http", mAgentsightHttp, errorMsg, warnOptionalParse);
+                if (innerConfig.isMember("EventStreamFormat")) {
+                    if (!GetOptionalBoolParam(
+                            innerConfig, "EventStreamFormat", mAgentsightEventStreamFormat, errorMsg)) {
+                        warnOptionalParse();
+                    }
+                }
+                if (innerConfig.isMember("MessageDeltaOnly")) {
+                    if (!GetOptionalBoolParam(innerConfig, "MessageDeltaOnly", mAgentsightMessageDeltaOnly, errorMsg)) {
+                        warnOptionalParse();
+                    }
+                }
                 return true;
             }
             case SecurityProbeType::FILE: {
@@ -763,6 +776,81 @@ bool SecurityOptions::Init(SecurityProbeType probeType,
     GetSecurityProbeDefaultCallName(probeType, thisSecurityOption.mCallNames);
     mOptionList.emplace_back(std::move(thisSecurityOption));
     mProbeType = probeType;
+    return true;
+}
+
+bool CpuProfilingOption::Init(const Json::Value& config,
+                              const CollectionPipelineContext* mContext,
+                              const std::string& sName) {
+    std::string errorMsg;
+
+    if (!GetOptionalUIntParam(config, "CollectIntervalMs", mCollectIntervalMs, errorMsg)) {
+        PARAM_WARNING_IGNORE(mContext->GetLogger(),
+                             mContext->GetAlarm(),
+                             errorMsg,
+                             sName,
+                             mContext->GetConfigName(),
+                             mContext->GetProjectName(),
+                             mContext->GetLogstoreName(),
+                             mContext->GetRegion());
+    }
+
+    if (!GetOptionalStringParam(config, "AppName", mAppName, errorMsg)) {
+        PARAM_WARNING_IGNORE(mContext->GetLogger(),
+                             mContext->GetAlarm(),
+                             errorMsg,
+                             sName,
+                             mContext->GetConfigName(),
+                             mContext->GetProjectName(),
+                             mContext->GetLogstoreName(),
+                             mContext->GetRegion());
+    }
+
+    if (!GetOptionalStringParam(config, "Language", mLanguage, errorMsg)) {
+        PARAM_WARNING_IGNORE(mContext->GetLogger(),
+                             mContext->GetAlarm(),
+                             errorMsg,
+                             sName,
+                             mContext->GetConfigName(),
+                             mContext->GetProjectName(),
+                             mContext->GetLogstoreName(),
+                             mContext->GetRegion());
+    }
+
+    std::vector<std::string> cmdlineStrs;
+    if (!GetOptionalListFilterParam<std::string>(config, "CommandLines", cmdlineStrs, errorMsg)) {
+        PARAM_WARNING_IGNORE(mContext->GetLogger(),
+                             mContext->GetAlarm(),
+                             errorMsg,
+                             sName,
+                             mContext->GetConfigName(),
+                             mContext->GetProjectName(),
+                             mContext->GetLogstoreName(),
+                             mContext->GetRegion());
+        return false;
+    }
+    for (const auto& cmdlineStr : cmdlineStrs) {
+        try {
+            mCmdlines.emplace_back(cmdlineStr);
+        } catch (const boost::regex_error& e) {
+            PARAM_WARNING_IGNORE(mContext->GetLogger(),
+                                 mContext->GetAlarm(),
+                                 "Invalid command line regex: " + cmdlineStr + ", error: " + e.what(),
+                                 sName,
+                                 mContext->GetConfigName(),
+                                 mContext->GetProjectName(),
+                                 mContext->GetLogstoreName(),
+                                 mContext->GetRegion());
+            return false;
+        }
+    }
+
+    if (AppConfig::GetInstance()->IsPurageContainerMode()) {
+        if (!mContainerDiscovery.Init(config, *mContext, sName)) {
+            return false;
+        }
+    }
+
     return true;
 }
 

@@ -72,7 +72,8 @@ void fake_config_set_log_path(AgentsightConfigHandle* c, const char* p) {
 
 int g_ut_cmdline_allow_calls = 0;
 int g_ut_cmdline_deny_calls = 0;
-int g_ut_domain_rule_calls = 0;
+int g_ut_https_calls = 0;
+int g_ut_http_calls = 0;
 
 void fake_config_add_cmdline_rule(AgentsightConfigHandle* cfg,
                                   const char* const* rule,
@@ -88,10 +89,17 @@ void fake_config_add_cmdline_rule(AgentsightConfigHandle* cfg,
     }
 }
 
-void fake_config_add_domain_rule(AgentsightConfigHandle* cfg, const char* rule) {
+void fake_config_add_https(AgentsightConfigHandle* cfg, const char* rule) {
     (void)cfg;
     (void)rule;
-    ++g_ut_domain_rule_calls;
+    ++g_ut_https_calls;
+}
+
+int fake_config_add_http(AgentsightConfigHandle* cfg, const char* target) {
+    (void)cfg;
+    (void)target;
+    ++g_ut_http_calls;
+    return 0;
 }
 
 AgentsightHandle* fake_handle_new(AgentsightConfigHandle* cfg) {
@@ -169,7 +177,8 @@ std::unique_ptr<AgentSightSymbolTable> makeFullSymbolTable() {
     t->config_set_verbose = fake_config_set_verbose;
     t->config_set_log_path = fake_config_set_log_path;
     t->config_add_cmdline_rule = fake_config_add_cmdline_rule;
-    t->config_add_domain_rule = fake_config_add_domain_rule;
+    t->config_add_https = fake_config_add_https;
+    t->config_add_http = fake_config_add_http;
     t->handle_new = fake_handle_new;
     t->handle_free = fake_handle_free;
     t->handle_start = fake_handle_start;
@@ -177,6 +186,16 @@ std::unique_ptr<AgentSightSymbolTable> makeFullSymbolTable() {
     t->handle_get_eventfd = fake_get_eventfd;
     t->handle_read = fake_handle_read;
     return t;
+}
+
+std::shared_ptr<AgentsightLlmRecord> makeMinimalLlmRecord(const char* configName, const char* sessionId) {
+    static AgentsightLLMData data{};
+    std::memset(&data, 0, sizeof(data));
+    data.session_id = sessionId;
+    data.conversation_id = "turn-ut";
+    data.response_id = "resp-ut";
+    data.timestamp_ns = 1U;
+    return std::make_shared<AgentsightLlmRecord>(std::string(configName), data);
 }
 
 class AgentSightTestEBPFAdapter : public EBPFAdapter {
@@ -218,11 +237,13 @@ public:
         g_config_new_null = false;
         g_ut_cmdline_allow_calls = 0;
         g_ut_cmdline_deny_calls = 0;
-        g_ut_domain_rule_calls = 0;
+        g_ut_https_calls = 0;
+        g_ut_http_calls = 0;
         auto& o = agentsightOptions();
         o.mAgentsightCmdlineWhitelist.clear();
         o.mAgentsightCmdlineBlacklist.clear();
-        o.mAgentsightDomainWhitelist.clear();
+        o.mAgentsightHttps.clear();
+        o.mAgentsightHttp.clear();
     }
 
     void TearDown() override {
@@ -236,7 +257,7 @@ public:
 
     std::shared_ptr<AbstractManager> createManagerInstance() override { return makeManager(); }
 
-    std::variant<SecurityOptions*, ObserverNetworkOption*> createTestOptions() override { return asVariant(); }
+    PluginOptions createTestOptions() override { return asVariant(); }
 
     static SecurityOptions& agentsightOptions() {
         static SecurityOptions o;
@@ -246,15 +267,29 @@ public:
         return o;
     }
 
-    std::variant<SecurityOptions*, ObserverNetworkOption*> asVariant() { return &agentsightOptions(); }
+    PluginOptions asVariant() { return &agentsightOptions(); }
 
-    std::shared_ptr<AgentsightManager> makeManager() {
-        auto m = AgentsightManager::Create(mProcessCacheManager,
-                                           std::static_pointer_cast<EBPFAdapter>(mAgentSightAdapter),
-                                           *mEventQueue,
-                                           mEventPool.get());
+    std::shared_ptr<AgentsightManager> makeManager(const size_t sessionInputCacheMaxSize = 4096) {
+        auto m = std::make_shared<AgentsightManager>(mProcessCacheManager,
+                                                     std::static_pointer_cast<EBPFAdapter>(mAgentSightAdapter),
+                                                     *mEventQueue,
+                                                     mEventPool.get(),
+                                                     sessionInputCacheMaxSize);
         APSARA_TEST_EQUAL(0, m->Init());
         return m;
+    }
+
+    void registerConfig(AgentsightManager& mgr, const char* configName) {
+        CollectionPipelineContext ctx;
+        ctx.SetConfigName(configName);
+        ctx.SetProcessQueueKey(1);
+        APSARA_TEST_EQUAL(0, mgr.AddOrUpdateConfig(&ctx, 0, nullptr, asVariant()));
+    }
+
+    void populateSessionInputCache(AgentsightManager& mgr, const char* configName, const char* const* sessionIds) {
+        for (const char* const* it = sessionIds; *it != nullptr; ++it) {
+            APSARA_TEST_EQUAL(0, mgr.HandleEvent(makeMinimalLlmRecord(configName, *it)));
+        }
     }
 
     void TestAddOrUpdateValidation();
@@ -272,9 +307,12 @@ public:
     void TestSuspend();
     void TestDestroyTwice();
     void TestGetPluginType();
-    void TestCmdlineAndDomainRulesInvokedOnAddOrUpdate();
+    void TestCmdlineHttpsHttpRulesInvokedOnAddOrUpdate();
     void TestBuiltinCmdlineRulesInjectedWhenCmdlineOmitted();
     void TestUserBlacklistOnlySkipsBuiltinAllowInjection();
+    void TestRemoveConfigClearsSessionInputCache();
+    void TestDestroyClearsSessionInputCache();
+    void TestSessionInputCacheLruEviction();
 
 protected:
     std::shared_ptr<AgentSightTestEBPFAdapter> mAgentSightAdapter;
@@ -293,21 +331,15 @@ void AgentsightManagerUnittest::TestAddOrUpdateValidation() {
     ctx.SetProcessQueueKey(1);
 
     ObserverNetworkOption o{};
-    APSARA_TEST_NOT_EQUAL(
-        0, mgr->AddOrUpdateConfig(&ctx, 0, nullptr, std::variant<SecurityOptions*, ObserverNetworkOption*>(&o)));
+    APSARA_TEST_NOT_EQUAL(0, mgr->AddOrUpdateConfig(&ctx, 0, nullptr, PluginOptions(&o)));
 
-    APSARA_TEST_NOT_EQUAL(
-        0,
-        mgr->AddOrUpdateConfig(
-            nullptr, 0, nullptr, std::variant<SecurityOptions*, ObserverNetworkOption*>(&agentsightOptions())));
+    APSARA_TEST_NOT_EQUAL(0, mgr->AddOrUpdateConfig(nullptr, 0, nullptr, PluginOptions(&agentsightOptions())));
 
     {
         static SecurityOptions wrong;
         wrong = agentsightOptions();
         wrong.mProbeType = SecurityProbeType::FILE;
-        APSARA_TEST_NOT_EQUAL(
-            0,
-            mgr->AddOrUpdateConfig(&ctx, 0, nullptr, std::variant<SecurityOptions*, ObserverNetworkOption*>(&wrong)));
+        APSARA_TEST_NOT_EQUAL(0, mgr->AddOrUpdateConfig(&ctx, 0, nullptr, PluginOptions(&wrong)));
     }
 
     mgr->Destroy();
@@ -447,7 +479,7 @@ void AgentsightManagerUnittest::TestResumeInvalidOptions() {
                                            mEventPool.get());
     std::shared_ptr<TestableAgentsightManager> mgr(p);
     APSARA_TEST_EQUAL(0, mgr->Init());
-    std::variant<SecurityOptions*, ObserverNetworkOption*> nullSec{static_cast<SecurityOptions*>(nullptr)};
+    PluginOptions nullSec{static_cast<SecurityOptions*>(nullptr)};
     APSARA_TEST_NOT_EQUAL(0, mgr->resume(nullSec));
     mgr->Destroy();
 }
@@ -480,12 +512,13 @@ void AgentsightManagerUnittest::TestDestroyTwice() {
     APSARA_TEST_EQUAL(0, mgr->Destroy());
 }
 
-void AgentsightManagerUnittest::TestCmdlineAndDomainRulesInvokedOnAddOrUpdate() {
+void AgentsightManagerUnittest::TestCmdlineHttpsHttpRulesInvokedOnAddOrUpdate() {
     auto& o = agentsightOptions();
     o.mAgentsightCmdlineWhitelist = {AgentsightCmdlineAllowRule{"claude-code", {"node", "*claude*"}},
                                      AgentsightCmdlineAllowRule{"claude-code", {"node", "*claude*"}}};
     o.mAgentsightCmdlineBlacklist = {{"node", "*webpack*"}};
-    o.mAgentsightDomainWhitelist = {"*.openai.com", "*.anthropic.com"};
+    o.mAgentsightHttps = {"*.openai.com", "*.anthropic.com"};
+    o.mAgentsightHttp = {":8080", "10.0.0.1:9090", "model-svc.default.svc", "*.internal.svc"};
 
     auto mgr = makeManager();
     CollectionPipelineContext ctx;
@@ -494,7 +527,8 @@ void AgentsightManagerUnittest::TestCmdlineAndDomainRulesInvokedOnAddOrUpdate() 
     APSARA_TEST_EQUAL(0, mgr->AddOrUpdateConfig(&ctx, 0, nullptr, asVariant()));
     APSARA_TEST_EQUAL(2, g_ut_cmdline_allow_calls);
     APSARA_TEST_EQUAL(1, g_ut_cmdline_deny_calls);
-    APSARA_TEST_EQUAL(2, g_ut_domain_rule_calls);
+    APSARA_TEST_EQUAL(2, g_ut_https_calls);
+    APSARA_TEST_EQUAL(4, g_ut_http_calls);
     mgr->RemoveConfig("p1");
     mgr->Destroy();
 }
@@ -507,7 +541,8 @@ void AgentsightManagerUnittest::TestBuiltinCmdlineRulesInjectedWhenCmdlineOmitte
     APSARA_TEST_EQUAL(0, mgr->AddOrUpdateConfig(&ctx, 0, nullptr, asVariant()));
     APSARA_TEST_EQUAL(9, g_ut_cmdline_allow_calls);
     APSARA_TEST_EQUAL(0, g_ut_cmdline_deny_calls);
-    APSARA_TEST_EQUAL(4, g_ut_domain_rule_calls);
+    APSARA_TEST_EQUAL(4, g_ut_https_calls);
+    APSARA_TEST_EQUAL(0, g_ut_http_calls);
     mgr->RemoveConfig("p1");
     mgr->Destroy();
 }
@@ -523,8 +558,65 @@ void AgentsightManagerUnittest::TestUserBlacklistOnlySkipsBuiltinAllowInjection(
     APSARA_TEST_EQUAL(0, mgr->AddOrUpdateConfig(&ctx, 0, nullptr, asVariant()));
     APSARA_TEST_EQUAL(0, g_ut_cmdline_allow_calls);
     APSARA_TEST_EQUAL(1, g_ut_cmdline_deny_calls);
-    APSARA_TEST_EQUAL(4, g_ut_domain_rule_calls);
+    APSARA_TEST_EQUAL(4, g_ut_https_calls);
+    APSARA_TEST_EQUAL(0, g_ut_http_calls);
     mgr->RemoveConfig("p1");
+    mgr->Destroy();
+}
+
+void AgentsightManagerUnittest::TestRemoveConfigClearsSessionInputCache() {
+    const char* kConfigName = "p_remove_cache";
+    static const char* kSessionIds[] = {"sess-remove-1", "sess-remove-2", nullptr};
+
+    auto mgr = makeManager();
+    registerConfig(*mgr, kConfigName);
+    populateSessionInputCache(*mgr, kConfigName, kSessionIds);
+    APSARA_TEST_EQUAL(2, mgr->GetSessionInputCacheSizeForTest());
+    APSARA_TEST_TRUE(mgr->SessionInputCacheContainsForTest("sess-remove-1"));
+    APSARA_TEST_TRUE(mgr->SessionInputCacheContainsForTest("sess-remove-2"));
+
+    APSARA_TEST_EQUAL(0, mgr->RemoveConfig(kConfigName));
+    APSARA_TEST_EQUAL(0, mgr->GetSessionInputCacheSizeForTest());
+    APSARA_TEST_TRUE(!mgr->SessionInputCacheContainsForTest("sess-remove-1"));
+    APSARA_TEST_TRUE(!mgr->SessionInputCacheContainsForTest("sess-remove-2"));
+
+    mgr->Destroy();
+}
+
+void AgentsightManagerUnittest::TestDestroyClearsSessionInputCache() {
+    const char* kConfigName = "p_destroy_cache";
+    static const char* kSessionIds[] = {"sess-destroy-1", "sess-destroy-2", nullptr};
+
+    auto mgr = makeManager();
+    registerConfig(*mgr, kConfigName);
+    populateSessionInputCache(*mgr, kConfigName, kSessionIds);
+    APSARA_TEST_EQUAL(2, mgr->GetSessionInputCacheSizeForTest());
+
+    APSARA_TEST_EQUAL(0, mgr->Destroy());
+    APSARA_TEST_EQUAL(0, mgr->GetSessionInputCacheSizeForTest());
+    APSARA_TEST_TRUE(!mgr->SessionInputCacheContainsForTest("sess-destroy-1"));
+    APSARA_TEST_TRUE(!mgr->SessionInputCacheContainsForTest("sess-destroy-2"));
+}
+
+void AgentsightManagerUnittest::TestSessionInputCacheLruEviction() {
+    const char* kConfigName = "p_lru_evict";
+    static constexpr size_t kCacheCap = 2;
+
+    auto mgr = makeManager(kCacheCap);
+    registerConfig(*mgr, kConfigName);
+
+    APSARA_TEST_EQUAL(0, mgr->HandleEvent(makeMinimalLlmRecord(kConfigName, "sess-lru-1")));
+    APSARA_TEST_EQUAL(0, mgr->HandleEvent(makeMinimalLlmRecord(kConfigName, "sess-lru-2")));
+    APSARA_TEST_EQUAL(kCacheCap, mgr->GetSessionInputCacheSizeForTest());
+    APSARA_TEST_TRUE(mgr->SessionInputCacheContainsForTest("sess-lru-1"));
+    APSARA_TEST_TRUE(mgr->SessionInputCacheContainsForTest("sess-lru-2"));
+
+    APSARA_TEST_EQUAL(0, mgr->HandleEvent(makeMinimalLlmRecord(kConfigName, "sess-lru-3")));
+    APSARA_TEST_EQUAL(kCacheCap, mgr->GetSessionInputCacheSizeForTest());
+    APSARA_TEST_TRUE(!mgr->SessionInputCacheContainsForTest("sess-lru-1"));
+    APSARA_TEST_TRUE(mgr->SessionInputCacheContainsForTest("sess-lru-2"));
+    APSARA_TEST_TRUE(mgr->SessionInputCacheContainsForTest("sess-lru-3"));
+
     mgr->Destroy();
 }
 
@@ -543,8 +635,11 @@ UNIT_TEST_CASE(AgentsightManagerUnittest, TestResumeInvalidOptions);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestResumeWithNoRegistration);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestSuspend);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestDestroyTwice);
-UNIT_TEST_CASE(AgentsightManagerUnittest, TestCmdlineAndDomainRulesInvokedOnAddOrUpdate);
+UNIT_TEST_CASE(AgentsightManagerUnittest, TestCmdlineHttpsHttpRulesInvokedOnAddOrUpdate);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestBuiltinCmdlineRulesInjectedWhenCmdlineOmitted);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestUserBlacklistOnlySkipsBuiltinAllowInjection);
+UNIT_TEST_CASE(AgentsightManagerUnittest, TestRemoveConfigClearsSessionInputCache);
+UNIT_TEST_CASE(AgentsightManagerUnittest, TestDestroyClearsSessionInputCache);
+UNIT_TEST_CASE(AgentsightManagerUnittest, TestSessionInputCacheLruEviction);
 
 UNIT_TEST_MAIN

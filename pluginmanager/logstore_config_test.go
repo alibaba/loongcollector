@@ -29,6 +29,7 @@ import (
 
 	global_config "github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/util"
@@ -43,6 +44,62 @@ func TestLogstroreConfig(t *testing.T) {
 
 type logstoreConfigTestSuite struct {
 	suite.Suite
+}
+
+func TestFetchPluginVersionAutoV2ForInputlessPipeline(t *testing.T) {
+	const flusherName = "flusher_autov2_test"
+	oldCreator, existed := pipeline.Flushers[flusherName]
+	pipeline.AddFlusherCreator(flusherName, func() pipeline.Flusher { return &autoV2TestFlusher{} })
+	t.Cleanup(func() {
+		if existed {
+			pipeline.Flushers[flusherName] = oldCreator
+		} else {
+			delete(pipeline.Flushers, flusherName)
+		}
+	})
+
+	version := fetchPluginVersion(map[string]interface{}{
+		"flushers": []interface{}{
+			map[string]interface{}{"type": flusherName},
+		},
+	})
+
+	assert.Equal(t, v2, version)
+}
+
+func TestFetchPluginVersionKeepsV1ForInputPipeline(t *testing.T) {
+	const flusherName = "flusher_autov2_with_input_test"
+	oldCreator, existed := pipeline.Flushers[flusherName]
+	pipeline.AddFlusherCreator(flusherName, func() pipeline.Flusher { return &autoV2TestFlusher{} })
+	t.Cleanup(func() {
+		if existed {
+			pipeline.Flushers[flusherName] = oldCreator
+		} else {
+			delete(pipeline.Flushers, flusherName)
+		}
+	})
+
+	version := fetchPluginVersion(map[string]interface{}{
+		"inputs": []interface{}{
+			map[string]interface{}{"type": "service_mock"},
+		},
+		"flushers": []interface{}{
+			map[string]interface{}{"type": flusherName},
+		},
+	})
+
+	assert.Equal(t, v1, version)
+}
+
+type autoV2TestFlusher struct{}
+
+func (*autoV2TestFlusher) Init(pipeline.Context) error        { return nil }
+func (*autoV2TestFlusher) Description() string                { return "auto v2 test flusher" }
+func (*autoV2TestFlusher) IsReady(string, string, int64) bool { return true }
+func (*autoV2TestFlusher) SetUrgent(bool)                     {}
+func (*autoV2TestFlusher) Stop() error                        { return nil }
+func (*autoV2TestFlusher) Export([]*models.PipelineGroupEvents, pipeline.PipelineContext) error {
+	return nil
 }
 
 func (s *logstoreConfigTestSuite) BeforeTest(suiteName, testName string) {

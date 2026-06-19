@@ -30,6 +30,8 @@ const string SelfMonitorServer::INTERNAL_DATA_TYPE_METRIC = "__metric__";
 const string SelfMonitorServer::INTERNAL_DATA_TYPE_TASK_STATUS = "__task_status__";
 const string SelfMonitorServer::INTERNAL_DATA_TYPE_CONTAINER = "__container__";
 
+constexpr int32_t kMetricSendCheckIntervalSeconds = 15;
+
 SelfMonitorServer::SelfMonitorServer() {
 }
 
@@ -53,7 +55,7 @@ void SelfMonitorServer::Monitor() {
                 break;
             }
             int32_t nowTime = time(NULL);
-            if ((nowTime - lastMonitorTime) >= 60) { // 60s
+            if ((nowTime - lastMonitorTime) >= kMetricSendCheckIntervalSeconds) {
                 lastMonitorTime = nowTime;
                 SendMetrics();
             }
@@ -134,7 +136,7 @@ bool SelfMonitorServer::ProcessSelfMonitorMetricEvent(SelfMonitorMetricEvent& ev
         }
         return false;
     }
-    event.SetInterval(rule.mInterval);
+    event.SetIntervalSeconds(rule.mIntervalSeconds);
     return true;
 }
 
@@ -200,9 +202,12 @@ void SelfMonitorServer::SendAlarms() {
     // metadata:
     // INTERNAL_DATA_TARGET_REGION:${region}
     // INTERNAL_DATA_TYPE:__alarm__
+// Todo: windows 上的 cgo 内存有问题，调用 GetGoAlarms 函数时可能会 crash，需要修复
+#ifndef _MSC_VER
     if (LogtailPlugin::GetInstance()->IsPluginOpened()) {
         LogtailPlugin::GetInstance()->GetGoAlarms();
     }
+#endif
     vector<PipelineEventGroup> pipelineEventGroupList;
     AlarmManager::GetInstance()->FlushAllRegionAlarm(pipelineEventGroupList);
 

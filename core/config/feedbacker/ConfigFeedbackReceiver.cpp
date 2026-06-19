@@ -92,4 +92,9 @@ void ConfigFeedbackReceiver::FeedbackInstanceConfigStatus(const string& name, Co
     }
 }
 
+bool ConfigFeedbackReceiver::IsOnetimePipelineConfigRegistered(const string& name) {
+    lock_guard<mutex> lock(mMutex);
+    return mOnetimePipelineConfigFeedbackableMap.count(name) > 0;
+}
+
 } // namespace logtail

@@ -62,6 +62,7 @@
     * [主机监控数据](plugins/input/extended/metric-system.md)
     * [MySQL Binlog](plugins/input/extended/service-canal.md)
     * [容器标准输出](plugins/input/extended/service-docker-stdout.md)
+    * [Windows ETW 数据](plugins/input/extended/service-etw.md)
     * [GO Profile](plugins/input/extended/service-goprofile.md)
     * [GPU数据](plugins/input/extended/service-gpu.md)
     * [HTTP数据](plugins/input/extended/service-http-server.md)
@@ -167,6 +168,7 @@
     * [单条协议](developer-guide/log-protocol/protocol-spec/custom-single.md)
     * [raw协议](developer-guide/log-protocol/protocol-spec/raw.md)
 * 自监控
+  * [如何将自监控数据发送到Go Pipeline](developer-guide/self-monitor/how-to-export-self-monitor-data.md)
   * 指标
     * [自监控指标说明](developer-guide/self-monitor/metrics/internal-metrics-description.md)
     * [如何收集自监控指标](developer-guide/self-monitor/metrics/how-to-collect-internal-metrics.md)

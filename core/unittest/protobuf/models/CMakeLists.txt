@@ -18,6 +18,10 @@ project(protobuf_models_unittest)
 add_executable(manual_pb_parser_unittest ManualPBParserUnittest.cpp)
 target_link_libraries(manual_pb_parser_unittest ${UT_BASE_TARGET})
 
+add_executable(protocol_conversion_unittest ProtocolConversionUnittest.cpp)
+target_link_libraries(protocol_conversion_unittest ${UT_BASE_TARGET})
+
 include(GoogleTest)
 gtest_discover_tests(manual_pb_parser_unittest)
+gtest_discover_tests(protocol_conversion_unittest)
 

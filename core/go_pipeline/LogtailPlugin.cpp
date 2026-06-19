@@ -28,6 +28,7 @@
 #include "common/TimeUtil.h"
 #include "common/compression/CompressorFactory.h"
 #include "file_server/ConfigManager.h"
+#include "file_server/checkpoint/CheckPointManager.h"
 #include "logger/Logger.h"
 #include "monitor/AlarmManager.h"
 #include "monitor/Monitor.h"
@@ -267,6 +268,20 @@ int LogtailPlugin::SendPbV2(const char* configName,
     return pConfig->Send(std::string(pbBuffer, pbSize), shardHashStr, logstore) ? 0 : -1;
 }
 
+int LogtailPlugin::UpdateCheckpoint(const char* configName,
+                                    int32_t configNameSize,
+                                    const char* sourceId,
+                                    int32_t sourceIdSize,
+                                    const char* logPath,
+                                    int32_t logPathSize,
+                                    int64_t offset) {
+    CheckPointManager::Instance()->UpdateGoConfirmedOffset(std::string(sourceId, sourceIdSize),
+                                                           std::string(configName, configNameSize),
+                                                           std::string(logPath, logPathSize),
+                                                           offset);
+    return 0;
+}
+
 
 bool LogtailPlugin::LoadPluginBase() {
     if (mPluginValid) {
@@ -289,25 +304,33 @@ bool LogtailPlugin::LoadPluginBase() {
             return mPluginValid;
         }
         int version = versionFun();
-        if (!(version / 100 == 2 || version / 100 == 3)) {
+        if (!(version / 100 == 2 || version / 100 == 3 || version / 100 == 4)) {
             LOG_ERROR(sLogger, ("invalid plugin adapter version, version", version));
             return mPluginValid;
         }
         LOG_INFO(sLogger, ("valid plugin adapter version, version", version));
 
-        // Be compatible with old libGoPluginAdapter.so, V2 -> V1.
-        auto registerV2Fun = (RegisterLogtailCallBackV2)loader.LoadMethod("RegisterLogtailCallBackV2", error);
+        // Be compatible with old libGoPluginAdapter.so, V3 -> V2 -> V1.
+        auto registerV3Fun = (RegisterLogtailCallBackV3)loader.LoadMethod("RegisterLogtailCallBackV3", error);
         if (error.empty()) {
-            registerV2Fun(LogtailPlugin::IsValidToSend, LogtailPlugin::SendPb, LogtailPlugin::SendPbV2);
+            registerV3Fun(LogtailPlugin::IsValidToSend,
+                          LogtailPlugin::SendPb,
+                          LogtailPlugin::SendPbV2,
+                          LogtailPlugin::UpdateCheckpoint);
         } else {
-            LOG_WARNING(sLogger, ("load RegisterLogtailCallBackV2 failed", error)("try to load V1", ""));
+            auto registerV2Fun = (RegisterLogtailCallBackV2)loader.LoadMethod("RegisterLogtailCallBackV2", error);
+            if (error.empty()) {
+                registerV2Fun(LogtailPlugin::IsValidToSend, LogtailPlugin::SendPb, LogtailPlugin::SendPbV2);
+            } else {
+                LOG_WARNING(sLogger, ("load RegisterLogtailCallBackV2 failed", error)("try to load V1", ""));
 
-            auto registerFun = (RegisterLogtailCallBack)loader.LoadMethod("RegisterLogtailCallBack", error);
-            if (!error.empty()) {
-                LOG_WARNING(sLogger, ("load RegisterLogtailCallBack failed", error));
-                return mPluginValid;
+                auto registerFun = (RegisterLogtailCallBack)loader.LoadMethod("RegisterLogtailCallBack", error);
+                if (!error.empty()) {
+                    LOG_WARNING(sLogger, ("load RegisterLogtailCallBack failed", error));
+                    return mPluginValid;
+                }
+                registerFun(LogtailPlugin::IsValidToSend, LogtailPlugin::SendPb);
             }
-            registerFun(LogtailPlugin::IsValidToSend, LogtailPlugin::SendPb);
         }
 
         mPluginAdapterPtr = loader.Release();
@@ -397,15 +420,10 @@ bool LogtailPlugin::LoadPluginBase() {
             return mPluginValid;
         }
         // C++传递单条数据到golang插件
-        mProcessLogsFun = (ProcessLogsFun)loader.LoadMethod("ProcessLog", error);
+        mProcessPipelineEventGroupFun
+            = (ProcessPipelineEventGroupFun)loader.LoadMethod("ProcessPipelineEventGroup", error);
         if (!error.empty()) {
-            LOG_ERROR(sLogger, ("load ProcessLogs error, Message", error));
-            return mPluginValid;
-        }
-        // C++传递数据到golang插件
-        mProcessLogGroupFun = (ProcessLogGroupFun)loader.LoadMethod("ProcessLogGroup", error);
-        if (!error.empty()) {
-            LOG_ERROR(sLogger, ("load ProcessLogGroup error, Message", error));
+            LOG_ERROR(sLogger, ("load ProcessPipelineEventGroup error, Message", error));
             return mPluginValid;
         }
         // 获取golang部分指标信息
@@ -451,63 +469,30 @@ bool LogtailPlugin::LoadPluginBase() {
 }
 
 
-void LogtailPlugin::ProcessLog(const std::string& configName,
-                               sls_logs::Log& log,
-                               const std::string& packId,
-                               const std::string& topic,
-                               const std::string& tags) {
-    if (!log.has_time() || !(mPluginValid && mProcessLogsFun != NULL)) {
-        return;
-    }
-
-    std::string packIdPrefix = ToHexString(HashString(packId));
-    std::string realConfigName = configName + "/2";
-    GoString goConfigName;
-    GoSlice goLog;
-    GoString goPackId;
-    GoString goTopic;
-    GoSlice goTags;
-    goConfigName.n = realConfigName.size();
-    goConfigName.p = realConfigName.c_str();
-    goPackId.n = packIdPrefix.size();
-    goPackId.p = packIdPrefix.c_str();
-    goTopic.n = topic.size();
-    goTopic.p = topic.c_str();
-    goTags.data = (void*)tags.c_str();
-    goTags.len = goTags.cap = tags.length();
-    std::string sLog = log.SerializeAsString();
-    goLog.len = goLog.cap = sLog.length();
-    goLog.data = (void*)sLog.c_str();
-    GoInt rst = mProcessLogsFun(goConfigName, goLog, goPackId, goTopic, goTags);
-    if (rst != (GoInt)0) {
-        LOG_WARNING(sLogger, ("process log error", configName)("result", rst));
-    }
-}
-
-void LogtailPlugin::ProcessLogGroup(const std::string& configName,
-                                    const std::string& logGroup,
-                                    const std::string& packId) {
+void LogtailPlugin::ProcessPipelineEventGroup(const std::string& configName,
+                                              const std::string& pipelineEventGroup,
+                                              const std::string& packId) {
 #ifndef APSARA_UNIT_TEST_MAIN
-    if (logGroup.empty() || !(mPluginValid && mProcessLogsFun != NULL)) {
+    if (pipelineEventGroup.empty() || !(mPluginValid && mProcessPipelineEventGroupFun != NULL)) {
         return;
     }
     std::string realConfigName = configName + "/2";
     std::string packIdPrefix = ToHexString(HashString(packId));
     GoString goConfigName;
-    GoSlice goLog;
+    GoSlice goData;
     GoString goPackId;
     goConfigName.n = realConfigName.size();
     goConfigName.p = realConfigName.c_str();
     goPackId.n = packIdPrefix.size();
     goPackId.p = packIdPrefix.c_str();
-    goLog.len = goLog.cap = logGroup.length();
-    goLog.data = (void*)logGroup.c_str();
-    GoInt rst = mProcessLogGroupFun(goConfigName, goLog, goPackId);
+    goData.len = goData.cap = pipelineEventGroup.length();
+    goData.data = (void*)pipelineEventGroup.c_str();
+    GoInt rst = mProcessPipelineEventGroupFun(goConfigName, goData, goPackId);
     if (rst != (GoInt)0) {
-        LOG_WARNING(sLogger, ("process loggroup error", configName)("result", rst));
+        LOG_WARNING(sLogger, ("process pipeline event group error", configName)("result", rst));
     }
 #else
-    LogtailPluginMock::GetInstance()->ProcessLogGroup(configName, logGroup, packId);
+    LogtailPluginMock::GetInstance()->ProcessPipelineEventGroup(configName, pipelineEventGroup, packId);
 #endif
 }
 

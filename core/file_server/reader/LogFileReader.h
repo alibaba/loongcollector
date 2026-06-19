@@ -37,6 +37,7 @@
 #include "file_server/FileDiscoveryOptions.h"
 #include "file_server/FileServer.h"
 #include "file_server/MultilineOptions.h"
+#include "file_server/checkpoint/FileReaderCommitTracker.h"
 #include "file_server/checkpoint/RangeCheckpoint.h"
 #include "file_server/event/Event.h"
 #include "file_server/reader/FileReaderOptions.h"
@@ -413,6 +414,17 @@ public:
 
     QueueKey GetQueueKey() const { return mReaderConfig.second->GetProcessQueueKey(); }
 
+    // Deferred (send-confirmed) offset commit for tailing input_file. When enabled, the persisted
+    // checkpoint offset is advanced only after the flusher confirms the data was sent, instead of at
+    // read time. Disabled for exactly-once readers and when flushing through the Go pipeline (the
+    // send token cannot cross the C++/Go boundary), in which case the legacy read-time commit is used.
+    bool IsDeferCommit() const { return mDeferCommit; }
+    const std::shared_ptr<FileReaderCommitTracker>& GetCommitTracker() const { return mCommitTracker; }
+    // Called by the reader thread before each read. If a flusher reported a terminal send failure,
+    // rewinds the read cursor to the last committed offset so the unconfirmed range is re-read, and
+    // returns true. No-op (returns false) when deferred commit is disabled.
+    bool ConsumeCommitRollbackAndRewind();
+
     // void SetDelaySkipBytes(int64_t value) { mReadDelaySkipBytes = value; }
 
     // void SetFuseMode(bool fusemode) { mIsFuseMode = fusemode; }
@@ -474,6 +486,15 @@ protected:
     ReadUTF8(LogBuffer& logBuffer, int64_t end, bool& moreData, bool tryRollback = true, bool isStaticFile = false);
     void ReadGBK(LogBuffer& logBuffer, int64_t end, bool& moreData, bool tryRollback = true, bool isStaticFile = false);
 
+    // WHOLE_FILE overwrite chunked drain helpers. Each emitted chunk is sized to end on a line boundary
+    // ('\n') when possible, otherwise on a character boundary, so that every chunk shown downstream
+    // (which does not reassemble) is human-readable.
+    void DrainWholeFileChunk(LogBuffer& logBuffer, bool& moreData);
+    // Byte length of the next front chunk of [data, data+available), capped at BUFFER_SIZE, preferring a
+    // trailing '\n', else a complete character; always >= 1 to guarantee progress.
+    size_t GetWholeFileChunkSize(char* data, size_t available);
+    int32_t CountWholeFileChunks();
+
     size_t
     ReadFile(LogFileOperator& logFileOp, void* buf, size_t size, int64_t& offset, TruncateInfo** truncateInfo = NULL);
     static int32_t ParseTime(const char* buffer, const std::string& timeFormat);
@@ -505,6 +526,13 @@ protected:
     int64_t mExpectedFileSize = 0; //  expected file size limit, used for StaticFileServer reader
     time_t mLastMTime = 0;
     std::string mCache;
+    bool mDrainingWholeFileCache = false;
+    int32_t mWholeFileChunkIndex = 0;
+    int32_t mWholeFileTotalChunks = 0;
+    std::string mWholeFileId;
+    // WHOLE_FILE overwrite detection baselines (only touched by whole_file overwrite logic).
+    int64_t mLastMTimeNs = 0;
+    int64_t mLastWholeFileSize = -1;
     // >= 0: index of reader array, -1: new reader, -2: not in reader array, -3: not found
     int32_t mIdxInReaderArrayFromLastCpt = CHECKPOINT_IDX_OF_NEW_READER_IN_ARRAY;
     // std::string mProjectName;
@@ -526,6 +554,9 @@ protected:
     std::string mContainerID;
     time_t mContainerStoppedTime = 0;
     time_t mReadStoppedContainerAlarmTime = 0;
+    // Rate-limits the "whole_file overwrite exceeds MaxWholeFileBytes" warning so an oversized file does
+    // not flood the log on every read cycle.
+    time_t mWholeFileOversizeWarnTime = 0;
     int32_t mReadDelayTime = 0;
     bool mSkipFirstModify = false;
     // int64_t mReadDelayAlarmBytes;
@@ -602,6 +633,11 @@ private:
         uint32_t concurrency = 8;
     };
     std::shared_ptr<ExactlyOnceOption> mEOOption;
+
+    // Deferred (send-confirmed) commit state for tailing input_file. mCommitTracker is created once
+    // per reader and referenced weakly by send tokens; mDeferCommit gates whether the feature is on.
+    bool mDeferCommit = false;
+    std::shared_ptr<FileReaderCommitTracker> mCommitTracker = std::make_shared<FileReaderCommitTracker>();
 
     // Select next checkpoint to recover from toReplayCheckpoints.
     // Called before read.
@@ -730,6 +766,8 @@ private:
     friend class CreateModifyHandlerUnittest;
     friend class LogFileReaderHoleUnittest;
     friend class LogFileReaderResolvedPathUnittest;
+    friend class WholeFileOverwriteUnittest;
+    friend class WholeFileOverwriteLargeUnittest;
 
 protected:
     void UpdateReaderManual();
@@ -747,6 +785,10 @@ struct LogBuffer {
     uint64_t readOffset = 0;
     uint64_t readLength = 0;
     std::unique_ptr<SourceBuffer> sourcebuffer;
+    // WHOLE_FILE overwrite mode: chunked delivery metadata
+    std::string wholeFileId;
+    int32_t wholeFileSeq = -1;
+    int32_t wholeFileTotal = -1;
 
     LogBuffer() : sourcebuffer(new SourceBuffer()) {}
     void SetDependecy(const LogFileReaderPtr& reader) { logFileReader = reader; }

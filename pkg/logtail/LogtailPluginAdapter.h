@@ -17,6 +17,8 @@
 #ifndef LOGTAILPLUGINADAPTER_H__
 #define LOGTAILPLUGINADAPTER_H__
 
+#include <stdint.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -49,6 +51,14 @@ extern "C" {
         char *pbBuffer, int pbSize,
         int lines,
         const char *shardHash, int shardHashSize);
+
+    typedef int(*UpdateCheckpointFun)(const char* configName, int configNameSize,
+        const char* sourceId, int sourceIdSize,
+        const char* logPath, int logPathSize, int64_t offset);
+
+    int LogtailUpdateCheckpoint(const char* configName, int configNameSize,
+        const char* sourceId, int sourceIdSize,
+        const char* logPath, int logPathSize, int64_t offset);
 
     // version for logtail plugin adapter, used for check plugin adapter version
     int PluginAdapterVersion();

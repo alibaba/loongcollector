@@ -17,6 +17,7 @@
 #include "common/JsonUtil.h"
 #include "common/TimeUtil.h"
 #include "config/OnetimeConfigInfoManager.h"
+#include "config/feedbacker/ConfigFeedbackReceiver.h"
 #include "logger/Logger.h"
 
 using namespace std;
@@ -77,6 +78,27 @@ PipelineConfig::PipelineConfig(const string& name, unique_ptr<Json::Value>&& det
     if (inputsIt != nullptr && inputsIt->isArray()) {
         mInputsHash = static_cast<uint64_t>(Hash(*inputsIt));
     }
+    // Fold the onetime generation (if present) into the inputs hash.
+    // The config server injects global.__onetime_generation__ (the command's CreatedAt)
+    // when delivering an onetime command. A delete+recreate of a same-named command yields
+    // a new generation but typically identical inputs, so without this fold the execution
+    // layer would classify it as UPDATED (resume from checkpoint) instead of NEW (fresh
+    // rerun). Folding the generation into mInputsHash makes a generation change alter the
+    // inputs hash, which OnetimeConfigInfoManager::GetOnetimeConfigStatus treats as NEW.
+    // A genuine in-place edit of an existing command keeps the same generation, so its
+    // inputs hash is unchanged and the UPDATED/resume semantics are preserved.
+    // Non-onetime configs never carry this key, so their inputs hash is unaffected.
+    const char* globalKey = "global";
+    const auto* globalIt = mDetail->find(globalKey, globalKey + strlen(globalKey));
+    if (globalIt != nullptr && globalIt->isObject()) {
+        const char* genKey = "__onetime_generation__";
+        const auto* genIt = globalIt->find(genKey, genKey + strlen(genKey));
+        if (genIt != nullptr && genIt->isNumeric()) {
+            uint64_t generation = genIt->asUInt64();
+            // Order-independent mix (same constant as boost::hash_combine's golden ratio).
+            mInputsHash ^= generation + 0x9e3779b97f4a7c15ULL + (mInputsHash << 6) + (mInputsHash >> 2);
+        }
+    }
     mConfigHash = static_cast<uint64_t>(Hash(*mDetail));
 }
 
@@ -110,7 +132,14 @@ bool PipelineConfig::GetExpireTimeIfOneTime(const Json::Value& global) {
                          "expire time", mOnetimeExpireTime.value())("config", mName));
             return true;
         case OnetimeConfigStatus::OBSOLETE: {
-            // OBSOLETE状态表示配置过期，删除配置文件
+            // OBSOLETE状态表示配置过期，删除配置文件。
+            // 注意：此处不调用 FeedbackOnetimePipelineConfigStatus(DELETED)。
+            // LoadConfigFile() 已在启动时将 mOnetimePipelineConfigInfoMap 中的状态设置为 APPLIED，
+            // 若在此覆盖为 DELETED，下次心跳会发送 version=-1 且 proto status=0 (UNSET)，
+            // 导致服务端记录状态变为 "0 (UNKNOWN)"。
+            // 服务端会独立判断 onetime 配置已过期（expire_time < now），并发 expire_time=-1
+            // cancel 给 agent，由 agent 负责清理 mOnetimePipelineConfigInfoMap 中的条目，
+            // 服务端最终保留的状态为 APPLIED，符合预期。
             error_code ec;
             if (filesystem::remove(mFilePath, ec)) {
                 LOG_INFO(sLogger,

@@ -32,7 +32,8 @@ void TaskPipelineManager::UpdatePipelines(TaskConfigDiff& diff) {
             if (iter == mPipelineNameEntityMap.end()) {
                 continue;
             }
-            isOnetime = iter->second->IsOnetime();
+            isOnetime = iter->second->IsOnetime()
+                || ConfigFeedbackReceiver::GetInstance().IsOnetimePipelineConfigRegistered(name);
             iter->second->Stop(true);
             {
                 unique_lock<shared_mutex> lock(mPipelineNameEntityMapMutex);
@@ -49,7 +50,8 @@ void TaskPipelineManager::UpdatePipelines(TaskConfigDiff& diff) {
     }
     for (auto& config : diff.mModified) {
         const string configName = config.mName;
-        const bool isOnetimeConfig = config.IsOnetime();
+        const bool isOnetimeConfig = config.IsOnetime()
+            || ConfigFeedbackReceiver::GetInstance().IsOnetimePipelineConfigRegistered(configName);
         auto p = BuildPipeline(std::move(config));
         if (!p) {
             LOG_WARNING(
@@ -70,7 +72,8 @@ void TaskPipelineManager::UpdatePipelines(TaskConfigDiff& diff) {
         LOG_INFO(sLogger,
                  ("task building for existing config succeeded",
                   "stop the old task and start the new one")("config", configName));
-        bool builtIsOnetime = p->IsOnetime();
+        bool builtIsOnetime = p->IsOnetime()
+            || ConfigFeedbackReceiver::GetInstance().IsOnetimePipelineConfigRegistered(configName);
         {
             auto iter = mPipelineNameEntityMap.find(configName);
             // when pipeline lifespan attribute changes, two pipelines are considered unrelated, and thus the old one
@@ -95,7 +98,8 @@ void TaskPipelineManager::UpdatePipelines(TaskConfigDiff& diff) {
     }
     for (auto& config : diff.mAdded) {
         const string configName = config.mName;
-        const bool isOnetimeConfig = config.IsOnetime();
+        const bool isOnetimeConfig = config.IsOnetime()
+            || ConfigFeedbackReceiver::GetInstance().IsOnetimePipelineConfigRegistered(configName);
         auto p = BuildPipeline(std::move(config));
         if (!p) {
             LOG_WARNING(sLogger,
@@ -113,7 +117,8 @@ void TaskPipelineManager::UpdatePipelines(TaskConfigDiff& diff) {
             continue;
         }
         LOG_INFO(sLogger, ("task building for new config succeeded", "begin to start task")("config", configName));
-        bool builtIsOnetime = p->IsOnetime();
+        bool builtIsOnetime = p->IsOnetime()
+            || ConfigFeedbackReceiver::GetInstance().IsOnetimePipelineConfigRegistered(configName);
         {
             unique_lock<shared_mutex> lock(mPipelineNameEntityMapMutex);
             mPipelineNameEntityMap[configName] = std::move(p);
