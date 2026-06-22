@@ -25,13 +25,14 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/alibaba/ilogtail/pkg/helper/containercenter"
-	"github.com/alibaba/ilogtail/pkg/logger"
-	"github.com/alibaba/ilogtail/pkg/pipeline"
-
 	"github.com/prometheus/procfs"
 	"github.com/shirou/gopsutil/disk"
 	"github.com/shirou/gopsutil/net"
+
+	"github.com/alibaba/ilogtail/pkg/helper/containercenter"
+	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
 type tcpState uint64
@@ -101,9 +102,9 @@ func (st tcpState) String() string {
 func (r *InputSystem) Init(context pipeline.Context) (int, error) {
 	r.context = context
 	// mount the host proc path
-	fs, err := procfs.NewFS(containercenter.GetMountedFilePath(procfs.DefaultMountPoint))
+	fs, err := procfs.NewFS(containercenter.GetMonitorFilePath(procfs.DefaultMountPoint))
 	if err != nil {
-		logger.Warning(r.context.GetRuntimeContext(), "READ_PROC_ALARM", "err", err)
+		logger.Warning(r.context.GetRuntimeContext(), selfmonitor.ReadProcAlarm, "err", err)
 		return 0, err
 	}
 	r.fs = &fs
@@ -118,11 +119,11 @@ func (r *InputSystem) CollectTCPStats(collector pipeline.Collector, stat *net.Pr
 
 	tcp, errTCP := r.fs.NetTCP()
 	if errTCP != nil {
-		logger.Warning(r.context.GetRuntimeContext(), "READ_PTOCTCP_ALARM", "err", errTCP)
+		logger.Warning(r.context.GetRuntimeContext(), selfmonitor.ReadPtoctcpAlarm, "err", errTCP)
 	}
 	tcp6, errTCP6 := r.fs.NetTCP6()
 	if errTCP6 != nil {
-		logger.Warning(r.context.GetRuntimeContext(), "READ_PTOCTCP6_ALARM", "err", errTCP6)
+		logger.Warning(r.context.GetRuntimeContext(), selfmonitor.ReadPtoctcp6Alarm, "err", errTCP6)
 	}
 	if errTCP != nil && errTCP6 != nil {
 		return
@@ -145,9 +146,9 @@ func (r *InputSystem) CollectTCPStats(collector pipeline.Collector, stat *net.Pr
 
 func (r *InputSystem) CollectOpenFD(collector pipeline.Collector) {
 	// mount the host proc path
-	file, err := os.Open(containercenter.GetMountedFilePath("/proc/sys/fs/file-nr"))
+	file, err := os.Open(containercenter.GetMonitorFilePath("/proc/sys/fs/file-nr"))
 	if err != nil {
-		logger.Warning(r.context.GetRuntimeContext(), "OPEN_FILENR_ALARM", "err", err)
+		logger.Warning(r.context.GetRuntimeContext(), selfmonitor.OpenFilenrAlarm, "err", err)
 		return
 	}
 	defer func(file *os.File) {
@@ -155,12 +156,12 @@ func (r *InputSystem) CollectOpenFD(collector pipeline.Collector) {
 	}(file)
 	content, err := io.ReadAll(file)
 	if err != nil {
-		logger.Warning(r.context.GetRuntimeContext(), "READ_FILENR_ALARM", "err", err)
+		logger.Warning(r.context.GetRuntimeContext(), selfmonitor.ReadFilenrAlarm, "err", err)
 		return
 	}
 	parts := bytes.Split(bytes.TrimSpace(content), []byte("\u0009"))
 	if len(parts) < 3 {
-		logger.Warning(r.context.GetRuntimeContext(), "FILENR_PATTERN_ALARM", "want", 3, "got", len(parts))
+		logger.Warning(r.context.GetRuntimeContext(), selfmonitor.FilenrPatternAlarm, "want", 3, "got", len(parts))
 		return
 	}
 	allocated, _ := strconv.ParseFloat(string(parts[0]), 64)
@@ -173,9 +174,9 @@ func (r *InputSystem) CollectOpenFD(collector pipeline.Collector) {
 // because one device would be mounted many times in virtual environment.
 func (r *InputSystem) CollectDiskUsage(collector pipeline.Collector) {
 	// mount the host proc path
-	file, err := os.Open(containercenter.GetMountedFilePath("/proc/1/mounts"))
+	file, err := os.Open(containercenter.GetMonitorFilePath("/proc/1/mounts"))
 	if err != nil {
-		logger.Warning(r.context.GetRuntimeContext(), "OPEN_1MOUNTS_ALARM", "err", err)
+		logger.Warning(r.context.GetRuntimeContext(), selfmonitor.Open1mountsAlarm, "err", err)
 		return
 	}
 	defer func(file *os.File) {
@@ -186,7 +187,7 @@ func (r *InputSystem) CollectDiskUsage(collector pipeline.Collector) {
 		text := scanner.Text()
 		parts := strings.Fields(text)
 		if len(parts) < 4 {
-			logger.Warning(r.context.GetRuntimeContext(), "READ_1MOUNTS_ALARM", "got", text)
+			logger.Warning(r.context.GetRuntimeContext(), selfmonitor.Read1mountsAlarm, "got", text)
 			return
 		}
 		if r.excludeDiskFsTypeRegex != nil && r.excludeDiskFsTypeRegex.MatchString(parts[2]) {
@@ -204,7 +205,7 @@ func (r *InputSystem) CollectDiskUsage(collector pipeline.Collector) {
 		labels.Append("device", parts[0])
 		labels.Append("fs_type", parts[2])
 		// wrapper with mountedpath because of using unix statfs rather than proc file system.
-		usage, err := disk.Usage(containercenter.GetMountedFilePath(parts[1]))
+		usage, err := disk.Usage(containercenter.GetMonitorFilePath(parts[1]))
 		if err == nil {
 			r.addMetric(collector, "disk_space_usage", labels, usage.UsedPercent)
 			r.addMetric(collector, "disk_inode_usage", labels, usage.InodesUsedPercent)

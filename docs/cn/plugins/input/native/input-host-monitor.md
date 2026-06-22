@@ -4,9 +4,15 @@
 
 `input_host_monitor` 插件定期采集宿主机的 CPU、内存、磁盘、网络、系统负载、进程等监控指标。
 
+源代码：[InputHostMonitor.cpp](https://github.com/alibaba/loongcollector/blob/main/core/plugin/input/InputHostMonitor.cpp)
+
 ## 版本
 
 [Beta](../../stability-level.md)
+
+## 版本说明
+
+* 推荐版本：LoongCollector v3.3.2 及以上
 
 ## 配置参数
 

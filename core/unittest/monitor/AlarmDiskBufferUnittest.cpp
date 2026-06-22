@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <filesystem>
+#include <fstream>
 #include <sstream>
 #include <vector>
 
@@ -28,6 +29,9 @@
 #include "monitor/AlarmManager.h"
 #include "monitor/SelfMonitorServer.h"
 #include "unittest/Unittest.h"
+
+DECLARE_FLAG_INT32(logtail_startup_alarm_file_max_size);
+DECLARE_FLAG_INT32(logtail_startup_alarm_file_min_level);
 
 namespace logtail {
 
@@ -189,6 +193,8 @@ public:
     void TestReadAndSendAlarmsFromFile();
     void TestFileSendRetry();
     void TestStopWritingAfter60s();
+    void TestStopWritingWhenFileSizeExceedsLimit();
+    void TestAlarmLevelFiltering();
     void TestNoDataLossOrDuplication();
 };
 
@@ -197,7 +203,9 @@ APSARA_UNIT_TEST_CASE(AlarmDiskBufferUnittest, TestAlarmDeduplicationInFile, 1);
 APSARA_UNIT_TEST_CASE(AlarmDiskBufferUnittest, TestReadAndSendAlarmsFromFile, 2);
 APSARA_UNIT_TEST_CASE(AlarmDiskBufferUnittest, TestFileSendRetry, 3);
 APSARA_UNIT_TEST_CASE(AlarmDiskBufferUnittest, TestStopWritingAfter60s, 4);
-APSARA_UNIT_TEST_CASE(AlarmDiskBufferUnittest, TestNoDataLossOrDuplication, 5);
+APSARA_UNIT_TEST_CASE(AlarmDiskBufferUnittest, TestStopWritingWhenFileSizeExceedsLimit, 5);
+APSARA_UNIT_TEST_CASE(AlarmDiskBufferUnittest, TestAlarmLevelFiltering, 6);
+APSARA_UNIT_TEST_CASE(AlarmDiskBufferUnittest, TestNoDataLossOrDuplication, 7);
 
 void AlarmDiskBufferUnittest::TestWriteAlarmToFileWhenPipelineNotReady() {
     // Pipeline 未就绪时，alarm 应该写入文件
@@ -366,6 +374,91 @@ void AlarmDiskBufferUnittest::TestStopWritingAfter60s() {
     // buffer 也应该为空（alarm 被丢弃）
     int32_t bufferCount = CountAlarmsInBuffer("Region1");
     APSARA_TEST_EQUAL(0, bufferCount);
+}
+
+void AlarmDiskBufferUnittest::TestStopWritingWhenFileSizeExceedsLimit() {
+    AlarmManager::GetInstance()->mAlarmPipelineReady.store(false);
+    AlarmManager::GetInstance()->mStopWritingFile.store(false);
+    Application::GetInstance()->mStartTime = time(nullptr);
+
+    // Set file size limit to a very small value (100 bytes)
+    int32_t origMaxSize = INT32_FLAG(logtail_startup_alarm_file_max_size);
+    INT32_FLAG(logtail_startup_alarm_file_max_size) = 100;
+
+    // Send first alarm to create the file
+    AlarmManager::GetInstance()->SendAlarmWarning(
+        USER_CONFIG_ALARM, "First message", "Region1", "Project1", "Config1", "Cat1");
+
+    // Close file handle to flush data
+    AlarmManager::GetInstance()->CloseAlarmDiskBufferFile();
+
+    // Verify file was created
+    APSARA_TEST_TRUE(!AlarmManager::GetInstance()->mAlarmDiskBufferFilePath.empty());
+    APSARA_TEST_TRUE(CheckExistance(AlarmManager::GetInstance()->mAlarmDiskBufferFilePath));
+
+    // Pad the file to exceed limit
+    {
+        std::ofstream ofs(AlarmManager::GetInstance()->mAlarmDiskBufferFilePath, std::ios::app);
+        std::string padding(200, 'x');
+        ofs << padding << "\n";
+    }
+
+    // Send another alarm — should trigger stop
+    AlarmManager::GetInstance()->SendAlarmWarning(
+        USER_CONFIG_ALARM, "Second message", "Region1", "Project1", "Config1", "Cat1");
+
+    // Should have stopped writing
+    APSARA_TEST_TRUE(AlarmManager::GetInstance()->mStopWritingFile.load());
+
+    // Buffer should also be empty (pipeline not ready, alarm discarded)
+    int32_t bufferCount = CountAlarmsInBuffer("Region1");
+    APSARA_TEST_EQUAL(0, bufferCount);
+
+    // Restore original flag
+    INT32_FLAG(logtail_startup_alarm_file_max_size) = origMaxSize;
+}
+
+void AlarmDiskBufferUnittest::TestAlarmLevelFiltering() {
+    AlarmManager::GetInstance()->mAlarmPipelineReady.store(false);
+    AlarmManager::GetInstance()->mStopWritingFile.store(false);
+    Application::GetInstance()->mStartTime = time(nullptr);
+
+    // Set min level to 2 (ERROR), so WARNING (level 1) alarms are filtered out
+    int32_t origMinLevel = INT32_FLAG(logtail_startup_alarm_file_min_level);
+    INT32_FLAG(logtail_startup_alarm_file_min_level) = 2;
+
+    // Send a WARNING level alarm (level 1) — should be filtered out
+    AlarmManager::GetInstance()->SendAlarmWarning(
+        USER_CONFIG_ALARM, "Warning message", "Region1", "Project1", "Config1", "Cat1");
+
+    // Close file handle
+    AlarmManager::GetInstance()->CloseAlarmDiskBufferFile();
+
+    // File should not exist or be empty (WARNING level < min level 2)
+    int32_t fileAlarmCount = CountAlarmsInFile();
+    APSARA_TEST_EQUAL(0, fileAlarmCount);
+
+    // Send an ERROR level alarm (level 2) — should be written
+    AlarmManager::GetInstance()->SendAlarmError(
+        USER_CONFIG_ALARM, "Error message", "Region1", "Project1", "Config1", "Cat1");
+
+    // Close file handle
+    AlarmManager::GetInstance()->CloseAlarmDiskBufferFile();
+
+    // File should have 1 alarm
+    fileAlarmCount = CountAlarmsInFile();
+    APSARA_TEST_EQUAL(1, fileAlarmCount);
+
+    // Verify the alarm in file is the ERROR one
+    int32_t errorCount = GetAlarmCountFromFile("Region1", "USER_CONFIG_ALARM", "Project1", "Cat1", "Config1", "2");
+    APSARA_TEST_EQUAL(1, errorCount);
+
+    // Buffer should be empty (pipeline not ready)
+    int32_t bufferCount = CountAlarmsInBuffer("Region1");
+    APSARA_TEST_EQUAL(0, bufferCount);
+
+    // Restore original flag
+    INT32_FLAG(logtail_startup_alarm_file_min_level) = origMinLevel;
 }
 
 void AlarmDiskBufferUnittest::TestNoDataLossOrDuplication() {

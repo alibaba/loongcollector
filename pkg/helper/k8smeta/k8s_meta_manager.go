@@ -40,13 +40,15 @@ type FlushCh struct {
 }
 
 type MetaManager struct {
-	clientset *kubernetes.Clientset
-	stopCh    chan struct{}
+	clientset  *kubernetes.Clientset
+	restConfig *rest.Config
+	stopCh     chan struct{}
 
 	ready atomic.Bool
 
 	metadataHandler *metadataHandler
 	cacheMap        map[string]MetaCache
+	cacheMu         sync.RWMutex
 	linkGenerator   *LinkGenerator
 	linkRegisterMap map[string][]string
 	registerLock    sync.RWMutex
@@ -74,11 +76,60 @@ func GetMetaManagerInstance() *MetaManager {
 		for _, resource := range AllResources {
 			metaManager.cacheMap[resource] = newK8sMetaCache(metaManager.stopCh, resource)
 		}
-		metaManager.linkGenerator = NewK8sMetaLinkGenerator(metaManager.cacheMap)
+		metaManager.linkGenerator = NewK8sMetaLinkGenerator(metaManager.cacheMap, &metaManager.cacheMu)
 		metaManager.linkRegisterMap = make(map[string][]string)
 		metaManager.projectNames = make(map[string]int)
 	})
 	return metaManager
+}
+
+// RegisterCustomResourceCollector registers a dynamic informer cache keyed by cfg.EntityType (after Normalize).
+// Optional PodLink registers Pod→CR link generation for PodLinkTypeForEntity(EntityType).
+// Safe before or after Init; if Init already ran, the dynamic client is attached immediately.
+func (m *MetaManager) RegisterCustomResourceCollector(cfg CustomResourceCollectorConfig) error {
+	if err := cfg.Normalize(); err != nil {
+		return err
+	}
+	m.cacheMu.Lock()
+	if exist, ok := m.cacheMap[cfg.EntityType]; ok {
+		if uc, isCR := exist.(*crUnifiedCache); isCR {
+			uc.SetGVRIfNotStarted(cfg.ToGVR())
+		}
+	} else {
+		m.cacheMap[cfg.EntityType] = newCRUnifiedCache(m.stopCh, cfg.EntityType, cfg.ToGVR())
+		if m.restConfig != nil {
+			if uc, ok := m.cacheMap[cfg.EntityType].(*crUnifiedCache); ok {
+				if err := uc.setRESTConfig(m.restConfig); err != nil {
+					// Graceful degradation: dynamicClient unset; crUnifiedCache.EnsureWatchStarted skips when client is nil (this CR informer does not run).
+					logger.Error(context.Background(), K8sMetaUnifyErrorCode, "setRESTConfig for custom resource cache", err, "entityType", cfg.EntityType)
+				}
+			}
+		}
+	}
+	m.cacheMu.Unlock()
+
+	if cfg.PodLink != nil {
+		m.linkGenerator.registerPodCRLink(PodLinkTypeForEntity(cfg.EntityType), &podCRLinkRuntime{
+			entityType:          cfg.EntityType,
+			ownerKind:           cfg.PodLink.OwnerKind,
+			ownerAPIGroupSubstr: firstNonEmpty(cfg.PodLink.OwnerAPIGroupContains, cfg.APIGroup),
+			podLabelKey:         cfg.PodLink.PodLabelKey,
+		})
+	}
+	return nil
+}
+
+// EnsureCustomResourceInformerStarted starts the dynamic informer for an EntityType if the REST config is ready.
+func (m *MetaManager) EnsureCustomResourceInformerStarted(entityType string) {
+	m.cacheMu.RLock()
+	c, ok := m.cacheMap[entityType]
+	m.cacheMu.RUnlock()
+	if !ok {
+		return
+	}
+	if uc, ok := c.(*crUnifiedCache); ok {
+		uc.EnsureWatchStarted()
+	}
 }
 
 func (m *MetaManager) Init(configPath string) (err error) {
@@ -103,6 +154,19 @@ func (m *MetaManager) Init(configPath string) (err error) {
 		return err
 	}
 	m.clientset = clientset
+	m.restConfig = config
+
+	// CR dynamic client: setRESTConfig errors are logged only (graceful degradation; built-in meta still starts).
+	// Failed caches keep dynamicClient nil; EnsureWatchStarted skips there (no CR informer until a successful setRESTConfig, e.g. after restart).
+	m.cacheMu.Lock()
+	for _, c := range m.cacheMap {
+		if uc, ok := c.(*crUnifiedCache); ok {
+			if err := uc.setRESTConfig(config); err != nil {
+				logger.Error(context.Background(), K8sMetaUnifyErrorCode, "setRESTConfig for custom resource cache at Init", err, "resourceType", uc.resourceType)
+			}
+		}
+	}
+	m.cacheMu.Unlock()
 
 	m.metricRecord = selfmonitor.MetricsRecord{}
 	m.addEventCount = selfmonitor.NewCounterMetricAndRegister(&m.metricRecord, selfmonitor.MetricRunnerK8sMetaAddEventTotal)
@@ -116,9 +180,21 @@ func (m *MetaManager) Init(configPath string) (err error) {
 
 	go func() {
 		startTime := time.Now()
+		m.cacheMu.RLock()
+		caches := make([]struct {
+			name string
+			c    MetaCache
+		}, 0, len(m.cacheMap))
 		for resourceType, cache := range m.cacheMap {
-			logger.Info(context.Background(), resourceType, "init success")
-			cache.init(clientset)
+			caches = append(caches, struct {
+				name string
+				c    MetaCache
+			}{resourceType, cache})
+		}
+		m.cacheMu.RUnlock()
+		for _, ent := range caches {
+			logger.Info(context.Background(), ent.name, "init success")
+			ent.c.init(clientset)
 		}
 		m.ready.Store(true)
 		logger.Info(context.Background(), "init k8s meta manager", "success", "latancy (ms)", fmt.Sprintf("%d", time.Since(startTime).Milliseconds()))
@@ -136,7 +212,10 @@ func (m *MetaManager) IsReady() bool {
 }
 
 func (m *MetaManager) RegisterSendFunc(projectName, configName, resourceType string, sendFunc SendFunc, interval int) {
-	if cache, ok := m.cacheMap[resourceType]; ok {
+	m.cacheMu.RLock()
+	cache, ok := m.cacheMap[resourceType]
+	m.cacheMu.RUnlock()
+	if ok {
 		cache.RegisterSendFunc(configName, func(events []*K8sMetaEvent) {
 			defer panicRecover()
 			sendFunc(events)
@@ -174,7 +253,13 @@ func (m *MetaManager) RegisterSendFunc(projectName, configName, resourceType str
 }
 
 func (m *MetaManager) UnRegisterAllSendFunc(projectName, configName string) {
+	m.cacheMu.RLock()
+	caches := make([]MetaCache, 0, len(m.cacheMap))
 	for _, cache := range m.cacheMap {
+		caches = append(caches, cache)
+	}
+	m.cacheMu.RUnlock()
+	for _, cache := range caches {
 		cache.UnRegisterSendFunc(configName)
 	}
 	m.registerLock.Lock()
@@ -197,10 +282,12 @@ func GetMetaManagerMetrics() []map[string]string {
 	// cache
 	queueSize := 0
 	cacheSize := 0
+	manager.cacheMu.RLock()
 	for _, cache := range manager.cacheMap {
 		queueSize += cache.GetQueueSize()
 		cacheSize += cache.GetSize()
 	}
+	manager.cacheMu.RUnlock()
 	manager.queueSizeGauge.Set(float64(queueSize))
 	manager.cacheResourceGauge.Set(float64(cacheSize))
 	// set labels
@@ -237,6 +324,13 @@ func GetMetaManagerMetrics() []map[string]string {
 
 func (m *MetaManager) runServer() {
 	go m.metadataHandler.K8sServerRun(m.stopCh)
+}
+
+func firstNonEmpty(val, def string) string {
+	if strings.TrimSpace(val) != "" {
+		return val
+	}
+	return def
 }
 
 func isEntity(resourceType string) bool {

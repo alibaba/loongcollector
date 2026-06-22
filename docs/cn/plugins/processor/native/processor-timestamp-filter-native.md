@@ -12,7 +12,7 @@
 
 ## 版本说明
 
-* 推荐版本：【待发布】
+* 推荐版本：LoongCollector v3.2.6 及以上
 
 ## 配置参数
 
@@ -78,6 +78,8 @@ flushers:
 
 * 输出
 
+（仅示意保留范围内的一条。）
+
 ```json
 {
     "__tag__:__path__": "/home/test-log/app.log",
@@ -91,6 +93,8 @@ flushers:
 采集包含时间戳字段的日志，根据时间戳字段进行过滤。
 
 * 输入
+
+文件 `/home/test-log/events.log` 中每行一条 JSON（NDJSON），等价于：
 
 ```json
 {"timestamp": "1705286400", "message": "Event 1", "level": "INFO"}
@@ -121,6 +125,8 @@ flushers:
 
 * 输出
 
+可能被保留的数据示例（`__time__` 以实际采集配置解析为准，以下为 **两条数据**）：
+
 ```json
 {
     "__tag__:__path__": "/home/test-log/events.log",
@@ -129,6 +135,7 @@ flushers:
     "level": "INFO",
     "__time__": "1234567890"
 }
+
 {
     "__tag__:__path__": "/home/test-log/events.log",
     "timestamp": "1705287000",
@@ -179,6 +186,7 @@ flushers:
     "message": "Event with millisecond timestamp",
     "__time__": "1234567890"
 }
+
 {
     "__tag__:__path__": "/home/test-log/ms-events.log",
     "ts": "1705287000000",

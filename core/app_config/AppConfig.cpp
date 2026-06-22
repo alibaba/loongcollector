@@ -489,7 +489,11 @@ string GetAgentLoggersPrefix() {
 }
 
 string GetAgentLogName() {
+#ifdef __CORP__
+    return "ilogtail.LOG";
+#else
     return "loongcollector.LOG";
+#endif
 }
 
 string GetObserverEbpfHostPath() {
@@ -548,11 +552,19 @@ string GetContinuousPipelineConfigDir() {
 }
 
 string GetPluginLogName() {
+#ifdef __CORP__
+    return "logtail_plugin.LOG";
+#else
     return "go_plugin.LOG";
+#endif
 }
 
 std::string GetVersionTag() {
+#ifdef __CORP__
+    return "ilogtail_version";
+#else
     return "loongcollector_version";
+#endif
 }
 
 std::string GetGoPluginCheckpoint() {
@@ -564,19 +576,31 @@ std::string GetGoPluginCheckpoint() {
 }
 
 std::string GetAgentName() {
+#ifdef __CORP__
+    return "ilogtail";
+#else
     return "loongcollector";
+#endif
 }
 
 std::string GetMonitorInfoFileName() {
     return "loongcollector_monitor_info";
 }
 
-std::string GetSymLinkName() {
-    return GetProcessExecutionDir() + "loongcollector";
+std::string GetPluginAdapterName() {
+#ifdef __CORP__
+    return "PluginAdapter";
+#else
+    return "GoPluginAdapter";
+#endif
 }
 
-std::string GetAgentPrefix() {
-    return LOONGCOLLECTOR_PREFIX;
+std::string GetPluginBaseName() {
+#ifdef __CORP__
+    return "PluginBase";
+#else
+    return "GoPluginBase";
+#endif
 }
 
 AppConfig::AppConfig() {

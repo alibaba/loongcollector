@@ -16,12 +16,12 @@
 
 #include <cstring>
 
-#include "AppConfig.h"
 #include "EcsMetaData.h"
 #include "FileSystemUtil.h"
 #include "StringTools.h"
 #include "common/FileSystemUtil.h"
 #include "common/JsonUtil.h"
+#include "common/LogtailCommonFlags.h"
 #include "common/UUIDUtil.h"
 #include "logger/Logger.h"
 #if defined(__linux__)
@@ -37,6 +37,8 @@
 #include <algorithm>
 #include <list>
 #include <map>
+#include <unordered_set>
+#include <vector>
 #elif defined(_MSC_VER)
 #include <WinSock2.h>
 #include <Windows.h>
@@ -70,6 +72,24 @@ bool GetRealOSVersion(POSVERSIONINFO osvi) {
 #endif
 
 namespace logtail {
+
+bool IsIgnoredInterfaceForHostIdentity(const char* ifname) {
+    if (ifname == nullptr || *ifname == '\0' || strcmp(ifname, "lo") == 0) {
+        return true;
+    }
+    const std::string& list = STRING_FLAG(ignored_interfaces);
+    if (list.empty()) {
+        return false;
+    }
+    std::string name(ifname);
+    for (auto& part : SplitString(list, ",")) {
+        std::string t = TrimString(part);
+        if (!t.empty() && t == name) {
+            return true;
+        }
+    }
+    return false;
+}
 
 std::string GetOsDetail() {
 #if defined(__linux__)
@@ -176,27 +196,30 @@ std::string GetHostName() {
 }
 
 #if defined(__linux__)
+// Non-loopback AF_INET addresses from getifaddrs. Excludes lo/127.* and interfaces on the host-identity blacklist
+// (STRING_FLAG ignored_interfaces, plus implicit lo).
 std::unordered_set<std::string> GetNicIpv4IPSet() {
-    struct ifaddrs* ifAddrStruct = NULL;
-    void* tmpAddrPtr = NULL;
     std::unordered_set<std::string> ipSet;
-    getifaddrs(&ifAddrStruct);
-    for (struct ifaddrs* ifa = ifAddrStruct; ifa != NULL; ifa = ifa->ifa_next) {
-        if (ifa->ifa_addr == NULL) {
+    struct ifaddrs* ifAddrStruct = nullptr;
+    if (getifaddrs(&ifAddrStruct) != 0) {
+        return ipSet;
+    }
+    for (struct ifaddrs* ifa = ifAddrStruct; ifa != nullptr; ifa = ifa->ifa_next) {
+        if (ifa->ifa_addr == nullptr || ifa->ifa_addr->sa_family != AF_INET) {
             continue;
         }
-        if (ifa->ifa_addr->sa_family == AF_INET) {
-            tmpAddrPtr = &((struct sockaddr_in*)ifa->ifa_addr)->sin_addr;
-            char addressBuffer[INET_ADDRSTRLEN] = "";
-            inet_ntop(AF_INET, tmpAddrPtr, addressBuffer, INET_ADDRSTRLEN);
-            std::string ip(addressBuffer);
-            // The loopback on most Linux distributions is lo, however it is not portable. For example loopback in OSX
-            // is lo0.
-            if (0 == strcmp("lo", ifa->ifa_name) || ip.empty() || StartWith(ip, "127.")) {
-                continue;
-            }
-            ipSet.insert(std::move(ip));
+        char addressBuffer[INET_ADDRSTRLEN] = "";
+        inet_ntop(AF_INET, &((struct sockaddr_in*)ifa->ifa_addr)->sin_addr, addressBuffer, sizeof(addressBuffer));
+        std::string ip(addressBuffer);
+        // The loopback on most Linux distributions is lo, however it is not portable. For example loopback in OSX
+        // is lo0.
+        if (strcmp("lo", ifa->ifa_name) == 0 || ip.empty() || StartWith(ip, "127.")) {
+            continue;
         }
+        if (IsIgnoredInterfaceForHostIdentity(ifa->ifa_name)) {
+            continue;
+        }
+        ipSet.insert(std::move(ip));
     }
     freeifaddrs(ifAddrStruct);
     return ipSet;
@@ -233,19 +256,19 @@ std::string GetHostIpByHostName() {
     std::string firstIp;
     char ipStr[INET_ADDRSTRLEN + 1] = "";
 #if defined(__linux__)
-    auto ipSet = GetNicIpv4IPSet();
+    std::unordered_set<std::string> nicIpSet = GetNicIpv4IPSet();
     for (size_t i = 0; i < addrs.size(); ++i) {
         auto p = inet_ntop(AF_INET, &addrs[i].sin_addr, ipStr, INET_ADDRSTRLEN);
         if (p == nullptr) {
             continue;
         }
         auto tmp = std::string(ipStr);
-        if (ipSet.find(tmp) != ipSet.end()) {
+        if (nicIpSet.find(tmp) != nicIpSet.end()) {
             return tmp;
         }
         if (i == 0) {
             firstIp = tmp;
-            if (ipSet.empty()) {
+            if (nicIpSet.empty()) {
                 LOG_INFO(sLogger, ("no entry from getifaddrs", "use first entry from getaddrinfo"));
                 return firstIp;
             }

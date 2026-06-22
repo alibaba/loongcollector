@@ -4,7 +4,7 @@
 
 `processor_json processor`插件可以实现对`Json`格式日志的解析。
 
-备注：当作为第一个日志解析插件时，建议使用[Json加速](../accelerator/json-accelerate.md)插件替代。
+备注：当作为第一个日志解析插件且追求原生性能时，可改用原生插件 [JSON 解析](../native/processor-parse-json-native.md)。
 
 ## 支持的Event类型
 

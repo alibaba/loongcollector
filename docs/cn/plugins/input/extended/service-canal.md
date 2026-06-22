@@ -21,7 +21,7 @@
 | Port | Interger，`3306` | 数据库端口。|
 | User | string，`root` | 数据库用户名。|
 | Password | string，默认值为空 | 数据库密码。|
-| ServerID | Interger，125 | Logtail模拟Mysql Slave的ID。|
+| ServerID | Interger，125 | LoongCollector（`service_canal`）模拟 MySQL Slave 的 server_id。|
 | IncludeTables | Array， 无默认值（必填） | 包含的表名称（包括db，例如：test_db.test_table），可配置为正则表达式。如果某个表不符合IncludeTables中的任一条件则该表不会被采集。如果您希望采集所有表，请将此参数设置为`.*\\..*`。如果需要完全匹配，请在前面加上^，后面加上$，例如：^test_db\\.test_table$。 |
 | ExcludeTables | Array， 无默认值（必填） | 忽略的表名称（包括db，例如：test_db.test_table），可配置为正则表达式。如果某个表符合ExcludeTables中的任一条件则该表不会被采集。不设置时默认收集所有表。|
 | StartBinName | string，`""` | 首次采集的Binlog文件名。不设置时，默认从当前时间点开始采集。如果想从指定位置开始采集，可以查看当前的Binlog文件以及文件大小偏移量，并将StartBinName、StartBinlogPos设置成对应的值。 |
@@ -33,7 +33,7 @@
 | EnableDDL | bool，`false` | 是否采集DDL（data definition language）事件数据。不设置时， 默认为false，表示不收集DDL事件数据。该选项不支持IncludeTables和ExcludeTables过滤。|
 | Charset | string，`utf-8` | 编码方式。不设置时，默认为utf-8。|
 | TextToString | bool，`false` | 是否将text类型的数据转换成字符串。不设置时，默认为false，表示不转换。|
-| PackValues | bool，`false` | 是否将事件数据打包成JSON格式。默认为false，表示不打包。如果设置为true，Logtail会将事件数据以JSON格式集中打包到data和old_data两个字段中，其中old_data仅在row_update事件中有意义。 示例：假设数据表有三列数据c1，c2，c3，设置为false，row_insert事件数据中会有c1，c2，c3三个字段，而设置为true时，c1，c2，c3会被统一打包为data字段，值为`{"c1":"...", "c2": "...", "c3": "..."}`。|
+| PackValues | bool，`false` | 是否将事件数据打包成JSON格式。默认为false，表示不打包。如果设置为 true，插件会将事件数据以 JSON 格式集中打包到 `data` 和 `old_data` 两个字段中，其中 `old_data` 仅在 row_update 事件中有意义。 示例：假设数据表有三列数据c1，c2，c3，设置为false，row_insert事件数据中会有c1，c2，c3三个字段，而设置为true时，c1，c2，c3会被统一打包为data字段，值为`{"c1":"...", "c2": "...", "c3": "..."}`。|
 | EnableEventMeta | bool，`false` | 是否采集事件的元数据，默认为false，表示不采集。 Binlog事件的元数据包括event_time、event_log_position、event_size和event_server_id。|
 | UseDecimal | bool，`false` | Binlog解析DECIMAL类型时，是否保持原格式输出，而不是使用科学计数法。如果未设置，系统默认为false，即默认使用科学计数法。|
 
@@ -94,9 +94,181 @@ flushers:
 * 输出
 
 ```json
-{"Time":1657890330,"Contents":[{"Key":"_table_","Value":"titles"},{"Key":"_offset_","Value":"4308"},{"Key":"_old_emp_no","Value":"10006"},{"Key":"from_date","Value":"1990-08-05"},{"Key":"_host_","Value":"127.0.0.1"},{"Key":"_event_","Value":"row_update"},{"Key":"_id_","Value":"12"},{"Key":"_old_from_date","Value":"1990-08-05"},{"Key":"_gtid_","Value":"00000000-0000-0000-0000-000000000000:0"},{"Key":"_db_","Value":"employees"},{"Key":"_filename_","Value":"mysql-bin.000001"},{"Key":"_old_title","Value":"Senior Engineer"},{"Key":"_old_to_date","Value":"9999-01-01"},{"Key":"emp_no","Value":"10006"},{"Key":"title","Value":"test-update"},{"Key":"to_date","Value":"9999-01-01"}]}
+{
+    "Time": 1657890330,
+    "Contents": [
+        {
+            "Key": "_table_",
+            "Value": "titles"
+        },
+        {
+            "Key": "_offset_",
+            "Value": "4308"
+        },
+        {
+            "Key": "_old_emp_no",
+            "Value": "10006"
+        },
+        {
+            "Key": "from_date",
+            "Value": "1990-08-05"
+        },
+        {
+            "Key": "_host_",
+            "Value": "127.0.0.1"
+        },
+        {
+            "Key": "_event_",
+            "Value": "row_update"
+        },
+        {
+            "Key": "_id_",
+            "Value": "12"
+        },
+        {
+            "Key": "_old_from_date",
+            "Value": "1990-08-05"
+        },
+        {
+            "Key": "_gtid_",
+            "Value": "00000000-0000-0000-0000-000000000000:0"
+        },
+        {
+            "Key": "_db_",
+            "Value": "employees"
+        },
+        {
+            "Key": "_filename_",
+            "Value": "mysql-bin.000001"
+        },
+        {
+            "Key": "_old_title",
+            "Value": "Senior Engineer"
+        },
+        {
+            "Key": "_old_to_date",
+            "Value": "9999-01-01"
+        },
+        {
+            "Key": "emp_no",
+            "Value": "10006"
+        },
+        {
+            "Key": "title",
+            "Value": "test-update"
+        },
+        {
+            "Key": "to_date",
+            "Value": "9999-01-01"
+        }
+    ]
+}
 
-{"Time":1657890333,"Contents":[{"Key":"_id_","Value":"13"},{"Key":"_filename_","Value":"mysql-bin.000001"},{"Key":"emp_no","Value":"10006"},{"Key":"title","Value":"test-update"},{"Key":"_db_","Value":"employees"},{"Key":"_table_","Value":"titles"},{"Key":"_event_","Value":"row_delete"},{"Key":"from_date","Value":"1990-08-05"},{"Key":"to_date","Value":"9999-01-01"},{"Key":"_host_","Value":"127.0.0.1"},{"Key":"_gtid_","Value":"00000000-0000-0000-0000-000000000000:0"},{"Key":"_offset_","Value":"4660"}]}
+{
+    "Time": 1657890333,
+    "Contents": [
+        {
+            "Key": "_id_",
+            "Value": "13"
+        },
+        {
+            "Key": "_filename_",
+            "Value": "mysql-bin.000001"
+        },
+        {
+            "Key": "emp_no",
+            "Value": "10006"
+        },
+        {
+            "Key": "title",
+            "Value": "test-update"
+        },
+        {
+            "Key": "_db_",
+            "Value": "employees"
+        },
+        {
+            "Key": "_table_",
+            "Value": "titles"
+        },
+        {
+            "Key": "_event_",
+            "Value": "row_delete"
+        },
+        {
+            "Key": "from_date",
+            "Value": "1990-08-05"
+        },
+        {
+            "Key": "to_date",
+            "Value": "9999-01-01"
+        },
+        {
+            "Key": "_host_",
+            "Value": "127.0.0.1"
+        },
+        {
+            "Key": "_gtid_",
+            "Value": "00000000-0000-0000-0000-000000000000:0"
+        },
+        {
+            "Key": "_offset_",
+            "Value": "4660"
+        }
+    ]
+}
 
-{"Time":1657890335,"Contents":[{"Key":"_offset_","Value":"4975"},{"Key":"emp_no","Value":"10006"},{"Key":"title","Value":"Senior Engineer"},{"Key":"from_date","Value":"1990-08-05"},{"Key":"_gtid_","Value":"00000000-0000-0000-0000-000000000000:0"},{"Key":"_filename_","Value":"mysql-bin.000001"},{"Key":"_table_","Value":"titles"},{"Key":"_event_","Value":"row_insert"},{"Key":"_id_","Value":"14"},{"Key":"to_date","Value":"9999-01-01"},{"Key":"_host_","Value":"127.0.0.1"},{"Key":"_db_","Value":"employees"}]}
+{
+    "Time": 1657890335,
+    "Contents": [
+        {
+            "Key": "_offset_",
+            "Value": "4975"
+        },
+        {
+            "Key": "emp_no",
+            "Value": "10006"
+        },
+        {
+            "Key": "title",
+            "Value": "Senior Engineer"
+        },
+        {
+            "Key": "from_date",
+            "Value": "1990-08-05"
+        },
+        {
+            "Key": "_gtid_",
+            "Value": "00000000-0000-0000-0000-000000000000:0"
+        },
+        {
+            "Key": "_filename_",
+            "Value": "mysql-bin.000001"
+        },
+        {
+            "Key": "_table_",
+            "Value": "titles"
+        },
+        {
+            "Key": "_event_",
+            "Value": "row_insert"
+        },
+        {
+            "Key": "_id_",
+            "Value": "14"
+        },
+        {
+            "Key": "to_date",
+            "Value": "9999-01-01"
+        },
+        {
+            "Key": "_host_",
+            "Value": "127.0.0.1"
+        },
+        {
+            "Key": "_db_",
+            "Value": "employees"
+        }
+    ]
+}
 ```

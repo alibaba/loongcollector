@@ -2,7 +2,7 @@
 
 ## 简介
 
-`aggregator_base` `aggregator`插件可以实现对单条日志的聚合。
+`aggregator_base` `aggregator` 插件可以实现对**单条数据**的聚合。
 
 ## 版本
 

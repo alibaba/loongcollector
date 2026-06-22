@@ -12,6 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <atomic>
+#include <fstream>
+#include <list>
+#include <set>
+#include <thread>
+
+#include "json/json.h"
+
 #include "monitor/AlarmManager.h"
 #include "unittest/Unittest.h"
 
@@ -33,10 +41,14 @@ public:
 
     void TestSendAlarm();
     void TestFlushAllRegionAlarm();
+    void TestAlarmTypeMessageTypeMapping();
+    void TestReservedAlarmTypeDrop();
 };
 
 APSARA_UNIT_TEST_CASE(AlarmManagerUnittest, TestSendAlarm, 0);
 APSARA_UNIT_TEST_CASE(AlarmManagerUnittest, TestFlushAllRegionAlarm, 1);
+APSARA_UNIT_TEST_CASE(AlarmManagerUnittest, TestAlarmTypeMessageTypeMapping, 2);
+APSARA_UNIT_TEST_CASE(AlarmManagerUnittest, TestReservedAlarmTypeDrop, 3);
 
 void AlarmManagerUnittest::TestSendAlarm() {
     {
@@ -78,6 +90,30 @@ void AlarmManagerUnittest::TestFlushAllRegionAlarm() {
 
     // Assuming each alarm results in a PipelineEventGroup
     APSARA_TEST_EQUAL(2U, pipelineEventGroupList.size());
+}
+
+void AlarmManagerUnittest::TestAlarmTypeMessageTypeMapping() {
+    auto* alarmManager = AlarmManager::GetInstance();
+    const std::vector<int32_t> reservedTypeIds = {60, 61, 62, 63};
+    std::set<int32_t> reservedTypeIdSet(reservedTypeIds.begin(), reservedTypeIds.end());
+    for (int32_t alarmTypeId = 0; alarmTypeId < ALL_LOGTAIL_ALARM_NUM; ++alarmTypeId) {
+        if (reservedTypeIdSet.find(alarmTypeId) != reservedTypeIdSet.end()) {
+            APSARA_TEST_EQUAL(true, alarmManager->mMessageType[alarmTypeId].empty());
+            continue;
+        }
+        APSARA_TEST_EQUAL(false, alarmManager->mMessageType[alarmTypeId].empty());
+    }
+    APSARA_TEST_EQUAL(std::string("HOST_MONITOR_ALARM"), alarmManager->mMessageType[HOST_MONITOR_ALARM]);
+}
+
+void AlarmManagerUnittest::TestReservedAlarmTypeDrop() {
+    AlarmManager::GetInstance()->mAllAlarmMap.clear();
+    const std::string region = "ReservedTypeRegion";
+    AlarmManager::GetInstance()->SendAlarmWarning(
+        static_cast<AlarmType>(60), "Reserved alarm should be dropped", region, "Project", "Config", "Category");
+    APSARA_TEST_EQUAL(true,
+                      AlarmManager::GetInstance()->mAllAlarmMap.find(region)
+                          == AlarmManager::GetInstance()->mAllAlarmMap.end());
 }
 
 } // namespace logtail

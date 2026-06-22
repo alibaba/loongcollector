@@ -50,27 +50,29 @@ flushers:
 
 ```json
 {
-    "tag1":"tag1",
-    "tag2":"tag2",
-    "field1":"field1",
-    "field2":"field2",
-    "Index":"101",
-    "__time__":"1658814793"
+    "tag1": "tag1",
+    "tag2": "tag2",
+    "field1": "field1",
+    "field2": "field2",
+    "Index": "101",
+    "__time__": "1658814793"
 }
+
 {
-    "tag1":"tag1",
-    "tag2":"tag2",
-    "field1":"field1",
-    "field2":"field2",
-    "Index":"102",
-    "__time__":"1658814793"
+    "tag1": "tag1",
+    "tag2": "tag2",
+    "field1": "field1",
+    "field2": "field2",
+    "Index": "102",
+    "__time__": "1658814793"
 }
+
 {
-    "tag1":"tag1",
-    "tag2":"tag2",
-    "field1":"field1",
-    "field2":"field2",
-    "Index":"103",
-    "__time__":"1658814794"
+    "tag1": "tag1",
+    "tag2": "tag2",
+    "field1": "field1",
+    "field2": "field2",
+    "Index": "103",
+    "__time__": "1658814794"
 }
 ```

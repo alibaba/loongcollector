@@ -32,9 +32,11 @@ LoongCollector 采用模块化的分层目录设计，以下展示了安装在 /
 
 - `/opt/loongcollector/conf/user_defined_id`
 
-采集配置文件：`/opt/loongcollector/conf/continuous_pipeline_config`
+持续采集配置定义：`/opt/loongcollector/conf/continuous_pipeline_config`
 
-进程级文件：`/opt/loongcollector/conf/instance_config`
+一次性采集配置定义：`/opt/loongcollector/conf/onetime_pipeline_config`
+
+实例级配置：`/opt/loongcollector/conf/instance_config`
 
 **数据目录：**`/opt/loongcollector/data`
 
@@ -91,9 +93,12 @@ inotify日志：`/opt/loongcollector/run/inotify_watcher_dirs`
                        │      ├── authorization.json
                        │      ├── continuous_pipeline_config/
                        │      │                 ├── local/
-                       │      │                 │         └── collect_stdout.json
+                       │      │                 │         └── collect_stdout.yaml
                        │      │                 └── remote/
-                       │      │                           └── collect_file.json
+                       │      │                           └── collect_file.yaml
+                       │      ├── onetime_pipeline_config/
+                       │      │                 ├── local/
+                       │      │                 └── remote/
                        │      └── instance_config/
                        │                        ├── local/
                        │                        │         ├── loongcollector_config.json（loongcollector配置）
@@ -161,7 +166,8 @@ LoongCollector 提供以下参数用于自定义各类目录位置：
 | agent可观测文件          | logtail_monitor_info    | loongcollector_monitor_info |
 | go插件采集的checkpoint   | checkpoint              | go_plugin_checkpoint        |
 | go插件运行日志           | logtail_plugin.LOG      | go_plugin.LOG               |
-| 采集配置目录名           | config                  | continuous_pipeline_config  |
+| 持续采集配置目录名         | config                  | continuous_pipeline_config  |
+| 一次性采集配置目录         | 无                      | onetime_pipeline_config     |
 | exactly_once的checkpoint | checkpoint_v2           | exactly_once_checkpoint     |
 | agent的发送缓冲buffer文件    | logtail_buffer_file_xxx | send_buffer_file_xxx        |
 | agent可观测文件          | ilogtail_status.LOG     | loongcollector_status.LOG   |

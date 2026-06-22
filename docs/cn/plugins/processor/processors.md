@@ -31,7 +31,7 @@
 - 基于C++实现的列式计算
 - 采用向量化执行，性能优异
 - 提供全面的数据处理算子
-- 支持管道式处理，可以灵活组合处理逻辑
+- 支持**流水线**式处理，可以灵活组合处理逻辑
 - 通过配置即可完成复杂数据处理，无需编码
 
 ## 特性对比
@@ -40,7 +40,7 @@
 |---------|---------|---------|---------|---------|
 | 原生插件 | C++ | 性能最优<br>资源开销极低 | 常用算子<br>标准处理场景 | 中等<br>需要C++开发能力 |
 | 扩展插件 | Golang | 性能适中<br>资源开销较低 | 丰富算子<br>支持复杂处理 | 较低<br>Golang开发门槛低 |
-| SPL处理 | C++ | 性能优异<br>向量化执行 | 算子全面<br>管道式处理<br>配置驱动 | 极低<br>仅需编写SPL语句 |
+| SPL处理 | C++ | 性能优异<br>向量化执行 | 算子全面<br>流水线式处理<br>配置驱动 | 极低<br>仅需编写SPL语句 |
 
 ## 使用约束与限制
 
@@ -50,16 +50,21 @@
 
 | 输入插件 | 说明 |
 |---------|------|
-| [`input_file`](../input/native/input-file.md) | 文本日志输入插件 |
-| [`input_static_file_onetime`](../input/native/input-static-file-onetime.md) | 一次性文件采集插件 |
 | [`input_container_stdio`](../input/native/input-container-stdio.md) | 容器标准输出插件 |
-| [`input_observer_network`](../input/native/metric-observer.md) | eBPF网络观测插件 |
+| [`input_file`](../input/native/input-file.md) | 文本日志输入插件 |
 | [`input_file_security`](../input/native/input-file-security.md) | 文件安全监控插件 |
-| [`input_network_observer`](../input/native/input-network-observer.md) | 网络观测插件 |
-| [`input_network_security`](../input/native/input-network-security.md) | 网络安全监控插件 |
-| [`input_process_security`](../input/native/input-process-security.md) | 进程安全监控插件 |
+| [`input_forward`](../input/native/input-forward.md) | 转发输入插件 |
+| [`input_host_meta`](../input/native/input-host-meta.md) | 主机元数据采集 |
+| [`input_host_monitor`](../input/native/input-host-monitor.md) | 主机监控数据采集 |
+| [`input_internal_alarms`](../input/native/input-internal-alarms.md) | 自监控告警 |
+| [`input_internal_metrics`](../input/native/input-internal-metrics.md) | 自监控指标 |
+| [`input_network_observer`](../input/native/input-network-observer.md) | eBPF 网络可观测 |
+| [`input_network_security`](../input/native/input-network-security.md) | eBPF 网络安全 |
+| [`input_process_security`](../input/native/input-process-security.md) | eBPF 进程安全 |
+| [`input_prometheus`](../input/native/input-prometheus.md) | Prometheus 抓取 |
+| [`input_static_file_onetime`](../input/native/input-static-file-onetime.md) | 一次性文件采集 |
 
-更多输入插件说明请参考[输入插件文档](../input/inputs.md)。
+上表按 **Type** 字典序排列。更多输入插件说明见[输入插件文档](../input/inputs.md)。
 
 ### 插件组合规则
 

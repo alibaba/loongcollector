@@ -25,6 +25,11 @@ DOCKER_BUILD_EXPORT_GO_ENVS ?= true
 DOCKER_BUILD_COPY_GIT_CONFIGS ?= true
 DOCKER_BUILD_USE_BUILDKIT ?=
 
+# Forwarded by scripts/gen_build_scripts.sh to CMake (coolbpf AgentSight / libagentsight).
+# The "all" / "dist" targets require ENABLE_AGENTSIGHT=ON; override is rejected there (use e.g. "core" to build with ENABLE_AGENTSIGHT=OFF).
+ENABLE_AGENTSIGHT ?= ON
+export ENABLE_AGENTSIGHT
+
 SCOPE ?= .
 
 TEST_DEBUG ?= false
@@ -187,9 +192,13 @@ unittest_e2e_engine: clean
 unittest_plugin: clean import_plugins
 	cp pkg/logtail/libGoPluginAdapter.so ./plugin_main
 	cp pkg/logtail/GoPluginAdapter.dll ./plugin_main
-	mv ./plugins/input/prometheus/input_prometheus.go ./plugins/input/prometheus/input_prometheus.go.bak
+	@if [ -f ./plugins/input/prometheus/input_prometheus.go ]; then \
+		mv ./plugins/input/prometheus/input_prometheus.go ./plugins/input/prometheus/input_prometheus.go.bak; \
+	fi
 	go test $$(go list ./...|grep -Ev "telegraf|external|envconfig|(input\/prometheus)|(input\/syslog)"| grep -Ev "plugin_main|pluginmanager") -coverprofile .testCoverage.txt
-	mv ./plugins/input/prometheus/input_prometheus.go.bak ./plugins/input/prometheus/input_prometheus.go
+	@if [ -f ./plugins/input/prometheus/input_prometheus.go.bak ]; then \
+		mv ./plugins/input/prometheus/input_prometheus.go.bak ./plugins/input/prometheus/input_prometheus.go; \
+	fi
 	rm -rf plugins/input/jmxfetch/test/
 
 .PHONY: unittest_plugin_clean
@@ -212,15 +221,26 @@ unittest_pluginmanager: clean import_plugins
 	cp pkg/logtail/libGoPluginAdapter.so ./plugin_main
 	cp pkg/logtail/GoPluginAdapter.dll ./plugin_main
 	cp pkg/logtail/libGoPluginAdapter.so ./pluginmanager
-	mv ./plugins/input/prometheus/input_prometheus.go ./plugins/input/prometheus/input_prometheus.go.bak
+	@if [ -f ./plugins/input/prometheus/input_prometheus.go ]; then \
+		mv ./plugins/input/prometheus/input_prometheus.go ./plugins/input/prometheus/input_prometheus.go.bak; \
+	fi
 	go test $$(go list ./...|grep -Ev "telegraf|external|envconfig"| grep -E "plugin_main|pluginmanager") -coverprofile .coretestCoverage.txt
-	mv ./plugins/input/prometheus/input_prometheus.go.bak ./plugins/input/prometheus/input_prometheus.go
+	@if [ -f ./plugins/input/prometheus/input_prometheus.go.bak ]; then \
+		mv ./plugins/input/prometheus/input_prometheus.go.bak ./plugins/input/prometheus/input_prometheus.go; \
+	fi
 
+# "all" is defined only when ENABLE_AGENTSIGHT=ON so Docker copies libagentsight.so (see scripts/gen_build_scripts.sh) next to loongcollector.
+ifeq ($(strip $(ENABLE_AGENTSIGHT)),ON)
 .PHONY: all
 all: clean import_plugins
 	./scripts/gen_build_scripts.sh all "$(GENERATED_HOME)" "$(VERSION)" "$(BUILD_REPOSITORY)" "$(OUT_DIR)" "$(DOCKER_BUILD_EXPORT_GO_ENVS)" "$(DOCKER_BUILD_COPY_GIT_CONFIGS)" "$(PLUGINS_CONFIG_FILE)" "$(GO_MOD_FILE)"
 	./scripts/docker_build.sh build "$(GENERATED_HOME)" "$(VERSION)" "$(BUILD_REPOSITORY)" false "$(DOCKER_BUILD_USE_BUILDKIT)"
 	./$(GENERATED_HOME)/gen_copy_docker.sh
+else
+.PHONY: all
+all:
+	$(error make all requires ENABLE_AGENTSIGHT=ON (current: $(ENABLE_AGENTSIGHT)) — use e.g. 'make core' to build the C++ binary without the full release layout)
+endif
 
 .PHONY: dist
 dist: all

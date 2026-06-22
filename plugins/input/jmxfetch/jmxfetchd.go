@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
 
@@ -69,7 +70,7 @@ func (m *Manager) execJmxfetchd(command string, needOutput bool) (output []byte,
 		err = cmd.Run()
 	}
 	if err != nil && !strings.Contains(err.Error(), "no child process") {
-		logger.Warningf(m.managerMeta.GetContext(), "JMXFETCH_RUNTIME_ALARM", "%v error, output: %v, error: %v", command, string(output), err)
+		logger.Warningf(m.managerMeta.GetContext(), selfmonitor.JmxfetchRuntimeAlarm, "%v error, output: %v, error: %v", command, string(output), err)
 	}
 	return
 }

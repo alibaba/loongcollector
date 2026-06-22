@@ -48,40 +48,53 @@ bool CheckGPUDevice() {
         return false;
     }
 
-    auto binary_path = boost::process::search_path(NVSMI);
-    if (binary_path.empty()) {
-        LOG_WARNING(sLogger, ("GPU check failed", "nvidia-smi not found in PATH"));
-        return false;
-    }
-
-    boost::process::ipstream pipe_stream;
-    std::string cmd = "nvidia-smi -L";
-    std::error_code ec;
-
-    int exit_code = boost::process::system(cmd, boost::process::std_out > pipe_stream, ec);
-    if (ec || exit_code != 0) {
-        LOG_WARNING(sLogger,
-                    ("GPU check failed",
-                     "nvidia-smi execution error")("command", cmd)("error", ec.message())("exit_code", exit_code));
-        return false;
-    }
-
-    std::string line;
-    bool has_output = false;
-    while (std::getline(pipe_stream, line)) {
-        if (!line.empty()) {
-            has_output = true;
-            LOG_DEBUG(sLogger, ("GPU detected", line));
+    try {
+        auto binary_path = boost::process::search_path(NVSMI);
+        if (binary_path.empty()) {
+            LOG_WARNING(sLogger, ("GPU check failed", "nvidia-smi not found in PATH"));
+            return false;
         }
-    }
 
-    if (!has_output) {
-        LOG_WARNING(sLogger, ("GPU check failed", "no GPU devices found"));
+        boost::process::ipstream pipe_stream;
+        std::string cmd = "nvidia-smi -L";
+
+        int exit_code = boost::process::system(cmd, boost::process::std_out > pipe_stream);
+        if (exit_code != 0) {
+            LOG_WARNING(sLogger,
+                        ("GPU check failed", "nvidia-smi execution error")("command", cmd)("exit_code", exit_code));
+            return false;
+        }
+
+        std::string line;
+        bool has_output = false;
+        while (std::getline(pipe_stream, line)) {
+            if (!line.empty()) {
+                has_output = true;
+                LOG_DEBUG(sLogger, ("GPU detected", line));
+            }
+        }
+
+        if (!has_output) {
+            LOG_WARNING(sLogger, ("GPU check failed", "no GPU devices found"));
+            return false;
+        }
+
+        LOG_INFO(sLogger, ("GPU check successful", "GPU monitoring available"));
+        return true;
+    } catch (const std::system_error& e) {
+        LOG_ERROR(sLogger,
+                  ("GPU check failed", "system error")("command", "nvidia-smi -L")("error",
+                                                                                   e.what())("code", e.code().value()));
+        return false;
+    } catch (const std::exception& e) {
+        LOG_ERROR(
+            sLogger,
+            ("GPU check failed", "std::exception during GPU check")("command", "nvidia-smi -L")("error", e.what()));
+        return false;
+    } catch (...) {
+        LOG_ERROR(sLogger, ("GPU check failed", "unknown exception during GPU check")("command", "nvidia-smi -L"));
         return false;
     }
-
-    LOG_INFO(sLogger, ("GPU check successful", "GPU monitoring available"));
-    return true;
 #elif defined(_MSC_VER)
     // GPU detection implementation for Windows platform
     // On Windows, GPU detection can be implemented via WMI or DirectX API

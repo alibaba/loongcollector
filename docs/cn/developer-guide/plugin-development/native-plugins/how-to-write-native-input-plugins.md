@@ -1,98 +1,73 @@
-# 如何开发原生Input插件
+# 如何开发原生 Input 插件
 
 ## 工作模式
 
-同一输入类型的所有插件实例共享同一个线程来获取数据，插件实例只负责保存插件配置。
+同一输入类型的多个插件实例通常由**管理类（Runner）**在共享线程或任务模型下驱动；实例侧保存配置并参与注册/反注册。
 
-## 接口定义
+## 接口定义（C++）
+
+原生 Input 声明见 [`core/collection_pipeline/plugin/interface/Input.h`](https://github.com/alibaba/loongcollector/blob/main/core/collection_pipeline/plugin/interface/Input.h)（派生自 `Plugin`）：
 
 ```c++
 class Input : public Plugin {
 public:
-    // 初始化插件，入参为插件参数
-    virtual bool Init(const Json::Value& config) = 0;
-    // 负责向管理类注册配置
+    virtual bool Init(const Json::Value& config, Json::Value& optionalGoPipeline) = 0;
     virtual bool Start() = 0;
-    // 负责向管理类注销配置
     virtual bool Stop(bool isPipelineRemoving) = 0;
+    virtual QueueType GetProcessQueueType() const = 0;
+    // ...
 };
 ```
 
+与早期文档相比，请注意 **`Init` 增加 `optionalGoPipeline` 参数**，且必须实现 **`GetProcessQueueType`**。
+
 ## 开发步骤
 
-1. 在plugin/input目录下新建一个Inputxxx.h和Inputxxx.cpp文件，用于派生Input接口生成具体的插件类；
+1. 在 [`core/plugin/input`](https://github.com/alibaba/loongcollector/tree/main/core/plugin/input) 下新增 `InputXxx.h` / `InputXxx.cpp`，派生 `Input` 实现具体插件。
 
-2. 在Inputxxx.h文件中定义新的输入插件类Inputxxx，满足以下规范：
+2. 在头文件中定义插件类：可配置字段一般为 **public**，其余成员 **private**。
 
-   a. 所有的可配置参数的权限为public，其余参数的权限均为private。
+3. 在 `Init` 中解析配置；非法参数按影响程度选择跳过、默认值或拒绝加载。
 
-3. 在Inputxxx.cpp文件中实现`Init`函数，即根据入参初始化插件，针对非法参数，根据非法程度和影响决定是跳过该参数、使用默认值或直接拒绝加载插件。
-
-4. 在根目录下新增一个目录，用于创建当前输入插件的管理类及其他辅助类，该管理类需要继承InputRunner接口：
+4. 在独立目录中实现**管理类 / Runner**（负责线程、调度与多实例注册），管理类应继承 [`core/runner/InputRunner.h`](https://github.com/alibaba/loongcollector/blob/main/core/runner/InputRunner.h) 中的 **`InputRunner`**：
 
 ```c++
 class InputRunner {
 public:
-    // 调用点：由插件的Start函数调用
-    // 作用：初始化管理类，并至少启动一个线程用于采集数据
-    // 注意：该函数必须是可重入的，因此需要在函数开头判断是否已经启动线程，如果是则直接退出
+    // 由插件 Start 路径触发：初始化并至少启动一条采集路径；需可重入（已启动则直接返回）
     virtual void Init() = 0;
-    // 调用点：进程退出时，或配置热加载结束后无注册插件时由框架调用
-    // 作用：停止管理类，并进行扫尾工作，如资源回收、checkpoint记录等
+    // 进程退出或配置卸载后无实例时：停止并回收
     virtual void Stop() = 0;
-    // 调用点：每次配置热加载结束后由框架调用
-    // 作用：判断是否有插件注册，若无，则框架将调用Stop函数对线程资源进行回收
-    virtual bool HasRegisteredPlugin() const = 0;
-}
+    // 热加载结束后由框架调用：是否仍有插件注册，无则 Stop
+    virtual bool HasRegisteredPlugins() const = 0;
+};
 ```
 
-管理类是输入插件线程资源的实际拥有者，其最基本的运行流程如下：
+`InputRunner` 的构造函数会向 [`CollectionPipelineManager`](https://github.com/alibaba/loongcollector/blob/main/core/collection_pipeline/CollectionPipelineManager.h) **自动注册**自身（见 `InputRunner.cpp`）。若自定义 Runner 不继承 `InputRunner`，需在合适时机调用 `CollectionPipelineManager::GetInstance()->RegisterInputRunner(...)`。
 
-- 依次访问每个注册的配置，根据配置情况抓取数据；
+管理类基本流程：
 
-- 根据数据类型将源数据转换为PipelineEvent子类中的一种，并将一批数据组装成PipelineEventGroup；
-
-- 将PipelineEventGroup发送到相应配置的处理队列中：
+* 遍历已注册的各实例配置并采集数据；
+* 将数据转为 `PipelineEvent` / `PipelineEventGroup`；
+* 投递到处理队列，例如：
 
 ```c++
-ProcessorRunner::GetInstance()->PushQueue(queueKey, inputIdx, std::move(group));
+ProcessorRunner::GetInstance()->PushQueue(queueKey, inputIndex, std::move(group));
 ```
 
-其中，
+其中：
 
-- queueKey是队列的key，可以从相应流水线的PipelineContext类的`GetProcessQueueKey()`方法来获取。
+* **queueKey**：处理队列键，可由**采集配置**上下文（如 [`CollectionPipelineContext::GetProcessQueueKey()`](https://github.com/alibaba/loongcollector/blob/main/core/collection_pipeline/CollectionPipelineContext.h)）取得。
+* **inputIndex**：该 Input 在**当前采集配置** **`inputs` 列表**中的下标（从 0 开始），与 `Input::SetInputIndex` 一致。
+* **group**：待发送的 `PipelineEventGroup`。
 
-- inputIdx是当前数据所属输入插件在该流水线所有输入插件的位置（即配置中第几个，从0开始计数）
+注册/注销应**尽量独立于**采集主循环，避免单实例变更阻塞全体线程。
 
-- group是待发送的数据包
+5. 在 `InputXxx.cpp` 中实现 `Start` / `Stop`：`Start` 中启动或挂靠管理类并注册本实例；`Stop` 中从管理类注销。
 
-最后，为了支持插件向管理类注册，管理类还需要提供注册和注销函数供插件使用，从性能的角度考虑，**该注册和注销过程应当是独立的，即某个插件的注册和注销不应当影响整个线程的运转**。
+6. 在 **PluginRegistry** 中注册插件：
 
-5. 在Inputxxx.cpp文件中实现其余接口函数：
+   * 在 [`core/collection_pipeline/plugin/PluginRegistry.cpp`](https://github.com/alibaba/loongcollector/blob/main/core/collection_pipeline/plugin/PluginRegistry.cpp) 头部增加 `#include "plugin/input/InputXxx.h"`（路径以工程 include 规则为准）。
+   * 在 `LoadStaticPlugins()` 中增加：`RegisterInputCreator(new StaticInputCreator<InputXxx>(), false);`
 
-    ```c++
-    bool Inputxxx::Start() {
-        // 1. 调用管理类的Start函数
-        // 2. 将当前插件注册到管理类中
-    }
-
-    bool Inputxxx::Stop(bool isPipelineRemoving) {
-        // 将当前插件从管理类中注销
-    }
-    ```
-
-6. 在`PluginRegistry`类中注册该插件：
-
-   a. 在pipeline/plugin/PluginRegistry.cpp文件的头文件包含区新增如下行：
-
-    ```c++
-    #include "plugin/input/Inputxxx.h"
-    ```
-
-   b. 在`PluginRegistry`类的`LoadStaticPlugins()`函数中新增如下行：
-
-    ```c++
-    RegisterInputCreator(new StaticInputCreator<Inputxxx>(), false);
-    ```
-
-   c. 在`PipelineManager`类的构造函数中注册该插件的管理类
+7. 其余与**采集配置生命周期**、队列、检查点交互的细节，请对标现有原生 Input（如 `InputFile`、`InputPrometheus`）的阅读路径按需补齐。

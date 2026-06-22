@@ -19,6 +19,7 @@
 #include "common/StringTools.h"
 #include "common/http/AsynCurlRunner.h"
 #include "common/queue/blockingconcurrentqueue.h"
+#include "ebpf/Config.h"
 #include "ebpf/EBPFAdapter.h"
 #include "ebpf/EBPFServer.h"
 #include "ebpf/plugin/ProcessCacheManager.h"
@@ -48,6 +49,7 @@ public:
     void BenchmarkConsumeTask();
     void TestReportAgentInfo();
     void TestConverge();
+    void TestAddOrUpdateConfigWrongOptionsVariant();
 
 protected:
     void SetUp() override {
@@ -297,7 +299,7 @@ void NetworkObserverManagerUnittest::TestRecordProcessing() {
     CollectionPipelineContext ctx;
     ctx.SetConfigName("test-config-networkobserver");
     ctx.SetProcessQueueKey(1);
-    mManager->AddOrUpdateConfig(&ctx, 0, nullptr, std::variant<SecurityOptions*, ObserverNetworkOption*>(&options));
+    mManager->AddOrUpdateConfig(&ctx, 0, nullptr, PluginOptions(&options));
 
     auto podInfo = std::make_shared<K8sPodInfo>();
     podInfo->mContainerIds = {"1", "2"};
@@ -714,7 +716,7 @@ void NetworkObserverManagerUnittest::TestHandleHostMetadataUpdate() {
     CollectionPipelineContext ctx;
     ctx.SetConfigName("test-config-networkobserver");
     ctx.SetProcessQueueKey(1);
-    mManager->AddOrUpdateConfig(&ctx, 0, nullptr, std::variant<SecurityOptions*, ObserverNetworkOption*>(&options));
+    mManager->AddOrUpdateConfig(&ctx, 0, nullptr, PluginOptions(&options));
 
     mManager->HandleHostMetadataUpdate({"1", "2", "3", "4"});
     APSARA_TEST_EQUAL(mManager->mEnableCids.size(), 4);
@@ -749,7 +751,7 @@ void NetworkObserverManagerUnittest::TestSaeScenario() {
     CollectionPipelineContext ctx;
     ctx.SetConfigName("test-config-networkobserver");
     ctx.SetProcessQueueKey(1);
-    mManager->AddOrUpdateConfig(&ctx, 0, nullptr, std::variant<SecurityOptions*, ObserverNetworkOption*>(&options));
+    mManager->AddOrUpdateConfig(&ctx, 0, nullptr, PluginOptions(&options));
 
     // only 0
     APSARA_TEST_EQUAL(mManager->mContainerConfigs.size(), 1);
@@ -865,7 +867,7 @@ void NetworkObserverManagerUnittest::TestConverge() {
     CollectionPipelineContext ctx;
     ctx.SetConfigName("test-config-networkobserver");
     ctx.SetProcessQueueKey(1);
-    mManager->AddOrUpdateConfig(&ctx, 0, nullptr, std::variant<SecurityOptions*, ObserverNetworkOption*>(&options));
+    mManager->AddOrUpdateConfig(&ctx, 0, nullptr, PluginOptions(&options));
 
     auto podInfo = std::make_shared<K8sPodInfo>();
     podInfo->mContainerIds = {"1", "2"};
@@ -982,6 +984,14 @@ void NetworkObserverManagerUnittest::TestConverge() {
     APSARA_TEST_TRUE(cnt > 0);
 }
 
+void NetworkObserverManagerUnittest::TestAddOrUpdateConfigWrongOptionsVariant() {
+    CollectionPipelineContext ctx;
+    ctx.SetConfigName("c-wrong-opt");
+    ctx.SetProcessQueueKey(1);
+    SecurityOptions bad{};
+    APSARA_TEST_NOT_EQUAL(0, mManager->AddOrUpdateConfig(&ctx, 0, nullptr, PluginOptions(&bad)));
+}
+
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestInitialization);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestEventHandling);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestWhitelistManagement);
@@ -993,6 +1003,7 @@ UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestSaeScenario);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, BenchmarkConsumeTask);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestReportAgentInfo);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestConverge);
+UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestAddOrUpdateConfigWrongOptionsVariant);
 
 class NetworkObserverManagerConfigPairUnittest : public NetworkObserverManagerUnittestBase {
 protected:

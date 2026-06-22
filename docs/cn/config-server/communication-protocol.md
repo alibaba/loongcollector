@@ -137,7 +137,7 @@ Agent 向 ConfigServer 请求时携带的配置文件信息。
 
 | 值 | 说明 |
 | - | - |
-| PIPELINE_CONFIG | 采集 pipeline 配置 |
+| PIPELINE_CONFIG | 采集配置 |
 | AGENT_CONFIG | Agent 运行配置 |
 
 ### RespCode（枚举类型）

@@ -10,7 +10,7 @@
 
 ## 版本说明
 
-* 推荐版本：【待发布】
+* 推荐版本：LoongCollector v3.1.4 及以上
 
 ## 配置参数
 
@@ -49,7 +49,7 @@
 
 * 输入
 
-```json
+```bash
 curl www.alibabacloud.com
 ```
 
@@ -111,6 +111,7 @@ flushers:
     "event_type": "kprobe",
     "__time__": "1758715178"
 }
+
 {
     "exec_id": "djQzYzExMjA0LnNxYS5uYTEzMTozNDY1MzQzNDQxMjM2MDI3MDo3NTQyNDU=",
     "pid": "754245",
@@ -142,6 +143,7 @@ flushers:
     "event_type": "kprobe",
     "__time__": "1758715178"
 }
+
 {
     "exec_id": "djQzYzExMjA0LnNxYS5uYTEzMTozNDY1MzQzNDQxMjM2MDI3MDo3NTQyNDU=",
     "pid": "754245",

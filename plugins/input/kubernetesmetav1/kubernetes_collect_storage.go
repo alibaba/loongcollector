@@ -20,6 +20,7 @@ import (
 
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
 // collectStorageClass list the kubernetes StorageClass by the label selector and collect the core metadata.
@@ -29,7 +30,7 @@ func (in *InputKubernetesMeta) collectStorageClass(lister interface{}, selector 
 	}
 	storageClasses, err := lister.(storage.StorageClassLister).List(selector)
 	if err != nil {
-		logger.Warning(in.context.GetRuntimeContext(), "KUBERNETES_META_ALARM", "err", err)
+		logger.Warning(in.context.GetRuntimeContext(), selfmonitor.KubernetesMetaAlarm, "err", err)
 		return
 	}
 	nodes = make([]*helper.MetaNode, 0, len(storageClasses))

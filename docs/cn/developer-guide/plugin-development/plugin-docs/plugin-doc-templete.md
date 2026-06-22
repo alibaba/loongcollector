@@ -20,7 +20,8 @@
 
 #### 版本说明
 
-这部分先填“【待发布】”，由LoongCollector社区进行统一发布和填写。
+- **新插件**（尚未随任一稳定 Release 宣发）：「推荐版本」可填 **【待发布】**；首次进入 Release 说明后，改为 **LoongCollector v{与 [GitHub Releases](https://github.com/alibaba/loongcollector/releases) 一致} 及以上**（或历史插件仍用 **iLogtail v…**，见项目插件文档惯例）。
+- **已定版插件**：按插件**源码最后一次变更**时间，对照 Release 记录，取**已包含该变更的最早**主线版本写入「推荐版本」（本地可用 `git log -1 -- <源码路径>`；无 tag 时以 `docs/cn/installation/release-notes/release-notes.md` 等为准）。
 
 #### 配置参数部分
 
@@ -43,8 +44,8 @@
 
 样例主要包括输入、采集配置和输出三部分。
 
-1. 在代码块附上`bash`、`json`、`yaml`等标签可以更加美观。
-2. 根据具体插件差异，可以有多组样例，每组样例也并不一定要有输入。
+1. **采集配置（collection pipeline）定义**（`enable` / `inputs` / `processors` / `flushers` 等段）须使用 **YAML**。**输入**为 NDJSON 时，\`\`\`json 块内**每行一条紧凑 JSON**（单行对象）。**输出**示意：**每条数据**为**一个独立 JSON 对象**；**多条数据**写在同一 \`\`\`json 代码块内、**对象之间空行分隔**，**不要**额外包一层 JSON 数组 `[]`。原始日志行、行协议也可用 \`\`\`text。
+2. 代码块标签常用 `bash`、`yaml`、`json`；根据插件差异可有多组样例，每组未必同时包含输入与输出。
 
 #### 参考
 
@@ -52,10 +53,10 @@
 
 ### 汇总页
 
-文档完成后，需要修改`docs/cn/plugins/overview.md`和`docs/cnSUMMARY.md`。
+文档完成后，需要修改 `docs/cn/plugins/overview.md` 和 `docs/cn/SUMMARY.md`。
 
-1. `overview.md`里所有的插件按英文名字典序升序排列，添加的时候注意插入的位置。
-2. `SUMMARY.md`中的插件顺序与`overview.md`保持一致，并附上链接。
+1. 两处以插件 **Type（英文名）字典序升序** 排列；新增插件时插入到正确位置。
+2. `SUMMARY.md` 中插件小节顺序与 `overview.md` 保持一致。
 
 ## 文档模版
 

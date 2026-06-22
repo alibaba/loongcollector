@@ -26,7 +26,7 @@
 | 模板           | 说明                              | 替换示例                                            |
 | -------------- | --------------------------------- | --------------------------------------------------- |
 | `{{__ip__}}`   | 替换为 LoongCollector 的 IP 地址         | 10.112.31.40                                        |
-| `{{__host__}}` | 替换为 LoongCollector 的主机名           | logtail-ds-xdfaf                                    |
+| `{{__host__}}` | 替换为 LoongCollector 的主机名           | loongcollector-ds-xdfaf                                    |
 | `{{$xxxx}}`    | 以`$`开头则会替换为环境变量的取值 | 例如存在环境变量 `key=value`，则`{{$key}}` 为 value |
 
 ## 示例
@@ -35,8 +35,8 @@
 
 * 输入
 
-```text
-"__labels__":"a#$#b"
+```json
+{"__labels__": "a#$#b"}
 ```
 
 * 配置详情
@@ -50,6 +50,6 @@ processors:
 
 * 配置后结果
 
-```text
-"__labels__":"a#$#b|host#$#david|ip#$#30.40.60.150"
+```json
+{"__labels__": "a#$#b|host#$#david|ip#$#30.40.60.150"}
 ```

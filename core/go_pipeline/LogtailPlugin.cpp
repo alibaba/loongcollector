@@ -56,9 +56,7 @@ LogtailPlugin::LogtailPlugin() {
     mStartFun = NULL;
     mLoadGlobalConfigFun = NULL;
     mPluginValid = false;
-    mPluginAlarmConfig.mLogstore = "logtail_alarm";
-    mPluginAlarmConfig.mAliuid = STRING_FLAG(logtail_profile_aliuid);
-    mPluginAlarmConfig.mCompressor = CompressorFactory::GetInstance()->Create(CompressType::ZSTD);
+    mGetGoAlarmsFun = NULL;
     mPluginContainerConfig.mLogstore = "logtail_containers";
     mPluginContainerConfig.mAliuid = STRING_FLAG(logtail_profile_aliuid);
     mPluginContainerConfig.mCompressor = CompressorFactory::GetInstance()->Create(CompressType::ZSTD);
@@ -230,10 +228,9 @@ int LogtailPlugin::SendPbV2(const char* configName,
                             int logstoreSize,
                             char* pbBuffer,
                             int32_t pbSize,
-                            int32_t lines,
+                            int32_t /*lines*/,
                             const char* shardHash,
                             int shardHashSize) {
-    static FlusherSLS* alarmConfig = &(LogtailPlugin::GetInstance()->mPluginAlarmConfig);
     static FlusherSLS* containerConfig = &(LogtailPlugin::GetInstance()->mPluginContainerConfig);
 
     string configNameStr = string(configName, configNameSize);
@@ -245,14 +242,7 @@ int LogtailPlugin::SendPbV2(const char* configName,
 
     // LOG_DEBUG(sLogger, ("send pb", configNameStr)("pb size", pbSize)("lines", lines));
     FlusherSLS* pConfig = NULL;
-    if (configNameStr == alarmConfig->mLogstore) {
-        pConfig = alarmConfig;
-        pConfig->mProject = GetProfileSender()->GetDefaultProfileProjectName();
-        pConfig->mRegion = GetProfileSender()->GetDefaultProfileRegion();
-        if (pConfig->mProject.empty()) {
-            return 0;
-        }
-    } else if (configNameStr == containerConfig->mLogstore) {
+    if (configNameStr == containerConfig->mLogstore) {
         pConfig = containerConfig;
         pConfig->mProject = GetProfileSender()->GetDefaultProfileProjectName();
         pConfig->mRegion = GetProfileSender()->GetDefaultProfileRegion();
@@ -277,7 +267,6 @@ int LogtailPlugin::SendPbV2(const char* configName,
     return pConfig->Send(std::string(pbBuffer, pbSize), shardHashStr, logstore) ? 0 : -1;
 }
 
-
 bool LogtailPlugin::LoadPluginBase() {
     if (mPluginValid) {
         return true;
@@ -288,7 +277,7 @@ bool LogtailPlugin::LoadPluginBase() {
         DynamicLibLoader loader;
         std::string error;
         // load plugin adapter
-        if (!loader.LoadDynLib("GoPluginAdapter", error, AppConfig::GetInstance()->GetWorkingDir())) {
+        if (!loader.LoadDynLib(GetPluginAdapterName(), error, AppConfig::GetInstance()->GetWorkingDir())) {
             LOG_ERROR(sLogger, ("open adapter lib error, Message", error));
             return mPluginValid;
         }
@@ -330,7 +319,7 @@ bool LogtailPlugin::LoadPluginBase() {
         DynamicLibLoader loader;
         std::string error;
         // load plugin base
-        if (!loader.LoadDynLib("GoPluginBase", error, AppConfig::GetInstance()->GetWorkingDir())) {
+        if (!loader.LoadDynLib(GetPluginBaseName(), error, AppConfig::GetInstance()->GetWorkingDir())) {
             LOG_ERROR(sLogger, ("open plugin base dl error, Message", error));
             return mPluginValid;
         }
@@ -422,6 +411,12 @@ bool LogtailPlugin::LoadPluginBase() {
         mGetGoMetricsFun = (GetGoMetricsFun)loader.LoadMethod("GetGoMetrics", error);
         if (!error.empty()) {
             LOG_ERROR(sLogger, ("load GetGoMetrics error, Message", error));
+            return mPluginValid;
+        }
+        // 获取golang部分告警信息
+        mGetGoAlarmsFun = (GetGoAlarmsFun)loader.LoadMethod("GetGoAlarms", error);
+        if (!error.empty()) {
+            LOG_ERROR(sLogger, ("load GetGoAlarms error, Message", error));
             return mPluginValid;
         }
 
@@ -544,6 +539,81 @@ void LogtailPlugin::GetGoMetrics(std::vector<std::map<std::string, std::string>>
             free(metrics->metrics);
             free(metrics);
         }
+    }
+}
+
+void LogtailPlugin::GetGoAlarms() {
+    if (mGetGoAlarmsFun == nullptr) {
+        return;
+    }
+    auto* alarms = mGetGoAlarmsFun();
+    if (alarms == nullptr) {
+        return;
+    }
+    int32_t syncedAlarmCount = 0;
+    int32_t droppedAlarmCount = 0;
+    for (int i = 0; i < alarms->count; ++i) {
+        InnerGoAlarm* innerAlarm = alarms->alarms[i];
+        if (innerAlarm == nullptr) {
+            continue;
+        }
+        std::string alarmType = innerAlarm->alarmType ? std::string(innerAlarm->alarmType) : "";
+        std::string alarmLevel = innerAlarm->alarmLevel ? std::string(innerAlarm->alarmLevel) : "";
+        std::string alarmMessage = innerAlarm->alarmMessage ? std::string(innerAlarm->alarmMessage) : "";
+        std::string projectName = innerAlarm->projectName ? std::string(innerAlarm->projectName) : "";
+        std::string category = innerAlarm->category ? std::string(innerAlarm->category) : "";
+        std::string config = innerAlarm->config ? std::string(innerAlarm->config) : "";
+        if (alarmType.empty()) {
+            ++droppedAlarmCount;
+            free(innerAlarm->alarmType);
+            free(innerAlarm->alarmLevel);
+            free(innerAlarm->alarmMessage);
+            free(innerAlarm->projectName);
+            free(innerAlarm->category);
+            free(innerAlarm->config);
+            free(innerAlarm);
+            continue;
+        }
+
+        AlarmLevel level = ALARM_LEVEL_WARNING;
+        if (alarmLevel == "2") {
+            level = ALARM_LEVEL_ERROR;
+        } else if (alarmLevel == "3") {
+            level = ALARM_LEVEL_CRITICAL;
+        }
+        int32_t count = innerAlarm->count > 0 ? innerAlarm->count : 1;
+        std::string pipelineConfig = config;
+        if (pipelineConfig.size() > 2 && pipelineConfig[pipelineConfig.size() - 2] == '/'
+            && (pipelineConfig.back() == '1' || pipelineConfig.back() == '2')) {
+            pipelineConfig = pipelineConfig.substr(0, pipelineConfig.size() - 2);
+        }
+        std::string resolvedRegion = STRING_FLAG(default_region_name);
+        const shared_ptr<CollectionPipeline>& pipeline
+            = CollectionPipelineManager::GetInstance()->FindConfigByName(pipelineConfig);
+        if (pipeline) {
+            const std::string& region = pipeline->GetContext().GetRegion();
+            if (!region.empty()) {
+                resolvedRegion = region;
+            }
+        }
+        AlarmManager::GetInstance()->SendExternalAlarm(
+            alarmType, level, alarmMessage, count, resolvedRegion, projectName, pipelineConfig, category);
+        ++syncedAlarmCount;
+
+        free(innerAlarm->alarmType);
+        free(innerAlarm->alarmLevel);
+        free(innerAlarm->alarmMessage);
+        free(innerAlarm->projectName);
+        free(innerAlarm->category);
+        free(innerAlarm->config);
+        free(innerAlarm);
+    }
+    free(alarms->alarms);
+    free(alarms);
+    if (syncedAlarmCount > 0 || droppedAlarmCount > 0) {
+        LOG_DEBUG(sLogger,
+                  ("sync go alarms to cpp pipeline", "finished")("synced", syncedAlarmCount)("dropped_empty_type",
+                                                                                             droppedAlarmCount));
     }
 }
 

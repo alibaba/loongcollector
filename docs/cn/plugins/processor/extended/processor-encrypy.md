@@ -37,7 +37,7 @@
 
 * 采集配置
 
-```Yaml
+```yaml
 processors:
   - Type: processor_encrypt
     SourceKeys:
@@ -87,7 +87,7 @@ $ cat plaintext
 
 * 配置详情（注意 Key/IV 都是十六进制表示）
 
-```Yaml
+```yaml
 processors:
   - Type: processor_encrypt
     SourceKeys:
@@ -122,7 +122,7 @@ $ cat plaintext
 
 * 前置条件
 
-运行 logtail 的机器上需要创建文件 `/home/admin/aes_key.json`（JSON 格式），并将密钥以十六进制存放在其中，命令如下：
+运行 LoongCollector 的节点上需要创建文件 `/home/admin/aes_key.json`（JSON 格式），并将密钥以十六进制存放在其中，命令如下：
 
 ```shell
 printf "{\"Key\": \"FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF\"}" > /home/admin/aes_key.json
@@ -138,7 +138,7 @@ printf "{\"Key\": \"FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
 
 * 配置详情
 
-```Yaml
+```yaml
 processors:
   - Type: processor_encrypt
     SourceKeys:

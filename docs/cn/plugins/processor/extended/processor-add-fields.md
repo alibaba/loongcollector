@@ -52,7 +52,7 @@ flushers:
 
 ```json
 {
-    "__tag__:__path__": "/home/test_log/key_value.log",
+    "__tag__:__path__": "/home/test-log/test.log",
     "content": "this is a test log",
     "service": "A",
     "__time__": "1657354602"

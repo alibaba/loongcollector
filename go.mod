@@ -9,6 +9,7 @@ require (
 	github.com/alibaba/ilogtail/pkg v0.0.0
 	github.com/apache/doris/sdk/go-doris-sdk v0.0.0-20251128023530-ff9100777811
 	github.com/apache/pulsar-client-go v0.10.0
+	github.com/bi-zone/etw v0.0.0-20210519083747-fe9042eb0ea8
 	github.com/buger/jsonparser v1.1.1
 	github.com/cespare/xxhash/v2 v2.3.0
 	github.com/cihub/seelog v0.0.0-20170130134532-f561c5e57575
@@ -189,6 +190,7 @@ require (
 	github.com/leodido/go-urn v1.4.0 // indirect
 	github.com/linkedin/goavro/v2 v2.9.8 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
+	github.com/miekg/dns v1.1.62
 	github.com/miekg/pkcs11 v1.1.1 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
 	github.com/moby/locker v1.0.1 // indirect
@@ -304,3 +306,5 @@ replace (
 	github.com/satori/go.uuid => github.com/satori/go.uuid v1.2.0
 	github.com/streadway/handy => github.com/iLogtail/handy v0.0.0-20230327021402-6a47ec586270
 )
+
+replace github.com/bi-zone/etw => github.com/zdy/etw v1.0.0

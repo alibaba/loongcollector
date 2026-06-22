@@ -41,7 +41,7 @@ metadata 中配置 key 为 `X-Loongsuite-Apm-Configname`，value 为采集配置
 * 采集配置
 
 ```yaml
-enabled: true
+enable: true
 inputs:
   - Type: input_forward
     Protocol: LoongSuite
@@ -59,6 +59,8 @@ flushers:
 通过gRPC客户端发送LoongSuite协议的转发请求，请求需要在metadata中包含`x-loongsuite-apm-configname: <采集配置名>`字段，数据内容在请求的data字段中，为 `PipelineEventGroup` PB 序列化的结果。
 
 * 输出
+
+以下为示意：实际字段取决于上游 PB 解析后的事件内容及下游 Flusher 序列化方式。
 
 ```json
 {

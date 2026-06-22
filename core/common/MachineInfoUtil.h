@@ -101,7 +101,14 @@ void GetAllPids(std::unordered_set<int32_t>& pids);
 bool GetKernelInfo(std::string& kernelRelease, int64_t& kernelVersion);
 bool GetRedHatReleaseInfo(std::string& os, int64_t& osVersion, std::string bashPath = "");
 bool IsDigitsDotsHostname(const char* hostname);
-// GetAnyAvailableIP walks through all interfaces (AF_INET) to find an available IP.
+// True if this interface must not supply host-identity IPs: null/empty name, "lo", or a trimmed match in
+// STRING_FLAG(ignored_interfaces) (comma-separated). When the flag list is empty, only the implicit rules apply.
+bool IsIgnoredInterfaceForHostIdentity(const char* ifname);
+inline bool IsIgnoredInterfaceForHostIdentity(const std::string& ifname) {
+    return IsIgnoredInterfaceForHostIdentity(ifname.c_str());
+}
+// GetAnyAvailableIP walks through interfaces (AF_INET) to find an available IP (Linux: excludes lo/127.* and
+// ignored_interfaces blacklist).
 // Priority:
 // - IP that does not start with "127.".
 // - IP from interface at first.

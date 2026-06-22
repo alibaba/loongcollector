@@ -98,6 +98,7 @@ public:
                                 const CollectionPipelineContext*,
                                 const std::string& basePathInCheckpoint = "");
     bool DeleteRawContainerInfo(const std::string& containerID);
+    void ClearContainerInfo();
 
     ContainerInfo* GetContainerPathByLogPath(const std::string& logPath) const;
 
@@ -108,8 +109,8 @@ public:
     bool IsTailingAllMatchedFiles() const { return mTailingAllMatchedFiles; }
     void SetTailingAllMatchedFiles(bool flag) { mTailingAllMatchedFiles = flag; }
 
-    uint32_t GetLastContainerUpdateTime() const { return mLastContainerUpdateTime; }
-    void SetLastContainerUpdateTime(uint32_t time) { mLastContainerUpdateTime = time; }
+    int64_t GetLastContainerUpdateTime() const { return mLastContainerUpdateTime; }
+    void SetLastContainerUpdateTime(int64_t time) { mLastContainerUpdateTime = time; }
 
 
     std::vector<std::string> mFilePaths;
@@ -165,11 +166,12 @@ private:
     // 过渡使用
     bool mTailingAllMatchedFiles = false;
 
-    uint32_t mLastContainerUpdateTime = 0;
+    int64_t mLastContainerUpdateTime = 0;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class FileDiscoveryOptionsUnittest;
     friend class ModifyHandlerUnittest;
+    friend class ConfigManagerUnittest;
 #endif
 };
 

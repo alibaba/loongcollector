@@ -24,6 +24,16 @@ DEFINE_FLAG_INT32(cpu_limit_num, "cpu violate limit num before shutdown", 10);
 DEFINE_FLAG_INT32(mem_limit_num, "memory violate limit num before shutdown", 10);
 DEFINE_FLAG_DOUBLE(cpu_usage_up_limit, "cpu usage upper limit, cores", 2.0);
 DEFINE_FLAG_INT64(memory_usage_up_limit, "memory usage upper limit, MB", 2 * 1024);
+// When resolving the host IP from the hostname on Linux, we walk NIC addresses. Virtual or bridge interfaces
+// often have IPs too, but those are usually not the node's primary identity IP (e.g. the cloud/ops-facing
+// address). This flag drops addresses on listed interface names so we do not pick them by mistake.
+// Defaults target common K8s+Docker nodes: kube-ipvs0 (kube-proxy IPVS dummy / service-like addresses),
+// nodelocaldns (NodeLocal DNS cache-related iface), docker0 (default Docker bridge, often the container subnet GW).
+DEFINE_FLAG_STRING(
+    ignored_interfaces,
+    "Comma-separated interface names ignored when resolving host IP from hostname (Linux). "
+    "JSON key ignored_interfaces in ilogtail_config.json; env ignored_interfaces or LOONG_IGNORED_INTERFACES.",
+    "kube-ipvs0,nodelocaldns,docker0");
 
 // checkpoint
 DEFINE_FLAG_INT32(unused_checkpoints_clear_interval_sec, "", 600);

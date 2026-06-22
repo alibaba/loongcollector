@@ -34,7 +34,7 @@ python3 tools/coverage-diff/main.py coverage-report/index.txt
 
 ### 测试工具
 
-从插件开发以及 [日志打印](How-to-use-logger.md) 篇幅可以看到，ilogtail.Context 接口包含了 LoongCollector 的元配置信息，因此提供了Mock Context 以及Mock Collector 实现进行单元测试。
+从插件开发以及 [Logger 接口](../plugin-development/plugin-debug/logger-api.md) 一文可以看到，`ilogtail.Context` 接口包含了 LoongCollector 的元配置信息，因此提供了 Mock Context 以及 Mock Collector 实现进行单元测试。
 
 ```go
 import (

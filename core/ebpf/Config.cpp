@@ -14,9 +14,11 @@
 
 #include "ebpf/Config.h"
 
+#include <functional>
 #include <string>
 #include <unordered_set>
 
+#include "app_config/AppConfig.h"
 #include "common/Flags.h"
 #include "common/ParamExtractor.h"
 #include "logger/Logger.h"
@@ -498,30 +500,259 @@ bool CheckProbeConfigValid(const Json::Value& config, std::string& errorMsg) {
     return true;
 }
 
+namespace {
+
+void WarnSecurityProbeConfigIgnore(const CollectionPipelineContext* mContext,
+                                   const std::string& msg,
+                                   const std::string& sName) {
+    PARAM_WARNING_IGNORE(mContext->GetLogger(),
+                         mContext->GetAlarm(),
+                         msg,
+                         sName,
+                         mContext->GetConfigName(),
+                         mContext->GetProjectName(),
+                         mContext->GetLogstoreName(),
+                         mContext->GetRegion());
+}
+
+namespace {
+
+bool ParseAgentsightAgentTypeField(const Json::Value& row,
+                                   const std::string& contextLabel,
+                                   size_t rowIndex,
+                                   std::string& agentType,
+                                   std::string& errorMsg) {
+    const std::string prefix = contextLabel + " row " + std::to_string(rowIndex);
+    if (!row.isMember("AgentType") || !row["AgentType"].isString()) {
+        errorMsg = prefix + " must have non-empty AgentType (string)";
+        return false;
+    }
+    agentType = row["AgentType"].asString();
+    if (agentType.empty()) {
+        errorMsg = prefix + " AgentType must be non-empty";
+        return false;
+    }
+    return true;
+}
+
+bool ParseAgentsightCmdlinePatternsArray(const Json::Value& row,
+                                         const std::string& contextLabel,
+                                         size_t rowIndex,
+                                         const char* fieldHint,
+                                         std::vector<std::string>& patterns,
+                                         std::string& errorMsg) {
+    const std::string prefix = contextLabel + " row " + std::to_string(rowIndex) + " " + fieldHint;
+    if (!row.isArray()) {
+        errorMsg = prefix + " must be a string array";
+        return false;
+    }
+    patterns.clear();
+    patterns.reserve(row.size());
+    for (const auto& cell : row) {
+        if (!cell.isString()) {
+            errorMsg = prefix + " contains non-string element";
+            return false;
+        }
+        patterns.emplace_back(cell.asString());
+    }
+    if (patterns.empty()) {
+        errorMsg = prefix + " is empty";
+        return false;
+    }
+    return true;
+}
+
+} // namespace
+
+/// Fills `dest` with cmdline-arg-glob rows from `rows` (must be JSON array of string arrays).
+void ParseAgentsightCmdlineRowArray(const Json::Value& rows,
+                                    const std::string& contextLabel,
+                                    std::vector<std::vector<std::string>>& dest,
+                                    std::string& errorMsg,
+                                    const std::function<void()>& warn) {
+    if (!rows.isArray()) {
+        errorMsg = contextLabel + " must be an array of string arrays";
+        warn();
+        return;
+    }
+    for (Json::ArrayIndex i = 0; i < rows.size(); ++i) {
+        std::vector<std::string> patterns;
+        if (!ParseAgentsightCmdlinePatternsArray(rows[i], contextLabel, i, "entry", patterns, errorMsg)) {
+            warn();
+            continue;
+        }
+        dest.emplace_back(std::move(patterns));
+    }
+}
+
+/// Fills `dest` with allow rules. Each entry must be `{"AgentType": "...", "Args": [...]}`.
+bool ParseAgentsightCmdlineAllowRuleArray(const Json::Value& rows,
+                                          const std::string& contextLabel,
+                                          std::vector<AgentsightCmdlineAllowRule>& dest,
+                                          std::string& errorMsg,
+                                          const std::function<void()>& warn) {
+    if (!rows.isArray()) {
+        errorMsg = contextLabel + " must be an array";
+        warn();
+        return false;
+    }
+    if (rows.empty()) {
+        errorMsg = contextLabel + " must contain at least one rule";
+        warn();
+        return false;
+    }
+    for (Json::ArrayIndex i = 0; i < rows.size(); ++i) {
+        const Json::Value& row = rows[i];
+        if (!row.isObject()) {
+            errorMsg = contextLabel + " row " + std::to_string(i) + " must be an object with AgentType and Args";
+            warn();
+            continue;
+        }
+        std::string agentType;
+        if (!ParseAgentsightAgentTypeField(row, contextLabel, i, agentType, errorMsg)) {
+            warn();
+            continue;
+        }
+        if (!row.isMember("Args")) {
+            errorMsg = contextLabel + " row " + std::to_string(i) + " object must have Args";
+            warn();
+            continue;
+        }
+        std::vector<std::string> patterns;
+        if (!ParseAgentsightCmdlinePatternsArray(row["Args"], contextLabel, i, "Args", patterns, errorMsg)) {
+            warn();
+            continue;
+        }
+        dest.push_back(AgentsightCmdlineAllowRule{std::move(agentType), std::move(patterns)});
+    }
+    if (dest.empty()) {
+        errorMsg = contextLabel + " has no valid rules";
+        warn();
+        return false;
+    }
+    return true;
+}
+
+void ParseAgentsightCmdlineFromOptionalKey(const Json::Value& innerConfig,
+                                           const char* key,
+                                           const std::string& contextLabel,
+                                           std::vector<std::vector<std::string>>& dest,
+                                           std::string& errorMsg,
+                                           const std::function<void()>& warn) {
+    if (!innerConfig.isMember(key)) {
+        return;
+    }
+    ParseAgentsightCmdlineRowArray(innerConfig[key], contextLabel, dest, errorMsg, warn);
+}
+
+void ParseAgentsightOptionalStringList(const Json::Value& innerConfig,
+                                       const char* key,
+                                       const std::string& contextLabel,
+                                       std::vector<std::string>& dest,
+                                       std::string& errorMsg,
+                                       const std::function<void()>& warn) {
+    if (!innerConfig.isMember(key)) {
+        return;
+    }
+    const Json::Value& dr = innerConfig[key];
+    if (!dr.isArray()) {
+        errorMsg = contextLabel + " must be an array of strings";
+        warn();
+        return;
+    }
+    for (Json::ArrayIndex i = 0; i < dr.size(); ++i) {
+        const Json::Value& cell = dr[i];
+        if (!cell.isString()) {
+            errorMsg = contextLabel + " element " + std::to_string(i) + " is not a string";
+            warn();
+            continue;
+        }
+        dest.emplace_back(cell.asString());
+    }
+}
+
+} // namespace
+
 bool SecurityOptions::Init(SecurityProbeType probeType,
                            const Json::Value& config,
                            const CollectionPipelineContext* mContext,
                            const std::string& sName) {
     std::string errorMsg;
+
+    if (probeType == SecurityProbeType::AGENTSIGHT_OBSERVE) {
+        mProbeType = probeType;
+        mOptionList.clear();
+        mVerbose = 0;
+        mLogPath.clear();
+        mAgentsightCmdlineWhitelist.clear();
+        mAgentsightCmdlineBlacklist.clear();
+        mAgentsightHttps.clear();
+        mAgentsightHttp.clear();
+        mAgentsightEventStreamFormat = true;
+        mAgentsightMessageDeltaOnly = true;
+    }
+
     SecurityOption thisSecurityOption;
 
     // ProbeConfig (Optional)
     if (!CheckProbeConfigValid(config, errorMsg)) {
         if (!errorMsg.empty()) {
-            PARAM_WARNING_IGNORE(mContext->GetLogger(),
-                                 mContext->GetAlarm(),
-                                 errorMsg,
-                                 sName,
-                                 mContext->GetConfigName(),
-                                 mContext->GetProjectName(),
-                                 mContext->GetLogstoreName(),
-                                 mContext->GetRegion());
+            WarnSecurityProbeConfigIgnore(mContext, errorMsg, sName);
+        }
+        if (probeType == SecurityProbeType::AGENTSIGHT_OBSERVE) {
+            // No ProbeConfig means AgentsightManager will fall back to built-in defaults.
+            return true;
         }
     } else {
         const auto& innerConfig = config["ProbeConfig"];
         // Genral Filter (Optional)
         std::variant<std::monostate, SecurityFileFilter, SecurityNetworkFilter> thisFilter;
         switch (probeType) {
+            case SecurityProbeType::AGENTSIGHT_OBSERVE: {
+                const auto warnOptionalParse = [&]() { WarnSecurityProbeConfigIgnore(mContext, errorMsg, sName); };
+                if (!GetOptionalIntParam(innerConfig, "Verbose", mVerbose, errorMsg)) {
+                    warnOptionalParse();
+                }
+                if (mVerbose < 0) {
+                    mVerbose = 0;
+                }
+                if (!GetOptionalStringParam(innerConfig, "LogPath", mLogPath, errorMsg)) {
+                    warnOptionalParse();
+                }
+                // CmdlineWhitelist is optional: when absent, AgentsightManager injects the
+                // built-in cmdline rules. When present, it must contain valid rules.
+                if (innerConfig.isMember("CmdlineWhitelist")) {
+                    if (!ParseAgentsightCmdlineAllowRuleArray(innerConfig["CmdlineWhitelist"],
+                                                              "ProbeConfig.CmdlineWhitelist",
+                                                              mAgentsightCmdlineWhitelist,
+                                                              errorMsg,
+                                                              warnOptionalParse)) {
+                        return false;
+                    }
+                }
+                ParseAgentsightCmdlineFromOptionalKey(innerConfig,
+                                                      "CmdlineBlacklist",
+                                                      "ProbeConfig.CmdlineBlacklist",
+                                                      mAgentsightCmdlineBlacklist,
+                                                      errorMsg,
+                                                      warnOptionalParse);
+                ParseAgentsightOptionalStringList(
+                    innerConfig, "Https", "ProbeConfig.Https", mAgentsightHttps, errorMsg, warnOptionalParse);
+                ParseAgentsightOptionalStringList(
+                    innerConfig, "Http", "ProbeConfig.Http", mAgentsightHttp, errorMsg, warnOptionalParse);
+                if (innerConfig.isMember("EventStreamFormat")) {
+                    if (!GetOptionalBoolParam(
+                            innerConfig, "EventStreamFormat", mAgentsightEventStreamFormat, errorMsg)) {
+                        warnOptionalParse();
+                    }
+                }
+                if (innerConfig.isMember("MessageDeltaOnly")) {
+                    if (!GetOptionalBoolParam(innerConfig, "MessageDeltaOnly", mAgentsightMessageDeltaOnly, errorMsg)) {
+                        warnOptionalParse();
+                    }
+                }
+                return true;
+            }
             case SecurityProbeType::FILE: {
                 SecurityFileFilter thisFileFilter;
                 InitSecurityFileFilter(innerConfig, thisFileFilter, mContext, sName);
@@ -538,20 +769,88 @@ bool SecurityOptions::Init(SecurityProbeType probeType,
                 break;
             }
             default:
-                PARAM_WARNING_IGNORE(mContext->GetLogger(),
-                                     mContext->GetAlarm(),
-                                     "Unknown security eBPF probe type",
-                                     sName,
-                                     mContext->GetConfigName(),
-                                     mContext->GetProjectName(),
-                                     mContext->GetLogstoreName(),
-                                     mContext->GetRegion());
+                WarnSecurityProbeConfigIgnore(mContext, "Unknown security eBPF probe type", sName);
         }
         thisSecurityOption.mFilter = thisFilter;
     }
     GetSecurityProbeDefaultCallName(probeType, thisSecurityOption.mCallNames);
     mOptionList.emplace_back(std::move(thisSecurityOption));
     mProbeType = probeType;
+    return true;
+}
+
+bool CpuProfilingOption::Init(const Json::Value& config,
+                              const CollectionPipelineContext* mContext,
+                              const std::string& sName) {
+    std::string errorMsg;
+
+    if (!GetOptionalUIntParam(config, "CollectIntervalMs", mCollectIntervalMs, errorMsg)) {
+        PARAM_WARNING_IGNORE(mContext->GetLogger(),
+                             mContext->GetAlarm(),
+                             errorMsg,
+                             sName,
+                             mContext->GetConfigName(),
+                             mContext->GetProjectName(),
+                             mContext->GetLogstoreName(),
+                             mContext->GetRegion());
+    }
+
+    if (!GetOptionalStringParam(config, "AppName", mAppName, errorMsg)) {
+        PARAM_WARNING_IGNORE(mContext->GetLogger(),
+                             mContext->GetAlarm(),
+                             errorMsg,
+                             sName,
+                             mContext->GetConfigName(),
+                             mContext->GetProjectName(),
+                             mContext->GetLogstoreName(),
+                             mContext->GetRegion());
+    }
+
+    if (!GetOptionalStringParam(config, "Language", mLanguage, errorMsg)) {
+        PARAM_WARNING_IGNORE(mContext->GetLogger(),
+                             mContext->GetAlarm(),
+                             errorMsg,
+                             sName,
+                             mContext->GetConfigName(),
+                             mContext->GetProjectName(),
+                             mContext->GetLogstoreName(),
+                             mContext->GetRegion());
+    }
+
+    std::vector<std::string> cmdlineStrs;
+    if (!GetOptionalListFilterParam<std::string>(config, "CommandLines", cmdlineStrs, errorMsg)) {
+        PARAM_WARNING_IGNORE(mContext->GetLogger(),
+                             mContext->GetAlarm(),
+                             errorMsg,
+                             sName,
+                             mContext->GetConfigName(),
+                             mContext->GetProjectName(),
+                             mContext->GetLogstoreName(),
+                             mContext->GetRegion());
+        return false;
+    }
+    for (const auto& cmdlineStr : cmdlineStrs) {
+        try {
+            mCmdlines.emplace_back(cmdlineStr);
+        } catch (const boost::regex_error& e) {
+            PARAM_WARNING_IGNORE(mContext->GetLogger(),
+                                 mContext->GetAlarm(),
+                                 "Invalid command line regex: " + cmdlineStr + ", error: " + e.what(),
+                                 sName,
+                                 mContext->GetConfigName(),
+                                 mContext->GetProjectName(),
+                                 mContext->GetLogstoreName(),
+                                 mContext->GetRegion());
+            return false;
+        }
+    }
+
+    if (AppConfig::GetInstance()->IsPurageContainerMode()) {
+        if (!mContainerDiscovery.Init(config, *mContext, sName)) {
+            return false;
+        }
+    }
+
     return true;
 }
 

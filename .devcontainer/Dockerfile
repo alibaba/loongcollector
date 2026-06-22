@@ -12,15 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.13
+FROM sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.17
 
 ARG USERNAME=admin
 ARG USER_PASSWORD
 USER root
 
+RUN sed -i '/mirrors.aliyuncs.com\|mirrors.cloud.aliyuncs.com/d' /etc/yum.repos.d/CentOS-Base.repo
 RUN yum -y install openssh-server && \
     ssh-keygen -A
     
+# Feature Docker-in-Docker
+COPY dind-install.sh /tmp/dind-install.sh
+RUN chmod +x /tmp/dind-install.sh && \
+    MOBY=false \
+    DOCKERDASHCOMPOSEVERSION=none \
+    INSTALLDOCKERBUILDX=false \
+    /tmp/dind-install.sh
+
 # Create the user
 COPY .env /tmp/.env
 COPY authorized_keys /tmp/authorized_keys
@@ -49,8 +58,13 @@ RUN cp /opt/logtail/deps/lib/libssl.so.1.0.0 /usr/lib64; \
     chown -R $USERNAME:$GROUPNAME /opt $(eval echo ~$USERNAME); \
     rm /tmp/authorized_keys; \
     echo "export PATH=/usr/local/go/bin:/opt/logtail/deps/bin:$PATH" >> /home/$USERNAME/.bashrc; \
+    echo "export PERL=/usr/bin/perl" >> /home/$USERNAME/.bashrc; \
+    echo "export PERL5LIB=/usr/share/perl5:/usr/lib64/perl5/vendor_perl:/usr/share/perl5/vendor_perl:/usr/lib64/perl5" >> /home/$USERNAME/.bashrc; \
     su - $USERNAME -c "\
     go env -w GO111MODULE=on && \
-    go env -w GOPROXY=https://goproxy.cn,direct"
+    go env -w GOPROXY=https://goproxy.cn,direct" && \
+    usermod -aG docker $USERNAME
 
 USER $USERNAME
+
+# ENTRYPOINT [ "/usr/local/share/docker-init.sh" ]

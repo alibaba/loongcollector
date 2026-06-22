@@ -52,6 +52,9 @@ function check_docker_buildkit_support {
 # development: build ilogtail development images.
 # production: build ilogtail production images.
 # multi-arch-production: build ilogtail multi-arch production images.
+#
+# AgentSight (coolbpf vendored openssl-sys): perl + openssl-devel come from loongcollector-build-linux 2.1.17+.
+# gen_build.sh verifies required Perl modules (scripts/gen_build_scripts.sh).
 ARCH=$(arch)
 CATEGORY=$1
 GENERATED_HOME=$2
@@ -98,6 +101,13 @@ elif [[ $CATEGORY = "production" ]]; then
     cat $ROOTDIR/docker/Dockerfile_production | grep -v "^#" | sed 's/ --platform=$TARGETPLATFORM//' >> $GEN_DOCKERFILE;
 elif [[ $CATEGORY = "multi-arch-production" ]]; then
     cat $ROOTDIR/docker/Dockerfile_production | grep -v "^#" >> $GEN_DOCKERFILE;
+fi
+
+# Fail-soft check: base image tag should be new enough to ship AgentSight perl/openssl build deps.
+if [[ "$CATEGORY" = "build" || "$CATEGORY" = "development" ]]; then
+    if ! grep -qE 'loongcollector-build-linux:2\.1\.(1[7-9]|[2-9][0-9])|loongcollector-build-linux:2\.[2-9]|loongcollector-build-linux:[3-9]' "$GEN_DOCKERFILE"; then
+        echo "WARNING: AgentSight expects loongcollector-build-linux 2.1.17+ in Dockerfile_build FROM; check generated Dockerfile." >&2
+    fi
 fi
 
 echo "=============DOCKERFILE=================="

@@ -17,6 +17,7 @@
 #include "monitor/SelfMonitorServer.h"
 
 #include "constants/TagConstants.h"
+#include "go_pipeline/LogtailPlugin.h"
 #include "logger/Logger.h"
 #include "monitor/AlarmManager.h"
 #include "monitor/Monitor.h"
@@ -201,6 +202,12 @@ void SelfMonitorServer::SendAlarms() {
     // metadata:
     // INTERNAL_DATA_TARGET_REGION:${region}
     // INTERNAL_DATA_TYPE:__alarm__
+// Todo: windows 上的 cgo 内存有问题，调用 GetGoAlarms 函数时可能会 crash，需要修复
+#ifndef _MSC_VER
+    if (LogtailPlugin::GetInstance()->IsPluginOpened()) {
+        LogtailPlugin::GetInstance()->GetGoAlarms();
+    }
+#endif
     vector<PipelineEventGroup> pipelineEventGroupList;
     ReadLock lock(mAlarmPipelineMux);
     if (mAlarmPipelineCtx == nullptr) {

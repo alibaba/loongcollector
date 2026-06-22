@@ -22,6 +22,9 @@ set -o pipefail
 # core: Only build the CPP part.
 # all: Do the above plugin and core steps.
 # e2e: Build plugin dynamic lib and build the CPP part.
+#
+# ENABLE_AGENTSIGHT=ON (non-plugin): generated gen_build.sh verifies Perl modules for openssl-sys
+# in the Docker build (docker/Dockerfile_build uses loongcollector-build-linux 2.1.17+ for packages).
 CATEGORY=$1
 GENERATED_HOME=$2
 VERSION=${3:-0.0.1}
@@ -40,6 +43,9 @@ ENABLE_COMPATIBLE_MODE=${ENABLE_COMPATIBLE_MODE:-OFF}
 ENABLE_STATIC_LINK_CRT=${ENABLE_STATIC_LINK_CRT:-OFF}
 WITHOUTGDB=${WITHOUTGDB:-OFF}
 WITHSPL=${WITHSPL:-ON}
+# Passed to core CMake; coolbpf must expose target libagentsight when enabled.
+# gen_copy_docker: libcoolbpf.so.* and libagentsight.so are under /opt/logtail/deps/lib (cmake --install prefix; core/dependencies.cmake DEPS_ROOT).
+ENABLE_AGENTSIGHT=${ENABLE_AGENTSIGHT:-ON}
 BUILD_SCRIPT_FILE=$GENERATED_HOME/gen_build.sh
 COPY_SCRIPT_FILE=$GENERATED_HOME/gen_copy_docker.sh
 MAKE_JOBS=${MAKE_JOBS:-$(nproc)}
@@ -81,14 +87,25 @@ EOF
   echo "echo 'StrictHostkeyChecking no' >> /etc/ssh/ssh_config" >> $BUILD_SCRIPT_FILE
 
   chmod 755 $BUILD_SCRIPT_FILE
+  # Appended to gen_build.sh: runs inside "docker build" when Dockerfile_build does RUN gen_build.sh.
+  # Perl/OpenSSL build deps come from loongcollector-build-linux 2.1.17+; only verify here.
+  if [ "${ENABLE_AGENTSIGHT}" = "ON" ] && [ "${CATEGORY}" != "plugin" ]; then
+    cat >>"$BUILD_SCRIPT_FILE" <<'AGENTSIGHT_BUILD_DEPS_EOF'
+
+# --- AgentSight / vendored openssl-sys (Docker build container only) ---
+perl -MIPC::Cmd -e1 && perl -MData::Dumper -e1 || { echo "ERROR: perl IPC::Cmd or Data::Dumper missing (use loongcollector-build-linux 2.1.17+ or install AgentSight build deps)." >&2; exit 1; }
+# --- end AgentSight build deps ---
+AGENTSIGHT_BUILD_DEPS_EOF
+  fi
+
   if [ $CATEGORY = "plugin" ]; then
     echo "mkdir -p core/build && cd core/build && cmake -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DLOGTAIL_VERSION=${VERSION} .. && cd plugin && make -s GoPluginAdapter && cd ../../.. && ./scripts/upgrade_adapter_lib.sh && ./scripts/plugin_build.sh mod c-shared ${OUT_DIR} ${VERSION} ${PLUGINS_CONFIG_FILE} ${GO_MOD_FILE}" >>$BUILD_SCRIPT_FILE
   elif [ $CATEGORY = "core" ]; then
-    echo "mkdir -p core/build && cd core/build && cmake -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DLOGTAIL_VERSION=${VERSION} -DBUILD_LOGTAIL=${BUILD_LOGTAIL} -DBUILD_LOGTAIL_UT=${BUILD_LOGTAIL_UT} -DENABLE_COMPATIBLE_MODE=${ENABLE_COMPATIBLE_MODE} -DENABLE_STATIC_LINK_CRT=${ENABLE_STATIC_LINK_CRT} -DWITHOUTGDB=${WITHOUTGDB} -DWITHSPL=${WITHSPL} .. && make -sj${MAKE_JOBS}" >>$BUILD_SCRIPT_FILE
+    echo "mkdir -p core/build && cd core/build && cmake -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DLOGTAIL_VERSION=${VERSION} -DBUILD_LOGTAIL=${BUILD_LOGTAIL} -DBUILD_LOGTAIL_UT=${BUILD_LOGTAIL_UT} -DENABLE_COMPATIBLE_MODE=${ENABLE_COMPATIBLE_MODE} -DENABLE_STATIC_LINK_CRT=${ENABLE_STATIC_LINK_CRT} -DWITHOUTGDB=${WITHOUTGDB} -DWITHSPL=${WITHSPL} -DENABLE_AGENTSIGHT=${ENABLE_AGENTSIGHT} .. && make -sj${MAKE_JOBS}" >>$BUILD_SCRIPT_FILE
   elif [ $CATEGORY = "all" ]; then
-    echo "mkdir -p core/build && cd core/build && cmake -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DLOGTAIL_VERSION=${VERSION} -DBUILD_LOGTAIL_UT=${BUILD_LOGTAIL_UT} -DENABLE_COMPATIBLE_MODE=${ENABLE_COMPATIBLE_MODE} -DENABLE_STATIC_LINK_CRT=${ENABLE_STATIC_LINK_CRT} -DWITHOUTGDB=${WITHOUTGDB} .. && make -sj\$nproc && cd - && ./scripts/upgrade_adapter_lib.sh && ./scripts/plugin_build.sh mod c-shared ${OUT_DIR} ${VERSION} ${PLUGINS_CONFIG_FILE} ${GO_MOD_FILE}" >>$BUILD_SCRIPT_FILE
+    echo "mkdir -p core/build && cd core/build && cmake -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DLOGTAIL_VERSION=${VERSION} -DBUILD_LOGTAIL_UT=${BUILD_LOGTAIL_UT} -DENABLE_COMPATIBLE_MODE=${ENABLE_COMPATIBLE_MODE} -DENABLE_STATIC_LINK_CRT=${ENABLE_STATIC_LINK_CRT} -DWITHOUTGDB=${WITHOUTGDB} -DENABLE_AGENTSIGHT=${ENABLE_AGENTSIGHT} .. && make -sj\$nproc && cd - && ./scripts/upgrade_adapter_lib.sh && ./scripts/plugin_build.sh mod c-shared ${OUT_DIR} ${VERSION} ${PLUGINS_CONFIG_FILE} ${GO_MOD_FILE}" >>$BUILD_SCRIPT_FILE
   elif [ $CATEGORY = "e2e" ]; then
-    echo "mkdir -p core/build && cd core/build && cmake -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DLOGTAIL_VERSION=${VERSION} -DBUILD_LOGTAIL_UT=${BUILD_LOGTAIL_UT} -DENABLE_COMPATIBLE_MODE=${ENABLE_COMPATIBLE_MODE} -DENABLE_STATIC_LINK_CRT=${ENABLE_STATIC_LINK_CRT} -DWITHOUTGDB=${WITHOUTGDB} .. && make -sj\$nproc && cd - && ./scripts/plugin_build.sh mod c-shared ${OUT_DIR} ${VERSION} ${PLUGINS_CONFIG_FILE} ${GO_MOD_FILE}" >>$BUILD_SCRIPT_FILE
+    echo "mkdir -p core/build && cd core/build && cmake -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DLOGTAIL_VERSION=${VERSION} -DBUILD_LOGTAIL_UT=${BUILD_LOGTAIL_UT} -DENABLE_COMPATIBLE_MODE=${ENABLE_COMPATIBLE_MODE} -DENABLE_STATIC_LINK_CRT=${ENABLE_STATIC_LINK_CRT} -DWITHOUTGDB=${WITHOUTGDB} -DENABLE_AGENTSIGHT=${ENABLE_AGENTSIGHT} .. && make -sj\$nproc && cd - && ./scripts/plugin_build.sh mod c-shared ${OUT_DIR} ${VERSION} ${PLUGINS_CONFIG_FILE} ${GO_MOD_FILE}" >>$BUILD_SCRIPT_FILE
   fi
 }
 
@@ -105,6 +122,11 @@ function generateCopyScript() {
       echo 'docker cp "$id":'${PATH_IN_DOCKER}'/core/build/loongcollector $BINDIR' >>$COPY_SCRIPT_FILE
       echo 'docker cp "$id":'${PATH_IN_DOCKER}'/core/build/go_pipeline/libGoPluginAdapter.so $BINDIR' >>$COPY_SCRIPT_FILE
       echo 'docker cp "$id":'${PATH_IN_DOCKER}'/core/build/ebpf/driver/libeBPFDriver.so $BINDIR' >>$COPY_SCRIPT_FILE
+      echo 'docker cp "$id":/opt/logtail/deps/lib/libcoolbpf.so.1.0.0 $BINDIR' >>$COPY_SCRIPT_FILE
+      if [ "${ENABLE_AGENTSIGHT}" = "ON" ]; then
+        echo 'docker cp "$id":/opt/logtail/deps/lib/libagentsight.so $BINDIR' >>$COPY_SCRIPT_FILE
+      fi
+      echo 'docker cp "$id":'${PATH_IN_DOCKER}'/core/build/_thirdparty/coolbpf/src/profiler/release/libprofiler.so $BINDIR' >>$COPY_SCRIPT_FILE
     fi
     if [ $BUILD_LOGTAIL_UT = "ON" ]; then
       echo 'docker cp "$id":'${PATH_IN_DOCKER}'/core/build core/build' >>$COPY_SCRIPT_FILE
@@ -117,6 +139,11 @@ function generateCopyScript() {
     echo 'docker cp "$id":'${PATH_IN_DOCKER}'/core/build/loongcollector $BINDIR' >>$COPY_SCRIPT_FILE
     echo 'docker cp "$id":'${PATH_IN_DOCKER}'/core/build/go_pipeline/libGoPluginAdapter.so $BINDIR' >>$COPY_SCRIPT_FILE
     echo 'docker cp "$id":'${PATH_IN_DOCKER}'/core/build/ebpf/driver/libeBPFDriver.so $BINDIR' >>$COPY_SCRIPT_FILE
+    echo 'docker cp "$id":/opt/logtail/deps/lib/libcoolbpf.so.1.0.0 $BINDIR' >>$COPY_SCRIPT_FILE
+    if [ "${ENABLE_AGENTSIGHT}" = "ON" ]; then
+      echo 'docker cp "$id":/opt/logtail/deps/lib/libagentsight.so $BINDIR' >>$COPY_SCRIPT_FILE
+    fi
+    echo 'docker cp "$id":'${PATH_IN_DOCKER}'/core/build/_thirdparty/coolbpf/src/profiler/release/libprofiler.so $BINDIR' >>$COPY_SCRIPT_FILE
     if [ $BUILD_LOGTAIL_UT = "ON" ]; then
       echo 'docker cp "$id":'${PATH_IN_DOCKER}'/core/build core/build' >>$COPY_SCRIPT_FILE
       echo 'rm -rf core/protobuf/sls && docker cp "$id":'${PATH_IN_DOCKER}'/core/protobuf/sls core/protobuf/sls' >>$COPY_SCRIPT_FILE

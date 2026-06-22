@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "common/TimeUtil.h"
 #include "config/OnetimeConfigInfoManager.h"
 #include "config/PipelineConfig.h"
 #include "logger/Logger.h"
@@ -71,9 +72,14 @@ void PipelineConfigUnittest::TestOnetimeConfig() const {
         auto configJson = make_unique<Json::Value>();
         (*configJson)["global"]["ExcutionTimeout"] = true;
 
+        auto now = std::chrono::system_clock::now();
+        ScopedClockOverride clockGuard(now);
         ConfigMock config("test", std::move(configJson), filepath);
         APSARA_TEST_TRUE(config.GetExpireTimeIfOneTime((*config.mDetail)["global"]));
-        APSARA_TEST_EQUAL(time(nullptr) + 604800U, config.mOnetimeExpireTime);
+        APSARA_TEST_EQUAL(
+            static_cast<uint32_t>(std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch()).count())
+                + 604800U,
+            config.mOnetimeExpireTime);
         APSARA_TEST_FALSE(config.mIsRunningBeforeStart);
     }
     {
@@ -81,9 +87,14 @@ void PipelineConfigUnittest::TestOnetimeConfig() const {
         auto configJson = make_unique<Json::Value>();
         (*configJson)["global"]["ExcutionTimeout"] = 1U;
 
+        auto now = std::chrono::system_clock::now();
+        ScopedClockOverride clockGuard(now);
         ConfigMock config("test", std::move(configJson), filepath);
         APSARA_TEST_TRUE(config.GetExpireTimeIfOneTime((*config.mDetail)["global"]));
-        APSARA_TEST_EQUAL(time(nullptr) + 600U, config.mOnetimeExpireTime);
+        APSARA_TEST_EQUAL(
+            static_cast<uint32_t>(std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch()).count())
+                + 600U,
+            config.mOnetimeExpireTime);
         APSARA_TEST_FALSE(config.mIsRunningBeforeStart);
     }
     {
@@ -91,9 +102,14 @@ void PipelineConfigUnittest::TestOnetimeConfig() const {
         auto configJson = make_unique<Json::Value>();
         (*configJson)["global"]["ExcutionTimeout"] = 1000000U;
 
+        auto now = std::chrono::system_clock::now();
+        ScopedClockOverride clockGuard(now);
         ConfigMock config("test", std::move(configJson), filepath);
         APSARA_TEST_TRUE(config.GetExpireTimeIfOneTime((*config.mDetail)["global"]));
-        APSARA_TEST_EQUAL(time(nullptr) + 604800U, config.mOnetimeExpireTime);
+        APSARA_TEST_EQUAL(
+            static_cast<uint32_t>(std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch()).count())
+                + 604800U,
+            config.mOnetimeExpireTime);
         APSARA_TEST_FALSE(config.mIsRunningBeforeStart);
     }
 
@@ -142,9 +158,14 @@ void PipelineConfigUnittest::TestOnetimeConfig() const {
         auto configJson = make_unique<Json::Value>();
         (*configJson)["global"]["ExcutionTimeout"] = 3600U;
 
+        auto now = std::chrono::system_clock::now();
+        ScopedClockOverride clockGuard(now);
         ConfigMock config("new_config", std::move(configJson), filepath);
         APSARA_TEST_TRUE(config.GetExpireTimeIfOneTime((*config.mDetail)["global"]));
-        APSARA_TEST_EQUAL(time(nullptr) + 3600U, config.mOnetimeExpireTime);
+        APSARA_TEST_EQUAL(
+            static_cast<uint32_t>(std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch()).count())
+                + 3600U,
+            config.mOnetimeExpireTime);
         APSARA_TEST_FALSE(config.mIsRunningBeforeStart);
         APSARA_TEST_EQUAL(sConfigManager->mConfigCheckpointMap.end(),
                           sConfigManager->mConfigCheckpointMap.find("new_config"));

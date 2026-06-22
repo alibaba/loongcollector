@@ -499,6 +499,7 @@ void PipelineConfigWatcher::PushPipelineConfig(CollectionConfig&& config,
             pDiff.mModified.push_back(std::move(config));
             break;
         default:
+            // Includes IgnoredUnchanged: do not push to mAdded (singleton path still uses IgnoredUnchanged above).
             break;
     }
 }

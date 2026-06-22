@@ -4,9 +4,15 @@
 
 `input_prometheus` 插件按 `ScrapeConfig` 配置抓取 Prometheus 指标并输出到 `raw_event`中。默认使用 `ProcessorPromParseMetricNative` 和 `ProcessorPromRelabelMetricNative` 两个 `Processor` 进行指标解析和处理。
 
+源代码：[InputPrometheus.cpp](https://github.com/alibaba/loongcollector/blob/main/core/plugin/input/InputPrometheus.cpp)
+
 ## 版本
 
 [Beta](../../stability-level.md)
+
+## 版本说明
+
+* 推荐版本：LoongCollector v3.2.6 及以上
 
 ## 配置参数
 
@@ -15,11 +21,11 @@
 |  参数  |  类型  |  必填  |  默认值  |  说明  |
 | --- | --- | --- | --- | --- |
 | Type | string | 是 | / | 固定为 `input_prometheus` |
-| ScrapeConfig | object | 是 | / | 兼容 Prometheus 采集配置对象，详见下表。 |
+| ScrapeConfig | object | 是 | / | 与 Prometheus 官方 `scrape_config` 结构兼容，详见下表。 |
 
 ### ScrapeConfig 参数
 
-ScrapeConfig 兼容绝大部分 [Prometheus scrape_config 采集配置](https://prometheus.io/docs/prometheus/latest/configuration/configuration/) ，下表是已兼容的配置项目。
+ScrapeConfig 兼容绝大部分 [Prometheus 官方配置中的 `scrape_config`](https://prometheus.io/docs/prometheus/latest/configuration/configuration/) ，下表是已兼容的配置项目。
 
 |  参数  |  类型  |  必填  |  默认值  |  说明  |
 | --- | --- | --- | --- | --- |

@@ -21,12 +21,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alibaba/ilogtail/pkg/helper"
-	"github.com/alibaba/ilogtail/pkg/helper/profile"
-	"github.com/alibaba/ilogtail/pkg/helper/profile/pyroscope/pprof"
-	"github.com/alibaba/ilogtail/pkg/logger"
-	"github.com/alibaba/ilogtail/pkg/pipeline"
-
 	"github.com/mitchellh/mapstructure"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/pyroscope-io/pyroscope/pkg/ingestion"
@@ -37,6 +31,13 @@ import (
 	"github.com/pyroscope-io/pyroscope/pkg/storage/metadata"
 	"github.com/pyroscope-io/pyroscope/pkg/util/bytesize"
 	"github.com/sirupsen/logrus"
+
+	"github.com/alibaba/ilogtail/pkg/helper"
+	"github.com/alibaba/ilogtail/pkg/helper/profile"
+	"github.com/alibaba/ilogtail/pkg/helper/profile/pyroscope/pprof"
+	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
 type Mode string
@@ -159,12 +160,12 @@ func (m *Manager) Start(p *GoProfile) error {
 		if err := m.discoveryManager.ApplyConfig(map[string]discovery.Configs{
 			c.JobName: c.ServiceDiscoveryConfigs,
 		}); err != nil {
-			logger.Warning(context.Background(), "GOPROFILE_ALARM", "apply discovery config error", err.Error())
+			logger.Warning(context.Background(), selfmonitor.GoprofileAlarm, "apply discovery config error", err.Error())
 		}
 		err := m.discoveryManager.Run()
 		logger.Debug(context.Background(), "finish discovery manager")
 		if err != nil {
-			logger.Warning(context.Background(), "GOPROFILE_ALARM", "discovery err", err.Error())
+			logger.Warning(context.Background(), selfmonitor.GoprofileAlarm, "discovery err", err.Error())
 		}
 	}()
 	go func() {
@@ -172,7 +173,7 @@ func (m *Manager) Start(p *GoProfile) error {
 		err := m.scrapeManager.Run(m.discoveryManager.SyncCh())
 		logger.Debug(context.Background(), "finish scrape manager")
 		if err != nil {
-			logger.Warning(context.Background(), "GOPROFILE_ALARM", "scrape err", err.Error())
+			logger.Warning(context.Background(), selfmonitor.GoprofileAlarm, "scrape err", err.Error())
 		}
 	}()
 	return nil

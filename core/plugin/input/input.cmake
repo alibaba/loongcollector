@@ -26,10 +26,12 @@ if(MSVC)
         ${CMAKE_SOURCE_DIR}/plugin/input/InputNetworkObserver.cpp
         ${CMAKE_SOURCE_DIR}/plugin/input/InputFileSecurity.cpp
         ${CMAKE_SOURCE_DIR}/plugin/input/InputProcessSecurity.cpp
+        ${CMAKE_SOURCE_DIR}/plugin/input/InputCpuProfiling.cpp
         ${CMAKE_SOURCE_DIR}/plugin/input/InputHostMeta.cpp
         ${CMAKE_SOURCE_DIR}/plugin/input/InputHostMonitor.cpp
         ${CMAKE_SOURCE_DIR}/plugin/input/InputPrometheus.cpp
         ${CMAKE_SOURCE_DIR}/plugin/input/InputForward.cpp
+        ${CMAKE_SOURCE_DIR}/plugin/input/InputAgentSight.cpp
         )
 elseif(UNIX)
 endif()

@@ -27,6 +27,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/helper/containercenter"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
 const userHZ = 100
@@ -43,14 +44,14 @@ type processCacheLinux struct {
 }
 
 func findAllProcessCache(maxLabelLength int) ([]processCache, error) {
-	fs, err := procfs.NewFS(containercenter.GetMountedFilePath(procfs.DefaultMountPoint))
+	fs, err := procfs.NewFS(containercenter.GetMonitorFilePath(procfs.DefaultMountPoint))
 	if err != nil {
-		logger.Warning(context.Background(), "OPEN_PROCFS_ALARM", "error", err)
+		logger.Warning(context.Background(), selfmonitor.OpenProcfsAlarm, "error", err)
 		return nil, err
 	}
 	procs, err := fs.AllProcs()
 	if err != nil {
-		logger.Warning(context.Background(), "PROCESS_LIST_ALARM", "error", err)
+		logger.Warning(context.Background(), selfmonitor.ProcessListAlarm, "error", err)
 		return nil, err
 	}
 	if len(procs) == 0 {
@@ -151,7 +152,7 @@ func (pc *processCacheLinux) Labels(customLabels *helper.MetricLabels) *helper.M
 		processLabels.Append("pid", strconv.Itoa(pc.GetPid()))
 		comm := pc.stat.Comm
 		if pc.meta.maxLabelLength < len(comm) {
-			logger.Warningf(context.Background(), "PROCESS_LABEL_TOO_LONG_ALARM", "the stat comm label is over %d chars: %s", pc.meta.maxLabelLength, comm)
+			logger.Warningf(context.Background(), selfmonitor.ProcessLabelTooLongAlarm, "the stat comm label is over %d chars: %s", pc.meta.maxLabelLength, comm)
 			processLabels.Append("comm", comm[:pc.meta.maxLabelLength])
 		} else {
 			processLabels.Append("comm", comm)

@@ -29,6 +29,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/doc"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
 const dorisName = "doris"
@@ -79,8 +80,7 @@ func (d *DorisSubscriber) GetData(sqlStr string, startTime int32) ([]*protocol.L
 
 		db, err := sql.Open("mysql", dsn)
 		if err != nil {
-			logger.Warningf(context.Background(), "DORIS_SUBSCRIBER_ALARM",
-				"failed to open doris connection, host %s, err: %s", host, err)
+			logger.Warningf(context.Background(), selfmonitor.DorisSubscriberAlarm, "failed to open doris connection, host %s, err: %s", host, err)
 			return nil, err
 		}
 
@@ -88,8 +88,7 @@ func (d *DorisSubscriber) GetData(sqlStr string, startTime int32) ([]*protocol.L
 		defer cancel()
 
 		if err = db.PingContext(ctx); err != nil {
-			logger.Warningf(context.Background(), "DORIS_SUBSCRIBER_ALARM",
-				"failed to ping doris, host %s, err: %s", host, err)
+			logger.Warningf(context.Background(), selfmonitor.DorisSubscriberAlarm, "failed to ping doris, host %s, err: %s", host, err)
 			_ = db.Close()
 			return nil, err
 		}
@@ -100,7 +99,7 @@ func (d *DorisSubscriber) GetData(sqlStr string, startTime int32) ([]*protocol.L
 
 	logGroup, err := d.queryRecords()
 	if err != nil {
-		logger.Warning(context.Background(), "DORIS_SUBSCRIBER_ALARM", "err", err)
+		logger.Warning(context.Background(), selfmonitor.DorisSubscriberAlarm, "err", err)
 		return nil, err
 	}
 	return []*protocol.LogGroup{logGroup}, nil
@@ -130,8 +129,7 @@ func (d *DorisSubscriber) queryRecords() (logGroup *protocol.LogGroup, err error
 
 	rows, err := d.client.QueryContext(ctx, query)
 	if err != nil {
-		logger.Warningf(context.Background(), "DORIS_SUBSCRIBER_ALARM",
-			"failed to query doris, query: %s, err: %s", query, err)
+		logger.Warningf(context.Background(), selfmonitor.DorisSubscriberAlarm, "failed to query doris, query: %s, err: %s", query, err)
 		return
 	}
 	defer rows.Close()
@@ -143,8 +141,7 @@ func (d *DorisSubscriber) queryRecords() (logGroup *protocol.LogGroup, err error
 			value     sql.NullString
 		)
 		if err = rows.Scan(&timestamp, &content, &value); err != nil {
-			logger.Warningf(context.Background(), "DORIS_SUBSCRIBER_ALARM",
-				"failed to scan row, err: %s", err)
+			logger.Warningf(context.Background(), selfmonitor.DorisSubscriberAlarm, "failed to scan row, err: %s", err)
 			return
 		}
 
@@ -177,8 +174,7 @@ func (d *DorisSubscriber) queryRecords() (logGroup *protocol.LogGroup, err error
 	}
 
 	if err = rows.Err(); err != nil {
-		logger.Warningf(context.Background(), "DORIS_SUBSCRIBER_ALARM",
-			"rows iteration error: %s", err)
+		logger.Warningf(context.Background(), selfmonitor.DorisSubscriberAlarm, "rows iteration error: %s", err)
 		return
 	}
 

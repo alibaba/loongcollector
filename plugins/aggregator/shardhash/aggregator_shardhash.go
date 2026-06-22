@@ -27,6 +27,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pkg/util"
 	"github.com/alibaba/ilogtail/plugins/aggregator/baseagg"
 )
@@ -174,7 +175,7 @@ func (s *AggregatorShardHash) Add(log *protocol.Log, ctx map[string]interface{})
 			}
 		}
 		if !found && s.ErrIfKeyNotFound {
-			logger.Warning(s.context.GetRuntimeContext(), "AGG_SHARDHASH_NOT_FOUND_KEY", key)
+			logger.Warning(s.context.GetRuntimeContext(), selfmonitor.AggShardhashNotFoundKey, key)
 		}
 
 		isFirstKey := 0 == idx

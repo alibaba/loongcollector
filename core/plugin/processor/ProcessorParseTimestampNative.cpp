@@ -203,7 +203,13 @@ bool ProcessorParseTimestampNative::ParseLogTime(const StringView& curTimeStr, /
     } else {
         strptimeResult = Strptime(curTimeStr.data(), mSourceFormat.c_str(), &logTime, nanosecondLength, mSourceYear);
         if (NULL != strptimeResult) {
-            timeStrCache = curTimeStr.substr(0, curTimeStr.length() - nanosecondLength);
+            // Use strptimeResult position (actual matched end) instead of curTimeStr.length()
+            // to correctly exclude any unmatched trailing chars (e.g. timezone +08:00) from cache.
+            int cacheLen = strptimeResult - curTimeStr.data();
+            if (nanosecondLength > 0) {
+                cacheLen -= nanosecondLength;
+            }
+            timeStrCache = curTimeStr.substr(0, cacheLen);
             logTime.tv_sec = logTime.tv_sec - mLogTimeZoneOffsetSecond;
         }
     }

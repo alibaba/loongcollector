@@ -34,6 +34,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/test/config"
 )
 
@@ -106,15 +107,13 @@ func (c *ComposeBooter) Start(ctx context.Context) error {
 		if execError.Error == nil {
 			break
 		}
-		logger.Error(context.Background(), "START_DOCKER_COMPOSE_ERROR",
-			"stdout", execError.Error.Error())
+		logger.Error(context.Background(), selfmonitor.StartDockerComposeError, "stdout", execError.Error.Error())
 		if i == 2 {
 			return execError.Error
 		}
 		execError = composeModule.NewLocalDockerCompose([]string{config.CaseHome + finalFileName}, projectName).Down()
 		if execError.Error != nil {
-			logger.Error(context.Background(), "DOWN_DOCKER_COMPOSE_ERROR",
-				"stdout", execError.Error.Error())
+			logger.Error(context.Background(), selfmonitor.DownDockerComposeError, "stdout", execError.Error.Error())
 			return execError.Error
 		}
 	}
@@ -131,7 +130,7 @@ func (c *ComposeBooter) Start(ctx context.Context) error {
 		),
 	})
 	if len(list) != 1 {
-		logger.Errorf(context.Background(), "LOONGCOLLECTOR_COMPOSE_ALARM", "loongcollector container size is not equal 1, got %d count", len(list))
+		logger.Errorf(context.Background(), selfmonitor.LoongcollectorComposeAlarm, "loongcollector container size is not equal 1, got %d count", len(list))
 		return err
 	}
 	c.logtailID = list[0].ID
@@ -143,7 +142,7 @@ func (c *ComposeBooter) Start(ctx context.Context) error {
 		"env |grep HOST_OS|grep Linux && ip -4 route list match 0/0|awk '{print $3\" host.docker.internal\"}' >> /etc/hosts",
 	}
 	if err = c.exec(c.logtailID, cmd); err != nil {
-		logger.Error(context.Background(), "EXEC_ALARM", "err", err)
+		logger.Error(context.Background(), selfmonitor.ExecAlarm, "err", err)
 		return err
 	}
 	err = registerDockerNetMapping(strategyWrappers)
@@ -158,8 +157,7 @@ func (c *ComposeBooter) Stop() error {
 	projectName = fmt.Sprintf("%x", hasher.Sum(nil))
 	execError := composeModule.NewLocalDockerCompose([]string{config.CaseHome + finalFileName}, projectName).Down()
 	if execError.Error != nil {
-		logger.Error(context.Background(), "STOP_DOCKER_COMPOSE_ERROR",
-			"stdout", execError.Stdout.Error(), "stderr", execError.Stderr.Error())
+		logger.Error(context.Background(), selfmonitor.StopDockerComposeError, "stdout", execError.Stdout.Error(), "stderr", execError.Stderr.Error())
 		return execError.Error
 	}
 	_ = os.Remove(config.CaseHome + finalFileName)
@@ -173,7 +171,7 @@ func (c *ComposeBooter) exec(id string, cmd []string) error {
 	}
 	resp, err := c.cli.ContainerExecCreate(context.Background(), id, cfg)
 	if err != nil {
-		logger.Errorf(context.Background(), "DOCKER_EXEC_ALARM", "cannot create exec config: %v", err)
+		logger.Errorf(context.Background(), selfmonitor.DockerExecAlarm, "cannot create exec config: %v", err)
 		return err
 	}
 	err = c.cli.ContainerExecStart(context.Background(), resp.ID, containertypes.ExecStartOptions{
@@ -181,7 +179,7 @@ func (c *ComposeBooter) exec(id string, cmd []string) error {
 		Tty:    false,
 	})
 	if err != nil {
-		logger.Errorf(context.Background(), "DOCKER_EXEC_ALARM", "cannot start exec config: %v", err)
+		logger.Errorf(context.Background(), selfmonitor.DockerExecAlarm, "cannot start exec config: %v", err)
 		return err
 	}
 	return nil
@@ -195,13 +193,13 @@ func (c *ComposeBooter) CopyCoreLogs() {
 		output, err := cmd.CombinedOutput()
 		logger.Debugf(context.Background(), "\n%s", string(output))
 		if err != nil {
-			logger.Error(context.Background(), "COPY_LOG_ALARM", "type", "main", "err", err)
+			logger.Error(context.Background(), selfmonitor.CopyLogAlarm, "type", "main", "err", err)
 		}
 		cmd = exec.Command("docker", "cp", c.logtailID+":/usr/local/loongcollector/log/go_plugin.LOG", config.LogDir)
 		output, err = cmd.CombinedOutput()
 		logger.Debugf(context.Background(), "\n%s", string(output))
 		if err != nil {
-			logger.Error(context.Background(), "COPY_LOG_ALARM", "type", "plugin", "err", err)
+			logger.Error(context.Background(), selfmonitor.CopyLogAlarm, "type", "plugin", "err", err)
 		}
 	}
 }

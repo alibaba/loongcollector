@@ -26,6 +26,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
 
@@ -51,7 +52,7 @@ func (f *Flusher) Init(ctx pipeline.Context) error {
 	if f.EnableTLS {
 		cfg, err := util.GetTLSConfig(f.CertFile, f.KeyFile, f.CAFile, f.InsecureSkipVerify)
 		if err != nil {
-			logger.Warningf(f.ctx.GetRuntimeContext(), "GRPC_FLUSHER_ALARM", "error in creating TLS config,: %v", err)
+			logger.Warningf(f.ctx.GetRuntimeContext(), selfmonitor.GRPCFlusherAlarm, "error in creating TLS config,: %v", err)
 			return err
 		}
 		options = append(options, grpc.WithTransportCredentials(credentials.NewTLS(cfg)))
@@ -62,7 +63,7 @@ func (f *Flusher) Init(ctx pipeline.Context) error {
 
 	c, err := grpc.Dial(f.Address, options...)
 	if err != nil {
-		logger.Warningf(f.ctx.GetRuntimeContext(), "GRPC_FLUSHER_ALARM", "error in dialing with gRPC server %s, would try again later", f.Address)
+		logger.Warningf(f.ctx.GetRuntimeContext(), selfmonitor.GRPCFlusherAlarm, "error in dialing with gRPC server %s, would try again later", f.Address)
 	} else {
 		f.conn = c
 		f.client = protocol.NewLogReportServiceClient(c)
@@ -85,7 +86,7 @@ func (f *Flusher) IsReady(projectName string, logstoreName string, logstoreKey i
 	// force try to dial with server.
 	c, err := grpc.Dial(f.Address, f.dialOptions...)
 	if err != nil {
-		logger.Warningf(f.ctx.GetRuntimeContext(), "GRPC_FLUSHER_ALARM", "error in dialing with gRPC server %s, would try again later", f.Address)
+		logger.Warningf(f.ctx.GetRuntimeContext(), selfmonitor.GRPCFlusherAlarm, "error in dialing with gRPC server %s, would try again later", f.Address)
 		return false
 	}
 	f.conn = c
@@ -97,7 +98,7 @@ func (f *Flusher) Flush(projectName string, logstoreName string, configName stri
 	stream, err := f.client.Collect(context.Background())
 	defer f.closeStream(stream)
 	if err != nil {
-		logger.Critical(f.ctx.GetRuntimeContext(), "GRPC_FLUSH_ALARM", "err", err)
+		logger.Critical(f.ctx.GetRuntimeContext(), selfmonitor.GRPCFlushAlarm, "err", err)
 		return err
 	}
 	for _, group := range logGroupList {
@@ -105,7 +106,7 @@ func (f *Flusher) Flush(projectName string, logstoreName string, configName stri
 			continue
 		}
 		if err := stream.Send(group); err != nil {
-			logger.Critical(f.ctx.GetRuntimeContext(), "GRPC_FLUSH_ALARM", "err", err)
+			logger.Critical(f.ctx.GetRuntimeContext(), selfmonitor.GRPCFlushAlarm, "err", err)
 			return err
 		}
 	}

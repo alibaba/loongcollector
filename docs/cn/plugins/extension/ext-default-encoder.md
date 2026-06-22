@@ -28,14 +28,12 @@
 ```yaml
 enable: true
 flushers:
-- Type: flusher_http
-  ...
-  Encoder:
-    Type: ext_default_encoder/prometheus
-    ...
-...
+  - Type: flusher_http
+    Address: http://127.0.0.1:8080/write
+    Encoder:
+      Type: ext_default_encoder/prometheus
 extensions:
-- Type: ext_default_encoder/prometheus
-  Format: 'prometheus'
-  SeriesLimit: 1024
+  - Type: ext_default_encoder/prometheus
+    Format: prometheus
+    SeriesLimit: 1024
 ```

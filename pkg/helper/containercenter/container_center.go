@@ -37,6 +37,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/flags"
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
 
@@ -51,6 +52,7 @@ const DockerTimeFormat = "2006-01-02T15:04:05.999999999Z"
 
 var DefaultSyncContainersPeriod = time.Second * 3 // should be same as docker_config_update_interval gflag in C
 var ContainerInfoDeletedTimeout = time.Second * time.Duration(120)
+var ForceReleaseDeletedFileFDTimeout = time.Second * time.Duration(-1) // -1 means disabled, use stat-based detection
 var EventListenerTimeout = time.Second * time.Duration(3600)
 var envRegex = regexp.MustCompile(`(^KUBERNETES_.*|.*_SERVICE_HOST$|.*_SERVICE_PORT.*|.*_SERVICE_PORT_PORT$|.*_SERVICE_\d+_PORT.*|.*_PORT_\d+_(TCP|UDP)_ADDR$|.*_PORT_\d+_(TCP|UDP)_PORT$|.*_PORT_\d+_(TCP|UDP)_PROTO$|.*_PORT_\d+_(TCP|UDP)$|.*PORT$)`)
 
@@ -307,9 +309,21 @@ func (did *DockerInfoDetail) MetadataHash() string {
 
 func (did *DockerInfoDetail) IsTimeout() bool {
 	nowTime := time.Now()
-	if nowTime.Sub(did.lastUpdateTime) > fetchAllSuccessTimeout ||
-		(did.deleteFlag && nowTime.Sub(did.lastUpdateTime) > ContainerInfoDeletedTimeout) {
+	if nowTime.Sub(did.lastUpdateTime) > fetchAllSuccessTimeout {
 		return true
+	}
+	if !did.deleteFlag {
+		return false
+	}
+
+	if ForceReleaseDeletedFileFDTimeout >= 0 {
+		if nowTime.Sub(did.lastUpdateTime) >= ForceReleaseDeletedFileFDTimeout {
+			return true
+		}
+	} else {
+		if nowTime.Sub(did.lastUpdateTime) > ContainerInfoDeletedTimeout {
+			return true
+		}
 	}
 	return false
 }
@@ -839,13 +853,27 @@ func getContainerCenterInstance() *ContainerCenter {
 		// containerFindingManager works in a producer-consumer model
 		// so even manager is not initialized, it will not affect consumers like service_stdout
 		go func() {
+			// Check if mount path exists before entering retry loop, to skip default host mode
+			if DefaultLogtailMountPath != "" {
+				if _, err := os.Stat(DefaultLogtailMountPath); err != nil {
+					if os.IsNotExist(err) {
+						logger.Infof(context.Background(),
+							"container discovery skipped: mount path does not exist",
+							"mount_path", DefaultLogtailMountPath)
+					} else {
+						logger.Warningf(context.Background(), selfmonitor.DockerCenterAlarm, "container discovery skipped: failed to check mount path", "mount_path", DefaultLogtailMountPath, "error", err)
+					}
+					return // Exit goroutine, no infinite retry needed
+				}
+			}
+
 			retryCount := 0
 			for {
 				if containerFindingManager.Init() {
 					break
 				}
 				if retryCount%10 == 0 {
-					logger.Critical(context.Background(), "DOCKER_CENTER_ALARM", "docker center init failed", "retry count", retryCount)
+					logger.Critical(context.Background(), selfmonitor.DockerCenterAlarm, "docker center init failed", "retry count", retryCount)
 				}
 				retryCount++
 				time.Sleep(time.Second * 1)
@@ -866,7 +894,7 @@ func (dc *ContainerCenter) readStaticConfig(forceFlush bool) {
 	defer staticDockerContainerLock.Unlock()
 	containerInfo, removedIDs, changed, err := tryReadStaticContainerInfo()
 	if err != nil {
-		logger.Warning(context.Background(), "READ_STATIC_CONFIG_ALARM", "read static container info error", err)
+		logger.Warning(context.Background(), selfmonitor.ReadStaticConfigAlarm, "read static container info error", err)
 	}
 	if !dc.initStaticContainerInfoSuccess && len(containerInfo) > 0 {
 		dc.initStaticContainerInfoSuccess = true
@@ -902,7 +930,7 @@ func (dc *ContainerCenter) setLastError(err error, msg string) {
 	dc.lastErr = err
 	dc.lastErrMu.Unlock()
 	if err != nil {
-		logger.Warning(context.Background(), "DOCKER_CENTER_ALARM", "message", msg, "error found", err)
+		logger.Warning(context.Background(), selfmonitor.DockerCenterAlarm, "message", msg, "error found", err)
 	} else {
 		logger.Debug(context.Background(), "message", msg)
 	}
@@ -1092,7 +1120,7 @@ func (dc *ContainerCenter) getAllAcceptedInfoV2(
 		if ok {
 			matchList[id] = c
 		} else {
-			logger.Warningf(context.Background(), "DOCKER_MATCH_ALARM", "matched container not in docker center")
+			logger.Warningf(context.Background(), selfmonitor.DockerMatchAlarm, "matched container not in docker center")
 		}
 	}
 
@@ -1374,7 +1402,7 @@ func containerCenterRecover() {
 	if err := recover(); err != nil {
 		trace := make([]byte, 2048)
 		runtime.Stack(trace, true)
-		logger.Critical(context.Background(), "PLUGIN_RUNTIME_ALARM", "docker center runtime error", err, "stack", string(trace))
+		logger.Critical(context.Background(), selfmonitor.PluginRuntimeAlarm, "docker center runtime error", err, "stack", string(trace))
 	}
 }
 
@@ -1406,7 +1434,7 @@ func (dc *ContainerCenter) eventListener() {
 			select {
 			case event, ok := <-events:
 				if !ok {
-					logger.Criticalf(context.Background(), "DOCKER_EVENT_ALARM", "docker event listener stop")
+					logger.Criticalf(context.Background(), selfmonitor.DockerEventAlarm, "docker event listener stop")
 					errorCount++
 					breakFlag = true
 					break
@@ -1428,15 +1456,15 @@ func (dc *ContainerCenter) eventListener() {
 					select {
 					case dc.eventChan <- event:
 					default:
-						logger.Error(context.Background(), "DOCKER_EVENT_ALARM", "event queue is full, miss event", event)
+						logger.Error(context.Background(), selfmonitor.DockerEventAlarm, "event queue is full, miss event", event)
 					}
 				}
 				dc.eventChanLock.Unlock()
 			case err = <-errors:
-				logger.Warning(context.Background(), "DOCKER_EVENT_ALARM", "docker event listener error", err)
+				logger.Warning(context.Background(), selfmonitor.DockerEventAlarm, "docker event listener error", err)
 				breakFlag = true
 			case <-timer.C:
-				logger.Warningf(context.Background(), "DOCKER_EVENT_ALARM", "no docker event in 1 hour. Reset event listener")
+				logger.Warningf(context.Background(), selfmonitor.DockerEventAlarm, "no docker event in 1 hour. Reset event listener")
 				breakFlag = true
 			}
 		}

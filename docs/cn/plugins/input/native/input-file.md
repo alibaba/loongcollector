@@ -26,12 +26,12 @@
 |  FileEncoding  |  string  |  否  |  utf8  |  文件编码格式。可选值包括utf8和gbk。  |
 |  TailSizeKB  |  uint  |  否  |  1024  |  配置首次生效时，匹配文件的起始采集位置距离文件结尾的大小。如果文件大小小于该值，则从头开始采集，取值范围为0～10485760KB。  |
 |  Multiline  |  object  |  否  |  空  |  多行聚合选项。详见表1。  |
-|  EnableContainerDiscovery  |  bool  |  否  |  false  |  是否启用容器发现功能。仅当Logtail以Daemonset模式运行，且采集文件路径为容器内路径时有效。  |
+|  EnableContainerDiscovery  |  bool  |  否  |  false  |  是否启用容器发现功能。仅当 LoongCollector 以 **DaemonSet** 模式运行，且采集文件路径为容器内路径时有效。  |
 |  ContainerFilters  |  object  |  否  |  空  |  容器过滤选项。多个选项之间为“且”的关系，仅当EnableContainerDiscovery取值为true时有效，详见表2。  |
 |  ExternalK8sLabelTag  |  map[string]string  |  否  |  空  |  对于部署于K8s环境的容器，需要在日志中额外添加的与Pod标签相关的tag。map中的key为Pod标签名，value为对应的tag名。 例如：在map中添加`app: k8s_label_app`，则若pod中包含`app=serviceA`的标签时，会将该信息以tag的形式添加到日志中，即添加字段\_\_tag\_\_:k8s\_label\_app: serviceA；若不包含`app`标签，则会添加空字段\_\_tag\_\_:k8s\_label\_app:  |
 |  ExternalEnvTag  |  map[string]string  |  否  |  空  |  对于部署于K8s环境的容器，需要在日志中额外添加的与容器环境变量相关的tag。map中的key为环境变量名，value为对应的tag名。 例如：在map中添加`VERSION: env_version`，则当容器中包含环境变量`VERSION=v1.0.0`时，会将该信息以tag的形式添加到日志中，即添加字段\_\_tag\_\_:env\_version: v1.0.0；若不包含`VERSION`环境变量，则会添加空字段\_\_tag\_\_:env\_version:  |
 |  AppendingLogPositionMeta  |  bool  |  否  |  false  |  是否在日志中添加该条日志所属文件的元信息，包括\_\_tag\_\_:\_\_inode\_\_字段和\_\_file\_offset\_\_字段。  |
-|  FlushTimeoutSecs  |  uint  |  否  |  5  |  当文件超过指定时间未出现新的完整日志时，将当前读取缓存中的内容作为一条日志输出。  |
+|  FlushTimeoutSecs  |  uint  |  否  |  60  |  当文件超过指定时间未出现新的完整日志行时，将当前读取缓存中的内容作为**一条数据**输出。  |
 |  EnableExactlyOnce  |  uint  |  否  |  0  |  **实验功能！**Exactly Once 并发度（>0 启用 Exactly Once 处理与提交保障）。  |
 |  AllowingIncludedByMultiConfigs  |  bool  |  否  |  false  |  是否允许当前配置采集其它配置已匹配的文件。  |
 |  FileOffsetKey | string | 否 | log.file.offset | 用于指定日志文件偏移量的字段名。 |
@@ -41,10 +41,12 @@
 
 |  **参数**  |  **类型**  |  **是否必填**  |  **默认值**  |  **说明**  |
 | --- | --- | --- | --- | --- |
-|  Mode  |  string  |  否  |  custom  |  多行聚合模式。可选值包括custom和JSON。  |
+|  Mode  |  string  |  否  |  custom  |  多行聚合模式。可选值包括custom、JSON和whole_file。其中whole_file表示将整个文件作为**一条**日志记录采集。  |
 |  StartPattern  |  string  |  当Multiline.Mode取值为custom时，至少1个必填  |  空  |  行首正则表达式。  |
 |  ContinuePattern  |  string  |  |  空  |  行继续正则表达式。  |
 |  EndPattern  |  string  |  |  空  |  行尾正则表达式。  |
+|  FileWriteMode  |  string  |  否  |  append  |  文件写入模式，仅当Multiline.Mode为whole_file时生效。可选值包括append和overwrite：<ul><li>append：文件以追加方式写入；</li><li>overwrite：文件被整体改写（原地truncate后重写），此时从头重新读取整个文件。</li></ul>   |
+|  MaxWholeFileBytes  |  uint  |  否  |  10485760  |  整文件采集时允许的最大文件字节数，仅当Multiline.Mode为whole_file时生效，默认10MB。当文件大小超过该上限时将被跳过不采集。  |
 |  UnmatchedContentTreatment  |  string  |  否  |  single_line  |  对于无法匹配的日志段的处理方式，可选值如下：<ul><li>discard：丢弃</li><li>single_line：将不匹配日志段的每一行各自存放在一个单独的事件中</li></ul>   |
 
 * 表2：容器过滤选项
@@ -109,10 +111,10 @@ flushers:
 }
 ```
 
-注意：`__tag__` 字段的输出会由于ilogtail版本的不同而存在差别。为了在标准输出中能够准确地观察到 `__tag__`，建议仔细检查以下几点：
+注意：`__tag__` 字段的输出会因 **LoongCollector / 兼容的旧版 iLogtail** 具体版本与输出路径而有所差别。为了在标准输出中能够准确地观察到 `__tag__`，建议仔细检查以下几点：
 
 * flusher_stdout 的配置中，设置了 `Tags: true`
-* 如果使用了较新版本的ilogtail，在观察标准输出时，`__tag__`可能会被拆分为一行单独的信息，先于日志的内容输出（这与文档中的示例输出会有差别），请注意不要观察遗漏。
+* 若使用较新版本 Agent，在观察标准输出时，`__tag__` 可能会被拆分为一行单独的信息，先于日志正文输出（与本文示例可能不一致），请勿遗漏。
 
 此注意事项适用于后文所有观察 `__tag__` 字段输出的地方。
 
@@ -135,7 +137,7 @@ flushers:
     Tags: true
 ```
 
-### 采集K8s容器文件（仅限iLogtail以Daemonset的方式部署）
+### 采集 K8s 容器文件（仅限以 DaemonSet 部署的 LoongCollector / 容器采集场景）
 
 采集K8s命名空间`default`中以`deploy`为Pod名前缀、Pod标签包含`version: 1.0`且容器环境变量不为`ID=123`的所有容器中，`/home/test-log/`路径下的所有文件名匹配`*.log`规则的文件，并将结果输出至stdout。
 
@@ -204,9 +206,7 @@ flushers:
     "__tag__:__path__": "/home/test-log/regMulti.log",
     "time": "2022-07-07T10:43:27.360266763",
     "level": "INFO",
-    "msg": "java.lang.Exception: exception happened
-    at com.aliyun.sls.devops.logGenerator.type.RegexMultiLog.f2(RegexMultiLog.java:108)
-    at java.base/java.lang.Thread.run(Thread.java:833)",
+    "msg": "java.lang.Exception: exception happened\n    at com.aliyun.sls.devops.logGenerator.type.RegexMultiLog.f2(RegexMultiLog.java:108)\n    at java.base/java.lang.Thread.run(Thread.java:833)",
     "__time__": "1657161807"
 }
 ```
@@ -259,11 +259,13 @@ flushers:
     "time": "2022-07-07T10:43:27.360266763",
     "msg": "[2022-07-07T10:43:27.360266763] [ERROR] java.lang.Exception: exception happened\n[2022-07-07T10:43:27.360266763]    at com.aliyun.sls.devops.logGenerator.type.RegexMultiLog.f2(RegexMultiLog.java:108)\n[2022-07-07T10:43:27.360266763]    at java.base/java.lang.Thread.run(Thread.java:833)\n[2022-07-07T10:43:27.360266763]    ... 23 more"
 }
+
 {
     "__tag__:__path__": "/home/test-log/regMulti.log",
     "time": "2022-07-07T10:43:27.360266763",
     "msg": "[2022-07-07T10:43:27.360266763] Some user custom log"
 }
+
 {
     "__tag__:__path__": "/home/test-log/regMulti.log",
     "time": "2022-07-07T10:43:27.360266763",

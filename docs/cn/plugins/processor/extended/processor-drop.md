@@ -55,7 +55,7 @@ flushers:
 
 ```json
 {
-    "__tag__:__path__": "/home/test-dir/test_log/json.log",
+    "__tag__:__path__": "/home/test-log/json.log",
     "key2": "abcd",
     "__time__": "1657354602"
 }

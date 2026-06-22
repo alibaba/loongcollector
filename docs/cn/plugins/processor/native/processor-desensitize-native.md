@@ -41,7 +41,7 @@ enable: true
 inputs:
   - Type: input_file
     FilePaths: 
-      - /home/test-log/reg.log
+      - /home/test-log/sen.log
 processors:
   - Type: processor_desensitize_native
     SourceKey: content
@@ -58,7 +58,7 @@ flushers:
 
 ```json
 {
-    "__tag__:__path__": "/home/test-log/reg.log",
+    "__tag__:__path__": "/home/test-log/sen.log",
     "content": "{\"account\":\"1812213231432969\",\"password\":\"******\"}",
     "__time__": "1657161810"
 }

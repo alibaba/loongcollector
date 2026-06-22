@@ -27,6 +27,7 @@ ENV container=docker
 ARG HOST_OS=Linux
 ARG VERSION=0.0.1
 ARG TARGETPLATFORM
+ARG TARGETARCH
 
 COPY --from=build /usr/local/loongcollector-${VERSION} /usr/local/loongcollector
 RUN chown -R $(whoami) /usr/local/loongcollector/ && \
@@ -46,9 +47,22 @@ RUN if [ "$HOST_OS" = "Linux" ]; then \
     fi
 
 # Provide CentOS-compiled SASL libraries for librdkafka (expects libsasl2.so.3)
-COPY --from=sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.13 /usr/lib64/libsasl2.so.3 /usr/lib/x86_64-linux-gnu/
-COPY --from=sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.13 /usr/lib64/libsasl2.so.3.0.0 /usr/lib/x86_64-linux-gnu/
-COPY --from=sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.13 /usr/lib64/sasl2 /usr/lib/x86_64-linux-gnu/sasl2
+COPY --from=sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.17 /usr/lib64/libsasl2.so.3 /tmp/sasl-compat/libsasl2.so.3
+COPY --from=sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.17 /usr/lib64/libsasl2.so.3.0.0 /tmp/sasl-compat/libsasl2.so.3.0.0
+COPY --from=sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.17 /usr/lib64/sasl2 /tmp/sasl-compat/sasl2
+RUN set -eux; \
+    case "${TARGETARCH}" in \
+        amd64) LIB_DIR="/usr/lib/x86_64-linux-gnu" ;; \
+        arm64) LIB_DIR="/usr/lib/aarch64-linux-gnu" ;; \
+        *) echo "Unsupported TARGETARCH: ${TARGETARCH}" >&2; exit 1 ;; \
+    esac; \
+    mkdir -p "${LIB_DIR}"; \
+    cp /tmp/sasl-compat/libsasl2.so.3 "${LIB_DIR}/libsasl2.so.3"; \
+    cp /tmp/sasl-compat/libsasl2.so.3.0.0 "${LIB_DIR}/libsasl2.so.3.0.0"; \
+    cp -a /tmp/sasl-compat/sasl2 "${LIB_DIR}/sasl2"; \
+    ln -sf "${LIB_DIR}/libsasl2.so.3" /usr/lib/libsasl2.so.3; \
+    ln -sf "${LIB_DIR}/libsasl2.so.3.0.0" /usr/lib/libsasl2.so.3.0.0; \
+    rm -rf /tmp/sasl-compat
 
 WORKDIR /usr/local/loongcollector
 RUN mkdir -p /usr/local/loongcollector/conf/instance_config/local

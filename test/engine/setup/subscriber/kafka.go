@@ -32,6 +32,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/doc"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/test/engine/setup/dockercompose"
 )
 
@@ -83,7 +84,7 @@ func (k *KafkaSubscriber) GetData(sql string, startTime int32) ([]*protocol.LogG
 		if ver, err := sarama.ParseKafkaVersion(k.Version); err == nil {
 			config.Version = ver
 		} else {
-			logger.Warningf(context.Background(), "KAFKA_SUBSCRIBER_ALARM", "invalid kafka version %s: %v", k.Version, err)
+			logger.Warningf(context.Background(), selfmonitor.KafkaSubscriberAlarm, "invalid kafka version %s: %v", k.Version, err)
 		}
 	}
 
@@ -286,11 +287,11 @@ func (k *KafkaSubscriber) testKafkaConnection() error {
 
 		conn, err := net.DialTimeout("tcp", address, 5*time.Second)
 		if err != nil {
-			logger.Warningf(context.Background(), "KAFKA_SUBSCRIBER_ALARM", "failed to connect to kafka broker %s: %v", address, err)
+			logger.Warningf(context.Background(), selfmonitor.KafkaSubscriberAlarm, "failed to connect to kafka broker %s: %v", address, err)
 			continue
 		}
 		if err := conn.Close(); err != nil {
-			logger.Warningf(context.Background(), "KAFKA_SUBSCRIBER_ALARM", "failed to close connection to kafka broker %s: %v", address, err)
+			logger.Warningf(context.Background(), selfmonitor.KafkaSubscriberAlarm, "failed to close connection to kafka broker %s: %v", address, err)
 		}
 		return nil
 	}

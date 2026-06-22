@@ -14,6 +14,8 @@
 
 #pragma once
 
+#include <cstdint>
+
 #include <string>
 #include <variant>
 #include <vector>
@@ -21,6 +23,7 @@
 #include "json/json.h"
 
 #include "collection_pipeline/CollectionPipelineContext.h"
+#include "container_manager/ContainerDiscoveryOptions.h"
 #include "ebpf/include/export.h"
 
 namespace logtail::ebpf {
@@ -35,7 +38,13 @@ bool InitObserverNetworkOption(const Json::Value& config,
 
 /////////////////////  /////////////////////
 
-enum class SecurityProbeType { PROCESS, FILE, NETWORK, MAX };
+enum class SecurityProbeType { PROCESS, FILE, NETWORK, AGENTSIGHT_OBSERVE, MAX };
+
+/// One cmdline allow rule: glob patterns plus the agent type reported as `gen_ai.agent.type`.
+struct AgentsightCmdlineAllowRule {
+    std::string agentType;
+    std::vector<std::string> patterns;
+};
 
 class SecurityOptions {
 public:
@@ -45,8 +54,41 @@ public:
               const std::string& sName);
 
     std::vector<SecurityOption> mOptionList;
-    SecurityProbeType mProbeType;
+    SecurityProbeType mProbeType = SecurityProbeType::PROCESS;
+
+    // Valid when mProbeType == SecurityProbeType::AGENTSIGHT_OBSERVE (AgentSight input).
+    int32_t mVerbose = 0;
+    std::string mLogPath;
+    /// Cmdline allow rules (argv globs + agent display name).
+    std::vector<AgentsightCmdlineAllowRule> mAgentsightCmdlineWhitelist;
+    /// Cmdline argv glob rows (allow=0) for AgentSight process matching.
+    std::vector<std::vector<std::string>> mAgentsightCmdlineBlacklist;
+    /// HTTPS 域名规则（glob 模式，大小写不敏感）。
+    std::vector<std::string> mAgentsightHttps;
+    /// HTTP 明文流量目标（端口、IP、IP:端口 或域名）。
+    std::vector<std::string> mAgentsightHttp;
+    /// When true, emit separate `gen_ai.model.request` and `gen_ai.model.response` logs per LLM call.
+    bool mAgentsightEventStreamFormat = true;
+    /// When true, omit system instructions, tool definitions, and full input messages (per dedup).
+    bool mAgentsightMessageDeltaOnly = true;
 };
+
+/////////////////////  /////////////////////
+
+class CpuProfilingOption {
+public:
+    bool Init(const Json::Value& config, const CollectionPipelineContext* mContext, const std::string& sName);
+
+    uint32_t mCollectIntervalMs = 0; // 0 means use default
+    std::vector<boost::regex> mCmdlines;
+    std::string mAppName;
+    // Since ebpf may collect mulit-language profiling data,
+    // the language field should be set by user.
+    std::string mLanguage = "java";
+    ContainerDiscoveryOptions mContainerDiscovery;
+};
+
+using PluginOptions = std::variant<SecurityOptions*, ObserverNetworkOption*, CpuProfilingOption*>;
 
 ///////////////////// Process Level Config /////////////////////
 

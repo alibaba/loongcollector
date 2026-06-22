@@ -25,6 +25,7 @@ DECLARE_FLAG_INT32(cpu_limit_num);
 DECLARE_FLAG_INT32(mem_limit_num);
 DECLARE_FLAG_DOUBLE(cpu_usage_up_limit);
 DECLARE_FLAG_INT64(memory_usage_up_limit);
+DECLARE_FLAG_STRING(ignored_interfaces);
 
 // checkpoint
 DECLARE_FLAG_INT32(unused_checkpoints_clear_interval_sec);

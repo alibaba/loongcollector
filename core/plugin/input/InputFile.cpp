@@ -211,6 +211,9 @@ bool InputFile::Stop(bool isPipelineRemoving) {
 }
 
 bool InputFile::CreateInnerProcessors() {
+    if (mMultiline.mMode == MultilineOptions::Mode::WHOLE_FILE) {
+        return true;
+    }
     unique_ptr<ProcessorInstance> processor;
     {
         Json::Value detail;
@@ -219,7 +222,7 @@ bool InputFile::CreateInnerProcessors() {
             processor = PluginRegistry::GetInstance()->CreateProcessor(
                 ProcessorSplitLogStringNative::sName, mContext->GetPipeline().GenNextPluginMeta(false));
             detail["SplitChar"] = Json::Value('\0');
-        } else if (mMultiline.IsMultiline()) {
+        } else if (mMultiline.IsMultiline() && mMultiline.mMode == MultilineOptions::Mode::CUSTOM) {
             processor = PluginRegistry::GetInstance()->CreateProcessor(
                 ProcessorSplitMultilineLogStringNative::sName, mContext->GetPipeline().GenNextPluginMeta(false));
             detail["Mode"] = Json::Value("custom");

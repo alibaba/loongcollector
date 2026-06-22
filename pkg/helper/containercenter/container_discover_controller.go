@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
 
@@ -153,7 +154,7 @@ func (c *ContainerDiscoverManager) Clean() {
 
 func (c *ContainerDiscoverManager) LogAlarm(err error, msg string) {
 	if err != nil {
-		logger.Warning(context.Background(), "DOCKER_CENTER_ALARM", "message", msg, "error found", err)
+		logger.Warning(context.Background(), selfmonitor.DockerCenterAlarm, "message", msg, "error found", err)
 	} else {
 		logger.Debug(context.Background(), "message", msg)
 	}
@@ -164,19 +165,11 @@ func (c *ContainerDiscoverManager) Init() bool {
 
 	// discover which runtime is valid
 	if wrapper, err := NewCRIRuntimeWrapper(containerCenterInstance); err != nil {
-		logger.Warningf(context.Background(), "DOCKER_CENTER_ALARM", "[CRIRuntime] creare cri-runtime client error: %v", err)
+		logger.Warningf(context.Background(), selfmonitor.DockerCenterAlarm, "[CRIRuntime] creare cri-runtime client error: %v", err)
 		criRuntimeWrapper = nil
 	} else {
 		logger.Infof(context.Background(), "[CRIRuntime] create cri-runtime client successfully")
 		criRuntimeWrapper = wrapper
-	}
-	if ok, err := util.PathExists(DefaultLogtailMountPath); err == nil {
-		if !ok {
-			logger.Info(context.Background(), "no docker mount path", "set empty")
-			DefaultLogtailMountPath = ""
-		}
-	} else {
-		logger.Warning(context.Background(), "check docker mount path error", err.Error())
 	}
 	c.enableCRIDiscover = criRuntimeWrapper != nil
 	c.enableDockerDiscover = containerCenterInstance.initClient() == nil
@@ -245,18 +238,37 @@ func (c *ContainerDiscoverManager) Init() bool {
 		}
 	}
 	logger.Info(context.Background(), "init docker center, max fetchOne count per second", MaxFetchOneTriggerPerSecond)
+	{
+		timeoutSec := int(ForceReleaseDeletedFileFDTimeout.Seconds())
+		if err := util.InitFromEnvInt("force_release_deleted_file_fd_timeout", &timeoutSec, timeoutSec); err != nil {
+			c.LogAlarm(err, "initialize env force_release_deleted_file_fd_timeout error")
+		}
+		// Support -1 (disabled), 0 (immediate), or positive values
+		if timeoutSec >= 0 {
+			ForceReleaseDeletedFileFDTimeout = time.Duration(timeoutSec) * time.Second
+		}
+		// FORCE_RELEASE_STOP_CONTAINER_FILE 不再推荐使用, 仅用于兼容历史版本行为, 设置为 True 等价于 force_release_deleted_file_fd_timeout = 0
+		forceReleaseStopContainerFile := false
+		if err := util.InitFromEnvBool("FORCE_RELEASE_STOP_CONTAINER_FILE", &forceReleaseStopContainerFile, forceReleaseStopContainerFile); err != nil {
+			c.LogAlarm(err, "initialize env FORCE_RELEASE_STOP_CONTAINER_FILE error")
+		}
+		if forceReleaseStopContainerFile {
+			ForceReleaseDeletedFileFDTimeout = time.Duration(0)
+		}
+	}
+	logger.Info(context.Background(), "init docker center, force release deleted file fd timeout", ForceReleaseDeletedFileFDTimeout.String())
 
 	var err error
 	if c.enableDockerDiscover {
 		if err = c.fetchDocker(); err != nil {
 			c.enableDockerDiscover = false
-			logger.Warningf(context.Background(), "DOCKER_CENTER_ALARM", "fetch docker containers error, close docker discover, will retry")
+			logger.Warningf(context.Background(), selfmonitor.DockerCenterAlarm, "fetch docker containers error, close docker discover, will retry")
 		}
 	}
 	if c.enableCRIDiscover {
 		if err = c.fetchCRI(); err != nil {
 			c.enableCRIDiscover = false
-			logger.Warningf(context.Background(), "DOCKER_CENTER_ALARM", "fetch cri containers error, close cri discover, will retry")
+			logger.Warningf(context.Background(), selfmonitor.DockerCenterAlarm, "fetch cri containers error, close cri discover, will retry")
 		}
 	}
 	if c.enableStaticDiscover {

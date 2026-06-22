@@ -27,6 +27,8 @@ import (
 	"github.com/elastic/beats/v7/winlogbeat/sys"
 	win "github.com/elastic/beats/v7/winlogbeat/sys/wineventlog"
 	"golang.org/x/sys/windows"
+
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
 const (
@@ -67,8 +69,7 @@ func (w *winEventLog) Open(checkpoint Checkpoint) error {
 	// https://msdn.microsoft.com/en-us/library/windows/desktop/aa385771(v=vs.85).aspx#pull
 	signalEvent, err := windows.CreateEvent(nil, 0, 0, nil)
 	if err != nil {
-		logger.Warningf(w.config.Context.GetRuntimeContext(), "WINEVENTLOG_API_ALARM",
-			"%s Create event error: %v", w.logPrefix, err)
+		logger.Warningf(w.config.Context.GetRuntimeContext(), selfmonitor.WineventlogApiAlarm, "%s Create event error: %v", w.logPrefix, err)
 		return err
 	}
 
@@ -114,15 +115,13 @@ func (w *winEventLog) Read() ([]Record, error) {
 			err = w.render(h, w.outputBuf)
 		}
 		if err != nil && w.outputBuf.Len() == 0 {
-			logger.Warningf(w.config.Context.GetRuntimeContext(), "WINEVENTLOG_API_ALARM",
-				"%s Dropping event with rendering error. %v", w.logPrefix, err)
+			logger.Warningf(w.config.Context.GetRuntimeContext(), selfmonitor.WineventlogApiAlarm, "%s Dropping event with rendering error. %v", w.logPrefix, err)
 			continue
 		}
 
 		r, err := w.buildRecordFromXML(w.outputBuf.Bytes(), err)
 		if err != nil {
-			logger.Warningf(w.config.Context.GetRuntimeContext(), "WINEVENTLOG_API_ALARM",
-				"%s Dropping event. %v", w.logPrefix, err)
+			logger.Warningf(w.config.Context.GetRuntimeContext(), selfmonitor.WineventlogApiAlarm, "%s Dropping event. %v", w.logPrefix, err)
 			continue
 		}
 
@@ -132,8 +131,7 @@ func (w *winEventLog) Read() ([]Record, error) {
 			Timestamp:    r.TimeCreated.SystemTime,
 		}
 		if r.Offset.Bookmark, err = w.createBookmarkFromEvent(h); err != nil {
-			logger.Warningf(w.config.Context.GetRuntimeContext(), "WINEVENTLOG_API_ALARM",
-				"%s failed creating bookmark: %v", w.logPrefix, err)
+			logger.Warningf(w.config.Context.GetRuntimeContext(), selfmonitor.WineventlogApiAlarm, "%s failed creating bookmark: %v", w.logPrefix, err)
 		}
 		records = append(records, r)
 		w.checkpoint = r.Offset
@@ -145,8 +143,7 @@ func (w *winEventLog) Read() ([]Record, error) {
 
 func (w *winEventLog) Close() error {
 	if err := windows.Close(w.signalEvent); err != nil {
-		logger.Warningf(w.config.Context.GetRuntimeContext(), "WINEVENTLOG_API_ALARM",
-			"%s Close signal event error: %v", w.logPrefix, err)
+		logger.Warningf(w.config.Context.GetRuntimeContext(), selfmonitor.WineventlogApiAlarm, "%s Close signal event error: %v", w.logPrefix, err)
 	}
 	w.signalEvent = 0
 	return win.Close(w.subscription)
@@ -177,8 +174,7 @@ func (w *winEventLog) eventHandles(maxRead int) ([]win.EvtHandle, int, error) {
 		}
 		return w.eventHandles(maxRead / 2)
 	default:
-		logger.Warningf(w.config.Context.GetRuntimeContext(), "WINEVENTLOG_API_ALARM",
-			"%s EventHandles returned error %v", w.logPrefix, err)
+		logger.Warningf(w.config.Context.GetRuntimeContext(), selfmonitor.WineventlogApiAlarm, "%s EventHandles returned error %v", w.logPrefix, err)
 		return nil, 0, err
 	}
 }

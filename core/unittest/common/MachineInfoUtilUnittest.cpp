@@ -15,6 +15,12 @@
 #include "common/MachineInfoUtil.h"
 #include "unittest/Unittest.h"
 
+#if defined(__linux__)
+#include "json/value.h"
+
+#include "app_config/AppConfig.h"
+#endif
+
 namespace logtail {
 class HostnameValidationUnittest : public ::testing::Test {
 public:
@@ -150,6 +156,22 @@ public:
 
 UNIT_TEST_CASE(HostnameValidationUnittest, DecHostnameValidationTest);
 UNIT_TEST_CASE(HostnameValidationUnittest, OctHostnameValidationTest);
+
+#if defined(__linux__)
+class MachineInfoUtilLinuxUnittest : public ::testing::Test {
+public:
+    void TestNicIpv4AndHostIdentityHelpers() {
+        Json::Value conf;
+        conf[kIgnoredInterfacesKey] = "kube-ipvs0,nodelocaldns,docker0";
+        AppConfig::GetInstance()->ParseJsonToFlags(conf);
+
+        EXPECT_TRUE(IsIgnoredInterfaceForHostIdentity("kube-ipvs0"));
+        (void)GetAnyAvailableIP();
+    }
+};
+
+UNIT_TEST_CASE(MachineInfoUtilLinuxUnittest, TestNicIpv4AndHostIdentityHelpers);
+#endif
 
 } // end of namespace logtail
 

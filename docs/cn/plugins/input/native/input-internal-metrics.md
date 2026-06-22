@@ -21,7 +21,7 @@
 |  Type  |  string  |  是  |  /  |  插件类型。固定为input\_internal\_metrics。  |
 |  Agent  |  InternalMetricRule  |  否  |  /  |  进程级指标（LoongCollector的基本信息、资源占用率等进程级别信息）的采集规则  |
 |  Runner  |  InternalMetricRule  |  否  |  /  |  Runner级指标（LoongCollector内重要单例的运行状态）的采集规则  |
-|  Pipeline  |  InternalMetricRule  |  否  |  /  |  Pipeline级指标（单个采集配置流水线的状态）的采集规则  |
+|  Pipeline  |  InternalMetricRule  |  否  |  /  |  Pipeline级指标（单个采集配置的状态）的采集规则  |
 |  PluginSource  |  InternalMetricRule  |  否  |  /  |  数据源级（例如被采集的文件的信息）的采集规则  |
 |  Plugin  |  InternalMetricRule  |  否  |  /  |  插件级指标（单个插件的状态、吞吐量等信息）的采集规则  |
 |  Component  |  InternalMetricRule  |  否  |  /  |  组件级指标（为了辅助Pipeline等运行的组件的状态）的采集规则  |
@@ -37,7 +37,7 @@ InternalMetricRule 的结构如下：
 
 采集LoongCollector所有自监控指标，并将采集结果写到本地文件。
 
-``` yaml
+```yaml
 enable: true
 inputs:
   - Type: input_internal_metrics
