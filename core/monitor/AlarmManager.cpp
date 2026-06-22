@@ -291,6 +291,12 @@ void AlarmManager::SendAlarm(const AlarmType& alarmType,
         // 空的project、region会自动发到default region，这种情况只能用instance_id查询。
     }
 
+    const string& messageType = mMessageType[alarmType];
+    if (messageType.empty()) {
+        LOG_ERROR(sLogger, ("alarm type is not mapped", static_cast<int32_t>(alarmType))("region", region));
+        return;
+    }
+
     // 如果 AlarmPipeline 已就绪，写 buffer；否则写文件（最多60s）
     if (mAlarmPipelineReady.load()) {
         // 写 buffer
@@ -300,7 +306,7 @@ void AlarmManager::SendAlarm(const AlarmType& alarmType,
         AlarmVector& alarmBufferVec = *MakesureLogtailAlarmMapVecUnlocked(region);
         if (alarmBufferVec[alarmType].find(key) == alarmBufferVec[alarmType].end()) {
             auto* messagePtr
-                = new AlarmMessage(mMessageType[alarmType], levelStr, projectName, category, config, message, 1);
+                = new AlarmMessage(messageType, levelStr, projectName, category, config, message, 1);
             alarmBufferVec[alarmType].emplace(key, messagePtr);
         } else {
             alarmBufferVec[alarmType][key]->IncCount();
@@ -310,16 +316,12 @@ void AlarmManager::SendAlarm(const AlarmType& alarmType,
         if (!region.empty()) {
             bool stopWriting = mStopWritingFile.load();
             if (ShouldWriteAlarmToFile(mAlarmPipelineReady.load(), stopWriting)) {
-                if (stopWriting != mStopWritingFile.load()) {
-                    mStopWritingFile.store(stopWriting);
-                }
                 if (static_cast<int32_t>(level) >= INT32_FLAG(logtail_startup_alarm_file_min_level)) {
                     WriteAlarmToFile(
-                        region, mMessageType[alarmType], ToString(level), message, projectName, category, config);
+                        region, messageType, ToString(level), message, projectName, category, config);
                 }
-            } else if (stopWriting != mStopWritingFile.load()) {
-                mStopWritingFile.store(stopWriting);
             }
+            mStopWritingFile.store(stopWriting);
         }
         // 如果已停止写文件，alarm 被丢弃（不写 buffer）
     }
@@ -415,45 +417,37 @@ bool AlarmManager::ReadAlarmsFromFile(std::vector<PipelineEventGroup>& pipelineE
             continue;
         }
 
-        const auto& region = doc["region"];
-        const auto& alarmType = doc["alarm_type"];
-        const auto& level = doc["alarm_level"];
-        const auto& ipValue = doc["ip"];
-        const auto& osValue = doc["os"];
-        const auto& verValue = doc["ver"];
-        const auto& instanceIdValue = doc["instance_id"];
-        const auto& hostnameValue = doc["hostname"];
-        const auto& projectName = doc.FindMember("project_name");
-        const auto& category = doc.FindMember("category");
-        const auto& config = doc.FindMember("config");
+        auto getStr = [&](const char* name) -> std::string {
+            auto it = doc.FindMember(name);
+            if (it != doc.MemberEnd() && it->value.IsString()) {
+                return it->value.GetString();
+            }
+            return "";
+        };
 
-        if (!region.IsString() || !alarmType.IsString() || !level.IsString()) {
+        std::string regionStr = getStr("region");
+        std::string alarmTypeStr = getStr("alarm_type");
+        std::string levelStr = getStr("alarm_level");
+        std::string ipStr = getStr("ip");
+        std::string osStr = getStr("os");
+        std::string verStr = getStr("ver");
+        std::string instanceIdStr = getStr("instance_id");
+        std::string hostnameStr = getStr("hostname");
+        std::string projectNameStr = getStr("project_name");
+        std::string categoryStr = getStr("category");
+        std::string configStr = getStr("config");
+
+        if (regionStr.empty() || alarmTypeStr.empty() || levelStr.empty()) {
             continue;
         }
 
-        std::string regionStr = region.GetString();
-        if (regionStr.empty()) {
-            continue;
-        }
-
-        std::string key = std::string(region.GetString()) + "_" + std::string(alarmType.GetString()) + "_";
-        if (projectName != doc.MemberEnd() && projectName->value.IsString()) {
-            key += projectName->value.GetString();
-        }
-        key += "_";
-        if (category != doc.MemberEnd() && category->value.IsString()) {
-            key += category->value.GetString();
-        }
-        key += "_";
-        if (config != doc.MemberEnd() && config->value.IsString()) {
-            key += config->value.GetString();
-        }
-        key += "_" + std::string(level.GetString());
-        key += "_" + std::string(ipValue.GetString());
-        key += "_" + std::string(osValue.GetString());
-        key += "_" + std::string(verValue.GetString());
-        key += "_" + std::string(instanceIdValue.GetString());
-        key += "_" + std::string(hostnameValue.GetString());
+        std::string key = regionStr + "_" + alarmTypeStr + "_" + projectNameStr + "_" + categoryStr + "_" + configStr;
+        key += "_" + levelStr;
+        key += "_" + ipStr;
+        key += "_" + osStr;
+        key += "_" + verStr;
+        key += "_" + instanceIdStr;
+        key += "_" + hostnameStr;
 
         // 累加 count
         keyToCount[key]++;
@@ -473,8 +467,18 @@ bool AlarmManager::ReadAlarmsFromFile(std::vector<PipelineEventGroup>& pipelineE
     std::unordered_map<std::string, size_t> regionToIndex;
     for (const auto& [key, count] : keyToCount) {
         const auto& doc = keyToDoc[key];
-        const auto& region = doc["region"];
-        std::string regionStr = region.GetString();
+        auto getSafe = [&](const char* name) -> std::string {
+            auto it = doc.FindMember(name);
+            if (it != doc.MemberEnd() && it->value.IsString()) {
+                return it->value.GetString();
+            }
+            return "";
+        };
+
+        std::string regionStr = getSafe("region");
+        if (regionStr.empty()) {
+            continue;
+        }
 
         // 保存原始 JSON，按 region 分组
         if (regionToRawJson.find(regionStr) == regionToRawJson.end()) {
@@ -499,31 +503,30 @@ bool AlarmManager::ReadAlarmsFromFile(std::vector<PipelineEventGroup>& pipelineE
         }
 
         auto* logEvent = pipelineEventGroupList[groupIdx].AddLogEvent();
-        const auto& timestamp = doc["timestamp"];
-        const auto& message = doc["alarm_message"];
-        if (timestamp.IsInt64()) {
-            logEvent->SetTimestamp(static_cast<time_t>(timestamp.GetInt64()));
+        auto timestampIt = doc.FindMember("timestamp");
+        if (timestampIt != doc.MemberEnd() && timestampIt->value.IsInt64()) {
+            logEvent->SetTimestamp(static_cast<time_t>(timestampIt->value.GetInt64()));
         }
-        logEvent->SetContent("alarm_type", std::string(doc["alarm_type"].GetString()));
-        logEvent->SetContent("alarm_level", std::string(doc["alarm_level"].GetString()));
-        logEvent->SetContent("alarm_message", std::string(message.IsString() ? std::string(message.GetString()) : ""));
+        logEvent->SetContent("alarm_type", getSafe("alarm_type"));
+        logEvent->SetContent("alarm_level", getSafe("alarm_level"));
+        logEvent->SetContent("alarm_message", getSafe("alarm_message"));
         logEvent->SetContent("alarm_count", ToString(count));
-        logEvent->SetContent("ip", std::string(doc["ip"].GetString()));
-        logEvent->SetContent("os", std::string(doc["os"].GetString()));
-        logEvent->SetContent("ver", std::string(doc["ver"].GetString()));
-        logEvent->SetContent("instance_id", std::string(doc["instance_id"].GetString()));
-        logEvent->SetContent("hostname", std::string(doc["hostname"].GetString()));
-        const auto& projectName = doc.FindMember("project_name");
-        if (projectName != doc.MemberEnd() && projectName->value.IsString()) {
-            logEvent->SetContent("project_name", std::string(projectName->value.GetString()));
+        logEvent->SetContent("ip", getSafe("ip"));
+        logEvent->SetContent("os", getSafe("os"));
+        logEvent->SetContent("ver", getSafe("ver"));
+        logEvent->SetContent("instance_id", getSafe("instance_id"));
+        logEvent->SetContent("hostname", getSafe("hostname"));
+        std::string pn = getSafe("project_name");
+        if (!pn.empty()) {
+            logEvent->SetContent("project_name", pn);
         }
-        const auto& category = doc.FindMember("category");
-        if (category != doc.MemberEnd() && category->value.IsString()) {
-            logEvent->SetContent("category", std::string(category->value.GetString()));
+        std::string cat = getSafe("category");
+        if (!cat.empty()) {
+            logEvent->SetContent("category", cat);
         }
-        const auto& config = doc.FindMember("config");
-        if (config != doc.MemberEnd() && config->value.IsString()) {
-            logEvent->SetContent("config", std::string(config->value.GetString()));
+        std::string cfg = getSafe("config");
+        if (!cfg.empty()) {
+            logEvent->SetContent("config", cfg);
         }
     }
 
@@ -562,26 +565,6 @@ bool AlarmManager::ShouldWriteAlarmToFile(bool alarmPipelineReady, bool& stopWri
                           "start_time", startTime));
         }
         return false;
-    }
-
-    // 检查文件大小限制
-    if (CheckExistance(mAlarmDiskBufferFilePath)) {
-        std::error_code ec;
-        const int64_t fileSize = std::filesystem::file_size(std::filesystem::path(mAlarmDiskBufferFilePath), ec);
-        if (!ec) {
-            const auto maxSizeBytes = static_cast<int64_t>(INT32_FLAG(logtail_startup_alarm_file_max_size));
-            if (fileSize >= maxSizeBytes) {
-                if (!stopWritingFile) {
-                    stopWritingFile = true;
-                    LOG_ERROR(sLogger,
-                              ("alarm disk buffer file size exceeds limit",
-                               ToString(INT32_FLAG(logtail_startup_alarm_file_max_size))
-                                   + " bytes, stop writing alarm to file and discard all subsequent alarms")(
-                                  "file_path", mAlarmDiskBufferFilePath)("file_size_bytes", ToString(fileSize)));
-                }
-                return false;
-            }
-        }
     }
 
     return true;
@@ -661,8 +644,24 @@ void AlarmManager::WriteAlarmToFile(const std::string& region,
 
     PTScopedLock lock(mAlarmDiskBufferFileMutex);
     if (mAlarmDiskBufferFileHandle != nullptr) {
+        // 检查文件大小限制（在锁内检查避免并发超限）
+        std::error_code ec;
+        const int64_t fileSize = std::filesystem::file_size(std::filesystem::path(mAlarmDiskBufferFilePath), ec);
+        if (!ec) {
+            const auto maxSizeBytes = static_cast<int64_t>(INT32_FLAG(logtail_startup_alarm_file_max_size));
+            if (fileSize >= maxSizeBytes) {
+                LOG_ERROR(sLogger,
+                          ("alarm disk buffer file size exceeds limit",
+                           ToString(INT32_FLAG(logtail_startup_alarm_file_max_size))
+                               + " bytes, stop writing")("file_size_bytes", ToString(fileSize)));
+                mStopWritingFile.store(true);
+                fclose(mAlarmDiskBufferFileHandle);
+                mAlarmDiskBufferFileHandle = nullptr;
+                return;
+            }
+        }
         fprintf(mAlarmDiskBufferFileHandle, "%s\n", buffer.GetString());
-        fflush(mAlarmDiskBufferFileHandle); // 确保数据及时写入
+        fflush(mAlarmDiskBufferFileHandle);
     }
 }
 

@@ -233,11 +233,11 @@ void SelfMonitorServer::SendAlarms() {
                 }
             }
             AlarmManager::GetInstance()->DeleteAlarmFile();
-            return;
+            pipelineEventGroupList.clear();
         }
     }
 
-    // 正常流程：从内存 buffer 获取 alarm
+    // 从内存 buffer 获取 alarm（首次就绪时也 flush，防止竞态窗口内的 alarm 延迟发送）
     AlarmManager::GetInstance()->FlushAllRegionAlarm(pipelineEventGroupList);
 
     for (auto& pipelineEventGroup : pipelineEventGroupList) {
