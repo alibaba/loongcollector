@@ -145,6 +145,9 @@ func (m *metaCollector) Start() error {
 	if m.serviceK8sMeta.MaxBufferSize < 1 {
 		m.serviceK8sMeta.MaxBufferSize = 200000
 	}
+	if m.serviceK8sMeta.DrainBatchSize < 1 {
+		m.serviceK8sMeta.DrainBatchSize = 2000
+	}
 	bufferSize := m.serviceK8sMeta.EventBufferSize * resourceTypeCount
 	if bufferSize > m.serviceK8sMeta.MaxBufferSize {
 		bufferSize = m.serviceK8sMeta.MaxBufferSize
