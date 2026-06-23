@@ -43,7 +43,20 @@ func InitEnv(ctx context.Context, envType string) (context.Context, error) {
 	if envType == "docker-compose" {
 		return ctx, nil
 	}
-	return SetAgentPID(ctx)
+	ctx, err := SetAgentPID(ctx)
+	if err != nil {
+		return ctx, err
+	}
+	return EnsureGeneratedLogDir(ctx)
+}
+
+// EnsureGeneratedLogDir creates GENERATED_LOG_DIR on the test target before log generation.
+func EnsureGeneratedLogDir(ctx context.Context) (context.Context, error) {
+	if config.TestConfig.GeneratedLogDir == "" {
+		return ctx, nil
+	}
+	_, err := Env.ExecOnSource(ctx, "mkdir -p "+config.TestConfig.GeneratedLogDir)
+	return ctx, err
 }
 
 func Mkdir(ctx context.Context, dir string) (context.Context, error) {

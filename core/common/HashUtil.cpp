@@ -15,6 +15,10 @@
 #include "HashUtil.h"
 
 #include <memory.h>
+#include <openssl/sha.h>
+
+#include <iomanip>
+#include <sstream>
 
 #include "boost/functional/hash.hpp"
 
@@ -326,6 +330,17 @@ std::string CalcMD5(const std::string& message) {
     uint8_t md5[MD5_BYTES];
     DoMd5((const uint8_t*)message.data(), message.length(), md5);
     return HexToString(md5);
+}
+
+std::string CalcSHA256Hex(const std::string& message) {
+    unsigned char digest[SHA256_DIGEST_LENGTH];
+    SHA256(reinterpret_cast<const unsigned char*>(message.data()), message.size(), digest);
+    std::ostringstream oss;
+    oss << std::hex << std::setfill('0');
+    for (const auto b : digest) {
+        oss << std::setw(2) << static_cast<unsigned>(b);
+    }
+    return oss.str();
 }
 
 bool SignatureToHash(const std::string& signature, uint64_t& sigHash, uint32_t& sigSize) {

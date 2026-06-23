@@ -47,6 +47,9 @@ fi
 if [ -f "${ROOTDIR}/${OUT_DIR}/libagentsight.so" ]; then
   cp "${ROOTDIR}/${OUT_DIR}/libagentsight.so" "${ROOTDIR}/${DIST_DIR}/${PACKAGE_DIR}"
 fi
+if [ -f "${ROOTDIR}/${OUT_DIR}/libprofiler.so" ]; then
+  cp "${ROOTDIR}/${OUT_DIR}/libprofiler.so" "${ROOTDIR}/${DIST_DIR}/${PACKAGE_DIR}"
+fi
 mkdir -p "${ROOTDIR}/${DIST_DIR}/${PACKAGE_DIR}/conf/instance_config/local/"
 mkdir -p "${ROOTDIR}/${DIST_DIR}/${PACKAGE_DIR}/conf/continuous_pipeline_config/local/"
 cp "${ROOTDIR}/${OUT_DIR}/conf/instance_config/local/loongcollector_config.json" "${ROOTDIR}/${DIST_DIR}/${PACKAGE_DIR}/conf/instance_config/local/"
@@ -64,6 +67,9 @@ if [ -f "${ROOTDIR}/${DIST_DIR}/${PACKAGE_DIR}/libcoolbpf.so.1.0.0" ]; then
 fi
 if [ -f "${ROOTDIR}/${DIST_DIR}/${PACKAGE_DIR}/libagentsight.so" ]; then
   strip "${ROOTDIR}/${DIST_DIR}/${PACKAGE_DIR}/libagentsight.so"
+fi
+if [ -f "${ROOTDIR}/${DIST_DIR}/${PACKAGE_DIR}/libprofiler.so" ]; then
+  strip "${ROOTDIR}/${DIST_DIR}/${PACKAGE_DIR}/libprofiler.so"
 fi
 
 # pack dist dir

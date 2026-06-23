@@ -38,7 +38,7 @@ concurrency:
 jobs:
   # 生成E2E测试用例列表
   GenerateE2ETestCasesList:
-    runs-on: ubuntu-latest
+    runs-on: loongcollector-small-runner
     outputs:
       cases: ${{ steps.discover.outputs.cases }}
     steps:
@@ -159,7 +159,7 @@ jobs:
 
   actions-timeline:
     needs: [E2E]
-    runs-on: ubuntu-latest
+    runs-on: loongcollector-small-runner
     permissions:
       actions: read
     steps:

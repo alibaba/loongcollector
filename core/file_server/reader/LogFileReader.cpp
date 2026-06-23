@@ -986,8 +986,9 @@ bool LogFileReader::ReadLog(LogBuffer& logBuffer, const Event* event, bool isSta
     bool tryRollback = true;
     if (event != nullptr && event->IsReaderFlushTimeout()) {
         // If flush timeout event, we should filter whether the event is legacy.
-        if (event->GetLastReadPos() == GetLastReadPos() && event->GetLastFilePos() == mLastFilePos
-            && event->GetInode() == mDevInode.inode) {
+        if (mDrainingWholeFileCache
+            || (event->GetLastReadPos() == GetLastReadPos() && event->GetLastFilePos() == mLastFilePos
+                && event->GetInode() == mDevInode.inode)) {
             tryRollback = false;
         } else {
             return false;
@@ -1343,6 +1344,64 @@ bool LogFileReader::CheckFileSignatureAndOffset(bool isOpenOnUpdate) {
     mLogFileOp.Stat(ps);
     time_t lastMTime = mLastMTime;
     mLastMTime = ps.GetMtime();
+
+    // In WHOLE_FILE overwrite mode, the entire file is treated as a single log entry. A rewrite must be
+    // re-read from the beginning. Detection combines three signals (OR), so a same-second overwrite that
+    // a second-precision mtime alone would miss is still caught:
+    //   1. mtime change at nanosecond OR second precision;
+    //   2. file size change;
+    //   3. first-1KB signature change (covers equal-size, same-timestamp rewrites).
+    // The 1KB signature read is only performed when the cheap mtime/size signals show no change.
+    if (mMultilineConfig.first->mMode == MultilineOptions::Mode::WHOLE_FILE
+        && mMultilineConfig.first->mFileWriteMode == MultilineOptions::FileWriteMode::OVERWRITE) {
+        int64_t mtimeSec = 0, mtimeNsec = 0;
+        ps.GetLastWriteTime(mtimeSec, mtimeNsec);
+        int64_t prevMTimeNsec = mLastMTimeNs;
+        int64_t prevWholeFileSize = mLastWholeFileSize;
+        mLastMTimeNs = mtimeNsec;
+        mLastWholeFileSize = endSize;
+
+        // Skip detection on the very first observation (no baseline yet).
+        if (lastMTime != 0) {
+            bool mtimeChanged = (lastMTime != mLastMTime) || (prevMTimeNsec != mtimeNsec);
+            bool sizeChanged = (prevWholeFileSize != endSize);
+            bool headChanged = false;
+            char firstLine[1025];
+            int nbytes = -1;
+            if (!mtimeChanged && !sizeChanged) {
+                nbytes = mLogFileOp.Pread(firstLine, 1, 1024, 0);
+                if (nbytes > 0) {
+                    firstLine[nbytes] = '\0';
+                    uint64_t tmpHash = mLastFileSignatureHash;
+                    uint32_t tmpSize = mLastFileSignatureSize;
+                    headChanged = !CheckAndUpdateSignature(string(firstLine), tmpHash, tmpSize);
+                }
+            }
+            if (mtimeChanged || sizeChanged || headChanged) {
+                LOG_INFO(sLogger,
+                         ("whole_file overwrite mode detected file modification, read from begin",
+                          mHostLogPath)("mtime changed", mtimeChanged)("size changed", sizeChanged)(
+                             "head changed", headChanged)("old mtime", lastMTime)("new mtime", mLastMTime)(
+                             "project", GetProject())("logstore", GetLogstore())("config", GetConfigName()));
+                mLastFilePos = 0;
+                mCache.clear();
+                mDrainingWholeFileCache = false;
+                mWholeFileChunkIndex = 0;
+                if (nbytes < 0) {
+                    nbytes = mLogFileOp.Pread(firstLine, 1, 1024, 0);
+                }
+                if (nbytes > 0) {
+                    firstLine[nbytes] = '\0';
+                    CheckAndUpdateSignature(string(firstLine), mLastFileSignatureHash, mLastFileSignatureSize);
+                }
+                if (mEOOption) {
+                    updatePrimaryCheckpointSignature();
+                }
+                return true;
+            }
+        }
+    }
+
     if (!isOpenOnUpdate || mLastFileSignatureSize == 0 || endSize < mLastFilePos
         || (endSize == mLastFilePos && lastMTime != mLastMTime)) {
         char firstLine[1025];
@@ -1551,6 +1610,21 @@ size_t LogFileReader::getNextReadSize(int64_t fileEnd, bool& fromCpt) {
         readSize = checkpoint.read_length();
         LOG_INFO(sLogger, ("read specified length", readSize)("offset", mLastFilePos));
     }
+    if (mMultilineConfig.first->mMode == MultilineOptions::Mode::WHOLE_FILE
+        && mMultilineConfig.first->mFileWriteMode == MultilineOptions::FileWriteMode::OVERWRITE) {
+        allowMoreBufferSize = true;
+        if (readSize > mMultilineConfig.first->mMaxWholeFileBytes) {
+            int32_t curTime = time(nullptr);
+            if (curTime - mWholeFileOversizeWarnTime >= INT32_FLAG(logtail_alarm_interval)) {
+                mWholeFileOversizeWarnTime = curTime;
+                LOG_WARNING(sLogger,
+                            ("whole_file overwrite mode file exceeds max limit, skipping", mHostLogPath)(
+                                "file size", fileEnd)("max allowed", mMultilineConfig.first->mMaxWholeFileBytes)(
+                                "project", GetProject())("logstore", GetLogstore())("config", GetConfigName()));
+            }
+            return 0;
+        }
+    }
     if (readSize > BUFFER_SIZE && !allowMoreBufferSize) {
         readSize = BUFFER_SIZE;
     }
@@ -1573,8 +1647,15 @@ void LogFileReader::ReadUTF8(LogBuffer& logBuffer, int64_t end, bool& moreData, 
     bool logTooLongSplitFlag = false;
 
     logBuffer.readOffset = mLastFilePos;
+    // WHOLE_FILE overwrite: chunked drain of large cache (continuation or initiation)
+    if (mDrainingWholeFileCache
+        || (!tryRollback && mMultilineConfig.first->mMode == MultilineOptions::Mode::WHOLE_FILE
+            && mMultilineConfig.first->mFileWriteMode == MultilineOptions::FileWriteMode::OVERWRITE
+            && mCache.size() > BUFFER_SIZE)) {
+        DrainWholeFileChunk(logBuffer, moreData);
+        return;
+    }
     if (!mLogFileOp.IsOpen()) {
-        // read flush timeout
         nbytes = mCache.size();
         StringBuffer stringMemory = logBuffer.sourcebuffer->AllocateStringBuffer(nbytes);
         stringBuffer = stringMemory.data;
@@ -1731,8 +1812,15 @@ void LogFileReader::ReadGBK(LogBuffer& logBuffer, int64_t end, bool& moreData, b
     bool allowRollback = true;
 
     logBuffer.readOffset = mLastFilePos;
+    // WHOLE_FILE overwrite: chunked drain of large cache (continuation or initiation)
+    if (mDrainingWholeFileCache
+        || (!tryRollback && mMultilineConfig.first->mMode == MultilineOptions::Mode::WHOLE_FILE
+            && mMultilineConfig.first->mFileWriteMode == MultilineOptions::FileWriteMode::OVERWRITE
+            && mCache.size() > BUFFER_SIZE)) {
+        DrainWholeFileChunk(logBuffer, moreData);
+        return;
+    }
     if (!mLogFileOp.IsOpen()) {
-        // read flush timeout
         readCharCount = mCache.size();
         gbkMemory.reset(new char[readCharCount + 1]);
         gbkBuffer = gbkMemory.get();
@@ -2152,6 +2240,82 @@ size_t LogFileReader::AlignLastCharacter(char* buffer, size_t size) {
     return size;
 }
 
+size_t LogFileReader::GetWholeFileChunkSize(char* data, size_t available) {
+    if (available <= BUFFER_SIZE) {
+        return available; // last chunk takes everything
+    }
+    // Prefer to end on a line boundary: the last '\n' within the window (newline included in the chunk).
+    for (size_t i = BUFFER_SIZE; i > 0; --i) {
+        if (data[i - 1] == '\n') {
+            return i;
+        }
+    }
+    // No newline in the window: avoid splitting a multibyte character (encoding-aware).
+    size_t aligned = AlignLastCharacter(data, BUFFER_SIZE);
+    return aligned == 0 ? BUFFER_SIZE : aligned; // guarantee progress
+}
+
+int32_t LogFileReader::CountWholeFileChunks() {
+    int32_t count = 0;
+    size_t pos = 0;
+    size_t total = mCache.size();
+    char* data = total ? &mCache[0] : nullptr;
+    while (pos < total) {
+        pos += GetWholeFileChunkSize(data + pos, total - pos);
+        ++count;
+    }
+    return count;
+}
+
+void LogFileReader::DrainWholeFileChunk(LogBuffer& logBuffer, bool& moreData) {
+    if (!mDrainingWholeFileCache) {
+        mDrainingWholeFileCache = true;
+        mWholeFileChunkIndex = 0;
+        mWholeFileTotalChunks = CountWholeFileChunks();
+        mWholeFileId = mHostLogPath + "_" + ToString(mLastMTime) + "_" + ToString(mDevInode.inode);
+        mLastForceRead = true;
+    }
+    if (mCache.empty()) {
+        mDrainingWholeFileCache = false;
+        moreData = false;
+        return;
+    }
+    char* data = &mCache[0];
+    size_t chunkSize = GetWholeFileChunkSize(data, mCache.size());
+    if (mReaderConfig.first->mFileEncoding == FileReaderOptions::Encoding::GBK) {
+        // mCache holds raw GBK bytes; convert this chunk to UTF8 so it is readable downstream.
+        vector<long> lineFeedPos = {-1};
+        for (long idx = 0; idx < static_cast<long>(chunkSize) - 1; ++idx) {
+            if (data[idx] == '\n') {
+                lineFeedPos.push_back(idx);
+            }
+        }
+        lineFeedPos.push_back(static_cast<long>(chunkSize) - 1);
+        size_t srcLength = chunkSize;
+        size_t requiredLen
+            = EncodingConverter::GetInstance()->ConvertGbk2Utf8(data, &srcLength, nullptr, 0, lineFeedPos);
+        StringBuffer stringMemory = logBuffer.sourcebuffer->AllocateStringBuffer(requiredLen + 1);
+        size_t resultCharCount = EncodingConverter::GetInstance()->ConvertGbk2Utf8(
+            data, &srcLength, stringMemory.data, stringMemory.capacity, lineFeedPos);
+        logBuffer.rawBuffer = StringView(stringMemory.data, resultCharCount);
+    } else {
+        StringBuffer stringMemory = logBuffer.sourcebuffer->AllocateStringBuffer(chunkSize);
+        memcpy(stringMemory.data, data, chunkSize);
+        logBuffer.rawBuffer = StringView(stringMemory.data, chunkSize);
+    }
+    logBuffer.readLength = chunkSize;
+    logBuffer.readOffset = mLastFilePos;
+    logBuffer.wholeFileId = mWholeFileId;
+    logBuffer.wholeFileSeq = mWholeFileChunkIndex++;
+    logBuffer.wholeFileTotal = mWholeFileTotalChunks;
+    mCache.erase(0, chunkSize);
+    mLastFilePos += chunkSize;
+    moreData = !mCache.empty();
+    if (!moreData) {
+        mDrainingWholeFileCache = false;
+    }
+}
+
 std::unique_ptr<Event> LogFileReader::CreateFlushTimeoutEvent() {
     auto result = std::make_unique<Event>(mHostLogPathDir,
                                           mHostLogPathFile,
@@ -2543,6 +2707,12 @@ PipelineEventGroup LogFileReader::GenerateEventGroup(LogFileReaderPtr reader, Lo
     event->SetTimestamp(logtime);
     event->SetContentNoCopy(DEFAULT_CONTENT_KEY, logBuffer->rawBuffer);
     event->SetPosition(logBuffer->readOffset, logBuffer->readLength);
+
+    if (logBuffer->wholeFileSeq >= 0) {
+        event->SetContent("__whole_file_id__", logBuffer->wholeFileId);
+        event->SetContent("__whole_file_seq__", ToString(logBuffer->wholeFileSeq));
+        event->SetContent("__whole_file_total__", ToString(logBuffer->wholeFileTotal));
+    }
 
     return group;
 }

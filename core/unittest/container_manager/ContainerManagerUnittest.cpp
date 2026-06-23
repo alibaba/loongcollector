@@ -59,6 +59,7 @@ public:
     void TestLoadContainerInfoFromContainersFormat() const;
     void TestLoadContainerInfoVersionHandling() const;
     void TestSaveContainerInfoWithVersion() const;
+    void TestAddAndRemoveContainerHandler() const;
     void TestContainerMatchingConsistency() const;
     void TestcomputeMatchedContainersDiffWithSnapshot() const;
     void TestNullRawContainerInfoHandling() const;
@@ -1073,6 +1074,38 @@ void ContainerManagerUnittest::TestSaveContainerInfoWithVersion() const {
     EXPECT_TRUE(foundAnotherKey);
 }
 
+void ContainerManagerUnittest::TestAddAndRemoveContainerHandler() const {
+    ContainerManager containerManager;
+
+    EXPECT_TRUE(containerManager.mContainerHandlers.empty());
+
+    FileDiscoveryOptions options1;
+    FileDiscoveryOptions options2;
+
+    containerManager.AddContainerHandler("configA", {&options1, nullptr}, [](std::shared_ptr<ContainerDiff>) {});
+
+    ASSERT_EQ(containerManager.mContainerHandlers.size(), 1);
+    auto itr = containerManager.mContainerHandlers.find("configA");
+    ASSERT_TRUE(itr != containerManager.mContainerHandlers.end());
+    EXPECT_EQ(itr->second.first.first, &options1);
+    EXPECT_EQ(itr->second.first.second, nullptr);
+
+    // Add the same key again, should overwrite the old handler/config.
+    containerManager.AddContainerHandler("configA", {&options2, nullptr}, [](std::shared_ptr<ContainerDiff>) {});
+
+    ASSERT_EQ(containerManager.mContainerHandlers.size(), 1);
+    itr = containerManager.mContainerHandlers.find("configA");
+    ASSERT_TRUE(itr != containerManager.mContainerHandlers.end());
+    EXPECT_EQ(itr->second.first.first, &options2);
+
+    containerManager.RemoveContainerHandler("configA");
+    EXPECT_TRUE(containerManager.mContainerHandlers.empty());
+
+    // Removing a non-existing key should be a no-op.
+    containerManager.RemoveContainerHandler("not_exist");
+    EXPECT_TRUE(containerManager.mContainerHandlers.empty());
+}
+
 std::string ContainerManagerUnittest::findTestDataDirectory() const {
     std::string testDataDir = GetProcessExecutionDir();
     // Remove trailing path separator if present
@@ -1674,9 +1707,8 @@ void ContainerManagerUnittest::runConcurrentContainerMapAccessTest(bool enableT2
                                     << containerId << R"(", "Status": "running")"
                                     << R"(, "LogPath": "/var/log/container_)" << containerId << R"(")"
                                     << R"(, "UpperDir": "/var/lib/docker/overlay2/container_)" << containerId
-                                    << R"(/diff")"
-                                    << R"(, "Env": {"ENV_KEY_1": "value_)" << counter << R"(", "COUNTER": ")" << counter
-                                    << R"("})"
+                                    << R"(/diff")" << R"(, "Env": {"ENV_KEY_1": "value_)" << counter
+                                    << R"(", "COUNTER": ")" << counter << R"("})"
                                     << R"(, "K8sInfo": {"Namespace": "default", "Pod": "pod-)" << containerId
                                     << R"(", "Labels": {"app": "app_)" << (counter % 5) << R"(", "version": "v)"
                                     << (counter % 3) << R"("}}})";
@@ -1701,8 +1733,7 @@ void ContainerManagerUnittest::runConcurrentContainerMapAccessTest(bool enableT2
                                     << containerId << R"(", "Status": "running")"
                                     << R"(, "LogPath": "/var/log/container_)" << containerId << R"(")"
                                     << R"(, "UpperDir": "/var/lib/docker/overlay2/container_)" << containerId
-                                    << R"(/diff")"
-                                    << R"(, "Env": {"ENV_KEY_1": "incremental_)" << counter
+                                    << R"(/diff")" << R"(, "Env": {"ENV_KEY_1": "incremental_)" << counter
                                     << R"(", "UPDATED_ENV": "new_)" << counter << R"("})"
                                     << R"(, "K8sInfo": {"Namespace": "default", "Pod": "pod-)" << containerId
                                     << R"(", "Labels": {"app": "incremental_)" << counter
@@ -1902,8 +1933,7 @@ void ContainerManagerUnittest::TestSequentialContainerDiffAndApply() {
         if (i > 0)
             metaBuilder1 << ",";
         metaBuilder1 << R"({"ID": "container_)" << i << R"(", "Name": "test_container_)" << i
-                     << R"(", "Status": "running")"
-                     << R"(, "LogPath": "/var/log/container_)" << i << R"(")"
+                     << R"(", "Status": "running")" << R"(, "LogPath": "/var/log/container_)" << i << R"(")"
                      << R"(, "UpperDir": "/var/lib/docker/overlay2/container_)" << i << R"(/diff")"
                      << R"(, "Env": {"ENV_KEY_1": "value_)" << i << R"("})"
                      << R"(, "K8sInfo": {"Namespace": "default", "Pod": "pod-)" << i << R"(", "Labels": {"app": "app_)"
@@ -1944,15 +1974,12 @@ void ContainerManagerUnittest::TestSequentialContainerDiffAndApply() {
                  << R"(, "LogPath": "/var/log/container_0_updated")"
                  << R"(, "UpperDir": "/var/lib/docker/overlay2/container_0/diff")"
                  << R"(, "Env": {"ENV_KEY_1": "updated_0"})"
-                 << R"(, "K8sInfo": {"Namespace": "default", "Pod": "pod-0")"
-                 << R"(, "Labels": {"app": "app_0"}}},)"
+                 << R"(, "K8sInfo": {"Namespace": "default", "Pod": "pod-0")" << R"(, "Labels": {"app": "app_0"}}},)"
                  << R"({"ID": "container_5", "Name": "test_container_5", "Status": "running")"
                  << R"(, "LogPath": "/var/log/container_5")"
                  << R"(, "UpperDir": "/var/lib/docker/overlay2/container_5/diff")"
-                 << R"(, "Env": {"ENV_KEY_1": "value_5"})"
-                 << R"(, "K8sInfo": {"Namespace": "default", "Pod": "pod-5")"
-                 << R"(, "Labels": {"app": "app_5"}}})"
-                 << R"(], "Delete": [], "Stop": []})";
+                 << R"(, "Env": {"ENV_KEY_1": "value_5"})" << R"(, "K8sInfo": {"Namespace": "default", "Pod": "pod-5")"
+                 << R"(, "Labels": {"app": "app_5"}}})" << R"(], "Delete": [], "Stop": []})";
 
     LogtailPluginMock::GetInstance()->SetUpDiffContainersMeta(diffBuilder1.str());
     containerManager.incrementallyUpdateContainersSnapshot();
@@ -2070,8 +2097,7 @@ void ContainerManagerUnittest::TestSequentialContainerDiffAndApply() {
         if (i > 0)
             metaBuilder3 << ",";
         metaBuilder3 << R"({"ID": "container_)" << id << R"(", "Name": "test_container_)" << id
-                     << R"(", "Status": "running")"
-                     << R"(, "LogPath": "/var/log/container_)" << id << R"(")"
+                     << R"(", "Status": "running")" << R"(, "LogPath": "/var/log/container_)" << id << R"(")"
                      << R"(, "UpperDir": "/var/lib/docker/overlay2/container_)" << id << R"(/diff")"
                      << R"(, "Env": {"ENV_KEY_1": "fullrefresh2_)" << id << R"("})"
                      << R"(, "K8sInfo": {"Namespace": "default", "Pod": "pod-)" << id << R"(", "Labels": {"app": "app_)"
@@ -2778,6 +2804,7 @@ UNIT_TEST_CASE(ContainerManagerUnittest, TestLoadContainerInfoFromDetailFormatPa
 UNIT_TEST_CASE(ContainerManagerUnittest, TestLoadContainerInfoFromContainersFormat)
 UNIT_TEST_CASE(ContainerManagerUnittest, TestLoadContainerInfoVersionHandling)
 UNIT_TEST_CASE(ContainerManagerUnittest, TestSaveContainerInfoWithVersion)
+UNIT_TEST_CASE(ContainerManagerUnittest, TestAddAndRemoveContainerHandler)
 UNIT_TEST_CASE(ContainerManagerUnittest, TestContainerMatchingConsistency)
 UNIT_TEST_CASE(ContainerManagerUnittest, TestcomputeMatchedContainersDiffWithSnapshot)
 UNIT_TEST_CASE(ContainerManagerUnittest, TestNullRawContainerInfoHandling)
