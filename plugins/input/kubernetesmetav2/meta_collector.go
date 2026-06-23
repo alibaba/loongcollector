@@ -530,6 +530,11 @@ func (m *metaCollector) sendInBackground() {
 					if len(entityGroup.Events) >= m.serviceK8sMeta.DrainBatchSize {
 						m.serviceK8sMeta.entityCount.Add(int64(len(entityGroup.Events)))
 						sendFunc(entityGroup)
+						select {
+						case <-m.stopCh:
+							return
+						default:
+						}
 					}
 				default:
 					break drainEntity
@@ -555,6 +560,11 @@ func (m *metaCollector) sendInBackground() {
 					if len(linkGroup.Events) >= m.serviceK8sMeta.DrainBatchSize {
 						m.serviceK8sMeta.linkCount.Add(int64(len(linkGroup.Events)))
 						sendFunc(linkGroup)
+						select {
+						case <-m.stopCh:
+							return
+						default:
+						}
 					}
 				default:
 					break drainLink
