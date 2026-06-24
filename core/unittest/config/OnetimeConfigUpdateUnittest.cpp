@@ -245,12 +245,10 @@ void OnetimeConfigUpdateUnittest::OnCollectionConfigUpdate() const {
             CollectionPipelineManager::GetInstance()->UpdatePipelines(diff.first);
         }
         sConfigManager->DumpCheckpointFile();
-        const auto now = time(nullptr);
 
         APSARA_TEST_EQUAL(3U, sConfigManager->mConfigInfoMap.size());
         {
             const auto& item = sConfigManager->mConfigInfoMap.at("new_config");
-=======
             APSARA_TEST_EQUAL(
                 static_cast<uint32_t>(
                     std::chrono::duration_cast<std::chrono::seconds>(restartNow.time_since_epoch()).count())
@@ -262,7 +260,6 @@ void OnetimeConfigUpdateUnittest::OnCollectionConfigUpdate() const {
         }
         {
             const auto& item = sConfigManager->mConfigInfoMap.at("changed_config");
-=======
             APSARA_TEST_EQUAL(
                 static_cast<uint32_t>(
                     std::chrono::duration_cast<std::chrono::seconds>(restartNow.time_since_epoch()).count())
@@ -347,7 +344,6 @@ void OnetimeConfigUpdateUnittest::OnCollectionConfigUpdate() const {
             excutionTimeout[filenames[i]] = extractExcutionTimeout(root);
         }
 
-        const auto now = time(nullptr);
         auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
         APSARA_TEST_TRUE(diff.first.HasDiff());
         auto updateNow = std::chrono::system_clock::now();
@@ -360,7 +356,6 @@ void OnetimeConfigUpdateUnittest::OnCollectionConfigUpdate() const {
         APSARA_TEST_EQUAL(3U, sConfigManager->mConfigInfoMap.size());
         {
             const auto& item = sConfigManager->mConfigInfoMap.at("new_config");
-=======
             APSARA_TEST_EQUAL(
                 static_cast<uint32_t>(
                     std::chrono::duration_cast<std::chrono::seconds>(updateNow.time_since_epoch()).count())
@@ -372,7 +367,6 @@ void OnetimeConfigUpdateUnittest::OnCollectionConfigUpdate() const {
         }
         {
             const auto& item = sConfigManager->mConfigInfoMap.at("old_config");
-=======
             APSARA_TEST_EQUAL(
                 static_cast<uint32_t>(
                     std::chrono::duration_cast<std::chrono::seconds>(updateNow.time_since_epoch()).count())

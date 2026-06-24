@@ -233,7 +233,6 @@ void SelfMonitorServer::SendAlarms() {
                 }
             }
             AlarmManager::GetInstance()->DeleteAlarmFile();
-            return;
         }
     }
 
