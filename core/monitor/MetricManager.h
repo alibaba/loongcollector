@@ -20,6 +20,7 @@
 #include <vector>
 
 #include "common/Lock.h"
+#include "models/PipelineEventGroup.h"
 #include "monitor/metric_constants/MetricConstants.h"
 #include "monitor/metric_models/MetricRecord.h"
 #include "monitor/metric_models/SelfMonitorMetricEvent.h"
