@@ -273,6 +273,12 @@ void AlarmManager::SendAlarm(const AlarmType& alarmType,
         return;
     }
 
+    // 未映射/保留的告警类型 messageType 为空，直接丢弃
+    if (mMessageType[alarmType].empty()) {
+        LOG_ERROR(sLogger, ("alarm type is not mapped", static_cast<int32_t>(alarmType))("region", region));
+        return;
+    }
+
     if (projectName.empty()) {
         string projects = FlusherSLS::GetAllProjects();
         // 如果是进程级别的告警，可能有多个project，在记录的时候需要发送到每个project的region。
