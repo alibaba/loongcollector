@@ -67,7 +67,7 @@ void OpenSSLThreadSupportUnittest::TestConcurrentErrorStateNoCrash() {
     std::vector<std::thread> workers;
     workers.reserve(kThreadCount);
     for (int i = 0; i < kThreadCount; ++i) {
-        workers.emplace_back([&finished]() {
+        workers.emplace_back([&finished, kIterations]() {
             for (int j = 0; j < kIterations; ++j) {
                 // Touch the global per-thread error-state hash (insert path).
                 ERR_put_error(ERR_LIB_SYS, 0, 1, "OpenSSLThreadSupportUnittest", 0);
