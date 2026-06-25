@@ -87,10 +87,12 @@ func (p *Encoder) EncodeV2(groupEvents *models.PipelineGroupEvents) ([][]byte, e
 			continue
 		}
 
-		wr.Timeseries = append(wr.Timeseries, genPromRemoteWriteTimeseries(metricEvent))
-		if len(wr.Timeseries) >= p.SeriesLimit {
-			res = append(res, marshalBatchTimeseriesData(wr))
-			wr.Timeseries = wr.Timeseries[:0]
+		for _, ts := range genPromRemoteWriteTimeseries(metricEvent) {
+			wr.Timeseries = append(wr.Timeseries, ts)
+			if len(wr.Timeseries) >= p.SeriesLimit {
+				res = append(res, marshalBatchTimeseriesData(wr))
+				wr.Timeseries = wr.Timeseries[:0]
+			}
 		}
 	}
 

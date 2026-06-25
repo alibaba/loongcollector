@@ -53,6 +53,13 @@ func StartDockerComposeEnv(ctx context.Context, dependencyName string) (context.
 		startTime := time.Now().Unix()
 		if err = dockerComposeEnv.BootController.Start(ctx); err != nil {
 			logger.Error(ctx, selfmonitor.BootStartAlarm, "err", err)
+			dockercompose.TryCopyCoreLogs()
+			return ctx, err
+		}
+		ctx, err = SetAgentPID(ctx)
+		if err != nil {
+			logger.Error(ctx, selfmonitor.BootStartAlarm, "err", err, "stage", "set_agent_pid")
+			dockercompose.TryCopyCoreLogs()
 			return ctx, err
 		}
 		return context.WithValue(ctx, config.StartTimeContextKey, int32(startTime)), nil
@@ -125,7 +132,11 @@ func (d *DockerComposeEnv) GetData() (*protocol.LogGroup, error) {
 }
 
 func (d *DockerComposeEnv) Clean() error {
-	d.BootController.Clean()
+	if d.BootController != nil {
+		d.BootController.Clean()
+	} else {
+		_ = dockercompose.ShutDown()
+	}
 	return nil
 }
 

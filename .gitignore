@@ -61,6 +61,7 @@ _deps
 # Custom
 /build/
 core/build/
+core/build-ut/
 *.pb.*
 core/common/Version.cpp
 !/Makefile

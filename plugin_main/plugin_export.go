@@ -200,19 +200,8 @@ func UnloadPipeline(configName string) int {
 	return 0
 }
 
-//export ProcessLog
-func ProcessLog(configName string, logBytes []byte, packID string, topic string, tags []byte) int {
-	pluginmanager.LogtailConfigLock.RLock()
-	config, flag := pluginmanager.LogtailConfig[configName]
-	if !flag {
-		return -1
-	}
-	pluginmanager.LogtailConfigLock.RUnlock()
-	return config.ProcessLog(logBytes, util.StringDeepCopy(packID), util.StringDeepCopy(topic), tags)
-}
-
-//export ProcessLogGroup
-func ProcessLogGroup(configName string, logBytes []byte, packID string) int {
+//export ProcessPipelineEventGroup
+func ProcessPipelineEventGroup(configName string, pbBytes []byte, packID string) int {
 	pluginmanager.LogtailConfigLock.RLock()
 	config, flag := pluginmanager.LogtailConfig[configName]
 	pluginmanager.LogtailConfigLock.RUnlock()
@@ -220,7 +209,7 @@ func ProcessLogGroup(configName string, logBytes []byte, packID string) int {
 		logger.Critical(context.Background(), selfmonitor.PluginAlarm, "config not found", configName)
 		return -1
 	}
-	return config.ProcessLogGroup(logBytes, util.StringDeepCopy(packID))
+	return config.ProcessPipelineEventGroup(pbBytes, util.StringDeepCopy(packID))
 }
 
 //export StopAllPipelines

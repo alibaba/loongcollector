@@ -156,8 +156,7 @@ typedef void (*StopBuiltInModulesFun)();
 typedef void (*StartFun)(GoString);
 typedef GoInt (*InitPluginBaseFun)();
 typedef GoInt (*InitPluginBaseV2Fun)(GoString cfg);
-typedef GoInt (*ProcessLogsFun)(GoString c, GoSlice l, GoString p, GoString t, GoSlice tags);
-typedef GoInt (*ProcessLogGroupFun)(GoString c, GoSlice l, GoString p);
+typedef GoInt (*ProcessPipelineEventGroupFun)(GoString c, GoSlice l, GoString p);
 typedef struct innerContainerMeta* (*GetContainerMetaFun)(GoString containerID);
 typedef char* (*GetAllContainerMetaFun)();
 typedef char* (*GetDiffContainerMetaFun)();
@@ -226,13 +225,9 @@ public:
 
     bool IsPluginOpened() { return mPluginValid; }
 
-    void ProcessLog(const std::string& configName,
-                    sls_logs::Log& log,
-                    const std::string& packId,
-                    const std::string& topic,
-                    const std::string& tags);
-
-    void ProcessLogGroup(const std::string& configName, const std::string& logGroup, const std::string& packId);
+    void ProcessPipelineEventGroup(const std::string& configName,
+                                   const std::string& pipelineEventGroup,
+                                   const std::string& packId);
 
     static int IsValidToSend(long long logstoreKey);
 
@@ -278,8 +273,7 @@ private:
     StartFun mStartFun;
     volatile bool mPluginValid;
     logtail::FlusherSLS mPluginContainerConfig;
-    ProcessLogsFun mProcessLogsFun;
-    ProcessLogGroupFun mProcessLogGroupFun;
+    ProcessPipelineEventGroupFun mProcessPipelineEventGroupFun;
     GetContainerMetaFun mGetContainerMetaFun;
     GetAllContainerMetaFun mGetAllContainerMetaFun;
     GetDiffContainerMetaFun mGetDiffContainerMetaFun;

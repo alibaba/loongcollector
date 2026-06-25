@@ -152,6 +152,8 @@ jobs:
       - name: E2E Behavior Test Case ${{ matrix.test_case }}
         env:
           TEST_CASE: ${{ matrix.test_case }}
+          DOCKER_BUILDKIT: "0"
+          COMPOSE_DOCKER_CLI_BUILD: "0"
         run: |
           ./scripts/e2e.sh e2e
 
