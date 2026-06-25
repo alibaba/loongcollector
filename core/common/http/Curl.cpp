@@ -23,6 +23,8 @@
 #include <winsock2.h>
 #endif
 
+#include <openssl/crypto.h>
+
 #include <map>
 #include <string>
 
@@ -32,10 +34,80 @@
 #include "common/http/HttpRequest.h"
 #include "common/http/HttpResponse.h"
 #include "logger/Logger.h"
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+#include <openssl/err.h>
+
+#include <mutex>
+#include <vector>
+
+#if defined(_MSC_VER)
+#include <windows.h>
+#else
+#include <pthread.h>
+#endif
+#endif
 
 using namespace std;
 
 namespace logtail {
+
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+namespace {
+
+// One mutex per OpenSSL static lock id. Allocated lazily and kept alive for the
+// whole process lifetime (intentionally never freed) so the locking callback
+// stays valid even during late destruction of other globals.
+std::vector<std::mutex>& GetOpenSSLMutexes() {
+    static std::vector<std::mutex> sMutexes(CRYPTO_num_locks() > 0 ? CRYPTO_num_locks() : 1);
+    return sMutexes;
+}
+
+void OpenSSLLockingCallback(int mode, int type, const char* /*file*/, int /*line*/) {
+    auto& mutexes = GetOpenSSLMutexes();
+    if (type < 0 || static_cast<size_t>(type) >= mutexes.size()) {
+        return;
+    }
+    if (mode & CRYPTO_LOCK) {
+        mutexes[type].lock();
+    } else {
+        mutexes[type].unlock();
+    }
+}
+
+void OpenSSLThreadIdCallback(CRYPTO_THREADID* id) {
+#if defined(_MSC_VER)
+    CRYPTO_THREADID_set_numeric(id, static_cast<unsigned long>(GetCurrentThreadId()));
+#else
+    CRYPTO_THREADID_set_numeric(id, static_cast<unsigned long>(pthread_self()));
+#endif
+}
+
+} // namespace
+
+void SetupOpenSSLThreadSupport() {
+    static std::once_flag sOnceFlag;
+    std::call_once(sOnceFlag, []() {
+        // Ensure the mutex array exists before the callback becomes visible to
+        // other threads.
+        GetOpenSSLMutexes();
+        // Do not override callbacks that another linked component (e.g. folly)
+        // may have already installed; any valid callback is sufficient.
+        if (CRYPTO_get_locking_callback() == nullptr) {
+            CRYPTO_set_locking_callback(OpenSSLLockingCallback);
+        }
+        if (CRYPTO_THREADID_get_callback() == nullptr) {
+            CRYPTO_THREADID_set_callback(OpenSSLThreadIdCallback);
+        }
+    });
+}
+
+#else // OPENSSL_VERSION_NUMBER >= 0x10100000L
+
+// OpenSSL >= 1.1.0 manages thread safety internally; nothing to register.
+void SetupOpenSSLThreadSupport() {
+}
+
+#endif
 
 NetworkCode GetNetworkStatus(CURLcode code) {
     // please refer to https://curl.se/libcurl/c/libcurl-errors.html
