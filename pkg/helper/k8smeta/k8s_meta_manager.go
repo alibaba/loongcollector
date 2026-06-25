@@ -28,10 +28,11 @@ type MetaCache interface {
 	GetQueueSize() int
 	List() []*ObjectWrapper
 	Filter(filterFunc func(*ObjectWrapper) bool, limit int) []*ObjectWrapper
-	RegisterSendFunc(key string, sendFunc SendFunc, interval int)
+	RegisterSendFunc(key string, sendFunc SendFunc, interval int, eventChSize int, drainBatch int)
 	UnRegisterSendFunc(key string)
 	init(*kubernetes.Clientset)
 	watch(stopCh <-chan struct{})
+	ensureWatchStarted()
 }
 
 type FlushCh struct {
@@ -211,7 +212,7 @@ func (m *MetaManager) IsReady() bool {
 	return m.ready.Load()
 }
 
-func (m *MetaManager) RegisterSendFunc(projectName, configName, resourceType string, sendFunc SendFunc, interval int) {
+func (m *MetaManager) RegisterSendFunc(projectName, configName, resourceType string, sendFunc SendFunc, interval int, eventChSize int, drainBatch int) {
 	m.cacheMu.RLock()
 	cache, ok := m.cacheMap[resourceType]
 	m.cacheMu.RUnlock()
@@ -229,7 +230,7 @@ func (m *MetaManager) RegisterSendFunc(projectName, configName, resourceType str
 				}
 			}
 			m.registerLock.RUnlock()
-		}, interval)
+		}, interval, eventChSize, drainBatch)
 		m.registerLock.Lock()
 		if cnt, ok := m.projectNames[projectName]; ok {
 			m.projectNames[projectName] = cnt + 1
@@ -241,6 +242,7 @@ func (m *MetaManager) RegisterSendFunc(projectName, configName, resourceType str
 	}
 	// register link
 	if !isEntity(resourceType) {
+		m.ensureLinkDependenciesStarted(resourceType)
 		m.registerLock.Lock()
 		if _, ok := m.linkRegisterMap[configName]; !ok {
 			m.linkRegisterMap[configName] = make([]string, 0)
@@ -319,6 +321,46 @@ func GetMetaManagerMetrics() []map[string]string {
 
 	return []map[string]string{
 		manager.metricRecord.ExportMetricRecords(),
+	}
+}
+
+var linkCacheDependencies = map[string][]string{
+	POD_NODE:                        {NODE},
+	POD_DEPLOYMENT:                  {REPLICASET, DEPLOYMENT},
+	POD_REPLICASET:                  {REPLICASET},
+	REPLICASET_DEPLOYMENT:           {DEPLOYMENT},
+	POD_STATEFULSET:                 {STATEFULSET},
+	POD_DAEMONSET:                   {DAEMONSET},
+	POD_JOB:                         {JOB},
+	JOB_CRONJOB:                     {CRONJOB},
+	POD_PERSISENTVOLUMECLAIN:        {PERSISTENTVOLUMECLAIM},
+	POD_CONFIGMAP:                   {CONFIGMAP},
+	POD_SERVICE:                     {SERVICE},
+	POD_CONTAINER:                   {},
+	INGRESS_SERVICE:                 {SERVICE},
+	POD_NAMESPACE:                   {NAMESPACE},
+	SERVICE_NAMESPACE:               {NAMESPACE},
+	DEPLOYMENT_NAMESPACE:            {NAMESPACE},
+	DAEMONSET_NAMESPACE:             {NAMESPACE},
+	STATEFULSET_NAMESPACE:           {NAMESPACE},
+	CONFIGMAP_NAMESPACE:             {NAMESPACE},
+	JOB_NAMESPACE:                   {NAMESPACE},
+	CRONJOB_NAMESPACE:               {NAMESPACE},
+	PERSISTENTVOLUMECLAIM_NAMESPACE: {NAMESPACE},
+	INGRESS_NAMESPACE:               {NAMESPACE},
+}
+
+func (m *MetaManager) ensureLinkDependenciesStarted(linkType string) {
+	deps, ok := linkCacheDependencies[linkType]
+	if !ok {
+		return
+	}
+	m.cacheMu.RLock()
+	defer m.cacheMu.RUnlock()
+	for _, dep := range deps {
+		if cache, ok := m.cacheMap[dep]; ok {
+			cache.ensureWatchStarted()
+		}
 	}
 }
 

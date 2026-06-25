@@ -3,6 +3,7 @@ package kubernetesmetav2
 import (
 	"context"
 	"encoding/json"
+	"sync/atomic"
 
 	// #nosec G501
 	"crypto/md5"
@@ -30,6 +31,8 @@ type metaCollector struct {
 	entityLinkBuffer chan models.PipelineEvent
 
 	stopCh          chan struct{}
+	dropCount       uint64
+	bufferSize      int
 	entityProcessor map[string]ProcessFunc
 	crConfigs       map[string]k8smeta.CustomResourceCollectorConfig
 }
@@ -130,135 +133,216 @@ func (m *metaCollector) Start() error {
 		m.serviceK8sMeta.metaManager.EnsureCustomResourceInformerStarted(cfg.EntityType)
 	}
 
+	// scale buffer size by the number of registered resource types,
+	// since all types share the same entityBuffer/entityLinkBuffer
+	resourceTypeCount := m.countResourceTypes()
+	if resourceTypeCount < 1 {
+		resourceTypeCount = 1
+	}
+	if m.serviceK8sMeta.EventBufferSize < 1 {
+		m.serviceK8sMeta.EventBufferSize = 10000
+	}
+	if m.serviceK8sMeta.MaxBufferSize < 1 {
+		m.serviceK8sMeta.MaxBufferSize = 200000
+	}
+	if m.serviceK8sMeta.DrainBatchSize < 1 {
+		m.serviceK8sMeta.DrainBatchSize = 2000
+	}
+	bufferSize := m.serviceK8sMeta.EventBufferSize * resourceTypeCount
+	if bufferSize > m.serviceK8sMeta.MaxBufferSize {
+		bufferSize = m.serviceK8sMeta.MaxBufferSize
+	}
+	m.bufferSize = bufferSize
+	m.entityBuffer = make(chan models.PipelineEvent, bufferSize)
+	m.entityLinkBuffer = make(chan models.PipelineEvent, bufferSize)
+
 	if m.serviceK8sMeta.Pod {
-		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.POD, m.handleEvent, m.serviceK8sMeta.Interval)
+		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.POD, m.handleEvent, m.serviceK8sMeta.Interval, m.serviceK8sMeta.EventBufferSize, m.serviceK8sMeta.DrainBatchSize)
 	}
 	if m.serviceK8sMeta.Node {
-		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.NODE, m.handleEvent, m.serviceK8sMeta.Interval)
+		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.NODE, m.handleEvent, m.serviceK8sMeta.Interval, m.serviceK8sMeta.EventBufferSize, m.serviceK8sMeta.DrainBatchSize)
 	}
 	if m.serviceK8sMeta.Service {
-		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.SERVICE, m.handleEvent, m.serviceK8sMeta.Interval)
+		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.SERVICE, m.handleEvent, m.serviceK8sMeta.Interval, m.serviceK8sMeta.EventBufferSize, m.serviceK8sMeta.DrainBatchSize)
 	}
 	if m.serviceK8sMeta.Deployment {
-		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.DEPLOYMENT, m.handleEvent, m.serviceK8sMeta.Interval)
+		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.DEPLOYMENT, m.handleEvent, m.serviceK8sMeta.Interval, m.serviceK8sMeta.EventBufferSize, m.serviceK8sMeta.DrainBatchSize)
 	}
 	if m.serviceK8sMeta.ReplicaSet {
-		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.REPLICASET, m.handleEvent, m.serviceK8sMeta.Interval)
+		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.REPLICASET, m.handleEvent, m.serviceK8sMeta.Interval, m.serviceK8sMeta.EventBufferSize, m.serviceK8sMeta.DrainBatchSize)
 	}
 	if m.serviceK8sMeta.DaemonSet {
-		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.DAEMONSET, m.handleEvent, m.serviceK8sMeta.Interval)
+		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.DAEMONSET, m.handleEvent, m.serviceK8sMeta.Interval, m.serviceK8sMeta.EventBufferSize, m.serviceK8sMeta.DrainBatchSize)
 	}
 	if m.serviceK8sMeta.StatefulSet {
-		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.STATEFULSET, m.handleEvent, m.serviceK8sMeta.Interval)
+		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.STATEFULSET, m.handleEvent, m.serviceK8sMeta.Interval, m.serviceK8sMeta.EventBufferSize, m.serviceK8sMeta.DrainBatchSize)
 	}
 	if m.serviceK8sMeta.Configmap {
-		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.CONFIGMAP, m.handleEvent, m.serviceK8sMeta.Interval)
+		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.CONFIGMAP, m.handleEvent, m.serviceK8sMeta.Interval, m.serviceK8sMeta.EventBufferSize, m.serviceK8sMeta.DrainBatchSize)
 	}
 	if m.serviceK8sMeta.Job {
-		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.JOB, m.handleEvent, m.serviceK8sMeta.Interval)
+		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.JOB, m.handleEvent, m.serviceK8sMeta.Interval, m.serviceK8sMeta.EventBufferSize, m.serviceK8sMeta.DrainBatchSize)
 	}
 	if m.serviceK8sMeta.CronJob {
-		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.CRONJOB, m.handleEvent, m.serviceK8sMeta.Interval)
+		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.CRONJOB, m.handleEvent, m.serviceK8sMeta.Interval, m.serviceK8sMeta.EventBufferSize, m.serviceK8sMeta.DrainBatchSize)
 	}
 	if m.serviceK8sMeta.Namespace {
-		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.NAMESPACE, m.handleEvent, m.serviceK8sMeta.Interval)
+		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.NAMESPACE, m.handleEvent, m.serviceK8sMeta.Interval, m.serviceK8sMeta.EventBufferSize, m.serviceK8sMeta.DrainBatchSize)
 	}
 	if m.serviceK8sMeta.PersistentVolume {
-		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.PERSISTENTVOLUME, m.handleEvent, m.serviceK8sMeta.Interval)
+		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.PERSISTENTVOLUME, m.handleEvent, m.serviceK8sMeta.Interval, m.serviceK8sMeta.EventBufferSize, m.serviceK8sMeta.DrainBatchSize)
 	}
 	if m.serviceK8sMeta.PersistentVolumeClaim {
-		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.PERSISTENTVOLUMECLAIM, m.handleEvent, m.serviceK8sMeta.Interval)
+		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.PERSISTENTVOLUMECLAIM, m.handleEvent, m.serviceK8sMeta.Interval, m.serviceK8sMeta.EventBufferSize, m.serviceK8sMeta.DrainBatchSize)
 	}
 	if m.serviceK8sMeta.StorageClass {
-		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.STORAGECLASS, m.handleEvent, m.serviceK8sMeta.Interval)
+		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.STORAGECLASS, m.handleEvent, m.serviceK8sMeta.Interval, m.serviceK8sMeta.EventBufferSize, m.serviceK8sMeta.DrainBatchSize)
 	}
 	if m.serviceK8sMeta.Ingress {
-		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.INGRESS, m.handleEvent, m.serviceK8sMeta.Interval)
+		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.INGRESS, m.handleEvent, m.serviceK8sMeta.Interval, m.serviceK8sMeta.EventBufferSize, m.serviceK8sMeta.DrainBatchSize)
 	}
 	for entityType, cfg := range m.crConfigs {
 		if cfg.CollectEntity {
-			m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, entityType, m.handleEvent, m.serviceK8sMeta.Interval)
+			m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, entityType, m.handleEvent, m.serviceK8sMeta.Interval, m.serviceK8sMeta.EventBufferSize, m.serviceK8sMeta.DrainBatchSize)
 		}
 		if m.serviceK8sMeta.Pod && cfg.PodLink != nil && cfg.Entity2PodRelation != "" {
-			m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.PodLinkTypeForEntity(entityType), m.handleEvent, m.serviceK8sMeta.Interval)
+			m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.PodLinkTypeForEntity(entityType), m.handleEvent, m.serviceK8sMeta.Interval, m.serviceK8sMeta.EventBufferSize, m.serviceK8sMeta.DrainBatchSize)
 		}
 		if m.serviceK8sMeta.Namespace && cfg.CollectEntity && cfg.Namespace2EntityRelation != "" {
-			m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.NamespaceLinkTypeForEntity(entityType), m.handleEvent, m.serviceK8sMeta.Interval)
+			m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.NamespaceLinkTypeForEntity(entityType), m.handleEvent, m.serviceK8sMeta.Interval, m.serviceK8sMeta.EventBufferSize, m.serviceK8sMeta.DrainBatchSize)
 		}
 	}
 
 	if m.serviceK8sMeta.Pod && m.serviceK8sMeta.Node && m.serviceK8sMeta.Node2Pod != "" {
-		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.POD_NODE, m.handleEvent, m.serviceK8sMeta.Interval)
+		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.POD_NODE, m.handleEvent, m.serviceK8sMeta.Interval, m.serviceK8sMeta.EventBufferSize, m.serviceK8sMeta.DrainBatchSize)
 	}
 	if m.serviceK8sMeta.Deployment && m.serviceK8sMeta.Pod && m.serviceK8sMeta.Deployment2Pod != "" {
-		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.POD_DEPLOYMENT, m.handleEvent, m.serviceK8sMeta.Interval)
+		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.POD_DEPLOYMENT, m.handleEvent, m.serviceK8sMeta.Interval, m.serviceK8sMeta.EventBufferSize, m.serviceK8sMeta.DrainBatchSize)
 	}
 	if m.serviceK8sMeta.ReplicaSet && m.serviceK8sMeta.Pod && m.serviceK8sMeta.ReplicaSet2Pod != "" {
-		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.POD_REPLICASET, m.handleEvent, m.serviceK8sMeta.Interval)
+		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.POD_REPLICASET, m.handleEvent, m.serviceK8sMeta.Interval, m.serviceK8sMeta.EventBufferSize, m.serviceK8sMeta.DrainBatchSize)
 	}
 	if m.serviceK8sMeta.Deployment && m.serviceK8sMeta.ReplicaSet && m.serviceK8sMeta.Deployment2ReplicaSet != "" {
-		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.REPLICASET_DEPLOYMENT, m.handleEvent, m.serviceK8sMeta.Interval)
+		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.REPLICASET_DEPLOYMENT, m.handleEvent, m.serviceK8sMeta.Interval, m.serviceK8sMeta.EventBufferSize, m.serviceK8sMeta.DrainBatchSize)
 	}
 	if m.serviceK8sMeta.StatefulSet && m.serviceK8sMeta.Pod && m.serviceK8sMeta.StatefulSet2Pod != "" {
-		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.POD_STATEFULSET, m.handleEvent, m.serviceK8sMeta.Interval)
+		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.POD_STATEFULSET, m.handleEvent, m.serviceK8sMeta.Interval, m.serviceK8sMeta.EventBufferSize, m.serviceK8sMeta.DrainBatchSize)
 	}
 	if m.serviceK8sMeta.DaemonSet && m.serviceK8sMeta.Pod && m.serviceK8sMeta.DaemonSet2Pod != "" {
-		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.POD_DAEMONSET, m.handleEvent, m.serviceK8sMeta.Interval)
+		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.POD_DAEMONSET, m.handleEvent, m.serviceK8sMeta.Interval, m.serviceK8sMeta.EventBufferSize, m.serviceK8sMeta.DrainBatchSize)
 	}
 	if m.serviceK8sMeta.CronJob && m.serviceK8sMeta.Job && m.serviceK8sMeta.CronJob2Job != "" {
-		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.JOB_CRONJOB, m.handleEvent, m.serviceK8sMeta.Interval)
+		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.JOB_CRONJOB, m.handleEvent, m.serviceK8sMeta.Interval, m.serviceK8sMeta.EventBufferSize, m.serviceK8sMeta.DrainBatchSize)
 	}
 	if m.serviceK8sMeta.Job && m.serviceK8sMeta.Pod && m.serviceK8sMeta.Job2Pod != "" {
-		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.POD_JOB, m.handleEvent, m.serviceK8sMeta.Interval)
+		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.POD_JOB, m.handleEvent, m.serviceK8sMeta.Interval, m.serviceK8sMeta.EventBufferSize, m.serviceK8sMeta.DrainBatchSize)
 	}
 	if m.serviceK8sMeta.Pod && m.serviceK8sMeta.PersistentVolumeClaim && m.serviceK8sMeta.Pod2PersistentVolumeClaim != "" {
-		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.POD_PERSISENTVOLUMECLAIN, m.handleEvent, m.serviceK8sMeta.Interval)
+		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.POD_PERSISENTVOLUMECLAIN, m.handleEvent, m.serviceK8sMeta.Interval, m.serviceK8sMeta.EventBufferSize, m.serviceK8sMeta.DrainBatchSize)
 	}
 	if m.serviceK8sMeta.Pod && m.serviceK8sMeta.Configmap && m.serviceK8sMeta.Pod2ConfigMap != "" {
-		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.POD_CONFIGMAP, m.handleEvent, m.serviceK8sMeta.Interval)
+		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.POD_CONFIGMAP, m.handleEvent, m.serviceK8sMeta.Interval, m.serviceK8sMeta.EventBufferSize, m.serviceK8sMeta.DrainBatchSize)
 	}
 	if m.serviceK8sMeta.Service && m.serviceK8sMeta.Pod && m.serviceK8sMeta.Service2Pod != "" {
-		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.POD_SERVICE, m.handleEvent, m.serviceK8sMeta.Interval)
+		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.POD_SERVICE, m.handleEvent, m.serviceK8sMeta.Interval, m.serviceK8sMeta.EventBufferSize, m.serviceK8sMeta.DrainBatchSize)
 	}
 	if m.serviceK8sMeta.Pod && m.serviceK8sMeta.Container && m.serviceK8sMeta.Pod2Container != "" {
-		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.POD_CONTAINER, m.handleEvent, m.serviceK8sMeta.Interval)
+		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.POD_CONTAINER, m.handleEvent, m.serviceK8sMeta.Interval, m.serviceK8sMeta.EventBufferSize, m.serviceK8sMeta.DrainBatchSize)
 	}
 	if m.serviceK8sMeta.Ingress && m.serviceK8sMeta.Service && m.serviceK8sMeta.Ingress2Service != "" {
-		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.INGRESS_SERVICE, m.handleEvent, m.serviceK8sMeta.Interval)
+		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.INGRESS_SERVICE, m.handleEvent, m.serviceK8sMeta.Interval, m.serviceK8sMeta.EventBufferSize, m.serviceK8sMeta.DrainBatchSize)
 	}
 	if m.serviceK8sMeta.Namespace && m.serviceK8sMeta.Pod && m.serviceK8sMeta.Namespace2Pod != "" {
-		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.POD_NAMESPACE, m.handleEvent, m.serviceK8sMeta.Interval)
+		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.POD_NAMESPACE, m.handleEvent, m.serviceK8sMeta.Interval, m.serviceK8sMeta.EventBufferSize, m.serviceK8sMeta.DrainBatchSize)
 	}
 	if m.serviceK8sMeta.Namespace && m.serviceK8sMeta.Service && m.serviceK8sMeta.Namespace2Service != "" {
-		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.SERVICE_NAMESPACE, m.handleEvent, m.serviceK8sMeta.Interval)
+		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.SERVICE_NAMESPACE, m.handleEvent, m.serviceK8sMeta.Interval, m.serviceK8sMeta.EventBufferSize, m.serviceK8sMeta.DrainBatchSize)
 	}
 	if m.serviceK8sMeta.Namespace && m.serviceK8sMeta.Deployment && m.serviceK8sMeta.Namespace2Deployment != "" {
-		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.DEPLOYMENT_NAMESPACE, m.handleEvent, m.serviceK8sMeta.Interval)
+		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.DEPLOYMENT_NAMESPACE, m.handleEvent, m.serviceK8sMeta.Interval, m.serviceK8sMeta.EventBufferSize, m.serviceK8sMeta.DrainBatchSize)
 	}
 	if m.serviceK8sMeta.Namespace && m.serviceK8sMeta.DaemonSet && m.serviceK8sMeta.Namespace2DaemonSet != "" {
-		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.DAEMONSET_NAMESPACE, m.handleEvent, m.serviceK8sMeta.Interval)
+		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.DAEMONSET_NAMESPACE, m.handleEvent, m.serviceK8sMeta.Interval, m.serviceK8sMeta.EventBufferSize, m.serviceK8sMeta.DrainBatchSize)
 	}
 	if m.serviceK8sMeta.Namespace && m.serviceK8sMeta.StatefulSet && m.serviceK8sMeta.Namespace2StatefulSet != "" {
-		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.STATEFULSET_NAMESPACE, m.handleEvent, m.serviceK8sMeta.Interval)
+		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.STATEFULSET_NAMESPACE, m.handleEvent, m.serviceK8sMeta.Interval, m.serviceK8sMeta.EventBufferSize, m.serviceK8sMeta.DrainBatchSize)
 	}
 	if m.serviceK8sMeta.Namespace && m.serviceK8sMeta.Configmap && m.serviceK8sMeta.Namespace2Configmap != "" {
-		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.CONFIGMAP_NAMESPACE, m.handleEvent, m.serviceK8sMeta.Interval)
+		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.CONFIGMAP_NAMESPACE, m.handleEvent, m.serviceK8sMeta.Interval, m.serviceK8sMeta.EventBufferSize, m.serviceK8sMeta.DrainBatchSize)
 	}
 	if m.serviceK8sMeta.Namespace && m.serviceK8sMeta.Job && m.serviceK8sMeta.Namespace2Job != "" {
-		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.JOB_NAMESPACE, m.handleEvent, m.serviceK8sMeta.Interval)
+		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.JOB_NAMESPACE, m.handleEvent, m.serviceK8sMeta.Interval, m.serviceK8sMeta.EventBufferSize, m.serviceK8sMeta.DrainBatchSize)
 	}
 	if m.serviceK8sMeta.Namespace && m.serviceK8sMeta.CronJob && m.serviceK8sMeta.Namespace2CronJob != "" {
-		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.CRONJOB_NAMESPACE, m.handleEvent, m.serviceK8sMeta.Interval)
+		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.CRONJOB_NAMESPACE, m.handleEvent, m.serviceK8sMeta.Interval, m.serviceK8sMeta.EventBufferSize, m.serviceK8sMeta.DrainBatchSize)
 	}
 	if m.serviceK8sMeta.Namespace && m.serviceK8sMeta.PersistentVolumeClaim && m.serviceK8sMeta.Namespace2PersistentVolumeClaim != "" {
-		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.PERSISTENTVOLUMECLAIM_NAMESPACE, m.handleEvent, m.serviceK8sMeta.Interval)
+		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.PERSISTENTVOLUMECLAIM_NAMESPACE, m.handleEvent, m.serviceK8sMeta.Interval, m.serviceK8sMeta.EventBufferSize, m.serviceK8sMeta.DrainBatchSize)
 	}
 	if m.serviceK8sMeta.Namespace && m.serviceK8sMeta.Ingress && m.serviceK8sMeta.Namespace2Ingress != "" {
-		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.INGRESS_NAMESPACE, m.handleEvent, m.serviceK8sMeta.Interval)
+		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.INGRESS_NAMESPACE, m.handleEvent, m.serviceK8sMeta.Interval, m.serviceK8sMeta.EventBufferSize, m.serviceK8sMeta.DrainBatchSize)
 	}
 
 	go m.sendInBackground()
 	return nil
+}
+
+// countResourceTypes returns the number of enabled entity and link types
+// (including custom resources). Used to scale shared buffer sizes, since all
+// types produce into the same entityBuffer/entityLinkBuffer.
+func (m *metaCollector) countResourceTypes() int {
+	s := m.serviceK8sMeta
+	count := 0
+	bools := []bool{s.Pod, s.Node, s.Service, s.Deployment, s.ReplicaSet, s.DaemonSet,
+		s.StatefulSet, s.Configmap, s.Job, s.CronJob, s.Namespace,
+		s.PersistentVolume, s.PersistentVolumeClaim, s.StorageClass, s.Ingress}
+	for _, b := range bools {
+		if b {
+			count++
+		}
+	}
+	links := []bool{
+		s.Pod && s.Node && s.Node2Pod != "",
+		s.Deployment && s.Pod && s.Deployment2Pod != "",
+		s.ReplicaSet && s.Pod && s.ReplicaSet2Pod != "",
+		s.Deployment && s.ReplicaSet && s.Deployment2ReplicaSet != "",
+		s.StatefulSet && s.Pod && s.StatefulSet2Pod != "",
+		s.DaemonSet && s.Pod && s.DaemonSet2Pod != "",
+		s.CronJob && s.Job && s.CronJob2Job != "",
+		s.Job && s.Pod && s.Job2Pod != "",
+		s.Pod && s.PersistentVolumeClaim && s.Pod2PersistentVolumeClaim != "",
+		s.Pod && s.Configmap && s.Pod2ConfigMap != "",
+		s.Service && s.Pod && s.Service2Pod != "",
+		s.Pod && s.Container && s.Pod2Container != "",
+		s.Ingress && s.Service && s.Ingress2Service != "",
+		s.Namespace && s.Pod && s.Namespace2Pod != "",
+		s.Namespace && s.Service && s.Namespace2Service != "",
+		s.Namespace && s.Deployment && s.Namespace2Deployment != "",
+		s.Namespace && s.DaemonSet && s.Namespace2DaemonSet != "",
+		s.Namespace && s.StatefulSet && s.Namespace2StatefulSet != "",
+		s.Namespace && s.Configmap && s.Namespace2Configmap != "",
+		s.Namespace && s.Job && s.Namespace2Job != "",
+		s.Namespace && s.CronJob && s.Namespace2CronJob != "",
+		s.Namespace && s.PersistentVolumeClaim && s.Namespace2PersistentVolumeClaim != "",
+		s.Namespace && s.Ingress && s.Namespace2Ingress != "",
+	}
+	for _, b := range links {
+		if b {
+			count++
+		}
+	}
+	for _, cfg := range m.crConfigs {
+		if cfg.CollectEntity {
+			count++
+		}
+		if s.Pod && cfg.PodLink != nil && cfg.Entity2PodRelation != "" {
+			count++
+		}
+		if s.Namespace && cfg.CollectEntity && cfg.Namespace2EntityRelation != "" {
+			count++
+		}
+	}
+	return count
 }
 
 func (m *metaCollector) Stop() error {
@@ -401,8 +485,12 @@ func (m *metaCollector) send(event models.PipelineEvent, entity bool) {
 	}
 	select {
 	case buffer <- event:
-	case <-time.After(3 * time.Second):
-		logger.Warning(context.Background(), k8smeta.K8sMetaUnifyErrorCode, "send event timeout, isEntity", entity)
+	default:
+		count := atomic.AddUint64(&m.dropCount, 1)
+		if count == 1 || count%1000 == 0 {
+			logger.Warning(context.Background(), k8smeta.K8sMetaUnifyErrorCode,
+				"send buffer full, events dropped", "total_dropped", count, "isEntity", entity)
+		}
 	}
 }
 
@@ -422,21 +510,72 @@ func (m *metaCollector) sendInBackground() {
 	// send cluster entity as soon as k8s meta collector started
 	m.sendClusterEntity()
 
+	flushTimer := time.NewTimer(3 * time.Second)
+	defer flushTimer.Stop()
+
 	for {
 		select {
 		case e := <-m.entityBuffer:
 			entityGroup.Events = append(entityGroup.Events, e)
-			if len(entityGroup.Events) >= 100 {
+			if len(entityGroup.Events) >= m.serviceK8sMeta.DrainBatchSize {
 				m.serviceK8sMeta.entityCount.Add(int64(len(entityGroup.Events)))
 				sendFunc(entityGroup)
 			}
+			n := len(m.entityBuffer)
+		drainEntity:
+			for i := 0; i < n && i < m.bufferSize; i++ {
+				select {
+				case e := <-m.entityBuffer:
+					entityGroup.Events = append(entityGroup.Events, e)
+					if len(entityGroup.Events) >= m.serviceK8sMeta.DrainBatchSize {
+						m.serviceK8sMeta.entityCount.Add(int64(len(entityGroup.Events)))
+						sendFunc(entityGroup)
+						select {
+						case <-m.stopCh:
+							return
+						default:
+						}
+					}
+				default:
+					break drainEntity
+				}
+			}
+			if len(entityGroup.Events) > 0 {
+				m.serviceK8sMeta.entityCount.Add(int64(len(entityGroup.Events)))
+				sendFunc(entityGroup)
+			}
+
 		case e := <-m.entityLinkBuffer:
 			linkGroup.Events = append(linkGroup.Events, e)
-			if len(linkGroup.Events) >= 100 {
+			if len(linkGroup.Events) >= m.serviceK8sMeta.DrainBatchSize {
 				m.serviceK8sMeta.linkCount.Add(int64(len(linkGroup.Events)))
 				sendFunc(linkGroup)
 			}
-		case <-time.After(3 * time.Second):
+			n := len(m.entityLinkBuffer)
+		drainLink:
+			for i := 0; i < n && i < m.bufferSize; i++ {
+				select {
+				case e := <-m.entityLinkBuffer:
+					linkGroup.Events = append(linkGroup.Events, e)
+					if len(linkGroup.Events) >= m.serviceK8sMeta.DrainBatchSize {
+						m.serviceK8sMeta.linkCount.Add(int64(len(linkGroup.Events)))
+						sendFunc(linkGroup)
+						select {
+						case <-m.stopCh:
+							return
+						default:
+						}
+					}
+				default:
+					break drainLink
+				}
+			}
+			if len(linkGroup.Events) > 0 {
+				m.serviceK8sMeta.linkCount.Add(int64(len(linkGroup.Events)))
+				sendFunc(linkGroup)
+			}
+
+		case <-flushTimer.C:
 			if len(entityGroup.Events) > 0 {
 				m.serviceK8sMeta.entityCount.Add(int64(len(entityGroup.Events)))
 				sendFunc(entityGroup)
@@ -445,6 +584,7 @@ func (m *metaCollector) sendInBackground() {
 				m.serviceK8sMeta.linkCount.Add(int64(len(linkGroup.Events)))
 				sendFunc(linkGroup)
 			}
+			flushTimer.Reset(3 * time.Second)
 		case <-m.stopCh:
 			return
 		}

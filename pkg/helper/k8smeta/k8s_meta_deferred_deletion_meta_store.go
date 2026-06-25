@@ -52,8 +52,10 @@ type TimerEvent struct {
 }
 
 type SendFuncWithStopCh struct {
-	SendFunc SendFunc
-	StopCh   chan struct{}
+	SendFunc   SendFunc
+	StopCh     chan struct{}
+	EventCh    chan []*K8sMetaEvent
+	DrainBatch int
 }
 
 func NewDeferredDeletionMetaStore(eventCh chan *K8sMetaEvent, stopCh <-chan struct{}, gracePeriod int64, keyFunc cache.KeyFunc, indexRules ...IdxFunc) *DeferredDeletionMetaStore {
@@ -130,14 +132,42 @@ func (m *DeferredDeletionMetaStore) Filter(filterFunc func(*ObjectWrapper) bool,
 	return result
 }
 
-func (m *DeferredDeletionMetaStore) RegisterSendFunc(key string, f SendFunc, interval int) {
+// sendBatch dispatches events with throttling for large batches (Timer full-sync).
+// Returns true if StopCh was triggered and the caller should exit.
+func (s *SendFuncWithStopCh) sendBatch(events []*K8sMetaEvent) bool {
+	if len(events) > s.DrainBatch {
+		throttle := time.NewTimer(50 * time.Millisecond)
+		defer throttle.Stop()
+		for i := 0; i < len(events); i += s.DrainBatch {
+			end := i + s.DrainBatch
+			if end > len(events) {
+				end = len(events)
+			}
+			s.SendFunc(events[i:end])
+			select {
+			case <-throttle.C:
+				throttle.Reset(50 * time.Millisecond)
+			case <-s.StopCh:
+				return true
+			}
+		}
+	} else {
+		s.SendFunc(events)
+	}
+	return false
+}
+
+func (m *DeferredDeletionMetaStore) RegisterSendFunc(key string, f SendFunc, interval int, eventChSize int, drainBatch int) {
 	sendFuncWithStopCh := &SendFuncWithStopCh{
-		SendFunc: f,
-		StopCh:   make(chan struct{}),
+		SendFunc:   f,
+		StopCh:     make(chan struct{}),
+		EventCh:    make(chan []*K8sMetaEvent, eventChSize),
+		DrainBatch: drainBatch,
 	}
 	m.registerLock.Lock()
 	m.sendFuncs[key] = sendFuncWithStopCh
 	m.registerLock.Unlock()
+
 	go func() {
 		defer panicRecover()
 		event := &K8sMetaEvent{
@@ -164,6 +194,22 @@ func (m *DeferredDeletionMetaStore) RegisterSendFunc(key string, f SendFunc, int
 			select {
 			case <-ticker.C:
 				m.eventCh <- event
+			case e := <-sendFuncWithStopCh.EventCh:
+				if sendFuncWithStopCh.sendBatch(e) {
+					return
+				}
+				n := len(sendFuncWithStopCh.EventCh)
+			drainEventCh:
+				for i := 0; i < n && i < sendFuncWithStopCh.DrainBatch; i++ {
+					select {
+					case next := <-sendFuncWithStopCh.EventCh:
+						if sendFuncWithStopCh.sendBatch(next) {
+							return
+						}
+					default:
+						break drainEventCh
+					}
+				}
 			case <-sendFuncWithStopCh.StopCh:
 				return
 			}
@@ -254,11 +300,17 @@ func (m *DeferredDeletionMetaStore) handleAddOrUpdateEvent(event *K8sMetaEvent) 
 		}
 	}
 
+	// cache is always updated regardless of whether the notification below succeeds;
+	// dropped notifications will be compensated by the periodic timer full-sync
 	m.Items[key] = event.Object
 	m.lock.Unlock()
 	m.registerLock.RLock()
 	for _, f := range m.sendFuncs {
-		f.SendFunc([]*K8sMetaEvent{event})
+		select {
+		case f.EventCh <- []*K8sMetaEvent{event}:
+		default:
+			logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "send buffer full, dropping event", "object_key", key)
+		}
 	}
 	m.registerLock.RUnlock()
 }
@@ -275,19 +327,30 @@ func (m *DeferredDeletionMetaStore) handleDeleteEvent(event *K8sMetaEvent) {
 		event.Object.FirstObservedTime = obj.FirstObservedTime
 	}
 	m.lock.Unlock()
+	// Dropped delete notifications are NOT compensated by Timer full-sync
+	// (Timer only sends non-deleted items). Downstream relies on keepAliveSeconds
+	// TTL to expire stale entities, so the delete will take effect after Interval*2.
 	m.registerLock.RLock()
 	for _, f := range m.sendFuncs {
-		f.SendFunc([]*K8sMetaEvent{event})
+		select {
+		case f.EventCh <- []*K8sMetaEvent{event}:
+		default:
+			logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "send buffer full, dropping delete event", "object_key", key)
+		}
 	}
 	m.registerLock.RUnlock()
-	go func() {
-		// wait and add a deferred delete event
-		time.Sleep(time.Duration(m.gracePeriod) * time.Second)
-		m.eventCh <- &K8sMetaEvent{
+	// time.AfterFunc avoids a sleeping goroutine per delete during gracePeriod
+	time.AfterFunc(time.Duration(m.gracePeriod)*time.Second, func() {
+		select {
+		case m.eventCh <- &K8sMetaEvent{
 			EventType: EventTypeDeferredDelete,
 			Object:    event.Object,
+		}:
+		default:
+			logger.Warning(context.Background(), K8sMetaUnifyErrorCode,
+				"eventCh full, deferred delete dropped", "key", key)
 		}
-	}()
+	})
 }
 
 func (m *DeferredDeletionMetaStore) handleDeferredDeleteEvent(event *K8sMetaEvent) {
@@ -321,19 +384,32 @@ func (m *DeferredDeletionMetaStore) handleTimerEvent(event *K8sMetaEvent) {
 	m.registerLock.RLock()
 	defer m.registerLock.RUnlock()
 	if f, ok := m.sendFuncs[timerEvent.ConfigName]; ok {
-		allItems := make([]*K8sMetaEvent, 0)
+		// skip building the full snapshot if EventCh is already full
+		if len(f.EventCh) == cap(f.EventCh) {
+			logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "send buffer full, skipping timer snapshot build", "config_name", timerEvent.ConfigName)
+			return
+		}
+		allItems := make([]*K8sMetaEvent, 0, len(m.Items))
 		m.lock.RLock()
 		for _, obj := range m.Items {
 			if !obj.Deleted {
-				obj.LastObservedTime = time.Now().Unix()
+				// shallow copy ObjectWrapper so we can set LastObservedTime without
+				// mutating the cached entry. Raw is effectively immutable after
+				// being stored, so sharing the pointer is safe.
+				newObj := *obj
+				newObj.LastObservedTime = time.Now().Unix()
 				allItems = append(allItems, &K8sMetaEvent{
 					EventType: EventTypeUpdate,
-					Object:    obj,
+					Object:    &newObj,
 				})
 			}
 		}
 		m.lock.RUnlock()
-		f.SendFunc(allItems)
+		select {
+		case f.EventCh <- allItems:
+		default:
+			logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "send buffer full, skipping timer event", "config_name", timerEvent.ConfigName)
+		}
 	}
 }
 

@@ -3,6 +3,7 @@ package k8smeta
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	app "k8s.io/api/apps/v1"
@@ -35,7 +36,8 @@ type k8sMetaCache struct {
 	resourceType string
 	schema       *runtime.Scheme
 
-	giveUp *informerGiveUp
+	watchOnce sync.Once
+	giveUp    *informerGiveUp
 }
 
 func newK8sMetaCache(stopCh chan struct{}, resourceType string) *k8sMetaCache {
@@ -60,7 +62,17 @@ func newK8sMetaCache(stopCh chan struct{}, resourceType string) *k8sMetaCache {
 func (m *k8sMetaCache) init(clientset *kubernetes.Clientset) {
 	m.clientset = clientset
 	m.metaStore.Start()
-	m.watch(m.stopCh)
+}
+
+func (m *k8sMetaCache) ensureWatchStarted() {
+	m.watchOnce.Do(func() {
+		if m.clientset != nil {
+			go m.watch(m.stopCh)
+		} else {
+			logger.Warning(context.Background(), K8sMetaUnifyErrorCode,
+				"ensureWatchStarted called before init, watch permanently skipped", m.resourceType)
+		}
+	})
 }
 
 func (m *k8sMetaCache) Get(key []string) map[string][]*ObjectWrapper {
@@ -83,8 +95,9 @@ func (m *k8sMetaCache) Filter(filterFunc func(*ObjectWrapper) bool, limit int) [
 	return m.metaStore.Filter(filterFunc, limit)
 }
 
-func (m *k8sMetaCache) RegisterSendFunc(key string, sendFunc SendFunc, interval int) {
-	m.metaStore.RegisterSendFunc(key, sendFunc, interval)
+func (m *k8sMetaCache) RegisterSendFunc(key string, sendFunc SendFunc, interval int, eventChSize int, drainBatch int) {
+	m.ensureWatchStarted()
+	m.metaStore.RegisterSendFunc(key, sendFunc, interval, eventChSize, drainBatch)
 	logger.Debug(context.Background(), "register send func", m.resourceType)
 }
 
@@ -123,6 +136,14 @@ func (m *k8sMetaCache) watch(stopCh <-chan struct{}) {
 		},
 		UpdateFunc: func(oldObj interface{}, obj interface{}) {
 			defer panicRecover()
+			oldMeta, err1 := meta.Accessor(oldObj)
+			newMeta, err2 := meta.Accessor(obj)
+			if err1 == nil && err2 == nil && oldMeta.GetResourceVersion() == newMeta.GetResourceVersion() {
+				return
+			}
+			if !isSignificantUpdate(m.resourceType, oldObj, obj) {
+				return
+			}
 			nowTime := time.Now().Unix()
 			m.eventCh <- &K8sMetaEvent{
 				EventType: EventTypeUpdate,

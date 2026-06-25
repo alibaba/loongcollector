@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	meta "k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -124,6 +125,10 @@ func gvrDiscoveryAvailable(d discovery.DiscoveryInterface, gvr schema.GroupVersi
 	return true
 }
 
+func (c *crUnifiedCache) ensureWatchStarted() {
+	c.EnsureWatchStarted()
+}
+
 // EnsureWatchStarted starts the dynamic informer (once) when the dynamic client is ready.
 // Important: never enter sync.Once when dynamicClient is nil.
 func (c *crUnifiedCache) EnsureWatchStarted() {
@@ -167,8 +172,13 @@ func (c *crUnifiedCache) EnsureWatchStarted() {
 				}
 				metaManager.addEventCount.Add(1)
 			},
-			UpdateFunc: func(_, obj interface{}) {
+			UpdateFunc: func(oldObj, obj interface{}) {
 				defer panicRecover()
+				oldMeta, err1 := meta.Accessor(oldObj)
+				newMeta, err2 := meta.Accessor(obj)
+				if err1 == nil && err2 == nil && oldMeta.GetResourceVersion() == newMeta.GetResourceVersion() {
+					return
+				}
 				u := trimmedCRCopyFromInformer(obj, c.resourceType)
 				if u == nil {
 					return
@@ -245,9 +255,9 @@ func (c *crUnifiedCache) Filter(filterFunc func(*ObjectWrapper) bool, limit int)
 	return c.metaStore.Filter(filterFunc, limit)
 }
 
-func (c *crUnifiedCache) RegisterSendFunc(key string, sendFunc SendFunc, interval int) {
+func (c *crUnifiedCache) RegisterSendFunc(key string, sendFunc SendFunc, interval int, eventChSize int, drainBatch int) {
 	c.EnsureWatchStarted()
-	c.metaStore.RegisterSendFunc(key, sendFunc, interval)
+	c.metaStore.RegisterSendFunc(key, sendFunc, interval, eventChSize, drainBatch)
 	logger.Debug(context.Background(), "register send func", c.resourceType)
 }
 
