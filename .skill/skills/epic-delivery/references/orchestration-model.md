@@ -42,13 +42,16 @@ flowchart LR
 - `按 epic-delivery 处理 Epic #<epic> / PR #<pr> 的评论`
 - 编排 Agent 用 `gh` 拉取**该 Epic 范围内**的评论/CI，处理完退出。
 
-### 2. 本地脚本唤醒
+### 2. 本地脚本唤醒（含自动处理）
 
 见 **`references/cursor-automation-setup.md`**：
 
 ```bash
-scripts/epic/wake-local.sh --repo <owner>/<repo> --epic <EPIC> [--pr <PR>]
+# 配置 CURSOR_API_KEY → scripts/epic/epic-wake.env
+scripts/epic/wake-local.sh --repo <owner>/<repo> --epic <EPIC> --auto
 ```
+
+`--auto`：对**本 Epic** 下 open PR，若**最新评论**为待处理人工意见且尚未派发，则调用 `invoke-cursor-agent.sh`（本地 CLI 或 Cloud API，`workOnCurrentBranch` + PR URL）。
 
 ### 3. 定时轮询（可选）
 
