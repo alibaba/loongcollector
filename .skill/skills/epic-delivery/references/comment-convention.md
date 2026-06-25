@@ -65,7 +65,14 @@ Triage 规则：
 | 含 `from=agent` + `action=required` | Agent 请求跟进 | 是 |
 | **无** `[epic-delivery]` 标识 | **人工** | **是**（默认） |
 
-> 若 Agent 漏打标识，其评论会被误判为人工意见并可能重复唤醒——**Agent 必须带 footer**。
+> 若 Agent 漏打标识，其**自检**类评论可能仍被启发式跳过；**非自检**的 Agent 消息会被误判为人工——Agent 必须带 footer。
+
+## 启发式（仅无标识时）
+
+| 无标识评论特征 | 判定 |
+|----------------|------|
+| 含 `**自检**` 或 `[epic-delivery triage]` | 视为 Agent 信息，跳过 |
+| 其它 | **人工**，需处理 |
 
 ## Triage 脚本
 
