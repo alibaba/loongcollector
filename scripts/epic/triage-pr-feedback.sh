@@ -51,6 +51,11 @@ classify_body() {
     fi
     return
   fi
+  # Untagged agent self-review (legacy); human never required to tag
+  if [[ "$body" == *'**自检**'* ]] || [[ "$body" == *'[epic-delivery triage]'* ]]; then
+    echo "skip untagged-agent"
+    return
+  fi
   # No agent tag → human, needs action
   echo "required human-default"
 }
