@@ -13,6 +13,6 @@ echo '}'
 
 sleep 2
 
-echo '{"single_line": true}'
+echo '{"name": "test_multiline_single", "single_line": true}'
 
 sleep 90
