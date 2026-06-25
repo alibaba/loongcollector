@@ -38,7 +38,7 @@ Agent 在 Issue / PR 评论**末尾**附加 footer（与正文空一行）：
 **处理完人工意见**：
 
 ```markdown
-已合并矩阵到 overview.md。
+已按 review 修改。
 
 ---
 `[epic-delivery]` from=agent role=feedback-handler action=none
@@ -47,7 +47,7 @@ Agent 在 Issue / PR 评论**末尾**附加 footer（与正文空一行）：
 发评辅助（Agent 专用）：
 
 ```bash
-scripts/epic/gh-comment.sh pr 2619 --from agent --role self-review --action none <<'EOF'
+scripts/epic/gh-comment.sh pr <PR> --repo <owner>/<repo> --from agent --role self-review --action none <<'EOF'
 **自检**：……
 EOF
 ```
@@ -77,19 +77,11 @@ Triage 规则：
 ## Triage 脚本
 
 ```bash
-# 列出 PR 上所有待处理人工意见
-scripts/epic/triage-pr-feedback.sh --repo alibaba/loongcollector --pr 2619
+# 当前 Epic 下所有相关 open PR
+scripts/epic/triage-pr-feedback.sh --repo <owner>/<repo> --epic <EPIC>
 
-# Automation / 事件唤醒：仅看最新一条评论
-scripts/epic/triage-pr-feedback.sh --repo alibaba/loongcollector --pr 2619 --latest-only
+# 单 PR；本地唤醒时常配合 --latest-only
+scripts/epic/triage-pr-feedback.sh --repo <owner>/<repo> --pr <PR> --latest-only
 ```
 
-## Cursor Automation 联动
-
-PR `COMMENTED` 触发时：
-
-1. `triage-pr-feedback.sh --pr <n> --latest-only`
-2. 最新评论为 Agent `action=none` → 发 orchestrator 摘要后退出
-3. 最新评论无标识（人工）→ 进入 epic-delivery 阶段 6
-
-详见 `references/cursor-automation-setup.md`（含**本地唤醒**方案）。
+本地唤醒见 `cursor-automation-setup.md`（`wake-local.sh`）。

@@ -4,9 +4,8 @@
 # Human comments: no tag required; default action=required
 #
 # Usage:
-#   triage-pr-feedback.sh --repo alibaba/loongcollector --pr 2619
-#   triage-pr-feedback.sh --repo alibaba/loongcollector --pr 2619 --latest-only
-#   triage-pr-feedback.sh --repo alibaba/loongcollector --epic 2595
+#   triage-pr-feedback.sh --repo owner/repo --pr <number> [--latest-only]
+#   triage-pr-feedback.sh --repo owner/repo --epic <number>
 set -euo pipefail
 
 REPO=""
@@ -39,8 +38,6 @@ done
 [[ -n "$REPO" ]] || usage
 [[ -n "$PR" || -n "$EPIC" ]] || usage
 
-# stdout: "<status> <source> <author>"
-# status: required | skip
 classify_body() {
   local body="$1"
   if [[ "$body" == *'[epic-delivery]'* && "$body" == *'from=agent'* ]]; then
@@ -51,12 +48,10 @@ classify_body() {
     fi
     return
   fi
-  # Untagged agent self-review (legacy); human never required to tag
   if [[ "$body" == *'**自检**'* ]] || [[ "$body" == *'[epic-delivery triage]'* ]]; then
     echo "skip untagged-agent"
     return
   fi
-  # No agent tag → human, needs action
   echo "required human-default"
 }
 
@@ -124,6 +119,34 @@ triage_pr() {
   fi
 }
 
+# Sub-issue numbers from Epic checklist (exclude epic itself)
+epic_sub_issue_numbers() {
+  local body
+  body="$(gh issue view "$EPIC" --repo "$REPO" --json body -q .body)"
+  grep -oE '#[0-9]+' <<<"$body" | tr -d '#' | sort -nu | while read -r n; do
+    [[ "$n" == "$EPIC" ]] && continue
+    echo "$n"
+  done
+}
+
+# Open PRs whose body closes a given issue
+prs_for_issue() {
+  local issue_num="$1"
+  gh pr list --repo "$REPO" --state open --json number,body \
+    -q ".[] | select(.body | test(\"(?i)closes #${issue_num}\\\\b\")) | .number"
+}
+
+epic_open_prs() {
+  local issue_num pr_num
+  while IFS= read -r issue_num; do
+    [[ -z "$issue_num" ]] && continue
+    while IFS= read -r pr_num; do
+      [[ -z "$pr_num" ]] && continue
+      echo "$pr_num"
+    done < <(prs_for_issue "$issue_num")
+  done < <(epic_sub_issue_numbers)
+}
+
 if [[ -n "$PR" ]]; then
   triage_pr "$PR"
   exit 0
@@ -138,9 +161,8 @@ while IFS= read -r pr_num; do
   [[ -z "$pr_num" ]] && continue
   triage_pr "$pr_num"
   found=1
-done < <(gh pr list --repo "$REPO" --state open --json number,headRefName \
-  --jq '.[] | select(.headRefName | test("feat/1928-")) | .number')
+done < <(epic_open_prs | sort -nu)
 
 if [[ "$found" -eq 0 ]]; then
-  echo "No open feat/1928-* PRs found; pass --pr explicitly"
+  echo "No open PRs linked to Epic #$EPIC sub-issues (Closes #<issue>); pass --pr explicitly"
 fi
