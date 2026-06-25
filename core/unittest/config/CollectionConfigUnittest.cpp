@@ -38,6 +38,7 @@ public:
     void HandleInvalidExtensions() const;
     void TestReplaceEnvVarRef() const;
     void SelfMonitorInputWithGoFlusher() const;
+    void NativeInputWithGoPlugin() const;
 
 protected:
     static void SetUpTestCase() { PluginRegistry::GetInstance()->LoadPlugins(); }
@@ -2439,8 +2440,60 @@ void CollectionConfigUnittest::SelfMonitorInputWithGoFlusher() const {
     APSARA_TEST_TRUE(config->Parse());
 }
 
+void CollectionConfigUnittest::NativeInputWithGoPlugin() const {
+    unique_ptr<Json::Value> configJson;
+    unique_ptr<CollectionConfig> config;
+    string errorMsg;
+
+    string configStr = R"(
+        {
+            "inputs": [
+                {
+                    "Type": "input_host_monitor"
+                }
+            ],
+            "processors": [
+                {
+                    "Type": "processor_json"
+                }
+            ],
+            "flushers": [
+                {
+                    "Type": "flusher_http"
+                }
+            ]
+        }
+    )";
+    configJson.reset(new Json::Value());
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
+    config.reset(new CollectionConfig(configName, std::move(configJson), filepath));
+    APSARA_TEST_TRUE(config->Parse());
+    APSARA_TEST_TRUE(config->HasGoPlugin());
+
+    configStr = R"(
+        {
+            "inputs": [
+                {
+                    "Type": "input_host_monitor"
+                }
+            ],
+            "flushers": [
+                {
+                    "Type": "flusher_http"
+                }
+            ]
+        }
+    )";
+    configJson.reset(new Json::Value());
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
+    config.reset(new CollectionConfig(configName, std::move(configJson), filepath));
+    APSARA_TEST_TRUE(config->Parse());
+    APSARA_TEST_TRUE(config->HasGoPlugin());
+}
+
 UNIT_TEST_CASE(CollectionConfigUnittest, HandleValidConfig)
 UNIT_TEST_CASE(CollectionConfigUnittest, SelfMonitorInputWithGoFlusher)
+UNIT_TEST_CASE(CollectionConfigUnittest, NativeInputWithGoPlugin)
 UNIT_TEST_CASE(CollectionConfigUnittest, HandleInvalidCreateTime)
 UNIT_TEST_CASE(CollectionConfigUnittest, HandleInvalidGlobal)
 UNIT_TEST_CASE(CollectionConfigUnittest, HandleInvalidInputs)
