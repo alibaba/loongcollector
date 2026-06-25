@@ -1,0 +1,6 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+@.skill/rules/project-knowledge/architecture.md

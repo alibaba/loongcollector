@@ -1,0 +1,39 @@
+# Rules 目录说明
+
+本 README 说明当前所有的规则文件。
+
+## 作用
+
+- `rules` 用于沉淀项目级约束与知识，帮助助手在编码、评审和分析时保持一致性。
+
+## coding-standards/
+
+- `cpp.mdc`：C++ 编码规范。
+- `golang.mdc`：Go 编码规范。
+- `commit.mdc`：提交信息规范入口。
+- `compile.mdc`：编译规范入口。
+
+## project-knowledge/
+
+- `architecture.md` / `architecture.mdc`：项目架构说明。
+- `codebase-map.md`：代码库结构与模块分布。
+- `config-pitfalls.mdc`：配置常见陷阱。
+- `terminology.mdc`：术语表。
+
+## review-standards/
+
+- `code-review.md` / `code-review.mdc`：代码评审规则。
+
+## testing-standards/
+
+- `e2e-manual.mdc`、`e2e-develop-guide.mdc`、`e2e-example-ebpf-process.mdc`：E2E 测试规范与示例。
+
+## workflows/
+
+- `design-document.mdc`：设计文档编写规范。
+- `riper5-protocol.mdc`：RIPER-5 工作协议。
+
+## 维护说明
+
+- 新增或删除规则文件时，同步更新本 README 与 `.skill/README.md`。
+- 文件描述保持「一行一句」，优先写清用途，不展开实现细节。
