@@ -6,7 +6,7 @@
 
 ### 原生插件
 
-> **Log / Metric / Span**：Native Input 产出的 `PipelineEvent` 类型；代码真源见 `core/plugin/input/InputEventTypeRegistry.cpp`；随插件演进持续更新本表。
+> **Log / Metric / Span**：Native Input 产出的 `PipelineEvent` 类型；随插件演进持续更新本表。
 
 | 名称 | 提供方 | Log | Metric | Span | 简介 |
 | --- | --- | --- | --- | --- | --- |
