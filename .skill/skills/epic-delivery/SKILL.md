@@ -180,23 +180,55 @@ ssh -T git@github.com 2>&1 | head -1   # push 走 SSH 时必须通
 
 并行 batch 中**部分 PR 等 review、部分仍在开发**是正常状态；编排 Agent 应持续派未开始的并行项，而不是等 batch 全部完成才汇报。
 
-### 感知与调度（必读）
+### 感知与调度（编排 Agent 必读 · 必执行）
 
-**编排 Agent 不是常驻进程。** 会话结束即退出；你在 PR/Issue 里的评论**不会**自动推送到某个「正在运行的编排 Agent」。
+**编排 Agent 不是 GitHub 常驻监听进程**，但接管某个 Epic 时**必须**启动评论轮询并在会话内持续消费事件。
 
-| 模式 | 是否需要常驻 | 如何感知你的评论 |
-|------|--------------|------------------|
-| **人工唤醒**（基线） | 否 | 你开新对话：「处理 Epic #2595 / PR #2618 的评论」→ 编排 Agent 用 `gh` **拉取**最新 comment/CI |
-| **事件唤醒**（推荐自动化） | 否 | PR comment 触发 **Cursor Automation** → 新会话 Triage（见 `references/cursor-automation-setup.md`）；或 Workflow / Webhook |
-| **定时轮询**（可选） | 否（cron 触发会话，非 Agent 挂机） | cron 定期 `gh pr list` + 有条件时启动 Agent |
+唯一输入是 **Epic Issue 编号**（如 `#2595`）。`scripts/epic/` 据此自动发现 checklist 子 Issue 与关联 PR，**与具体 Epic 内容解耦**，换 Epic 只改 `--epic` 参数。
 
-人工评论后的标准路径：
+#### 编排 Agent 必做（接管 Epic 起）
 
-1. **唤醒**（你说话，或事件触发）→ 2. 编排 Agent **Triage**（`gh pr view`、review comments、checks）→ 3. **派子 Agent** 或自行进入阶段 6 AddressFeedback → 4. 修复并回复 thread → 5. ReadyToMerge 后**停止**，等人工 Merge。
+1. **启动轮询**（未运行时）：
 
-「并行不等反馈」仅指：**不因某个 PR 被 comment 就阻塞其它并行 Issue 的开发**；处理 comment 仍需一次唤醒，不会自动发生。
+```bash
+./scripts/epic/poll-start.sh --epic <EPIC_NUMBER>
+# 可选：--repo owner/repo（默认 epic.env 或 gh repo view）
+```
 
-唤醒后 Triage 命令与路由规则见 **`references/orchestration-model.md`**。
+2. **每轮工作前 Triage**（含用户新消息、派子 Agent 前）：
+
+```bash
+./scripts/epic/orchestrate-once.sh --epic <EPIC_NUMBER>
+```
+
+3. **有 pending 事件** → 按输出 `DISPATCH` 提示派**执行 Agent**进入阶段 6（AddressFeedback）；处理完：
+
+```bash
+./scripts/epic/events.sh --epic <EPIC_NUMBER> mark-handled <comment_id>
+```
+
+4. **Epic 交付结束或交还人工** → 停止轮询：
+
+```bash
+./scripts/epic/poll-stop.sh --epic <EPIC_NUMBER>
+```
+
+#### 轮询机制摘要
+
+| 项 | 说明 |
+|----|------|
+| 扫描范围 | Epic Issue + checklist 子 Issue + 关联 PR（Issue/PR/Review 评论） |
+| 判读 | 无 `from=agent` → 待处理；`action=none/fyi` 的 Agent 评 → 跳过（见 `comment-convention.md`） |
+| 状态目录 | `/tmp/epic-<EPIC>-poll/`（`seen-ids.txt`、`events.jsonl`、`poll.log`） |
+| 间隔 | 默认 60s（`epic.env` 的 `INTERVAL` 或 `--interval`） |
+
+人工在 PR/Issue 评论后的路径：
+
+1. `poll-loop` 写入 `events.jsonl` → 2. 编排 Agent `orchestrate-once` → 3. 派子 Agent AddressFeedback → 4. `mark-handled` → 5. ReadyToMerge 后停止，等人工 Merge。
+
+「并行不等反馈」仅指：**不因某个 PR 被 comment 就阻塞其它并行 Issue 的开发**；评论处理由轮询 + 编排派发完成。
+
+完整命令、路由规则见 **`references/orchestration-model.md`**。
 
 ## 阶段 3 · 开发
 
@@ -274,22 +306,16 @@ make core PATH_IN_DOCKER=$(pwd)
 ### PR / Issue 评论标识
 
 - **Agent 发评必须带 footer**（见 `references/comment-convention.md`）：`from=agent role=self-review action=none` 等。
-- **人工评论无格式要求**；Triage 将无 `from=agent` 标识的评论视为待处理意见。
-
-发评：`scripts/epic/gh-comment.sh pr <n> --from agent --role self-review --action none`  
-Triage：`scripts/epic/triage-pr-feedback.sh --repo <owner>/<repo> --pr <n> [--latest-only]`  
-本地唤醒（无 Cloud Agent 时）：`scripts/epic/wake-local.sh --repo <owner>/<repo> --epic <n>`
-
-事件唤醒：Cloud Automation 见 `references/cursor-automation-setup.md`；org 仓不可用时用 **本地 Desktop Agent + wake-local**。
+- **人工评论无格式要求**；编排 Agent 用 `gh` 拉取后，无 `from=agent` 标识视为待处理意见。
 
 ## 阶段 6 · 自主处理 PR 意见与 CI
 
-**入口**：必须由「人工唤醒」或「事件触发的新会话」进入；编排 Agent 先用 `gh` 拉取该 PR 的 review comments、review threads、CI 状态（见 `references/orchestration-model.md`），再派执行 Agent 或自行处理。
+**入口**：编排 Agent 先 `orchestrate-once.sh --epic <n>` 读 pending 事件；无事件时可用 `gh` 手动拉取该 PR 的 review comments、CI（见 `orchestration-model.md`），再派执行 Agent 或自行处理。
 
 循环直到"可合并"：
 
 1. **冲突**：智能合并，保留双方意图；意图冲突则停手、打 `needs-human`、@maintainer。
-2. **评论**：处理未解决评论；对每条意见**先验证再采纳**——用 `code-review` / `review-standards` 复核被指出的代码，有效则修复并回复证据，无效则在 thread 内解释，不盲从。
+2. **评论**：处理未解决评论；对每条意见**先验证再采纳**——用 `code-review` / `review-standards` 复核被指出的代码，有效则修复并回复证据，无效则在 thread 内解释，不盲从。评论里的**提问 / 质疑 / 选型**一律在**该 GitHub thread 内回答**（需决策时给选项+建议并 @maintainer，靠轮询取答复）；**禁止**把评论里的问题搬到本地 Agent 对话向人确认（见 `comment-convention.md`「在哪里回答评论里的问题」）。
 3. **CI**：只修本 PR 范围内导致的失败；**禁止改 CI workflow 骗绿**；疑似与本 PR 无关的失败，先把分支与默认分支同步（可能他人已修）再判断。
 4. 所有修复 push 到**同一 PR 分支**；每轮修复后回到阶段 4 复检。
 
@@ -331,18 +357,13 @@ Triage：`scripts/epic/triage-pr-feedback.sh --repo <owner>/<repo> --pr <n> [--l
 
 | 载体 | 内容 |
 |------|------|
-| `SKILL.md` | 状态机、并行编排、感知模型摘要 |
-| `references/orchestration-model.md` | **唤醒 / Triage / 无需常驻** 的完整设计 |
-| `references/comment-convention.md` | **PR/Issue 评论标识**（agent/human + action=required/none） |
-| `references/cursor-automation-setup.md` | **Cursor Automation** PR 评论事件唤醒 |
-| `references/cursor-automation-draft.yaml` | Automation 预填草稿（导入编辑器） |
+| `SKILL.md` | 状态机、并行编排、**编排 Agent 必执行轮询** |
+| `references/orchestration-model.md` | 轮询 / Triage / 派发 / 脚本参考 |
+| `references/comment-convention.md` | **PR/Issue 评论标识**（Agent footer） |
 | `references/github-templates.md` | Issue / PR 模板 |
-| `scripts/epic/triage-pr-feedback.sh` | Triage：扫描待处理人工评论 |
-| `scripts/epic/gh-comment.sh` | Agent 发带标识的评论 |
-| `scripts/epic/wake-local.sh` | **本地唤醒**：轮询 + 生成 Desktop Agent 提示词 |
-| 可选 Workflow / cron | 事件唤醒（仓库侧配置，非 skill 正文） |
+| `scripts/epic/` | **`--epic` 驱动的 gh 轮询**（与具体 Epic 解耦） |
 
-默认部署：**无常驻 Agent** + 人工或事件唤醒 + 唤醒后 `gh` 拉取。
+默认部署：**编排 Agent 启动 `poll-start` + 周期 `orchestrate-once` + 派子 Agent**。
 
 ## 禁止行为
 

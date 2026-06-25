@@ -41,7 +41,7 @@ Preflight（失败则停手，打 needs-human）：
 完成动作：
 - 用 .claude/skills/commit 写 commit
 - 先开 draft PR，body 含 Closes #<n> 与 Test plan（须含实际 PASS 命令输出）
-- PR 首评用 scripts/epic/gh-comment.sh 带 from=agent role=self-review action=none
+- PR 首评末尾带 footer：`[epic-delivery]` from=agent role=self-review action=none
 - 处理 CI 与人工评论直到可合并；人工评论无需 footer，Agent 回复必须带 footer
 - 在 Epic Issue 评论 PR 链接（或回复编排 Agent 汇总）
 - 推到 ReadyToMerge 后停止；**不要 merge，不要等人工确认再继续**

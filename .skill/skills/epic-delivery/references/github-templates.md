@@ -141,4 +141,4 @@ Closes #<issue>
 `[epic-delivery]` from=agent role=self-review action=none
 ```
 
-Agent 发评：`scripts/epic/gh-comment.sh pr <n> --from agent --role self-review --action none`
+Agent 发评时在正文末尾附加 footer（见上），无需额外工具。

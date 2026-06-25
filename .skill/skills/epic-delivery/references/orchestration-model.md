@@ -1,61 +1,90 @@
 # 编排 Agent 感知与调度模型
 
-> 回答：**你在 PR 里评论后，编排 Agent 如何知道？是否需要常驻进程？**
+> 编排 Agent 接管 Epic 时，用 **`--epic <Issue编号>`** 驱动 `scripts/epic/`，自动发现范围并轮询评论。
 
 ## 结论（先看这个）
 
 | 问题 | 答案 |
 |------|------|
-| 编排 Agent 会自己「听到」评论吗？ | **不会**。会话结束后 Agent 不存在，没有后台监听。 |
-| 需要常驻进程吗？ | **不需要**。本地 `wake-local.sh` + Desktop Agent，或人工开对话。 |
-| 跟踪范围？ | **仅当前 Epic 的子 Issue / PR / Discussion**，不扫全仓。 |
+| 脚本绑定某个 Epic 吗？ | **否**。只传 Epic Issue 号；子 Issue / PR 从 checklist 与 `Closes #` 自动发现。 |
+| 编排 Agent 要常驻吗？ | **Agent 会话不常驻**；**轮询 shell 后台常驻**（`poll-loop`），由编排 Agent 启动/停止。 |
+| 跟踪范围？ | **仅该 Epic** 的 Issue / 子 Issue / 关联 PR，不扫全仓。 |
 
-推荐模型：**无常驻 + 本地唤醒 + `gh` 拉取本 Epic 状态**。
+推荐模型：**编排 Agent 启动 poll-loop → 周期 orchestrate-once → 派执行 Agent → mark-handled**。
 
 ---
 
-## 架构：唤醒方式
+## 架构
 
 ```mermaid
 flowchart LR
-  subgraph Triggers["唤醒源"]
-    H["人工开对话"]
-    L["wake-local.sh\n（手动或 cron）"]
-  end
+  Poll["poll-loop.sh\n--epic N"]
+  GH["GitHub"]
+  Events["events.jsonl"]
+  Orch["编排 Agent"]
+  Sub["执行 Agent"]
 
-  subgraph Orchestrator["编排 Agent 会话（短命）"]
-    T["Triage：本 Epic PR/Issue"]
-    R["路由：派子 Agent / AddressFeedback"]
-    S["汇总 → 退出"]
-  end
-
-  GH["GitHub\n本 Epic 相关 PR"]
-
-  H --> Orchestrator
-  L --> Orchestrator
-  Orchestrator -->|gh| GH
-  Orchestrator --> S
+  Poll -->|gh 每分钟| GH
+  Poll --> Events
+  Orch -->|orchestrate-once| Events
+  Orch --> Sub
+  Sub -->|push + 回复| GH
 ```
 
-### 1. 人工唤醒
+---
 
-- `按 epic-delivery 处理 Epic #<epic> / PR #<pr> 的评论`
-- 编排 Agent 用 `gh` 拉取**该 Epic 范围内**的评论/CI，处理完退出。
+## 编排 Agent 必执行流程
 
-### 2. 本地脚本唤醒（含自动处理）
-
-见 **`references/cursor-automation-setup.md`**：
+### 1. 接管 Epic：启动轮询
 
 ```bash
-# 配置 CURSOR_API_KEY → scripts/epic/epic-wake.env
-scripts/epic/wake-local.sh --repo <owner>/<repo> --epic <EPIC> --auto
+./scripts/epic/poll-start.sh --epic <EPIC_NUMBER> [--repo owner/repo]
 ```
 
-`--auto`：对**本 Epic** 下 open PR，若**最新评论**为待处理人工意见且尚未派发，则调用 `invoke-cursor-agent.sh`（本地 CLI 或 Cloud API，`workOnCurrentBranch` + PR URL）。
+- 首次启动会对当前评论做 **baseline**（`seen-ids.txt`），之后只报**新增**可处理评论。
+- 状态目录：`/tmp/epic-<EPIC>-poll/`（与 Epic 号一一对应，可并存多个 Epic）。
 
-### 3. 定时轮询（可选）
+### 2. 每轮工作：Triage + 派发
 
-cron 定期跑 `wake-local.sh --epic <EPIC>`；有 pending 时粘贴提示词到 Desktop Agent。
+```bash
+./scripts/epic/orchestrate-once.sh --epic <EPIC_NUMBER>
+```
+
+输出 `DISPATCH PR #…` / `DISPATCH issue #…` 时，派**执行 Agent**（单 Issue / 单 PR）进入 AddressFeedback。
+
+派子 Agent 前仍须读 **`Blocked by`**（B2 不得与 B1 并行派发开发，见下节）。
+
+### 3. 处理完毕：标记已消费
+
+```bash
+./scripts/epic/events.sh --epic <EPIC_NUMBER> mark-handled <comment_id>
+```
+
+处理人工 PR 意见时，**在该评论下回复**（禁止另开顶层汇总评）：
+
+```bash
+./scripts/epic/gh-reply.sh --repo <owner>/<repo> --pr <pr> --comment-id <id> --body-file reply.md
+```
+
+- Review 行评：`pulls/{pr}/comments/{id}/replies`（真 thread）
+- Conversation 评论：API 不支持 thread 时用 **Quote reply**（`gh-reply.sh` 自动引用原文）
+
+### 4. Epic 结束：停止轮询
+
+```bash
+./scripts/epic/poll-stop.sh --epic <EPIC_NUMBER>
+```
+
+### 辅助命令
+
+```bash
+./scripts/epic/scan-scope.sh --epic <EPIC_NUMBER>     # 查看扫描范围
+./scripts/epic/events.sh --epic <EPIC_NUMBER> list    # pending 事件 JSON
+./scripts/epic/poll-once.sh --epic <EPIC_NUMBER>      # 手动单次扫描
+tail -f /tmp/epic-<EPIC>-poll/poll.log                # 轮询日志
+```
+
+可选默认：`scripts/epic/epic.env`（仅 `REPO`、`INTERVAL`，**不含 Epic 号**）。
 
 ---
 
@@ -71,57 +100,40 @@ Discussion 阶段表常写「A1–A2 ∥ B1–B2」，表示**同一阶段可同
 | B2 | B1 | **否** — B1 至少 ReadyToMerge / 合入后再派 B2 |
 | A1 / A2 | —（阶段 1） | 可以 |
 
-**#1928 实际偏差**：编排 Agent 把 B2 与 B1 同批并行派发，**忽略了 #2599 上的 `Blocked by: B1`** 以及 Discussion 明细表中 B2 依赖 B1。B2 的矩阵盘点虽多为只读，但按 Epic 契约应等 B1 透传 helper 就绪后再做，避免重复口径、返工。
-
 「并行不等反馈」指：**已派发且互不依赖**的 Issue 之间，不因某个 PR 被 comment 就阻塞其它 PR 的开发；**不**表示可以跳过 `Blocked by`。
 
 ---
 
-## 人工评论后：推荐流程
+## 评论事件路由
 
-```mermaid
-sequenceDiagram
-  participant Human as 人工
-  participant GH as GitHub PR
-  participant Wake as wake-local / 人工
-  participant Orch as 编排 Agent
-  participant Sub as 执行 Agent
+| 信号 | 动作 |
+|------|------|
+| 新增人工评论（无 `from=agent`） | AddressFeedback |
+| Agent 评论 `action=required` | AddressFeedback |
+| Agent 评论 `action=none/fyi` | 跳过（仅信息） |
+| 仅 CI 红、无新 comment | 修 CI（本 PR 范围） |
+| ReadyToMerge、无新 comment | 不动，@人工 Merge |
+| 需架构决策 | `needs-human` |
 
-  Human->>GH: PR 评论
-  Wake->>Orch: 启动会话（仅本 Epic 上下文）
-  Orch->>GH: triage-pr-feedback + gh 拉 CI
-  Orch->>Sub: AddressFeedback
-  Sub->>GH: push + from=agent 回复
-  Orch-->>Human: 汇报；退出
-```
+评论标识：`comment-convention.md`。
 
 ---
 
-## Triage 清单（仅本 Epic）
+## 手动 gh Triage（补充）
+
+轮询未覆盖或需深挖 CI 时，编排 Agent 仍可直接：
 
 ```bash
 REPO=<owner>/<repo>
 EPIC=<epic_number>
 
 gh issue view $EPIC --repo $REPO --json title,body,subIssuesSummary
-bash scripts/epic/triage-pr-feedback.sh --repo $REPO --epic $EPIC
 
 PR=<number>
-bash scripts/epic/triage-pr-feedback.sh --repo $REPO --pr $PR --latest-only
-gh pr view $PR --repo $REPO --json reviews,comments,statusCheckRollup
+gh pr view $PR --repo $REPO --json reviews,comments,statusCheckRollup,headRefName
+gh api repos/$REPO/pulls/$PR/comments --jq '.[] | {user:.user.login, path, line, body}'
 gh pr checks $PR --repo $REPO
 ```
-
-路由规则：
-
-| 信号 | 动作 |
-|------|------|
-| 人工新评论 / CI 红 + comment | AddressFeedback |
-| 仅 CI 红 | 修 CI（本 PR 范围） |
-| ReadyToMerge、无新 comment | 不动，@人工 Merge |
-| 需架构决策 | `needs-human` |
-
-评论标识：`comment-convention.md`（仅 Agent 必打 footer）。
 
 ---
 
@@ -131,7 +143,6 @@ gh pr checks $PR --repo $REPO
 |------|------------|------|
 | 派发**无依赖**的并行步骤 | **不等** | 派子 Agent 后汇总 draft PR |
 | 有 `Blocked by` 的步骤 | **等 blocker** | 不得与 blocker 并行派发 |
-| PR review 中 | 无唤醒则不处理 | comment 需一次唤醒 |
 | ReadyToMerge | **等 Merge** | 仅 Merge 必须人工 |
 
 ---
@@ -143,5 +154,6 @@ gh pr checks $PR --repo $REPO
 | 总进度 | Epic checklist + Sub-issues |
 | PR 链接 | 子 Issue 评论 |
 | 阻塞 | `needs-human` label |
+| 轮询 baseline / 事件 | `/tmp/epic-<EPIC>-poll/` |
 
 不建议依赖编排 Agent 会话内存。
