@@ -7,6 +7,8 @@
 ### 原生插件
 
 > **Log / Metric / Span**：Native Input 产出的 `PipelineEvent` 类型；随插件演进持续更新本表。
+>
+> **图例**：`✓` = 支持（Yes）；`—` = 不支持（No）。
 
 | 名称 | 提供方 | Log | Metric | Span | 简介 |
 | --- | --- | --- | --- | --- | --- |
@@ -19,7 +21,7 @@
 | `input_host_meta`<br>[主机元数据](input/native/input-host-meta.md) | SLS 官方 | ✓ | — | — | 定时采集主机、进程及关联关系等元数据。 |
 | `input_host_monitor`<br>[主机监控数据](input/native/input-host-monitor.md) | SLS 官方 | — | ✓ | — | 采集主机 CPU/内存/磁盘/网络等指标。 |
 | `input_internal_alarms`<br>[自监控告警数据](input/native/input-internal-alarms.md) | SLS 官方 | ✓ | — | — | 导出自监控告警数据。 |
-| `input_internal_config_container_info` | SLS 官方 | ✓ | — | — | 导出容器配置快照。 |
+| `input_internal_config_container_info`<br>(暂无文档) | SLS 官方 | ✓ | — | — | 导出容器配置快照。 |
 | `input_internal_metrics`<br>[自监控指标数据](input/native/input-internal-metrics.md) | SLS 官方 | — | ✓ | — | 导出自监控指标数据。 |
 | `input_network_observer`<br>[eBPF 网络可观测数据](input/native/input-network-observer.md) | SLS 官方 | ✓ | ✓ | ✓ | eBPF 网络可观测数据采集。 |
 | `input_network_security`<br>[eBPF 网络安全数据](input/native/input-network-security.md) | SLS 官方 | ✓ | — | — | eBPF 网络安全数据采集。 |
