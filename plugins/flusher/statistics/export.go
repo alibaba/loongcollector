@@ -12,18 +12,108 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package exportutil
+package statistics
 
 import (
 	"bytes"
 	"encoding/json"
 	"fmt"
 
+	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/models"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
+	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
-// SerializePassthroughEvent JSON-encodes Metric/Span (and other non-log) events for log-only flushers.
-func SerializePassthroughEvent(event models.PipelineEvent) ([]byte, error) {
+const passthroughLogKey = "__pipeline_passthrough__"
+
+func (p *FlusherStatistics) Export(groups []*models.PipelineGroupEvents, _ pipeline.PipelineContext) error {
+	for _, groupEvents := range groups {
+		if groupEvents == nil || len(groupEvents.Events) == 0 {
+			continue
+		}
+		logEvents, passThrough := partitionLogOnlyEvents(groupEvents.Events)
+		if len(logEvents) == 0 && len(passThrough) == 0 {
+			continue
+		}
+		logGroup, err := eventsToLogGroup(groupEvents.Group, logEvents)
+		if err != nil {
+			return err
+		}
+		if err := appendPassthroughLogs(logGroup, passThrough); err != nil {
+			return err
+		}
+		if len(logGroup.Logs) == 0 {
+			continue
+		}
+		if err := p.Flush("", "", "", []*protocol.LogGroup{logGroup}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func partitionLogOnlyEvents(events []models.PipelineEvent) (logEvents, passThrough []models.PipelineEvent) {
+	for _, event := range events {
+		if event.GetType() == models.EventTypeLogging {
+			logEvents = append(logEvents, event)
+		} else {
+			passThrough = append(passThrough, event)
+		}
+	}
+	return logEvents, passThrough
+}
+
+func eventsToLogGroup(group *models.GroupInfo, logEvents []models.PipelineEvent) (*protocol.LogGroup, error) {
+	logGroup := &protocol.LogGroup{
+		Logs: make([]*protocol.Log, 0, len(logEvents)),
+	}
+	if group != nil {
+		logGroup.LogTags = make([]*protocol.LogTag, 0, group.GetTags().Len())
+		for k, v := range group.GetTags().Iterator() {
+			logGroup.LogTags = append(logGroup.LogTags, &protocol.LogTag{
+				Key:   k,
+				Value: v,
+			})
+		}
+	}
+	for _, event := range logEvents {
+		log, ok := event.(*models.Log)
+		if !ok {
+			return nil, fmt.Errorf("expected log event, got %T", event)
+		}
+		pbLog, err := helper.TransferLogEventToPB(log)
+		if err != nil {
+			return nil, err
+		}
+		legacyLog, err := helper.TransferPBLogEventToLegacyLog(pbLog)
+		if err != nil {
+			return nil, err
+		}
+		logGroup.Logs = append(logGroup.Logs, legacyLog)
+	}
+	return logGroup, nil
+}
+
+func appendPassthroughLogs(logGroup *protocol.LogGroup, passThrough []models.PipelineEvent) error {
+	for _, event := range passThrough {
+		payload, err := serializePassthroughEvent(event)
+		if err != nil {
+			return err
+		}
+		ts := event.GetTimestamp()
+		logGroup.Logs = append(logGroup.Logs, &protocol.Log{
+			Time: uint32(ts / 1e9),
+			Contents: []*protocol.Log_Content{{
+				Key:   passthroughLogKey,
+				Value: string(payload),
+			}},
+		})
+	}
+	return nil
+}
+
+func serializePassthroughEvent(event models.PipelineEvent) ([]byte, error) {
 	payload, err := passthroughPayload(event)
 	if err != nil {
 		return nil, err

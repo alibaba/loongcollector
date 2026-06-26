@@ -21,22 +21,31 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/alibaba/ilogtail/pkg/models"
-	"github.com/alibaba/ilogtail/pkg/protocol"
-	"github.com/alibaba/ilogtail/plugins/flusher/exportutil"
 )
 
-// TestFlusherKafkaExportDefaultProtocol covers the custom_single Export path used by FlusherKafka.Export.
-func TestFlusherKafkaExportDefaultProtocol(t *testing.T) {
-	var flushed int
+func TestExportLogOnlyPreservesMetricAndSpan(t *testing.T) {
 	groups := mixedLogMetricSpanGroups()
-	err := exportutil.ExportLogOnly(groups, "", "", "", func(_ string, _ string, _ string, logGroupList []*protocol.LogGroup) error {
-		for _, lg := range logGroupList {
-			flushed += len(lg.Logs)
-		}
-		return nil
-	})
-	require.NoError(t, err)
+	var flushed int
+	for _, groupEvents := range groups {
+		logEvents, passThrough := partitionLogOnlyEvents(groupEvents.Events)
+		logGroup, err := eventsToLogGroup(groupEvents.Group, logEvents)
+		require.NoError(t, err)
+		require.NoError(t, appendPassthroughLogs(logGroup, passThrough))
+		flushed += len(logGroup.Logs)
+	}
 	assert.Equal(t, 3, flushed)
+}
+
+func TestSerializePassthroughEventMetricAndSpan(t *testing.T) {
+	metric := models.NewSingleValueMetric("cpu", models.MetricTypeGauge, models.NewTagsWithKeyValues("host", "h1"), 100, 0.5)
+	metricPayload, err := serializePassthroughEvent(metric)
+	require.NoError(t, err)
+	assert.Contains(t, string(metricPayload), `"eventType":"metric"`)
+
+	span := models.NewSpan("op", "trace-id", "span-id", models.SpanKindServer, 200, 201, models.NewTags(), nil, nil)
+	spanPayload, err := serializePassthroughEvent(span)
+	require.NoError(t, err)
+	assert.Contains(t, string(spanPayload), `"eventType":"span"`)
 }
 
 func mixedLogMetricSpanGroups() []*models.PipelineGroupEvents {

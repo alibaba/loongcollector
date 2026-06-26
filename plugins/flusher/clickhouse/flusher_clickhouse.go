@@ -24,12 +24,10 @@ import (
 	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
-	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	converter "github.com/alibaba/ilogtail/pkg/protocol/converter"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
-	"github.com/alibaba/ilogtail/plugins/flusher/exportutil"
 )
 
 type FlusherClickHouse struct {
@@ -185,10 +183,6 @@ func (f *FlusherClickHouse) Flush(projectName string, logstoreName string, confi
 }
 
 var _ pipeline.FlusherV2 = (*FlusherClickHouse)(nil)
-
-func (f *FlusherClickHouse) Export(groups []*models.PipelineGroupEvents, _ pipeline.PipelineContext) error {
-	return exportutil.ExportLogOnly(groups, "", "", "", f.Flush)
-}
 
 func (f *FlusherClickHouse) BufferFlush(projectName string, logstoreName string, configName string, logGroupList []*protocol.LogGroup) error {
 	ctx := context.Background()

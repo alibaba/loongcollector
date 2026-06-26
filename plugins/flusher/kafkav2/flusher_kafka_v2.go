@@ -33,7 +33,6 @@ import (
 	converter "github.com/alibaba/ilogtail/pkg/protocol/converter"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pkg/util"
-	"github.com/alibaba/ilogtail/plugins/flusher/exportutil"
 )
 
 const (
@@ -300,43 +299,16 @@ func (k *FlusherKafka) Flush(projectName string, logstoreName string, configName
 }
 
 func (k *FlusherKafka) Export(groupEventsArray []*models.PipelineGroupEvents, ctx pipeline.PipelineContext) error {
-	if k.converter.Protocol == converter.ProtocolRaw || k.converter.Protocol == converter.ProtocolInfluxdb {
-		return k.exportWithConverterV2(groupEventsArray)
-	}
-	return exportutil.ExportLogOnly(groupEventsArray, "", "", "", k.Flush)
-}
-
-var _ pipeline.FlusherV2 = (*FlusherKafka)(nil)
-
-func (k *FlusherKafka) exportWithConverterV2(groupEventsArray []*models.PipelineGroupEvents) error {
 	for _, groupEvents := range groupEventsArray {
 		logger.Debug(k.context.GetRuntimeContext(), "[GroupEvents] events count", len(groupEvents.Events),
 			"tags", groupEvents.Group.GetTags().Iterator())
-		converterEvents, passthroughEvents := exportutil.PartitionForConverterProtocol(k.converter.Protocol, groupEvents.Events)
-		if len(converterEvents) > 0 {
-			subGroup := &models.PipelineGroupEvents{Group: groupEvents.Group, Events: converterEvents}
-			if err := k.exportGroupWithConverterV2(subGroup); err != nil {
-				return err
-			}
+		logs, values, err := k.converter.ToByteStreamWithSelectedFieldsV2(groupEvents, k.selectFields)
+		if err != nil {
+			logger.Warning(k.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "flush kafka convert log fail, error", err)
 		}
-		if len(passthroughEvents) > 0 {
-			if err := exportutil.ExportLogOnly([]*models.PipelineGroupEvents{{
-				Group: groupEvents.Group, Events: passthroughEvents,
-			}}, "", "", "", k.Flush); err != nil {
-				return err
-			}
+		for index, log := range logs.([][]byte) {
+			k.flush(log, values[index])
 		}
-	}
-	return nil
-}
-
-func (k *FlusherKafka) exportGroupWithConverterV2(groupEvents *models.PipelineGroupEvents) error {
-	logs, values, err := k.converter.ToByteStreamWithSelectedFieldsV2(groupEvents, k.selectFields)
-	if err != nil {
-		logger.Warning(k.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "flush kafka convert log fail, error", err)
-	}
-	for index, log := range logs.([][]byte) {
-		k.flush(log, values[index])
 	}
 	return nil
 }

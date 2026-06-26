@@ -19,10 +19,8 @@ import (
 	"time"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
-	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
-	"github.com/alibaba/ilogtail/plugins/flusher/exportutil"
 
 	"github.com/paulbellamy/ratecounter"
 )
@@ -87,10 +85,6 @@ func (p *FlusherStatistics) Flush(projectName string, logstoreName string, confi
 }
 
 var _ pipeline.FlusherV2 = (*FlusherStatistics)(nil)
-
-func (p *FlusherStatistics) Export(groups []*models.PipelineGroupEvents, _ pipeline.PipelineContext) error {
-	return exportutil.ExportLogOnly(groups, "", "", "", p.Flush)
-}
 
 // IsReady is ready to flush
 func (*FlusherStatistics) IsReady(projectName string, logstoreName string, logstoreKey int64) bool {

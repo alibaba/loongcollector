@@ -17,10 +17,8 @@ package sleep
 import (
 	"time"
 
-	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
-	"github.com/alibaba/ilogtail/plugins/flusher/exportutil"
 )
 
 type FlusherSleep struct {
@@ -43,10 +41,6 @@ func (p *FlusherSleep) Flush(projectName string, logstoreName string, configName
 }
 
 var _ pipeline.FlusherV2 = (*FlusherSleep)(nil)
-
-func (p *FlusherSleep) Export(groups []*models.PipelineGroupEvents, _ pipeline.PipelineContext) error {
-	return exportutil.ExportLogOnly(groups, "", "", "", p.Flush)
-}
 
 func (*FlusherSleep) SetUrgent(flag bool) {
 }
