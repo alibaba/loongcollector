@@ -38,6 +38,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	converter "github.com/alibaba/ilogtail/pkg/protocol/converter"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
+	"github.com/alibaba/ilogtail/plugins/flusher/exportutil"
 )
 
 const (
@@ -199,19 +200,100 @@ func (f *FlusherHTTP) Flush(projectName string, logstoreName string, configName 
 }
 
 func (f *FlusherHTTP) Export(groupEventsArray []*models.PipelineGroupEvents, ctx pipeline.PipelineContext) error {
+	if f.encoder != nil {
+		return f.exportWithEncoder(groupEventsArray)
+	}
+	if f.usesConverterV2Export() {
+		return f.exportWithConverterV2(groupEventsArray)
+	}
+	return f.exportViaAsyncQueue(groupEventsArray)
+}
+
+func (f *FlusherHTTP) usesConverterV2Export() bool {
+	return f.exportProtocolName() == converter.ProtocolRaw || f.exportProtocolName() == converter.ProtocolInfluxdb
+}
+
+func (f *FlusherHTTP) exportProtocolName() string {
+	if f.converter != nil {
+		return f.converter.Protocol
+	}
+	return f.Convert.Protocol
+}
+
+func (f *FlusherHTTP) exportViaAsyncQueue(groupEventsArray []*models.PipelineGroupEvents) error {
 	for _, groupEvents := range groupEventsArray {
 		if !f.AsyncIntercept && f.interceptor != nil {
 			groupEvents = f.interceptor.Intercept(groupEvents)
-			// skip groupEvents that is nil or empty.
 			if groupEvents == nil || len(groupEvents.Events) == 0 {
 				continue
 			}
 		}
-
 		f.addTask(groupEvents)
 	}
 	return nil
 }
+
+func (f *FlusherHTTP) exportWithEncoder(groupEventsArray []*models.PipelineGroupEvents) error {
+	for _, groupEvents := range groupEventsArray {
+		if !f.AsyncIntercept && f.interceptor != nil {
+			groupEvents = f.interceptor.Intercept(groupEvents)
+			if groupEvents == nil || len(groupEvents.Events) == 0 {
+				continue
+			}
+		}
+		f.addTask(groupEvents)
+	}
+	return nil
+}
+
+func (f *FlusherHTTP) exportWithConverterV2(groupEventsArray []*models.PipelineGroupEvents) error {
+	for _, groupEvents := range groupEventsArray {
+		if !f.AsyncIntercept && f.interceptor != nil {
+			groupEvents = f.interceptor.Intercept(groupEvents)
+			if groupEvents == nil || len(groupEvents.Events) == 0 {
+				continue
+			}
+		}
+		converterEvents, passthroughEvents := partitionForConverterProtocol(f.exportProtocolName(), groupEvents.Events)
+		if len(converterEvents) > 0 {
+			f.addTask(&models.PipelineGroupEvents{Group: groupEvents.Group, Events: converterEvents})
+		}
+		if len(passthroughEvents) > 0 {
+			if err := exportutil.ExportLogOnly([]*models.PipelineGroupEvents{{
+				Group: groupEvents.Group, Events: passthroughEvents,
+			}}, "", "", "", f.Flush); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func partitionForConverterProtocol(protocol string, events []models.PipelineEvent) (converterEvents, passthroughEvents []models.PipelineEvent) {
+	switch protocol {
+	case converter.ProtocolInfluxdb:
+		for _, event := range events {
+			if event.GetType() == models.EventTypeMetric {
+				converterEvents = append(converterEvents, event)
+			} else {
+				passthroughEvents = append(passthroughEvents, event)
+			}
+		}
+	case converter.ProtocolRaw:
+		for _, event := range events {
+			if event.GetType() == models.EventTypeByteArray {
+				converterEvents = append(converterEvents, event)
+			} else {
+				passthroughEvents = append(passthroughEvents, event)
+			}
+		}
+	default:
+		return exportutil.PartitionEvents(events, exportutil.LogOnlyEventKinds)
+	}
+	return converterEvents, passthroughEvents
+}
+
+var _ pipeline.FlusherV2 = (*FlusherHTTP)(nil)
 
 func (f *FlusherHTTP) SetUrgent(flag bool) {
 }
@@ -412,6 +494,28 @@ func (f *FlusherHTTP) encodeAndFlush(event any) error {
 	return nil
 }
 
+func (f *FlusherHTTP) flushLogGroupSync(_ string, _ string, _ string, logGroupList []*protocol.LogGroup) error {
+	for _, logGroup := range logGroupList {
+		logs, varValues, err := f.converter.ToByteStreamWithSelectedFields(logGroup, f.varKeys)
+		if err != nil {
+			return err
+		}
+		switch rows := logs.(type) {
+		case [][]byte:
+			for idx, data := range rows {
+				if err := f.flushWithRetry(data, varValues[idx]); err != nil {
+					return err
+				}
+			}
+		case []byte:
+			if err := f.flushWithRetry(rows, varValues[0]); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 func (f *FlusherHTTP) convertAndFlush(data interface{}) error {
 	defer f.countDownTask()
 	var logs interface{}
@@ -427,7 +531,13 @@ func (f *FlusherHTTP) convertAndFlush(data interface{}) error {
 				return nil
 			}
 		}
+		if f.converter == nil {
+			return exportutil.ExportLogOnly([]*models.PipelineGroupEvents{v}, "", "", "", f.flushLogGroupSync)
+		}
 		logs, varValues, err = f.converter.ToByteStreamWithSelectedFieldsV2(v, f.varKeys)
+		if err != nil {
+			return exportutil.ExportLogOnly([]*models.PipelineGroupEvents{v}, "", "", "", f.flushLogGroupSync)
+		}
 	default:
 		return fmt.Errorf("unsupport data type")
 	}

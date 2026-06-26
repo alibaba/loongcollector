@@ -21,8 +21,10 @@ import (
 	"sync"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/plugins/flusher/exportutil"
 )
 
 type FlusherChecker struct {
@@ -137,6 +139,12 @@ func (p *FlusherChecker) Flush(projectName string, logstoreName string, configNa
 		}
 	}
 	return nil
+}
+
+var _ pipeline.FlusherV2 = (*FlusherChecker)(nil)
+
+func (p *FlusherChecker) Export(groups []*models.PipelineGroupEvents, _ pipeline.PipelineContext) error {
+	return exportutil.ExportLogOnly(groups, "", "", "", p.Flush)
 }
 
 // IsReady is ready to flush

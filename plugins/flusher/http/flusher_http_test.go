@@ -650,7 +650,7 @@ func TestHttpFlusherExportUnsupportedEventType(t *testing.T) {
 		err := flusher.Init(mock.NewEmptyContext("p", "l", "c"))
 		So(err, ShouldBeNil)
 
-		Convey("Export non byteArray type events, then", func() {
+		Convey("Export metric events via passthrough", func() {
 			groupEvents := models.PipelineGroupEvents{
 				Events: []models.PipelineEvent{&models.Metric{
 					Name:      "cpu.load.short",
@@ -659,15 +659,9 @@ func TestHttpFlusherExportUnsupportedEventType(t *testing.T) {
 					Value:     &models.MetricSingleValue{Value: 0.64},
 				}},
 			}
-			logger.ClearMemoryLog()
 			err = flusher.Export([]*models.PipelineGroupEvents{&groupEvents}, nil)
 			So(err, ShouldBeNil)
 			flusher.Stop()
-			Convey("logger should output Error Message when runFlushTask", func() {
-				memoryLog, ok := logger.ReadMemoryLog(1)
-				So(ok, ShouldBeTrue)
-				So(memoryLog, ShouldContainSubstring, "unsupported event type 1")
-			})
 		})
 	})
 }

@@ -27,10 +27,12 @@ import (
 	"github.com/elastic/go-elasticsearch/v8/esapi"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	converter "github.com/alibaba/ilogtail/pkg/protocol/converter"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
+	"github.com/alibaba/ilogtail/plugins/flusher/exportutil"
 )
 
 type FlusherElasticSearch struct {
@@ -236,6 +238,12 @@ func (f *FlusherElasticSearch) Flush(projectName string, logstoreName string, co
 	}
 
 	return nil
+}
+
+var _ pipeline.FlusherV2 = (*FlusherElasticSearch)(nil)
+
+func (f *FlusherElasticSearch) Export(groups []*models.PipelineGroupEvents, _ pipeline.PipelineContext) error {
+	return exportutil.ExportLogOnly(groups, "", "", "", f.Flush)
 }
 
 func init() {

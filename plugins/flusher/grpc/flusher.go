@@ -24,10 +24,12 @@ import (
 	"google.golang.org/grpc/encoding"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pkg/util"
+	"github.com/alibaba/ilogtail/plugins/flusher/exportutil"
 )
 
 type Flusher struct {
@@ -111,6 +113,12 @@ func (f *Flusher) Flush(projectName string, logstoreName string, configName stri
 		}
 	}
 	return nil
+}
+
+var _ pipeline.FlusherV2 = (*Flusher)(nil)
+
+func (f *Flusher) Export(groups []*models.PipelineGroupEvents, _ pipeline.PipelineContext) error {
+	return exportutil.ExportLogOnly(groups, "", "", "", f.Flush)
 }
 
 func (f *Flusher) SetUrgent(flag bool) {

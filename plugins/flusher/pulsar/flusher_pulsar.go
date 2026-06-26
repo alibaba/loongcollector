@@ -24,11 +24,13 @@ import (
 
 	"github.com/alibaba/ilogtail/pkg/fmtstr"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	converter "github.com/alibaba/ilogtail/pkg/protocol/converter"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pkg/util"
+	"github.com/alibaba/ilogtail/plugins/flusher/exportutil"
 )
 
 type FlusherPulsar struct {
@@ -230,6 +232,12 @@ func (f *FlusherPulsar) Description() string {
 }
 
 func (*FlusherPulsar) SetUrgent(flag bool) {
+}
+
+var _ pipeline.FlusherV2 = (*FlusherPulsar)(nil)
+
+func (f *FlusherPulsar) Export(groups []*models.PipelineGroupEvents, _ pipeline.PipelineContext) error {
+	return exportutil.ExportLogOnly(groups, "", "", "", f.Flush)
 }
 
 // IsReady is ready to flush
