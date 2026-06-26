@@ -26,6 +26,7 @@ import (
 	"github.com/apache/doris/sdk/go-doris-sdk/pkg/load"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	converter "github.com/alibaba/ilogtail/pkg/protocol/converter"
@@ -282,7 +283,21 @@ func (f *FlusherDoris) Flush(projectName string, logstoreName string, configName
 	return f.flushSync(logGroupList)
 }
 
-var _ pipeline.FlusherV2 = (*FlusherDoris)(nil)
+func (f *FlusherDoris) Export(groups []*models.PipelineGroupEvents, _ pipeline.PipelineContext) error {
+	for _, groupEvents := range groups {
+		logGroup, err := converter.PipelineGroupEventsToLogGroup(groupEvents)
+		if err != nil {
+			return err
+		}
+		if logGroup == nil || len(logGroup.Logs) == 0 {
+			continue
+		}
+		if err := f.Flush("", "", "", []*protocol.LogGroup{logGroup}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
 // addTask adds a flush task to the queue for async processing
 // This method will BLOCK if the queue is full, ensuring NO DATA LOSS

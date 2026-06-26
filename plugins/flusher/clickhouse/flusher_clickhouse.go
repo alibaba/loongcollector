@@ -24,6 +24,7 @@ import (
 	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	converter "github.com/alibaba/ilogtail/pkg/protocol/converter"
@@ -182,7 +183,23 @@ func (f *FlusherClickHouse) Flush(projectName string, logstoreName string, confi
 	return f.flusher(projectName, logstoreName, configName, logGroupList)
 }
 
-var _ pipeline.FlusherV2 = (*FlusherClickHouse)(nil)
+func (f *FlusherClickHouse) Export(groups []*models.PipelineGroupEvents, _ pipeline.PipelineContext) error {
+	ctx := context.Background()
+	for _, groupEvents := range groups {
+		serializedLogs, err := f.converter.ToByteStreamV2(groupEvents)
+		if err != nil {
+			logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "flush clickhouse convert log fail, error", err)
+			continue
+		}
+		for _, log := range serializedLogs.([][]byte) {
+			sql := fmt.Sprintf("INSERT INTO %s.ilogtail_%s_buffer (_timestamp, _log) VALUES (%d, '%s')", f.Authentication.PlainText.Database, f.Table, time.Now().Unix(), string(log))
+			if err := f.conn.AsyncInsert(ctx, sql, false); err != nil {
+				logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "flush clickhouse AsyncInsert fail, error", err)
+			}
+		}
+	}
+	return nil
+}
 
 func (f *FlusherClickHouse) BufferFlush(projectName string, logstoreName string, configName string, logGroupList []*protocol.LogGroup) error {
 	ctx := context.Background()

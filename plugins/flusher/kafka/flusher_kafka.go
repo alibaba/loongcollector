@@ -23,8 +23,10 @@ import (
 	"github.com/IBM/sarama"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
+	converter "github.com/alibaba/ilogtail/pkg/protocol/converter"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
@@ -179,10 +181,24 @@ func (k *FlusherKafka) hashPartitionKey(log *protocol.Log, defaultKey string) sa
 	return sarama.StringEncoder(strings.Join(hashData, "###"))
 }
 
-func (*FlusherKafka) SetUrgent(flag bool) {
+func (k *FlusherKafka) Export(groups []*models.PipelineGroupEvents, _ pipeline.PipelineContext) error {
+	for _, groupEvents := range groups {
+		logGroup, err := converter.PipelineGroupEventsToLogGroup(groupEvents)
+		if err != nil {
+			return err
+		}
+		if logGroup == nil || len(logGroup.Logs) == 0 {
+			continue
+		}
+		if err := k.Flush("", "", "", []*protocol.LogGroup{logGroup}); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
-var _ pipeline.FlusherV2 = (*FlusherKafka)(nil)
+func (*FlusherKafka) SetUrgent(flag bool) {
+}
 
 // IsReady is ready to flush
 func (k *FlusherKafka) IsReady(projectName string, logstoreName string, logstoreKey int64) bool {

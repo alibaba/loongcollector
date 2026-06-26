@@ -24,8 +24,10 @@ import (
 	"google.golang.org/grpc/encoding"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
+	converter "github.com/alibaba/ilogtail/pkg/protocol/converter"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
@@ -113,7 +115,21 @@ func (f *Flusher) Flush(projectName string, logstoreName string, configName stri
 	return nil
 }
 
-var _ pipeline.FlusherV2 = (*Flusher)(nil)
+func (f *Flusher) Export(groups []*models.PipelineGroupEvents, _ pipeline.PipelineContext) error {
+	for _, groupEvents := range groups {
+		logGroup, err := converter.PipelineGroupEventsToLogGroup(groupEvents)
+		if err != nil {
+			return err
+		}
+		if logGroup == nil || len(logGroup.Logs) == 0 {
+			continue
+		}
+		if err := f.Flush("", "", "", []*protocol.LogGroup{logGroup}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
 func (f *Flusher) SetUrgent(flag bool) {
 }

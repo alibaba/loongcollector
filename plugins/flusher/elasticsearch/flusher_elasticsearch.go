@@ -27,6 +27,7 @@ import (
 	"github.com/elastic/go-elasticsearch/v8/esapi"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	converter "github.com/alibaba/ilogtail/pkg/protocol/converter"
@@ -238,7 +239,54 @@ func (f *FlusherElasticSearch) Flush(projectName string, logstoreName string, co
 	return nil
 }
 
-var _ pipeline.FlusherV2 = (*FlusherElasticSearch)(nil)
+func (f *FlusherElasticSearch) Export(groups []*models.PipelineGroupEvents, _ pipeline.PipelineContext) error {
+	nowTime := time.Now().Local()
+	for _, groupEvents := range groups {
+		serializedLogs, values, err := f.converter.ToByteStreamWithSelectedFieldsV2(groupEvents, f.indexKeys)
+		if err != nil {
+			logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "flush elasticsearch convert log fail, error", err)
+			return err
+		}
+		var buffer []string
+		for index, log := range serializedLogs.([][]byte) {
+			ESIndex := &f.Index
+			if f.isDynamicIndex {
+				valueMap := values[index]
+				ESIndex, err = fmtstr.FormatIndex(valueMap, f.Index, uint32(nowTime.Unix()))
+				if err != nil {
+					logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "flush elasticsearch format index fail, error", err)
+					return err
+				}
+			}
+			var builder strings.Builder
+			builder.WriteString(`{"index": {"_index": "`)
+			builder.WriteString(*ESIndex)
+			builder.WriteString(`"}}`)
+			buffer = append(buffer, builder.String())
+			buffer = append(buffer, string(log))
+		}
+		body := strings.Join(buffer, "\n")
+		req := esapi.BulkRequest{
+			Body: strings.NewReader(body + "\n"),
+		}
+
+		res, err := req.Do(context.Background(), f.esClient)
+		if err != nil {
+			logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "flush elasticsearch request fail, error", err)
+			return err
+		}
+		defer res.Body.Close()
+
+		if res.StatusCode >= 400 && res.StatusCode <= 499 {
+			logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "flush elasticsearch request client error", res)
+			return fmt.Errorf("err status returned: %v", res.Status())
+		} else if res.StatusCode >= 500 && res.StatusCode <= 599 {
+			logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "flush elasticsearch request server error", res)
+			return fmt.Errorf("err status returned: %v", res.Status())
+		}
+	}
+	return nil
+}
 
 func init() {
 	pipeline.Flushers["flusher_elasticsearch"] = func() pipeline.Flusher {

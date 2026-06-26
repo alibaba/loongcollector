@@ -172,8 +172,6 @@ func (f *FlusherLoki) Flush(projectName string, logstoreName string, configName 
 	return nil
 }
 
-var _ pipeline.FlusherV2 = (*FlusherLoki)(nil)
-
 func (f *FlusherLoki) Export(groups []*models.PipelineGroupEvents, _ pipeline.PipelineContext) error {
 	for _, groupEvents := range groups {
 		serializedLogs, values, err := f.converter.ToByteStreamWithSelectedFieldsV2(groupEvents, f.DynamicLabels)

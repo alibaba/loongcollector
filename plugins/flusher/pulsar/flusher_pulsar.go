@@ -233,8 +233,6 @@ func (f *FlusherPulsar) Description() string {
 func (*FlusherPulsar) SetUrgent(flag bool) {
 }
 
-var _ pipeline.FlusherV2 = (*FlusherPulsar)(nil)
-
 func (f *FlusherPulsar) Export(groups []*models.PipelineGroupEvents, _ pipeline.PipelineContext) error {
 	topic := f.Topic
 	for _, groupEvents := range groups {
