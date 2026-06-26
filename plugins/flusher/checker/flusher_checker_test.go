@@ -1,4 +1,4 @@
-// Copyright 2021 iLogtail Authors
+// Copyright 2026 iLogtail Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,49 +12,33 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package kafka
+package checker
 
 import (
 	"encoding/json"
+	"sort"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/protocol"
-	"github.com/alibaba/ilogtail/plugins/test"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
 )
 
-// Invalid Test
-func InvalidTestConnectAndWrite(t *testing.T) {
-	if testing.Short() {
-		t.Skip("Skipping integration test in short mode")
+func createLogByFields(fields map[string]string) *protocol.Log {
+	var slsLog protocol.Log
+	for key, val := range fields {
+		slsLog.Contents = append(slsLog.Contents, &protocol.Log_Content{Key: key, Value: val})
 	}
-
-	brokers := []string{"172.17.0.2:9092"}
-	k := &FlusherKafka{
-		Brokers:      brokers,
-		Topic:        "Test",
-		SASLUsername: "",
-		SASLPassword: "",
-	}
-
-	// Verify that we can connect to the Kafka broker
-	lctx := mock.NewEmptyContext("p", "l", "c")
-	err := k.Init(lctx)
-	require.NoError(t, err)
-
-	// Verify that we can successfully write data to the kafka broker
-	lgl := makeTestLogGroupList()
-	err = k.Flush("projectName", "logstoreName", "configName", lgl.GetLogGroupList())
-	require.NoError(t, err)
-	_ = k.Stop()
+	protocol.SetLogTime(&slsLog, uint32(time.Now().Unix()))
+	return &slsLog
 }
 
 func makeTestLogGroupList() *protocol.LogGroupList {
-	f := map[string]string{}
+	fields := map[string]string{}
 	lgl := &protocol.LogGroupList{
 		LogGroupList: make([]*protocol.LogGroup, 0, 10),
 	}
@@ -64,10 +48,9 @@ func makeTestLogGroupList() *protocol.LogGroupList {
 			Source: "",
 		}
 		for j := 1; j <= 10; j++ {
-			f["group"] = strconv.Itoa(i)
-			f["message"] = "The message: " + strconv.Itoa(j)
-			l := test.CreateLogByFields(f)
-			lg.Logs = append(lg.Logs, l)
+			fields["group"] = strconv.Itoa(i)
+			fields["message"] = "The message: " + strconv.Itoa(j)
+			lg.Logs = append(lg.Logs, createLogByFields(fields))
 		}
 		lgl.LogGroupList = append(lgl.LogGroupList, lg)
 	}
@@ -105,31 +88,40 @@ func makePipelineGroupEventsFromLogGroups(v1Groups []*protocol.LogGroup) []*mode
 	return v2Groups
 }
 
-func TestFlusherKafka_FlushExportParity(t *testing.T) {
+func logsToNormalizedJSON(logs []*protocol.Log) ([]string, error) {
+	out := make([]string, 0, len(logs))
+	for _, log := range logs {
+		fields := make(map[string]string, len(log.Contents))
+		for _, c := range log.Contents {
+			fields[c.Key] = c.Value
+		}
+		payload, err := json.Marshal(map[string]interface{}{
+			"time":   log.GetTime(),
+			"fields": fields,
+		})
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, string(payload))
+	}
+	sort.Strings(out)
+	return out, nil
+}
+
+func TestFlusherChecker_FlushExportParity(t *testing.T) {
 	v1Groups, v2Groups := makeParityLogGroups()
 
-	var flushPayloads, exportPayloads []string
-	newCapture := func(dst *[]string) FlusherFunc {
-		return func(_ string, _ string, _ string, logGroupList []*protocol.LogGroup) error {
-			for _, lg := range logGroupList {
-				for _, log := range lg.Logs {
-					buf, err := json.Marshal(log)
-					require.NoError(t, err)
-					*dst = append(*dst, string(buf))
-				}
-			}
-			return nil
-		}
-	}
+	flushChecker := &FlusherChecker{}
+	require.NoError(t, flushChecker.Init(mock.NewEmptyContext("p", "l", "c")))
+	require.NoError(t, flushChecker.Flush("", "", "", v1Groups))
 
-	flushFlusher := &FlusherKafka{flusher: newCapture(&flushPayloads)}
-	require.NoError(t, flushFlusher.Flush("", "", "", v1Groups))
+	exportChecker := &FlusherChecker{}
+	require.NoError(t, exportChecker.Init(mock.NewEmptyContext("p", "l", "c")))
+	require.NoError(t, exportChecker.Export(v2Groups, nil))
 
-	exportFlusher := &FlusherKafka{flusher: newCapture(&exportPayloads)}
-	require.NoError(t, exportFlusher.Export(v2Groups, nil))
-
-	require.Equal(t, len(flushPayloads), len(exportPayloads))
-	for i := range flushPayloads {
-		require.JSONEq(t, flushPayloads[i], exportPayloads[i])
-	}
+	v1JSON, err := logsToNormalizedJSON(flushChecker.LogGroup.Logs)
+	require.NoError(t, err)
+	v2JSON, err := logsToNormalizedJSON(exportChecker.LogGroup.Logs)
+	require.NoError(t, err)
+	require.Equal(t, v1JSON, v2JSON)
 }

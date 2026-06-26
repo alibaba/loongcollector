@@ -19,6 +19,8 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"sort"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -26,12 +28,90 @@ import (
 	"github.com/prometheus/common/model"
 	"github.com/stretchr/testify/require"
 
-	"github.com/alibaba/ilogtail/plugins/test/flusherparity"
+	"github.com/alibaba/ilogtail/pkg/models"
+	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/plugins/test"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
 )
 
+func makeTestLogGroupList() *protocol.LogGroupList {
+	fields := map[string]string{}
+	lgl := &protocol.LogGroupList{
+		LogGroupList: make([]*protocol.LogGroup, 0, 10),
+	}
+	for i := 1; i <= 10; i++ {
+		lg := &protocol.LogGroup{
+			Logs:   make([]*protocol.Log, 0, 10),
+			Source: "",
+		}
+		for j := 1; j <= 10; j++ {
+			fields["group"] = strconv.Itoa(i)
+			fields["message"] = "The message: " + strconv.Itoa(j)
+			l := test.CreateLogByFields(fields)
+			lg.Logs = append(lg.Logs, l)
+		}
+		lgl.LogGroupList = append(lgl.LogGroupList, lg)
+	}
+	return lgl
+}
+
+func makeParityLogGroups() ([]*protocol.LogGroup, []*models.PipelineGroupEvents) {
+	lg := makeTestLogGroupList().GetLogGroupList()[0]
+	single := &protocol.LogGroup{
+		Logs:   []*protocol.Log{lg.Logs[0]},
+		Source: "",
+	}
+	v1Groups := []*protocol.LogGroup{single}
+	return v1Groups, makePipelineGroupEventsFromLogGroups(v1Groups)
+}
+
+func makePipelineGroupEventsFromLogGroups(v1Groups []*protocol.LogGroup) []*models.PipelineGroupEvents {
+	v2Groups := make([]*models.PipelineGroupEvents, 0, len(v1Groups))
+	for _, lg := range v1Groups {
+		groupTags := models.NewTags()
+		groupTags.Add("host.ip", lg.Source)
+		for _, tag := range lg.LogTags {
+			groupTags.Add(tag.Key, tag.Value)
+		}
+		group := models.NewGroup(models.NewMetadata(), groupTags)
+		events := make([]models.PipelineEvent, 0, len(lg.Logs))
+		for _, log := range lg.Logs {
+			ts := uint64(log.GetTime()) * 1e9
+			if log.TimeNs != nil {
+				ts += uint64(*log.TimeNs)
+			}
+			v2Log := models.NewLog("", nil, "", "", "", models.NewTags(), ts)
+			for _, c := range log.Contents {
+				v2Log.GetIndices().Add(c.Key, c.Value)
+			}
+			events = append(events, v2Log)
+		}
+		v2Groups = append(v2Groups, &models.PipelineGroupEvents{Group: group, Events: events})
+	}
+	return v2Groups
+}
+
+func normalizeJSONLines(lines [][]byte) []string {
+	out := make([]string, 0, len(lines))
+	for _, line := range lines {
+		var obj map[string]interface{}
+		if err := json.Unmarshal(line, &obj); err != nil {
+			out = append(out, string(line))
+			continue
+		}
+		normalized, err := json.Marshal(obj)
+		if err != nil {
+			out = append(out, string(line))
+			continue
+		}
+		out = append(out, string(normalized))
+	}
+	sort.Strings(out)
+	return out
+}
+
 func TestFlusherLoki_FlushExportParity(t *testing.T) {
-	v1Groups, v2Groups := flusherparity.BuildCustomSingleParityFixtures()
+	v1Groups, v2Groups := makeParityLogGroups()
 
 	flushLines := captureLokiPayloads(t, func(f *FlusherLoki) error {
 		return f.Flush("", "", "", v1Groups)
@@ -67,7 +147,7 @@ func captureLokiPayloads(t *testing.T, run func(*FlusherLoki) error) []string {
 	for _, body := range bodies {
 		payloads = append(payloads, extractJSONLogLine(body))
 	}
-	return flusherparity.NormalizeJSONLines(toBytes(payloads))
+	return normalizeJSONLines(toBytes(payloads))
 }
 
 func extractJSONLogLine(body string) string {
@@ -75,11 +155,6 @@ func extractJSONLogLine(body string) string {
 	if start < 0 {
 		return body
 	}
-	end := start
-	for end < len(body) && body[end] != '}' {
-		end++
-	}
-	// include nested closing braces
 	depth := 0
 	for i := start; i < len(body); i++ {
 		switch body[i] {
@@ -95,7 +170,7 @@ func extractJSONLogLine(body string) string {
 			}
 		}
 	}
-	return body[start:end]
+	return body[start:]
 }
 
 func toBytes(lines []string) [][]byte {
