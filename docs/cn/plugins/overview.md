@@ -2,6 +2,16 @@
 
 下文各表按插件 **Type（反引号内英文名）字典序** 升序排列。
 
+## 事件能力列说明
+
+下列说明适用于**扩展 Processor**与**扩展 Flusher**表格中的 StructureType / 事件能力列（随插件演进持续更新）：
+
+- **v1 接口 / v2 接口**：是否实现 v1（`ProcessLogs` / `Flush(LogGroup)`）或 v2（`Process(PipelineGroupEvents)` / `Export`）处理路径。
+- **Log / Metric / Span**：对该事件类型的支持；`v1`/`dual`/`v2` 表示明确实现，`透传未知` 表示代码中无类型特化信号（可能随 Pipeline 透传）。
+- **占位符语义**：
+  - `—` 表示**不支持 / 未实现**。
+  - `TBD` 表示**尚未扫描确认**（待后续补充）。
+
 ## 输入
 
 ### 原生插件
@@ -72,9 +82,7 @@
 
 ### 扩展插件
 
-> **StructureType / 事件能力列说明**（扩展 Processor / Flusher；随插件演进持续更新）：
-> - **v1 接口 / v2 接口**：是否实现 v1（`ProcessLogs` / `Flush(LogGroup)`）或 v2（`Process(PipelineGroupEvents)` / `Export`）处理路径。
-> - **Log / Metric / Span**：对该事件类型的支持；`v1`/`dual`/`v2` 表示明确实现，`透传未知` 表示代码中无类型特化信号（可能随 Pipeline 透传）。
+> 各列含义见 [事件能力列说明](#事件能力列说明)。
 
 | 名称 | 提供方 | v1 接口 | v2 接口 | Log | Metric | Span | 简介 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -127,9 +135,7 @@
 
 ### 扩展插件
 
-> **StructureType / 事件能力列说明**（扩展 Processor / Flusher；随插件演进持续更新）：
-> - **v1 接口 / v2 接口**：是否实现 v1（`ProcessLogs` / `Flush(LogGroup)`）或 v2（`Process(PipelineGroupEvents)` / `Export`）处理路径。
-> - **Log / Metric / Span**：对该事件类型的支持；`v1`/`dual`/`v2` 表示明确实现，`透传未知` 表示代码中无类型特化信号（可能随 Pipeline 透传）。
+> 各列含义见 [事件能力列说明](#事件能力列说明)。
 
 | 名称 | 提供方 | v1 接口 | v2 接口 | Log | Metric | Span | 简介 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -140,8 +146,8 @@
 | `flusher_kafka`<br>[Kafka](flusher/extended/flusher-kafka.md) | 社区 | ✓ | — | v1 | 透传未知 | 透传未知 | 将采集到的数据输出到 Kafka。推荐使用下面的 flusher_kafka_v2 |
 | `flusher_kafka_v2`<br>[Kafka V2](flusher/extended/flusher-kafka-v2.md) | 社区<br>[shalousun](https://github.com/shalousun) | ✓ | ✓ | dual | 透传未知 | 透传未知 | 将采集到的数据输出到 Kafka。 |
 | `flusher_loki`<br>[Loki](flusher/extended/flusher-loki.md) | 社区<br>[abingcbc](https://github.com/abingcbc) | ✓ | — | v1 | 透传未知 | 透传未知 | 将采集到的数据输出到 Loki。 |
-| `flusher_otlp_log`<br>[OTLP 日志](flusher/extended/flusher-otlp.md) | 社区<br>[liuhaoyang](https://github.com/liuhaoyang) | ✓ | ✓ | dual | 透传未知 | 透传未知 | 将采集到的数据支持`Opentelemetry log protocol`的后端。 |
-| `flusher_prometheus`<br>[Prometheus](flusher/extended/flusher-prometheus.md) | 社区<br> | — | — | — | — | — | 将采集到的数据，经过处理后，通过 http 格式发送到指定的 Prometheus RemoteWrite 地址。（待扫描补充） |
+| `flusher_otlp_log`<br>[OTLP 日志](flusher/extended/flusher-otlp.md) | 社区<br>[liuhaoyang](https://github.com/liuhaoyang) | ✓ | ✓ | dual | 透传未知 | 透传未知 | 将采集到的数据支持`OpenTelemetry log protocol`的后端。 |
+| `flusher_prometheus`<br>[Prometheus](flusher/extended/flusher-prometheus.md) | 社区<br> | TBD | TBD | TBD | TBD | TBD | 将采集到的数据，经过处理后，通过 http 格式发送到指定的 Prometheus RemoteWrite 地址。（待扫描补充） |
 | `flusher_pulsar`<br>[Pulsar](flusher/extended/flusher-pulsar.md) | 社区<br>[shalousun](https://github.com/shalousun) | ✓ | — | v1 | 透传未知 | 透传未知 | 将采集到的数据输出到 Pulsar。 |
 | `flusher_stdout`<br>[标准输出/文件](flusher/extended/flusher-stdout.md) | SLS 官方 | ✓ | ✓ | dual | v2 | v2 | 将采集到的数据输出到标准输出或文件。 |
 
