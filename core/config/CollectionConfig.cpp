@@ -97,11 +97,11 @@ static void ReplaceEnvVarRef(Json::Value& value, bool& res) {
 }
 
 static const unordered_set<string>& GetNativeInputBlacklistWhenUsingGoPlugin() {
-    // A1: explicit blacklist of native inputs that cannot coexist with Go processors/flushers yet.
-    // All registered native inputs minus legacy whitelist:
+    // A1: explicit blacklist framework; populated to match pre-A1 legacy whitelist parity
+    // (does NOT expand Parse allow surface). Allowed native inputs:
     //   input_file, input_container_stdio, input_static_file_onetime,
     //   input_*_security, input_internal_metrics, input_internal_alarms.
-    // Remove one entry after B-line matrix/E2E proves runtime reachability.
+    // Remove one blacklist entry after B-line matrix/E2E proves end-to-end reachability.
     static const unordered_set<string> kBlacklist = {
         "input_agentsight",
         "input_cpu_profiling",
