@@ -205,6 +205,7 @@ wake 后读 inbox 并处理：
 > 不要用 `nohup`/`&` 脱离会话后台跑 poll——须 IDE 可见以便 monitor 唤醒。
 
 2. **读 `inbox --json` 后派执行 Agent**（代码/长验收由子 Agent 做）；编排 Agent **禁止**亲自 checkout、改代码、跑长构建。纯文字回复可简短代劳。派前读 **`Blocked by`**。
+   - **`pr_state` MERGED**：先 `merge-followup --pr <n> --json`，对 `unlocked[]` **每条立即 Task 派执行 Agent**，再 `mark-handled`。
 
 3. **子 Agent 完成后**编排 Agent `mark-handled`（或按回报代 mark）：
 
@@ -220,7 +221,7 @@ wake 后读 inbox 并处理：
 |----|------|
 | 扫描范围 | Epic Issue + checklist 子 Issue + 关联 PR（Issue/PR/Review 评论 **+ PR 状态 OPEN/MERGED/CLOSED**） |
 | 判读 | 无 `from=agent` → 待处理；`action=none/fyi` 的 Agent 评 → 跳过（见 `comment-convention.md`） |
-| **PR 状态事件** | PR 合并/关闭产生 `pr_state` 事件 → 编排 Agent 勾选 Epic checklist、清理 worktree、解锁被 `Blocked by` 此 PR 的后续 Issue |
+| **PR 状态事件** | PR 合并/关闭产生 `pr_state` 事件 → 编排 Agent 执行 **`merge-followup`**（勾选 checklist、清理 wt、更新/解锁后续 Issue、**立即派执行 Agent**） |
 | **Agent 唤醒** | 有 pending 时 poll 打印 `AGENT_TRIGGER_EPIC<N>` JSON → 编排 Agent monitor 后读 `inbox --json` |
 | 状态目录 | `/tmp/epic-<EPIC>-poll/`（`seen-ids.txt`、`events.jsonl`、`poll.log`） |
 | 间隔 | 默认 60s（`epic.env` 的 `INTERVAL` 或 `--interval`） |
@@ -376,7 +377,7 @@ make core PATH_IN_DOCKER=$(pwd)
 | `references/orchestration-model.md` | 轮询 / Triage / 派发 / 脚本参考 |
 | `references/comment-convention.md` | **PR/Issue 评论标识**（Agent footer） |
 | `references/github-templates.md` | Issue / PR 模板 |
-| `scripts/epic/epic.sh` | **单一入口**：`poll`/`inbox`/`triage`/`dispatch`/`events`/`scope`/`reply`/`stop` |
+| `scripts/epic/epic.sh` | **单一入口**：`poll`/`inbox`/`triage`/`dispatch`/`merge-followup`/`events`/`scope`/`reply`/`stop` |
 | `scripts/epic/dispatch-hook.sh` | 可选 bash hook（`AUTO_DISPATCH=true` 时） |
 
 默认部署：**poll + monitor `AGENT_TRIGGER` → 编排 Agent 只 triage/派发 → 执行 Agent 改代码/回复**。

@@ -23,6 +23,7 @@ Agent 在 Issue / PR 评论**末尾**附加 footer（与正文空一行）：
 | `action` | `none` | 信息性 |
 | | `required` | 少见，显式请求跟进 |
 | | `fyi` | 仅供参考 |
+| | `unlock-notify` / `start-dispatch` | 编排 Agent 解锁/开工通知（poll **跳过**） |
 
 ### 示例
 

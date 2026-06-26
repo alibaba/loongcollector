@@ -13,6 +13,7 @@
 #   scope       打印 Epic 范围（子 Issue + 关联 PR）
 #   reply       在评论 thread 内回复（review 行评真 thread；conversation 用 quote reply）
 #   stop        停止后台记录的 poll 循环
+#   merge-followup  PR merge 后：勾选 checklist、清理 worktree、解锁/更新后续 Issue、标记开工并输出派工 JSON
 #
 # 全局参数：--epic <n>（多数子命令必填）、--repo owner/repo、--interval 秒、--state-dir 路径
 # reply 专用：--pr <n> --comment-id <id> (--body 文本 | --body-file 路径)
@@ -70,7 +71,12 @@ is_actionable_body() {
   local body="$1" non_quoted
   non_quoted="$(printf '%s\n' "${body}" | grep -v '^[[:space:]]*>' || true)"
   if [[ "${non_quoted}" == *'from=agent'* ]]; then
-    if [[ "${non_quoted}" == *'action=none'* ]] || [[ "${non_quoted}" == *'action=fyi'* ]]; then
+    if [[ "${non_quoted}" == *'action=none'* ]] || [[ "${non_quoted}" == *'action=fyi'* ]] \
+      || [[ "${non_quoted}" == *'action=unlock-notify'* ]] \
+      || [[ "${non_quoted}" == *'action=start-dispatch'* ]] \
+      || [[ "${non_quoted}" == *'action=address-feedback'* ]] \
+      || [[ "${non_quoted}" == *'action=pr-opened'* ]] \
+      || [[ "${non_quoted}" == *'action=ready-to-merge'* ]]; then
       return 1
     fi
   fi
@@ -217,7 +223,8 @@ if kind == "pr_state":
     preview = e.get("preview", "")
     print("DISPATCH PR #{} STATE-CHANGE: {} (epic #{})".format(target, preview, epic))
     if "MERGED" in preview:
-        print("  action: 勾选 Epic checklist；清理 worktree；解锁被 Blocked by 此 PR 的后续 Issue")
+        print("  action: merge-followup → 勾选 checklist、清理 wt、更新/解锁后续 Issue、标记开工、Task 派执行 Agent")
+        print("  cmd: ./scripts/epic/epic.sh merge-followup --epic {} --pr {} --json".format(epic, target))
     elif "CLOSED" in preview:
         print("  action: 确认是否需重开 / 调整 Epic 计划")
     print("  hint: gh pr view {} --repo {}".format(target, repo))
@@ -322,8 +329,16 @@ kind, target = e["kind"], e["target"]
 action = e.get("action", "AddressFeedback")
 cid = e["comment_id"]
 if kind == "pr_state":
-    task = "PR #{} 状态变更：{}".format(target, e.get("preview", ""))
-    steps = "编排 Agent：勾选 Epic checklist、清理 worktree；解锁 Blocked by"
+    preview = e.get("preview", "")
+    task = "PR #{} 状态变更：{}".format(target, preview)
+    if "MERGED" in preview:
+        steps = (
+            "1) merge-followup --epic {} --pr {} --json "
+            "2) 对 unlocked[] 每条 Task 派执行 Agent（wt new + Develop→draft PR） "
+            "3) mark-handled {}".format(epic, target, cid)
+        )
+    else:
+        steps = "编排 Agent：确认 PR 关闭原因；必要时调整 Epic 计划；mark-handled {}".format(cid)
 elif kind == "issue":
     task = "Issue #{} {}".format(target, action)
     steps = "Task 派执行 Agent：AddressFeedback + reply --body-file；编排 mark-handled {}".format(cid)
@@ -591,6 +606,215 @@ ${BODY}"
   echo "replied via quote-reply (conversation comment ${COMMENT_ID})"
 }
 
+# PR merge 后：勾选 checklist、清理 worktree、解锁后续 Issue、更新上下文、标记开工、输出派工
+cmd_merge_followup() {
+  require_epic
+  [[ -n "${PR:-}" ]] || die "merge-followup 需要 --pr <n>"
+  local dry_run=false
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --json) shift ;;
+      --dry-run) dry_run=true; shift ;;
+      *) die "merge-followup 用法：merge-followup --pr <n> [--json] [--dry-run]" ;;
+    esac
+  done
+
+  EPIC="${EPIC}" REPO="${REPO}" PR="${PR}" DRY_RUN="${dry_run}" python3 - <<'PY'
+import json, os, re, subprocess, sys, tempfile
+
+repo = os.environ["REPO"]
+epic = int(os.environ["EPIC"])
+pr = int(os.environ["PR"])
+dry_run = os.environ.get("DRY_RUN", "false") == "true"
+
+def gh_json(cmd):
+    r = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+    if r.returncode != 0 or not r.stdout.strip():
+        return None
+    return json.loads(r.stdout)
+
+def run(cmd, check=True):
+    if dry_run:
+        print("[dry-run] " + " ".join(cmd), file=sys.stderr)
+        return ""
+    r = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+    if check and r.returncode != 0:
+        sys.stderr.write(r.stderr or r.stdout)
+        sys.exit(1)
+    return r.stdout
+
+pr_data = gh_json(["gh", "pr", "view", str(pr), "--repo", repo,
+                   "--json", "state,title,body,mergedAt,url"])
+if not pr_data:
+    sys.exit("PR #{} not found".format(pr))
+if pr_data.get("state") != "MERGED":
+    sys.exit("PR #{} state={} (need MERGED)".format(pr, pr_data.get("state")))
+
+closes = re.findall(r"(?i)closes\s+#(\d+)", pr_data.get("body") or "")
+if not closes:
+    sys.exit("PR #{} body has no Closes #issue".format(pr))
+closed_issue = int(closes[0])
+
+issue_data = gh_json(["gh", "issue", "view", str(closed_issue), "--repo", repo,
+                      "--json", "title,body,state,labels"])
+if not issue_data:
+    sys.exit("Issue #{} not found".format(closed_issue))
+
+step_m = re.search(r"\[(\d+)-([A-Za-z0-9]+)\]", issue_data.get("title") or "")
+wt_epic = step_m.group(1) if step_m else None
+step_code = step_m.group(2) if step_m else None
+step_lower = step_code.lower() if step_code else None
+wt_id = "{}-{}".format(wt_epic, step_lower) if wt_epic and step_lower else None
+
+epic_data = gh_json(["gh", "issue", "view", str(epic), "--repo", repo, "--json", "body"])
+epic_body = epic_data.get("body") or ""
+pat = re.compile(r"- \[ \] #{}(\b)".format(closed_issue))
+new_epic_body, n = pat.subn(r"- [x] #{}\1".format(closed_issue), epic_body, count=1)
+if n and not dry_run:
+    with tempfile.NamedTemporaryFile("w", suffix=".md", delete=False) as fh:
+        fh.write(new_epic_body)
+        tmp = fh.name
+    run(["gh", "issue", "edit", str(epic), "--repo", repo, "--body-file", tmp])
+    os.unlink(tmp)
+
+if wt_id and not dry_run:
+    repo_root = subprocess.run(["git", "rev-parse", "--show-toplevel"],
+                               stdout=subprocess.PIPE, universal_newlines=True).stdout.strip()
+    epic_sh = os.path.join(repo_root, "scripts", "epic", "epic.sh")
+    if os.path.isfile(epic_sh):
+        subprocess.run([epic_sh, "wt", "rm", "--id", wt_id], cwd=repo_root,
+                         stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+subs = [int(x) for x in re.findall(r"- \[[ xX]\] #(\d+)", epic_body)]
+sub_meta = {}
+for sub in subs:
+    sd = gh_json(["gh", "issue", "view", str(sub), "--repo", repo,
+                  "--json", "title,body,state,labels"])
+    if sd:
+        sub_meta[sub] = sd
+
+def parse_blockers(blocked_text):
+    parts = re.split(r"[、,/\s]+|\band\b", blocked_text)
+    out = []
+    for p in parts:
+        p = p.strip()
+        if not p:
+            continue
+        m = re.match(r"#?(\d+)\b", p)
+        if m:
+            out.append(("issue", int(m.group(1))))
+            continue
+        m = re.search(r"\b([A-C]\d+)\b", p, re.I)
+        if m:
+            out.append(("step", m.group(1).upper()))
+    return out
+
+def step_to_issue(step_code):
+    for num, sd in sub_meta.items():
+        t = sd.get("title") or ""
+        if re.search(r"\[\d+-{}\]".format(re.escape(step_code)), t, re.I):
+            return num
+    return None
+
+def blocker_satisfied(blocker):
+    if blocker[0] == "issue":
+        num = blocker[1]
+        return sub_meta.get(num, {}).get("state") == "CLOSED"
+    num = step_to_issue(blocker[1])
+    if num is None:
+        return False
+    return sub_meta.get(num, {}).get("state") == "CLOSED"
+
+unlocked = []
+for sub in subs:
+    if sub == closed_issue:
+        continue
+    sub_data = sub_meta.get(sub)
+    if not sub_data or sub_data.get("state") != "OPEN":
+        continue
+    body = sub_data.get("body") or ""
+    blk = re.search(r"(?i)blocked by[:\s]*([^\n]+)", body)
+    if not blk:
+        continue
+    blockers = parse_blockers(blk.group(1))
+    if not blockers:
+        continue
+    if not all(blocker_satisfied(b) for b in blockers):
+        continue
+    open_prs = gh_json(["gh", "pr", "list", "--repo", repo, "--state", "open",
+                        "--search", "Closes #{}".format(sub), "--json", "number"])
+    if open_prs:
+        continue
+    labels = [lb["name"] for lb in sub_data.get("labels") or []]
+    if "in-progress" in labels:
+        continue
+    sub_step = re.search(r"\[(\d+)-([A-Za-z0-9]+)\]", sub_data.get("title") or "")
+    u_wt_epic = sub_step.group(1) if sub_step else wt_epic
+    u_step = sub_step.group(2).lower() if sub_step else "step{}".format(sub)
+    u_wt_id = "{}-{}".format(u_wt_epic, u_step) if u_wt_epic else None
+    unlocked.append({
+        "issue": sub,
+        "title": sub_data.get("title", ""),
+        "wt_id": u_wt_id,
+        "wt_epic": u_wt_epic,
+        "step": u_step,
+    })
+
+pre_summary = (
+    "前置 **{}**（Issue #{}, PR #{}）已 merge。\n\n"
+    "**交付摘要**：{}\n\n"
+    "**PR**：{}\n\n"
+    "依赖已满足，编排 Agent 已标记开工并派发执行 Agent。"
+).format(
+    issue_data.get("title", ""),
+    closed_issue,
+    pr,
+    (pr_data.get("title") or "").strip(),
+    pr_data.get("url", ""),
+)
+
+for u in unlocked:
+    comment = (
+        "## 前置完成 · 自动解锁\n\n"
+        + pre_summary
+        + "\n\n---\n`[epic-delivery]` from=agent role=orchestrator action=start-dispatch\n"
+    )
+    if not dry_run:
+        with tempfile.NamedTemporaryFile("w", suffix=".md", delete=False) as fh:
+            fh.write(comment)
+            tmp = fh.name
+        run(["gh", "issue", "comment", str(u["issue"]), "--repo", repo, "--body-file", tmp])
+        os.unlink(tmp)
+        subprocess.run(["gh", "label", "create", "in-progress", "--repo", repo,
+                        "--color", "fbca04",
+                        "--description", "执行 Agent 已接单开发"],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        run(["gh", "issue", "edit", str(u["issue"]), "--repo", repo, "--add-label", "in-progress"])
+    u["dispatch"] = {
+        "task": "Issue #{} · Epic #{} · 依赖 #{} 已 merge，立即开工".format(u["issue"], epic, closed_issue),
+        "wt_new": "./scripts/epic/epic.sh wt new --id {} --slug <short-desc>".format(u["wt_id"] or "EPIC-STEP"),
+        "prompt": (
+            "按 epic-delivery 执行 Issue #{}（Epic #{}）。\n"
+            "前置 #{} / PR #{} 已 merge；Issue 评论含交付摘要。\n"
+            "要求：wt new → Develop → SelfReview → draft PR（Closes #{}）→ ReadyToMerge 后停。\n"
+            "禁止 merge。"
+        ).format(u["issue"], epic, closed_issue, pr, u["issue"]),
+    }
+
+out = {
+    "epic": epic,
+    "merged_pr": pr,
+    "closed_issue": closed_issue,
+    "closed_title": issue_data.get("title", ""),
+    "wt_id_cleaned": wt_id,
+    "checklist_updated": bool(n),
+    "unlocked": unlocked,
+    "dispatch_count": len(unlocked),
+}
+print(json.dumps(out, ensure_ascii=False, indent=2))
+PY
+}
+
 # ------------------------------------------------------------------ wt (fork-based worktree)
 wt_cfg() {
   UPSTREAM_REMOTE="${UPSTREAM_REMOTE:-upstream}"
@@ -754,7 +978,8 @@ case "${SUBCMD}" in
   scope)      cmd_scope ;;
   reply)      cmd_reply ;;
   stop)       cmd_stop ;;
+  merge-followup) cmd_merge_followup ${REST[@]+"${REST[@]}"} ;;
   wt)         cmd_wt ${REST[@]+"${REST[@]}"} ;;
   -h|--help|help) usage ;;
-  *) die "未知子命令：${SUBCMD}（poll|poll-once|triage|dispatch|inbox|events|scope|reply|stop|wt）" ;;
+  *) die "未知子命令：${SUBCMD}（poll|poll-once|triage|dispatch|inbox|events|scope|reply|stop|merge-followup|wt）" ;;
 esac

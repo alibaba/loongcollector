@@ -173,7 +173,7 @@ Discussion 阶段表常写「A1–A2 ∥ B1–B2」，表示**同一阶段可同
 | 新增人工评论（无 `from=agent`） | AddressFeedback |
 | Agent 评论 `action=required` | AddressFeedback |
 | Agent 评论 `action=none/fyi` | 跳过（仅信息） |
-| **PR 合并**（`pr_state` → MERGED） | 勾选 Epic checklist、清理 worktree、解锁被 `Blocked by` 此 PR 的后续 Issue |
+| **PR 合并**（`pr_state` → MERGED） | **merge-followup 全流程**（见下节）→ 对 `unlocked[]` **立即 Task 派执行 Agent** |
 | **PR 关闭**（`pr_state` → CLOSED） | 确认是否需重开 / 调整 Epic 计划 |
 | 仅 CI 红、无新 comment | 修 CI（本 PR 范围） |
 | ReadyToMerge、无新 comment | 不动，@人工 Merge |
@@ -183,7 +183,30 @@ Discussion 阶段表常写「A1–A2 ∥ B1–B2」，表示**同一阶段可同
 
 ---
 
-## 手动 gh Triage（补充）
+## PR merge → 解锁、更新、开工、派工（必遵）
+
+收到 `pr_state` **MERGED** 时，编排 Agent **不得**只发 unlock 评论就结束；须在同一轮完成：
+
+```bash
+./scripts/epic/epic.sh merge-followup --epic <EPIC> --pr <PR> --json
+./scripts/epic/epic.sh events --epic <EPIC> mark-handled prstate-<PR>-MERGED
+```
+
+`merge-followup` 自动完成：
+
+| 步骤 | 动作 |
+|------|------|
+| 1 | Epic checklist 勾选 `Closes #` 对应子 Issue |
+| 2 | `wt rm --id <1928-b2>` 清理已 merge 的 worktree |
+| 3 | 扫描 Epic 子 Issue：匹配 `Blocked by: <步骤>` / `#<issue>` 且 **无 open PR**、无 `in-progress` |
+| 4 | 在后续 Issue **评论**前置交付摘要（PR 标题/链接）；打 `in-progress` label |
+| 5 | stdout JSON 的 `unlocked[].dispatch.prompt` → **每条 Task 派执行 Agent**（`wt new` → draft PR） |
+
+编排 Agent 收到 `merge-followup` 输出后**立即并行派发**所有 `unlocked` 项，不要等人工确认。
+
+**禁止**：仅发 `unlock-notify` 评论而不派工；编排 Agent 自己的 `action=start-dispatch` / `action=unlock-notify` 评论会被 poll **跳过**（非 AddressFeedback）。
+
+---
 
 轮询未覆盖或需深挖 CI 时，编排 Agent 仍可直接：
 
