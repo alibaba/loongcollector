@@ -95,11 +95,36 @@ static void ReplaceEnvVarRef(Json::Value& value, bool& res) {
     }
 }
 
-static bool IsNativeInputBlockedWhenUsingGoPlugin(const string& pluginType) {
-    // Step A1: switch to "default allow + blacklist" for native input coexistence with Go plugins.
-    // Add plugin types here if they are proven incompatible in later stages.
-    (void)pluginType;
+static bool IsNativeInputAllowedWithGoPlugin(const string& pluginType) {
+    // Legacy whitelist before A1: file / security / self-monitor native inputs may coexist with Go plugins.
+#ifndef APSARA_UNIT_TEST_MAIN
+    if (pluginType == "input_file" || pluginType == "input_container_stdio"
+        || pluginType == "input_static_file_onetime") {
+        return true;
+    }
+#else
+    if (pluginType.find("input_file") != string::npos || pluginType.find("input_container_stdio") != string::npos
+        || pluginType.find("input_static_file_onetime") != string::npos) {
+        return true;
+    }
+#endif
+    if (pluginType.find("_security") != string::npos) {
+        return true;
+    }
+    if (pluginType == "input_internal_metrics" || pluginType == "input_internal_alarms") {
+        return true;
+    }
     return false;
+}
+
+static bool IsNativeInputBlockedWhenUsingGoPlugin(const string& pluginType, bool isOnetime) {
+    // A1 framework: default-allow + blacklist. Populate blacklist with legacy non-whitelist native inputs
+    // so Parse behavior stays consistent until B-line matrix/E2E proves runtime reachability.
+    // Parse success != events reaching Go pipeline; silent discard alarm follow-up tracked on #2599 / #2606.
+    if (!PluginRegistry::GetInstance()->IsValidNativeInputPlugin(pluginType, isOnetime)) {
+        return false;
+    }
+    return !IsNativeInputAllowedWithGoPlugin(pluginType);
 }
 
 bool CollectionConfig::Parse() {
@@ -274,7 +299,7 @@ bool CollectionConfig::Parse() {
             hasFileInput = true;
         }
 #endif
-        if (IsNativeInputBlockedWhenUsingGoPlugin(pluginType)) {
+        if (IsNativeInputBlockedWhenUsingGoPlugin(pluginType, IsOnetime())) {
             hasNativeInputBlockedWhenUsingGoPlugin = true;
         }
     }

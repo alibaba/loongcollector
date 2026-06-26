@@ -2445,6 +2445,7 @@ void CollectionConfigUnittest::NativeInputWithGoPlugin() const {
     unique_ptr<CollectionConfig> config;
     string errorMsg;
 
+    // Legacy non-whitelist native input + Go processor/flusher must fail Parse (blacklist).
     string configStr = R"(
         {
             "inputs": [
@@ -2467,8 +2468,7 @@ void CollectionConfigUnittest::NativeInputWithGoPlugin() const {
     configJson.reset(new Json::Value());
     APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
     config.reset(new CollectionConfig(configName, std::move(configJson), filepath));
-    APSARA_TEST_TRUE(config->Parse());
-    APSARA_TEST_TRUE(config->HasGoPlugin());
+    APSARA_TEST_FALSE(config->Parse());
 
     configStr = R"(
         {
@@ -2487,8 +2487,7 @@ void CollectionConfigUnittest::NativeInputWithGoPlugin() const {
     configJson.reset(new Json::Value());
     APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
     config.reset(new CollectionConfig(configName, std::move(configJson), filepath));
-    APSARA_TEST_TRUE(config->Parse());
-    APSARA_TEST_TRUE(config->HasGoPlugin());
+    APSARA_TEST_FALSE(config->Parse());
 }
 
 UNIT_TEST_CASE(CollectionConfigUnittest, HandleValidConfig)
