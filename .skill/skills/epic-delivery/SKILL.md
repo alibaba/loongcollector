@@ -204,9 +204,9 @@ wake 后读 inbox 并处理：
 
 > 不要用 `nohup`/`&` 脱离会话后台跑 poll——须 IDE 可见以便 monitor 唤醒。
 
-2. **按 inbox JSON 的 `prompt` 处理**；派执行 Agent 进入阶段 6（AddressFeedback）。派前读 **`Blocked by`**。
+2. **读 `inbox --json` 后派执行 Agent**（代码/长验收由子 Agent 做）；编排 Agent **禁止**亲自 checkout、改代码、跑长构建。纯文字回复可简短代劳。派前读 **`Blocked by`**。
 
-3. **处理完毕**：
+3. **子 Agent 完成后**编排 Agent `mark-handled`（或按回报代 mark）：
 
 ```bash
 ./scripts/epic/epic.sh events --epic <EPIC_NUMBER> mark-handled <comment_id>
@@ -227,7 +227,7 @@ wake 后读 inbox 并处理：
 
 人工在 PR/Issue 评论后的路径：
 
-1. `epic.sh poll` 写入 `events.jsonl` + **`AGENT_TRIGGER`** → 2. 编排 Agent wake → **`inbox --json`** → 3. AddressFeedback → 4. `mark-handled` → 5. ReadyToMerge 后等人工 Merge。
+1. `epic.sh poll` → **`AGENT_TRIGGER`** → 2. 编排 Agent `inbox` → **3. 派执行 Agent** AddressFeedback → 4. 编排 `mark-handled` → 5. ReadyToMerge 后等人工 Merge。
 
 「并行不等反馈」仅指：**不因某个 PR 被 comment 就阻塞其它并行 Issue 的开发**；评论处理由轮询 + 编排派发完成。
 
@@ -355,6 +355,7 @@ make core PATH_IN_DOCKER=$(pwd)
 - 一个会话只做一个 Issue；不在同一分支堆叠多个不相关步骤。
 - 涉及 `.github/workflows/` 等需要 **`workflow` scope** 的改动，Preflight 确认无权限则停手打 `needs-human`。
 - **编排 Agent 不得**在可并行步骤上串行等待人工；应派子 Agent 并行推进。
+- **编排 Agent 不得**在 `AGENT_TRIGGER` / AddressFeedback 路径上亲自改代码、checkout 分支或跑长时构建；应 **Task 派执行 Agent**，自身继续 poll / 调度。
 
 ## 子 Skill 索引
 
@@ -378,7 +379,7 @@ make core PATH_IN_DOCKER=$(pwd)
 | `scripts/epic/epic.sh` | **单一入口**：`poll`/`inbox`/`triage`/`dispatch`/`events`/`scope`/`reply`/`stop` |
 | `scripts/epic/dispatch-hook.sh` | 可选 bash hook（`AUTO_DISPATCH=true` 时） |
 
-默认部署：**poll 前台 + 编排 Agent monitor `AGENT_TRIGGER` + `inbox --json` 驱动处理**。
+默认部署：**poll + monitor `AGENT_TRIGGER` → 编排 Agent 只 triage/派发 → 执行 Agent 改代码/回复**。
 
 ## 禁止行为
 

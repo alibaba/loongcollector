@@ -10,26 +10,52 @@
 | 编排 Agent 要常驻吗？ | **轮询 `poll-loop` 在编排 Agent 终端前台运行**，与会话同生死（会话关→轮询停），不留孤儿进程。 |
 | 跟踪范围？ | **仅该 Epic** 的 Issue / 子 Issue / 关联 PR，不扫全仓。 |
 
-推荐模型：**`poll` 打印 `AGENT_TRIGGER_EPIC<N>` → 编排 Agent（IDE monitor）唤醒 → `inbox --json` 读取 → AddressFeedback → mark-handled**。
+推荐模型：**`poll` → `AGENT_TRIGGER` → 编排 Agent `inbox` → 派执行 Agent（代码/回复）→ 编排 Agent `mark-handled`**。
 
 ```mermaid
 flowchart LR
   Poll["epic.sh poll"]
   GH["GitHub"]
   Events["events.jsonl"]
-  Trigger["AGENT_TRIGGER\n(stdout)"]
-  Agent["编排 Agent\n(monitor wake)"]
+  Trigger["AGENT_TRIGGER"]
+  Orch["编排 Agent\ntriage / 派发"]
+  Sub["执行 Agent\n代码 / 回复"]
   Inbox["inbox --json"]
-  Sub["执行 / 回复"]
 
   Poll -->|scan| GH
   Poll --> Events
   Poll --> Trigger
-  Trigger --> Agent
-  Agent --> Inbox
-  Inbox --> Events
-  Agent --> Sub
-  Sub -->|reply| GH
+  Trigger --> Orch
+  Orch --> Inbox
+  Orch -->|Task 派发| Sub
+  Sub -->|push + reply| GH
+  Orch -->|mark-handled| Events
+```
+
+---
+
+## 编排 vs 执行（必遵 · 勿阻塞编排 Agent）
+
+| 角色 | 做什么 | **禁止** |
+|------|--------|----------|
+| **编排 Agent** | 跑 poll、读 `inbox --json`、读 `Blocked by`、**派执行 Agent**、汇总 Epic 进度、`mark-handled`、并行派发无依赖 Issue | **亲自**改代码、checkout 分支、长时构建/单测、大段读 diff、在 AddressFeedback 里写 commit |
+| **执行 Agent** | 单 Issue/单 PR 全闭环：读评论 → 改代码 → 验收 → `reply --body-file` → 回报 PR URL / 是否 ReadyToMerge | 兼做编排；一个会话做多 Issue |
+
+**原则**：编排 Agent 收到 `AGENT_TRIGGER` 后**只做 triage + 派发**，随即回到 poll/其他并行调度；**代码相关改动一律 Task 派子 Agent**（可 `run_in_background: true`），子 Agent 完成后再由编排 Agent `mark-handled`（或子 Agent 回报 comment_id 后编排代 mark）。
+
+纯文字回复（无需改代码、已核查完毕）时，编排 Agent 可**仅** `reply --body-file` + `mark-handled`，但仍应简短，勿在长链路上阻塞。
+
+**派发模板**（每条 inbox 事件一条 Task）：
+
+```text
+按 epic-delivery 执行 AddressFeedback（Epic #<epic> · PR #<pr> · comment <id>）。
+
+要求：
+- 读 inbox 事件 URL / preview；在对应 GitHub thread 内 reply --body-file
+- 若需改代码：在独立 worktree/分支完成，push 到 PR 分支，勿在编排会话里改
+- 完成后回报：comment_id、是否已回复、是否需编排 mark-handled
+
+禁止：merge；禁止等人工确认（架构争议打 needs-human 并 @维护者）
 ```
 
 ---
@@ -50,13 +76,13 @@ flowchart LR
 ^AGENT_TRIGGER_EPIC<EPIC_NUMBER>
 ```
 
-收到 wake 后**立即**：
+收到 wake 后**立即**（编排 Agent **不**在此步改代码）：
 
 ```bash
 ./scripts/epic/epic.sh inbox --epic <EPIC_NUMBER> --json
 ```
 
-按每条 JSON 的 `prompt` / `steps` 进入 AddressFeedback；完成后：
+对每条 inbox 事件：**派执行 Agent** 进入 AddressFeedback（见上节「编排 vs 执行」）；子 Agent 完成后编排 Agent：
 
 ```bash
 ./scripts/epic/epic.sh events --epic <N> mark-handled <comment_id>

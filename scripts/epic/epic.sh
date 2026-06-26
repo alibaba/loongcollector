@@ -288,9 +288,8 @@ print(json.dumps({
     "pending": pending,
     "prompt": (
         "Epic #{} 有 {} 条待处理 GitHub 事件（本轮新增 {}）。"
-        "按 epic-delivery 执行 AddressFeedback："
-        "./scripts/epic/epic.sh inbox --epic {} --json 读取详情，"
-        "处理完每条后 mark-handled。".format(epic, pending, new, epic)
+        "编排 Agent：inbox --json 后 Task 派执行 Agent 做 AddressFeedback（勿亲自改代码）；"
+        "子 Agent 完成后 mark-handled。".format(epic, pending, new, epic)
     ),
     "cmd": "./scripts/epic/epic.sh inbox --epic {} --json".format(epic),
 }, ensure_ascii=False))')"
@@ -324,16 +323,17 @@ action = e.get("action", "AddressFeedback")
 cid = e["comment_id"]
 if kind == "pr_state":
     task = "PR #{} 状态变更：{}".format(target, e.get("preview", ""))
-    steps = "勾选 Epic checklist；清理 worktree；解锁 Blocked by 后续 Issue"
+    steps = "编排 Agent：勾选 Epic checklist、清理 worktree；解锁 Blocked by"
 elif kind == "issue":
     task = "Issue #{} {}".format(target, action)
-    steps = "gh issue view {} --repo {}; thread 内 reply --body-file; mark-handled {}".format(target, repo, cid)
+    steps = "Task 派执行 Agent：AddressFeedback + reply --body-file；编排 mark-handled {}".format(cid)
 else:
     task = "PR #{} {}".format(target, action)
-    steps = "gh pr view {} --repo {}; epic.sh reply; mark-handled {}".format(target, repo, cid)
+    steps = "Task 派执行 Agent：AddressFeedback + epic.sh reply；编排 mark-handled {}".format(cid)
 out = dict(e)
 out["task"] = task
 out["steps"] = steps
+out["dispatch"] = "orchestrator: Task sub-agent; do NOT edit code in orchestrator session"
 out["prompt"] = "{} · {} · url={} · {}".format(task, action, e.get("url", ""), steps)
 print(json.dumps(out, ensure_ascii=False))
 '

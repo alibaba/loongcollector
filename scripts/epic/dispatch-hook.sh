@@ -21,5 +21,5 @@ if [[ -n "${AGENT_CMD:-}" ]]; then
   exit $?
 fi
 
-echo "[dispatch-hook] 未配置 AGENT_CMD；编排 Agent 应通过 poll 的 AGENT_TRIGGER + inbox --json 处理" >&2
+echo "[dispatch-hook] 未配置 AGENT_CMD；编排 Agent 应 AGENT_TRIGGER → inbox → Task 派执行 Agent（勿在编排会话改代码）" >&2
 exit 2
