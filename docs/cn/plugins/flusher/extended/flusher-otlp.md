@@ -5,6 +5,14 @@
 `flusher_otlp` `flusher`插件可以实现将采集到的数据，经过处理后，发送到支持`Opentelemetry Protocol`的后端。
 v1采集配置目前只支持Logs数据，v2采集配置支持Logs/Metrics/Traces三种数据。
 
+## 事件能力
+
+列含义见 [概览 · 事件能力列说明](../overview.md#事件能力列说明)。
+
+| v1 接口 | v2 接口 | Log | Metric | Span |
+| --- | --- | --- | --- | --- |
+| ✓ | ✓ | v1&v2 | 透传未知 | 透传未知 |
+
 ## 版本
 
 [Alpha](../../stability-level.md)

@@ -4,7 +4,13 @@
 
 `processor_rename processor`插件可以将日志字段重命名。
 
-## 支持的Event类型
+## 事件能力
+
+列含义见 [概览 · 事件能力列说明](../overview.md#事件能力列说明)。
+
+| v1 接口 | v2 接口 | Log | Metric | Span |
+| --- | --- | --- | --- | --- |
+| ✓ | ✓ | v1&v2 | 透传未知 | 透传未知 |
 
 | LogGroup(v1) | EventTypeLogging | EventTypeMetric | EventTypeSpan |
 | ------------ | ---------------- | --------------- | ------------- |

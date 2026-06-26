@@ -6,7 +6,13 @@
 
 备注：当作为第一个日志解析插件且追求原生性能时，可改用原生插件 [JSON 解析](../native/processor-parse-json-native.md)。
 
-## 支持的Event类型
+## 事件能力
+
+列含义见 [概览 · 事件能力列说明](../overview.md#事件能力列说明)。
+
+| v1 接口 | v2 接口 | Log | Metric | Span |
+| --- | --- | --- | --- | --- |
+| ✓ | ✓ | v1&v2 | 透传未知 | 透传未知 |
 
 | LogGroup(v1) | EventTypeLogging | EventTypeMetric | EventTypeSpan |
 | ------------ | ---------------- | --------------- | ------------- |

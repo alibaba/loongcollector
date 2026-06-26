@@ -6,6 +6,14 @@
 
 `processor_split_string processor`插件可以通过多字符的分隔符提取字段，该方式不支持使用引用符对分隔符进行包裹。
 
+## 事件能力
+
+列含义见 [概览 · 事件能力列说明](../overview.md#事件能力列说明)。
+
+| v1 接口 | v2 接口 | Log | Metric | Span |
+| --- | --- | --- | --- | --- |
+| ✓ | — | v1 | 透传未知 | 透传未知 |
+
 ## 版本
 
 [Stable](../../stability-level.md)
