@@ -4338,6 +4338,9 @@ public:
     void TestMergeJsonEscapedQuoteCrossEvent();
     void TestMergeJsonOversized();
     void TestMergeJsonIncompleteAtEnd();
+    void TestMergeJsonConsecutiveBackslashes();
+    void TestMergeJsonEmptyEventInterleaved();
+    void TestMergeJsonSingleCharEvents();
     CollectionPipelineContext mContext;
 };
 
@@ -4351,6 +4354,9 @@ UNIT_TEST_CASE(ProcessorMergeMultilineLogJsonUnittest, TestMergeJsonEscapedQuote
 UNIT_TEST_CASE(ProcessorMergeMultilineLogJsonUnittest, TestMergeJsonEscapedQuoteCrossEvent);
 UNIT_TEST_CASE(ProcessorMergeMultilineLogJsonUnittest, TestMergeJsonOversized);
 UNIT_TEST_CASE(ProcessorMergeMultilineLogJsonUnittest, TestMergeJsonIncompleteAtEnd);
+UNIT_TEST_CASE(ProcessorMergeMultilineLogJsonUnittest, TestMergeJsonConsecutiveBackslashes);
+UNIT_TEST_CASE(ProcessorMergeMultilineLogJsonUnittest, TestMergeJsonEmptyEventInterleaved);
+UNIT_TEST_CASE(ProcessorMergeMultilineLogJsonUnittest, TestMergeJsonSingleCharEvents);
 
 void ProcessorMergeMultilineLogJsonUnittest::TestMergeJsonInit() {
     Json::Value config;
@@ -4917,6 +4923,189 @@ void ProcessorMergeMultilineLogJsonUnittest::TestMergeJsonIncompleteAtEnd() {
         "events": [
             {
                 "contents": {"content": "{\n  \"a\":1,\n  \"b\":2"},
+                "timestamp": 12345678901,
+                "timestampNanosecond": 0,
+                "type": 1
+            }
+        ]
+    })";
+    std::string outJson = eventGroup.ToJsonString();
+    APSARA_TEST_STREQ(CompactJson(expectJson.str()).c_str(), CompactJson(outJson).c_str());
+}
+
+// Consecutive backslashes \\\\ should pair up and NOT leave pendingEscape set.
+// In JSON, \\\\ represents two literal backslashes. After scanning, inQuote should
+// remain unchanged and the following " should correctly toggle inQuote.
+void ProcessorMergeMultilineLogJsonUnittest::TestMergeJsonConsecutiveBackslashes() {
+    Json::Value config;
+    config["MergeType"] = "json";
+    ProcessorMergeMultilineLogNative processor;
+    processor.SetContext(mContext);
+    processor.CreateMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
+    APSARA_TEST_TRUE_FATAL(processor.Init(config));
+    processor.CommitMetricsRecordRef();
+
+    auto sourceBuffer = std::make_shared<SourceBuffer>();
+    PipelineEventGroup eventGroup(sourceBuffer);
+    // Input: {"path": "C:\\\\"}
+    // The value is C:\\ (two literal backslashes). The \\\\ pairs into two skip-pairs,
+    // then " closes the string, then } closes the object. braceDepth should reach 0.
+    std::string inJson = R"({
+        "events": [
+            {
+                "contents": {"content": "{\"path\": \"C:\\\\\\\\\"}"},
+                "timestamp": 12345678901,
+                "timestampNanosecond": 0,
+                "type": 1
+            }
+        ]
+    })";
+    eventGroup.FromJsonString(inJson);
+
+    processor.Process(eventGroup);
+
+    APSARA_TEST_EQUAL(1UL, eventGroup.GetEvents().size());
+    std::stringstream expectJson;
+    expectJson << R"({
+        "events": [
+            {
+                "contents": {"content": "{\"path\": \"C:\\\\\\\\\"}"},
+                "timestamp": 12345678901,
+                "timestampNanosecond": 0,
+                "type": 1
+            }
+        ]
+    })";
+    std::string outJson = eventGroup.ToJsonString();
+    APSARA_TEST_STREQ(CompactJson(expectJson.str()).c_str(), CompactJson(outJson).c_str());
+}
+
+// Empty events interleaved in a multi-line JSON block should be silently skipped
+// without breaking the merge. The empty events must not reset begin or corrupt state.
+void ProcessorMergeMultilineLogJsonUnittest::TestMergeJsonEmptyEventInterleaved() {
+    Json::Value config;
+    config["MergeType"] = "json";
+    ProcessorMergeMultilineLogNative processor;
+    processor.SetContext(mContext);
+    processor.CreateMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
+    APSARA_TEST_TRUE_FATAL(processor.Init(config));
+    processor.CommitMetricsRecordRef();
+
+    auto sourceBuffer = std::make_shared<SourceBuffer>();
+    PipelineEventGroup eventGroup(sourceBuffer);
+    // 4 events: E1={, E2=(empty), E3="a":1, E4=}
+    // E2 is empty and should be skipped; E1+E3+E4 merge into one JSON block.
+    std::string inJson = R"({
+        "events": [
+            {
+                "contents": {"content": "{"},
+                "timestamp": 12345678901,
+                "timestampNanosecond": 0,
+                "type": 1
+            },
+            {
+                "contents": {},
+                "timestamp": 12345678901,
+                "timestampNanosecond": 0,
+                "type": 1
+            },
+            {
+                "contents": {"content": "  \"a\":1"},
+                "timestamp": 12345678901,
+                "timestampNanosecond": 0,
+                "type": 1
+            },
+            {
+                "contents": {"content": "}"},
+                "timestamp": 12345678901,
+                "timestampNanosecond": 0,
+                "type": 1
+            }
+        ]
+    })";
+    eventGroup.FromJsonString(inJson);
+
+    processor.Process(eventGroup);
+
+    APSARA_TEST_EQUAL(1UL, eventGroup.GetEvents().size());
+    std::stringstream expectJson;
+    expectJson << R"({
+        "events": [
+            {
+                "contents": {"content": "{\n  \"a\":1\n}"},
+                "timestamp": 12345678901,
+                "timestampNanosecond": 0,
+                "type": 1
+            }
+        ]
+    })";
+    std::string outJson = eventGroup.ToJsonString();
+    APSARA_TEST_STREQ(CompactJson(expectJson.str()).c_str(), CompactJson(outJson).c_str());
+}
+
+// Single-char events exercise boundary conditions in the escape handling:
+// - A single " toggles inQuote
+// - A single \ inside a quote sets pendingEscape (since i+1 == content.size())
+// - A single } outside a quote decrements braceDepth
+void ProcessorMergeMultilineLogJsonUnittest::TestMergeJsonSingleCharEvents() {
+    Json::Value config;
+    config["MergeType"] = "json";
+    ProcessorMergeMultilineLogNative processor;
+    processor.SetContext(mContext);
+    processor.CreateMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
+    APSARA_TEST_TRUE_FATAL(processor.Init(config));
+    processor.CommitMetricsRecordRef();
+
+    auto sourceBuffer = std::make_shared<SourceBuffer>();
+    PipelineEventGroup eventGroup(sourceBuffer);
+    // 5 single-char events that form: {"a":1}
+    // E1: {   E2: "   E3: a   E4: "   E5: }
+    // After scanning: { opens depth=1, " opens quote, a inside quote,
+    // " closes quote, } closes depth=0 → merge all into 1 event.
+    std::string inJson = R"({
+        "events": [
+            {
+                "contents": {"content": "{"},
+                "timestamp": 12345678901,
+                "timestampNanosecond": 0,
+                "type": 1
+            },
+            {
+                "contents": {"content": "\""},
+                "timestamp": 12345678901,
+                "timestampNanosecond": 0,
+                "type": 1
+            },
+            {
+                "contents": {"content": "a"},
+                "timestamp": 12345678901,
+                "timestampNanosecond": 0,
+                "type": 1
+            },
+            {
+                "contents": {"content": "\""},
+                "timestamp": 12345678901,
+                "timestampNanosecond": 0,
+                "type": 1
+            },
+            {
+                "contents": {"content": "}"},
+                "timestamp": 12345678901,
+                "timestampNanosecond": 0,
+                "type": 1
+            }
+        ]
+    })";
+    eventGroup.FromJsonString(inJson);
+
+    processor.Process(eventGroup);
+
+    APSARA_TEST_EQUAL(1UL, eventGroup.GetEvents().size());
+    std::stringstream expectJson;
+    expectJson << R"({
+        "events": [
+            {
+                "contents": {"content": "{\n\"\na\n\"\n}"},
                 "timestamp": 12345678901,
                 "timestampNanosecond": 0,
                 "type": 1

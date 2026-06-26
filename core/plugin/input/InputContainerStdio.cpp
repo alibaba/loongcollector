@@ -370,6 +370,15 @@ bool InputContainerStdio::CreateInnerProcessors() {
                        == MultilineOptions::UnmatchedContentTreatment::SINGLE_LINE) {
                 detail["UnmatchedContentTreatment"] = Json::Value("single_line");
             }
+        } else {
+            PARAM_ERROR_RETURN(mContext->GetLogger(),
+                               mContext->GetAlarm(),
+                               "unsupported Multiline.Mode for container stdio",
+                               sName,
+                               mContext->GetConfigName(),
+                               mContext->GetProjectName(),
+                               mContext->GetLogstoreName(),
+                               mContext->GetRegion());
         }
         if (!processor->Init(detail, *mContext)) {
             return false;
