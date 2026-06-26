@@ -4333,6 +4333,7 @@ public:
     void TestMergeJsonMultiLineBlock();
     void TestMergeJsonMultipleBlocks();
     void TestMergeJsonBraceInString();
+    void TestMergeJsonBraceInStringCrossEvent();
     void TestMergeJsonEscapedQuote();
     void TestMergeJsonOversized();
     void TestMergeJsonIncompleteAtEnd();
@@ -4344,6 +4345,7 @@ UNIT_TEST_CASE(ProcessorMergeMultilineLogJsonUnittest, TestMergeJsonSingleLineBl
 UNIT_TEST_CASE(ProcessorMergeMultilineLogJsonUnittest, TestMergeJsonMultiLineBlock);
 UNIT_TEST_CASE(ProcessorMergeMultilineLogJsonUnittest, TestMergeJsonMultipleBlocks);
 UNIT_TEST_CASE(ProcessorMergeMultilineLogJsonUnittest, TestMergeJsonBraceInString);
+UNIT_TEST_CASE(ProcessorMergeMultilineLogJsonUnittest, TestMergeJsonBraceInStringCrossEvent);
 UNIT_TEST_CASE(ProcessorMergeMultilineLogJsonUnittest, TestMergeJsonEscapedQuote);
 UNIT_TEST_CASE(ProcessorMergeMultilineLogJsonUnittest, TestMergeJsonOversized);
 UNIT_TEST_CASE(ProcessorMergeMultilineLogJsonUnittest, TestMergeJsonIncompleteAtEnd);
@@ -4591,6 +4593,84 @@ void ProcessorMergeMultilineLogJsonUnittest::TestMergeJsonBraceInString() {
         "events": [
             {
                 "contents": {"content": "{\"key\": \"value with { and } braces\"}"},
+                "timestamp": 12345678901,
+                "timestampNanosecond": 0,
+                "type": 1
+            }
+        ]
+    })";
+    std::string outJson = eventGroup.ToJsonString();
+    APSARA_TEST_STREQ(CompactJson(expectJson.str()).c_str(), CompactJson(outJson).c_str());
+}
+
+void ProcessorMergeMultilineLogJsonUnittest::TestMergeJsonBraceInStringCrossEvent() {
+    Json::Value config;
+    config["MergeType"] = "json";
+    ProcessorMergeMultilineLogNative processor;
+    processor.SetContext(mContext);
+    processor.CreateMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
+    APSARA_TEST_TRUE_FATAL(processor.Init(config));
+    processor.CommitMetricsRecordRef();
+
+    auto sourceBuffer = std::make_shared<SourceBuffer>();
+    PipelineEventGroup eventGroup(sourceBuffer);
+    // Simulates a multi-line JSON where a string value containing braces spans multiple events:
+    //   {
+    //     "msg": "error at {
+    //     details
+    //     }",
+    //     "level": "error"
+    //   }
+    std::string inJson = R"({
+        "events": [
+            {
+                "contents": {"content": "{"},
+                "timestamp": 12345678901,
+                "timestampNanosecond": 0,
+                "type": 1
+            },
+            {
+                "contents": {"content": "  \"msg\": \"error at {"},
+                "timestamp": 12345678901,
+                "timestampNanosecond": 0,
+                "type": 1
+            },
+            {
+                "contents": {"content": "  details"},
+                "timestamp": 12345678901,
+                "timestampNanosecond": 0,
+                "type": 1
+            },
+            {
+                "contents": {"content": "  }\","},
+                "timestamp": 12345678901,
+                "timestampNanosecond": 0,
+                "type": 1
+            },
+            {
+                "contents": {"content": "  \"level\": \"error\""},
+                "timestamp": 12345678901,
+                "timestampNanosecond": 0,
+                "type": 1
+            },
+            {
+                "contents": {"content": "}"},
+                "timestamp": 12345678901,
+                "timestampNanosecond": 0,
+                "type": 1
+            }
+        ]
+    })";
+    eventGroup.FromJsonString(inJson);
+
+    processor.Process(eventGroup);
+
+    APSARA_TEST_EQUAL(1UL, eventGroup.GetEvents().size());
+    std::stringstream expectJson;
+    expectJson << R"({
+        "events": [
+            {
+                "contents": {"content": "{\n  \"msg\": \"error at {\n  details\n  }\",\n  \"level\": \"error\"\n}"},
                 "timestamp": 12345678901,
                 "timestampNanosecond": 0,
                 "type": 1

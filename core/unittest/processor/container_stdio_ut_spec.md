@@ -254,6 +254,27 @@ FileServer (读文件块)
 - 1 个事件（全部合并为 Java stack trace）
 - content = `"Exception in thread 'main' java.lang.NullPointerException\n    at com.example"`
 
+#### TC-DOCKER-PARTIAL-04: TestDockerJsonPartialLogAllPartial
+
+**目的**：验证全 partial 场景（批次内所有 Docker JSON log 均无末尾 `\n`），经过 Split → Parse → MergeByFlag 后正确合并。
+
+**前置条件**：
+
+- 三个 processor：`ProcessorSplitLogStringNative`(\n) → `ProcessorParseContainerLogNative` → `ProcessorMergeMultilineLogNative`(flag)
+- eventGroup metadata: `LOG_FORMAT = "docker_json-file"`
+
+**输入**：3 条 Docker JSON 行，所有 log 字段均不以 `\n` 结尾（全 partial）：
+
+- `{"log":"part1 ","stream":"stdout","time":"..."}`
+- `{"log":"part2 ","stream":"stdout","time":"..."}`
+- `{"log":"part3","stream":"stdout","time":"..."}`
+
+**预期输出**：
+
+- 1 个事件（3 条 partial 合并）
+- content = `"part1 part2 part3"`
+- eventGroup metadata: 无 `has.part.log`（MergeByFlag 完成后清除）
+
 ### 4.2 GetLastLineDataUnittest — 新增
 
 #### TC-GETLASTLINE-DOCKER-PARTIAL-01: TestLastDockerJsonFileSingleLine
@@ -377,6 +398,23 @@ FileServer (读文件块)
 
 **预期**：1 个事件不变（braceDepth 正确归零）。
 
+#### TC-JSON-05b: TestMergeJsonBraceInStringCrossEvent
+
+**目的**：验证跨事件的 `inQuote` 状态正确持久化——当 JSON 字符串值包含 `{` 或 `}` 且分布在多个事件时，花括号不被误计数。
+
+**输入**：6 个事件，模拟字符串值中包含花括号且跨行的多行 JSON：
+
+```
+{
+  "msg": "error at {
+  details
+  }",
+  "level": "error"
+}
+```
+
+**预期**：1 个事件，content 为上述 6 行用 `\n` 拼接（`inQuote` 跨事件传递后，字符串内的 `{` 和 `}` 不影响 `braceDepth`）。
+
 #### TC-JSON-06: TestMergeJsonEscapedQuote
 
 **目的**：验证转义引号 `\"` 不影响 inQuote 状态。
@@ -429,7 +467,8 @@ ProcessorParseContainerLogNativeUnittest
   ├── TestParseDockerLog                          [已有] ParseDockerLog 底层函数
 + ├── TestDockerJsonPartialLogBasic               [新增] Docker partial: PartLogFlag 设置
 + ├── TestDockerJsonPartialLogWithSplit            [新增] Docker partial: P+P+F 全链路合并
-+ └── TestDockerJsonPartialLogWithSplitAndRegex   [新增] Docker partial: 四步全链路
++ ├── TestDockerJsonPartialLogWithSplitAndRegex   [新增] Docker partial: 四步全链路
++ └── TestDockerJsonPartialLogAllPartial          [新增] Docker partial: 全 partial 无完整行
 
 GetLastLineDataUnittest
   ├── LastMatchedContainerdTextLineUnittest
@@ -449,7 +488,8 @@ ProcessorMergeMultilineLogNativeUnittest (Phase 4 新增)
 +     ├── TestMergeJsonSingleLineBlock               [新增] 单行 JSON 不合并
 +     ├── TestMergeJsonMultiLineBlock                [新增] 多行 JSON 块合并
 +     ├── TestMergeJsonMultipleBlocks                [新增] 连续多块各自合并
-+     ├── TestMergeJsonBraceInString                 [新增] 引号内大括号忽略
++     ├── TestMergeJsonBraceInString                 [新增] 引号内大括号忽略（单事件）
++     ├── TestMergeJsonBraceInStringCrossEvent       [新增] 引号内大括号跨事件持久化
 +     ├── TestMergeJsonEscapedQuote                  [新增] 转义引号处理
 +     ├── TestMergeJsonOversized                     [新增] 超限强制输出
 +     └── TestMergeJsonIncompleteAtEnd               [新增] 末尾未闭合

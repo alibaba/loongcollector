@@ -57,6 +57,7 @@ public:
     void TestDockerJsonPartialLogBasic();
     void TestDockerJsonPartialLogWithSplit();
     void TestDockerJsonPartialLogWithSplitAndRegex();
+    void TestDockerJsonPartialLogAllPartial();
 
     CollectionPipelineContext mContext;
 };
@@ -72,6 +73,7 @@ UNIT_TEST_CASE(ProcessorParseContainerLogNativeUnittest, TestParseDockerLog);
 UNIT_TEST_CASE(ProcessorParseContainerLogNativeUnittest, TestDockerJsonPartialLogBasic);
 UNIT_TEST_CASE(ProcessorParseContainerLogNativeUnittest, TestDockerJsonPartialLogWithSplit);
 UNIT_TEST_CASE(ProcessorParseContainerLogNativeUnittest, TestDockerJsonPartialLogWithSplitAndRegex);
+UNIT_TEST_CASE(ProcessorParseContainerLogNativeUnittest, TestDockerJsonPartialLogAllPartial);
 // UNIT_TEST_CASE(ProcessorParseContainerLogNativeUnittest, TestFindAndSearchPerformance);
 
 // 生成一个随机字符串
@@ -2564,6 +2566,85 @@ void ProcessorParseContainerLogNativeUnittest::TestDockerJsonPartialLogWithSplit
             "container.type": "docker_json-file"
         }
     })";
+    std::string outJson = eventGroup.ToJsonString();
+    APSARA_TEST_STREQ(CompactJson(expectJson.str()).c_str(), CompactJson(outJson).c_str());
+}
+
+// TC-DOCKER-PARTIAL-04: All-partial Docker JSON logs (no full log at end) — MergeByFlag merges trailing partials
+void ProcessorParseContainerLogNativeUnittest::TestDockerJsonPartialLogAllPartial() {
+    auto sourceBuffer = std::make_shared<SourceBuffer>();
+    PipelineEventGroup eventGroup(sourceBuffer);
+    eventGroup.SetMetadata(EventGroupMetaKey::LOG_FORMAT, ProcessorParseContainerLogNative::DOCKER_JSON_FILE);
+    std::stringstream inJson;
+    inJson << R"({
+        "events": [
+            {
+                "contents": {
+                    "content": "{\"log\":\"part1 \",\"stream\":\"stdout\",\"time\":\"2024-02-19T03:49:37.793533014Z\"}\n{\"log\":\"part2 \",\"stream\":\"stdout\",\"time\":\"2024-02-19T03:49:37.793533014Z\"}\n{\"log\":\"part3\",\"stream\":\"stdout\",\"time\":\"2024-02-19T03:49:37.793533014Z\"}"
+                },
+                "timestamp": 12345678901,
+                "timestampNanosecond": 0,
+                "type": 1
+            }
+        ]
+    })";
+    eventGroup.FromJsonString(inJson.str());
+
+    // ProcessorSplitLogStringNative
+    {
+        Json::Value config;
+        ProcessorSplitLogStringNative processor;
+        processor.SetContext(mContext);
+        processor.CreateMetricsRecordRef(ProcessorSplitLogStringNative::sName, "1");
+        APSARA_TEST_TRUE_FATAL(processor.Init(config));
+        processor.CommitMetricsRecordRef();
+        processor.Process(eventGroup);
+    }
+    // ProcessorParseContainerLogNative
+    {
+        Json::Value config;
+        config["IgnoringStdout"] = false;
+        config["IgnoringStderr"] = false;
+        ProcessorParseContainerLogNative processor;
+        processor.SetContext(mContext);
+        processor.CreateMetricsRecordRef(ProcessorParseContainerLogNative::sName, "1");
+        APSARA_TEST_TRUE_FATAL(processor.Init(config));
+        processor.CommitMetricsRecordRef();
+        processor.Process(eventGroup);
+    }
+    // ProcessorMergeMultilineLogNative BY_FLAG
+    {
+        Json::Value config;
+        config["MergeType"] = "flag";
+        config["UnmatchedContentTreatment"] = "single_line";
+        ProcessorMergeMultilineLogNative processor;
+        processor.SetContext(mContext);
+        processor.CreateMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
+        APSARA_TEST_TRUE_FATAL(processor.Init(config));
+        processor.CommitMetricsRecordRef();
+        processor.Process(eventGroup);
+    }
+
+    // All 3 entries are partial (no trailing \n), so MergeByFlag merges them into 1 event
+    std::stringstream expectJson;
+    expectJson << R"({
+        "events": [
+            {
+                "contents": {
+                    "_source_": "stdout",
+                    "_time_": "2024-02-19T03:49:37.793533014Z",
+                    "content": "part1 part2 part3"
+                },
+                "timestamp": 12345678901,
+                "timestampNanosecond": 0,
+                "type": 1
+            }
+        ],
+        "metadata": {
+            "container.type": "docker_json-file"
+        }
+    })";
+    APSARA_TEST_EQUAL(1UL, eventGroup.GetEvents().size());
     std::string outJson = eventGroup.ToJsonString();
     APSARA_TEST_STREQ(CompactJson(expectJson.str()).c_str(), CompactJson(outJson).c_str());
 }

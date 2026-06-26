@@ -393,6 +393,7 @@ void ProcessorMergeMultilineLogNative::MergeLogsByJson(PipelineEventGroup& logGr
     std::vector<LogEvent*> events;
     size_t begin = 0;
     int braceDepth = 0;
+    bool inQuote = false;
     size_t accumulatedSize = 0;
     size_t maxSize = mMaxJsonBlockSize > 0 ? mMaxJsonBlockSize : LogFileReader::BUFFER_SIZE;
     StringView logPath = logGroup.GetMetadata(EventGroupMetaKey::LOG_FILE_PATH_RESOLVED);
@@ -415,7 +416,6 @@ void ProcessorMergeMultilineLogNative::MergeLogsByJson(PipelineEventGroup& logGr
 
         StringView content = sourceEvent->GetContent(mSourceKey);
 
-        bool inQuote = false;
         for (size_t i = 0; i < content.size(); ++i) {
             char c = content[i];
             switch (c) {
@@ -453,12 +453,14 @@ void ProcessorMergeMultilineLogNative::MergeLogsByJson(PipelineEventGroup& logGr
             sourceEvents[newSize++] = std::move(sourceEvents[begin]);
             events.clear();
             braceDepth = 0;
+            inQuote = false;
             accumulatedSize = 0;
         } else if (accumulatedSize > maxSize) {
             MergeEvents(events, true);
             sourceEvents[newSize++] = std::move(sourceEvents[begin]);
             events.clear();
             braceDepth = 0;
+            inQuote = false;
             accumulatedSize = 0;
 
             StringView oversizedContent = sourceEvents[newSize - 1].Cast<LogEvent>().GetContent(mSourceKey);

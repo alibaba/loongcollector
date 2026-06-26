@@ -525,7 +525,9 @@ bool ProcessorParseContainerLogNative::ParseDockerJsonLogLine(LogEvent& sourceEv
     sourceEvent.SetContentNoCopy(containerLogKey, content);
     if (isPartialLog) {
         sourceEvent.SetContentNoCopy(ProcessorMergeMultilineLogNative::PartLogFlag, StringView());
-        logGroup.SetMetadata(EventGroupMetaKey::HAS_PART_LOG, ProcessorMergeMultilineLogNative::PartLogFlag);
+        if (!logGroup.HasMetadata(EventGroupMetaKey::HAS_PART_LOG)) {
+            logGroup.SetMetadataNoCopy(EventGroupMetaKey::HAS_PART_LOG, ProcessorMergeMultilineLogNative::PartLogFlag);
+        }
     }
 
     return true;
