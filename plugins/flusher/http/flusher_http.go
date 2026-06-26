@@ -254,7 +254,7 @@ func (f *FlusherHTTP) exportWithConverterV2(groupEventsArray []*models.PipelineG
 				continue
 			}
 		}
-		converterEvents, passthroughEvents := partitionForConverterProtocol(f.exportProtocolName(), groupEvents.Events)
+		converterEvents, passthroughEvents := exportutil.PartitionForConverterProtocol(f.exportProtocolName(), groupEvents.Events)
 		if len(converterEvents) > 0 {
 			f.addTask(&models.PipelineGroupEvents{Group: groupEvents.Group, Events: converterEvents})
 		}
@@ -267,30 +267,6 @@ func (f *FlusherHTTP) exportWithConverterV2(groupEventsArray []*models.PipelineG
 		}
 	}
 	return nil
-}
-
-func partitionForConverterProtocol(protocol string, events []models.PipelineEvent) (converterEvents, passthroughEvents []models.PipelineEvent) {
-	switch protocol {
-	case converter.ProtocolInfluxdb:
-		for _, event := range events {
-			if event.GetType() == models.EventTypeMetric {
-				converterEvents = append(converterEvents, event)
-			} else {
-				passthroughEvents = append(passthroughEvents, event)
-			}
-		}
-	case converter.ProtocolRaw:
-		for _, event := range events {
-			if event.GetType() == models.EventTypeByteArray {
-				converterEvents = append(converterEvents, event)
-			} else {
-				passthroughEvents = append(passthroughEvents, event)
-			}
-		}
-	default:
-		return exportutil.PartitionEvents(events, exportutil.LogOnlyEventKinds)
-	}
-	return converterEvents, passthroughEvents
 }
 
 var _ pipeline.FlusherV2 = (*FlusherHTTP)(nil)

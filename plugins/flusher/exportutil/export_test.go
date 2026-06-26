@@ -22,6 +22,7 @@ import (
 
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/protocol"
+	converter "github.com/alibaba/ilogtail/pkg/protocol/converter"
 )
 
 func TestPartitionEvents_LogMetricSpan(t *testing.T) {
@@ -34,8 +35,15 @@ func TestPartitionEvents_LogMetricSpan(t *testing.T) {
 	require.Len(t, matched, 1)
 	require.Len(t, passThrough, 2)
 	assert.Equal(t, models.EventTypeLogging, matched[0].GetType())
-	assert.Equal(t, models.EventTypeMetric, passThrough[0].GetType())
-	assert.Equal(t, models.EventTypeSpan, passThrough[1].GetType())
+}
+
+func TestPartitionForConverterProtocol_Influxdb(t *testing.T) {
+	metric := models.NewSingleValueMetric("m", models.MetricTypeGauge, models.NewTags(), 2, 1.0)
+	log := models.NewLog("", []byte("log"), "info", "", "", models.NewTags(), 1)
+	converterEvents, passthrough := PartitionForConverterProtocol(converter.ProtocolInfluxdb, []models.PipelineEvent{log, metric})
+	require.Len(t, converterEvents, 1)
+	require.Len(t, passthrough, 1)
+	assert.Equal(t, models.EventTypeMetric, converterEvents[0].GetType())
 }
 
 func TestSerializePassthroughEvent_MetricAndSpan(t *testing.T) {

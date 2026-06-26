@@ -312,7 +312,7 @@ func (k *FlusherKafka) exportWithConverterV2(groupEventsArray []*models.Pipeline
 	for _, groupEvents := range groupEventsArray {
 		logger.Debug(k.context.GetRuntimeContext(), "[GroupEvents] events count", len(groupEvents.Events),
 			"tags", groupEvents.Group.GetTags().Iterator())
-		converterEvents, passthroughEvents := partitionForConverterProtocol(k.converter.Protocol, groupEvents.Events)
+		converterEvents, passthroughEvents := exportutil.PartitionForConverterProtocol(k.converter.Protocol, groupEvents.Events)
 		if len(converterEvents) > 0 {
 			subGroup := &models.PipelineGroupEvents{Group: groupEvents.Group, Events: converterEvents}
 			if err := k.exportGroupWithConverterV2(subGroup); err != nil {
@@ -328,30 +328,6 @@ func (k *FlusherKafka) exportWithConverterV2(groupEventsArray []*models.Pipeline
 		}
 	}
 	return nil
-}
-
-func partitionForConverterProtocol(protocol string, events []models.PipelineEvent) (converterEvents, passthroughEvents []models.PipelineEvent) {
-	switch protocol {
-	case converter.ProtocolInfluxdb:
-		for _, event := range events {
-			if event.GetType() == models.EventTypeMetric {
-				converterEvents = append(converterEvents, event)
-			} else {
-				passthroughEvents = append(passthroughEvents, event)
-			}
-		}
-	case converter.ProtocolRaw:
-		for _, event := range events {
-			if event.GetType() == models.EventTypeByteArray {
-				converterEvents = append(converterEvents, event)
-			} else {
-				passthroughEvents = append(passthroughEvents, event)
-			}
-		}
-	default:
-		return exportutil.PartitionEvents(events, exportutil.LogOnlyEventKinds)
-	}
-	return converterEvents, passthroughEvents
 }
 
 func (k *FlusherKafka) exportGroupWithConverterV2(groupEvents *models.PipelineGroupEvents) error {

@@ -237,7 +237,65 @@ func (*FlusherPulsar) SetUrgent(flag bool) {
 var _ pipeline.FlusherV2 = (*FlusherPulsar)(nil)
 
 func (f *FlusherPulsar) Export(groups []*models.PipelineGroupEvents, _ pipeline.PipelineContext) error {
+	if f.converter.Protocol == converter.ProtocolRaw || f.converter.Protocol == converter.ProtocolInfluxdb {
+		return f.exportWithConverterV2(groups)
+	}
 	return exportutil.ExportLogOnly(groups, "", "", "", f.Flush)
+}
+
+func (f *FlusherPulsar) exportWithConverterV2(groups []*models.PipelineGroupEvents) error {
+	for _, groupEvents := range groups {
+		converterEvents, passthroughEvents := exportutil.PartitionForConverterProtocol(f.converter.Protocol, groupEvents.Events)
+		if len(converterEvents) > 0 {
+			subGroup := &models.PipelineGroupEvents{Group: groupEvents.Group, Events: converterEvents}
+			if err := f.exportGroupWithConverterV2(subGroup); err != nil {
+				return err
+			}
+		}
+		if len(passthroughEvents) > 0 {
+			if err := exportutil.ExportLogOnly([]*models.PipelineGroupEvents{{
+				Group: groupEvents.Group, Events: passthroughEvents,
+			}}, "", "", "", f.Flush); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (f *FlusherPulsar) exportGroupWithConverterV2(groupEvents *models.PipelineGroupEvents) error {
+	topic := f.Topic
+	logs, values, err := f.converter.ToByteStreamWithSelectedFieldsV2(groupEvents, f.selectFields)
+	if err != nil {
+		logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "flush pulsar convert log fail, error", err)
+		return nil
+	}
+	for index, log := range logs.([][]byte) {
+		valueMap := values[index]
+		if len(f.topicKeys) > 0 {
+			formattedTopic, err := fmtstr.FormatTopic(valueMap, f.Topic)
+			if err != nil {
+				logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "flush pulsar format topic fail, error", err)
+			} else {
+				topic = *formattedTopic
+			}
+		}
+		producer, err := f.producers.GetProducer(topic, f.pulsarClient, f.producerOptions)
+		if err != nil {
+			logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "load pulsar producer fail,topic", topic, "err", err)
+			return err
+		}
+		message := &pulsar.ProducerMessage{Payload: log}
+		if f.PartitionKeys != nil {
+			message.Key = f.hashPartitionKey(valueMap, "")
+		}
+		producer.SendAsync(f.context.GetRuntimeContext(), message, func(msgId pulsar.MessageID, prodMsg *pulsar.ProducerMessage, err error) {
+			if err != nil {
+				logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "send message to pulsar fail,error", err)
+			}
+		})
+	}
+	return nil
 }
 
 // IsReady is ready to flush
