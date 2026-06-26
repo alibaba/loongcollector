@@ -15,6 +15,7 @@
 #include "config/CollectionConfig.h"
 
 #include <string>
+#include <unordered_set>
 
 #include "boost/regex.hpp"
 
@@ -95,36 +96,30 @@ static void ReplaceEnvVarRef(Json::Value& value, bool& res) {
     }
 }
 
-static bool IsNativeInputAllowedWithGoPlugin(const string& pluginType) {
-    // Legacy whitelist before A1: file / security / self-monitor native inputs may coexist with Go plugins.
-#ifndef APSARA_UNIT_TEST_MAIN
-    if (pluginType == "input_file" || pluginType == "input_container_stdio"
-        || pluginType == "input_static_file_onetime") {
-        return true;
-    }
-#else
-    if (pluginType.find("input_file") != string::npos || pluginType.find("input_container_stdio") != string::npos
-        || pluginType.find("input_static_file_onetime") != string::npos) {
-        return true;
-    }
-#endif
-    if (pluginType.find("_security") != string::npos) {
-        return true;
-    }
-    if (pluginType == "input_internal_metrics" || pluginType == "input_internal_alarms") {
-        return true;
-    }
-    return false;
+static const unordered_set<string>& GetNativeInputBlacklistWhenUsingGoPlugin() {
+    // A1: explicit blacklist of native inputs that cannot coexist with Go processors/flushers yet.
+    // All registered native inputs minus legacy whitelist:
+    //   input_file, input_container_stdio, input_static_file_onetime,
+    //   input_*_security, input_internal_metrics, input_internal_alarms.
+    // Remove one entry after B-line matrix/E2E proves runtime reachability.
+    static const unordered_set<string> kBlacklist = {
+        "input_agentsight",
+        "input_cpu_profiling",
+        "input_forward",
+        "input_host_meta",
+        "input_host_monitor",
+        "input_internal_config_container_info",
+        "input_network_observer",
+        "input_prometheus",
+    };
+    return kBlacklist;
 }
 
 static bool IsNativeInputBlockedWhenUsingGoPlugin(const string& pluginType, bool isOnetime) {
-    // A1 framework: default-allow + blacklist. Populate blacklist with legacy non-whitelist native inputs
-    // so Parse behavior stays consistent until B-line matrix/E2E proves runtime reachability.
-    // Parse success != events reaching Go pipeline; silent discard alarm follow-up tracked on #2599 / #2606.
     if (!PluginRegistry::GetInstance()->IsValidNativeInputPlugin(pluginType, isOnetime)) {
         return false;
     }
-    return !IsNativeInputAllowedWithGoPlugin(pluginType);
+    return GetNativeInputBlacklistWhenUsingGoPlugin().count(pluginType) > 0;
 }
 
 bool CollectionConfig::Parse() {

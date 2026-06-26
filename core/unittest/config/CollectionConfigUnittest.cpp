@@ -14,6 +14,7 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "json/json.h"
 
@@ -2445,49 +2446,61 @@ void CollectionConfigUnittest::NativeInputWithGoPlugin() const {
     unique_ptr<CollectionConfig> config;
     string errorMsg;
 
-    // Legacy non-whitelist native input + Go processor/flusher must fail Parse (blacklist).
-    string configStr = R"(
-        {
-            "inputs": [
-                {
-                    "Type": "input_host_monitor"
-                }
-            ],
-            "processors": [
-                {
-                    "Type": "processor_json"
-                }
-            ],
-            "flushers": [
-                {
-                    "Type": "flusher_http"
-                }
-            ]
-        }
-    )";
-    configJson.reset(new Json::Value());
-    APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
-    config.reset(new CollectionConfig(configName, std::move(configJson), filepath));
-    APSARA_TEST_FALSE(config->Parse());
+    // Explicit blacklist (all native inputs minus legacy whitelist) must fail Parse with Go plugins.
+    const vector<string> blacklistedInputs = {
+        "input_agentsight",
+        "input_cpu_profiling",
+        "input_forward",
+        "input_host_meta",
+        "input_host_monitor",
+        "input_internal_config_container_info",
+        "input_network_observer",
+        "input_prometheus",
+    };
+    for (const auto& inputType : blacklistedInputs) {
+        string configStr = R"(
+            {
+                "inputs": [
+                    {
+                        "Type": ")" + inputType + R"("
+                    }
+                ],
+                "processors": [
+                    {
+                        "Type": "processor_json"
+                    }
+                ],
+                "flushers": [
+                    {
+                        "Type": "flusher_http"
+                    }
+                ]
+            }
+        )";
+        configJson.reset(new Json::Value());
+        APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
+        config.reset(new CollectionConfig(configName, std::move(configJson), filepath));
+        APSARA_TEST_FALSE_DESC(config->Parse(), inputType);
 
-    configStr = R"(
-        {
-            "inputs": [
-                {
-                    "Type": "input_host_monitor"
-                }
-            ],
-            "flushers": [
-                {
-                    "Type": "flusher_http"
-                }
-            ]
-        }
-    )";
-    configJson.reset(new Json::Value());
-    APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
-    config.reset(new CollectionConfig(configName, std::move(configJson), filepath));
-    APSARA_TEST_FALSE(config->Parse());
+        configStr = R"(
+            {
+                "inputs": [
+                    {
+                        "Type": ")" + inputType + R"("
+                    }
+                ],
+                "flushers": [
+                    {
+                        "Type": "flusher_http"
+                    }
+                ]
+            }
+        )";
+        configJson.reset(new Json::Value());
+        APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
+        config.reset(new CollectionConfig(configName, std::move(configJson), filepath));
+        APSARA_TEST_FALSE_DESC(config->Parse(), inputType);
+    }
 }
 
 UNIT_TEST_CASE(CollectionConfigUnittest, HandleValidConfig)
