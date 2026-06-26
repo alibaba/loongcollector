@@ -4,6 +4,15 @@
 
 您可以选择根据pipeline event group的属性将group发送到不同的flusher。
 
+
+## 事件能力
+
+列含义见 [概览 · 事件能力列说明](../overview.md#事件能力列说明)。
+
+| Log | Metric | Span |
+| --- | --- | --- |
+| ✓ | ✓ | ✓ |
+
 ## 限制
 
 仅限使用原生处理插件且所有flusher均支持发送路由能力的场景。

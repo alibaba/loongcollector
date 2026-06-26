@@ -4,6 +4,15 @@
 
 `metric_meta_host` `input`插件用于采集主机的Meta信息（例如CPU型号、内存大小、进程等）。
 
+
+## 事件能力
+
+列含义见 [概览 · 事件能力列说明](../../overview.md#事件能力列说明)。
+
+| Log | Metric | Span |
+| --- | --- | --- |
+| — | ✓ | — |
+
 ## 版本
 
 [Stable](../../stability-level.md)
