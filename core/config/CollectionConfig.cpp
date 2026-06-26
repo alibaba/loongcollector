@@ -115,10 +115,9 @@ static const unordered_set<string>& GetNativeInputBlacklistWhenUsingGoPlugin() {
     return kBlacklist;
 }
 
-static bool IsNativeInputBlockedWhenUsingGoPlugin(const string& pluginType, bool isOnetime) {
-    if (!PluginRegistry::GetInstance()->IsValidNativeInputPlugin(pluginType, isOnetime)) {
-        return false;
-    }
+static bool IsNativeInputBlockedWhenUsingGoPlugin(const string& pluginType, bool /* isOnetime */) {
+    // Blacklist is platform-agnostic: Linux-only native inputs are not registered on Windows,
+    // but configs referencing them must still be rejected when paired with Go plugins.
     return GetNativeInputBlacklistWhenUsingGoPlugin().count(pluginType) > 0;
 }
 
@@ -241,7 +240,9 @@ bool CollectionConfig::Parse() {
             }
         }
         if (i == 0) {
-            if (PluginRegistry::GetInstance()->IsValidGoPlugin(pluginType)) {
+            if (IsNativeInputBlockedWhenUsingGoPlugin(pluginType, IsOnetime())) {
+                mHasNativeInput = true;
+            } else if (PluginRegistry::GetInstance()->IsValidGoPlugin(pluginType)) {
                 mHasGoInput = true;
             } else if (PluginRegistry::GetInstance()->IsValidNativeInputPlugin(pluginType, IsOnetime())) {
                 mHasNativeInput = true;
