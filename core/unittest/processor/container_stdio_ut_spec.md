@@ -453,11 +453,11 @@ FileServer (读文件块)
 
 ---
 
-## 5. 现有测试 vs 新增测试对照
+## 5. 测试用例完整目录
 
 ```
 ProcessorParseContainerLogNativeUnittest
-  ├── TestInit                                    [已有]
+  ├── TestInit                                    [已有] 参数非法时 Init 仍通过
   ├── TestContainerdLog                           [已有] CRI P/F 解析
   ├── TestIgnoringStdoutStderr                    [已有] CRI stdout/stderr 过滤
   ├── TestContainerdLogWithSplit                  [已有] CRI 全链路 P/F + 正则
@@ -465,41 +465,50 @@ ProcessorParseContainerLogNativeUnittest
   ├── TestDockerJsonLogLineParser                 [已有] Docker 字段边界
   ├── TestKeepingSourceWhenParseFail              [已有] 解析失败保留/丢弃
   ├── TestParseDockerLog                          [已有] ParseDockerLog 底层函数
-+ ├── TestDockerJsonPartialLogBasic               [新增] Docker partial: PartLogFlag 设置
-+ ├── TestDockerJsonPartialLogWithSplit            [新增] Docker partial: P+P+F 全链路合并
-+ ├── TestDockerJsonPartialLogWithSplitAndRegex   [新增] Docker partial: 四步全链路
-+ └── TestDockerJsonPartialLogAllPartial          [新增] Docker partial: 全 partial 无完整行
+  ├── TestDockerJsonPartialLogBasic               [新增] Docker partial: PartLogFlag + HAS_PART_LOG 设置
+  ├── TestDockerJsonPartialLogWithSplit            [新增] Docker partial: P+P+F 全链路 Split→Parse→MergeByFlag
+  ├── TestDockerJsonPartialLogWithSplitAndRegex   [新增] Docker partial: 四步全链路 Split→Parse→MergeByFlag→MergeByRegex
+  └── TestDockerJsonPartialLogAllPartial          [新增] Docker partial: 全 partial 无完整行，MergeByFlag 尾部合并
+
+ProcessorMergeMultilineLogNativeUnittest
+  ├── ProcessorMergeMultilineLogNativeUnittest     [已有] MergeType flag/regex Init
+  ├── ProcessEventsWithPartLogUnittest             [已有] BY_FLAG 手动构造 PartLogFlag 合并
+  ├── ProcessorMergeMultilineLogDisacardUnmatch    [已有] BY_REGEX + discard 5 个正则组合
+  ├── ProcessorMergeMultilineLogKeepUnmatch        [已有] BY_REGEX + single_line 5 个正则组合
+  └── ProcessorMergeMultilineLogJsonUnittest       [新增] BY_JSON 合并
+      ├── TestMergeJsonInit                        MergeType=json Init 成功
+      ├── TestMergeJsonSingleLineBlock             单行完整 JSON 不合并
+      ├── TestMergeJsonMultiLineBlock              多行 JSON 块正确合并（嵌套对象）
+      ├── TestMergeJsonMultipleBlocks              连续多块各自独立合并
+      ├── TestMergeJsonBraceInString               引号内大括号不影响深度计数（单事件）
+      ├── TestMergeJsonBraceInStringCrossEvent     引号内大括号跨事件 inQuote 持久化
+      ├── TestMergeJsonEscapedQuote                转义引号 \" 不翻转 inQuote（单事件）
+      ├── TestMergeJsonEscapedQuoteCrossEvent      转义序列 \" 跨事件 pendingEscape 传递
+      ├── TestMergeJsonOversized                   超过 MaxJsonBlockSize 强制分割 + 告警
+      ├── TestMergeJsonIncompleteAtEnd             批次末尾未闭合 JSON 块不丢弃
+      ├── TestMergeJsonConsecutiveBackslashes       连续反斜杠 \\\\ 正确配对，不误设 pendingEscape
+      ├── TestMergeJsonEmptyEventInterleaved       空事件穿插在 JSON 块中间，不影响合并
+      └── TestMergeJsonSingleCharEvents            单字符事件边界条件（{、"、a、"、}）
+
+InputContainerStdioUnittest
+  ├── OnSuccessfulInit                             [已有] Init 成功
+  ├── OnEnableContainerDiscovery                   [已有] 容器发现启用
+  ├── OnPipelineUpdate                             [已有] Pipeline 更新
+  ├── TestTryGetRealPath                           [已有] 符号链接路径解析
+  └── TestCreateInnerProcessorsJsonMultilineNoJsonReader  [新增] JSON 多行模式不设 RequiringJsonReaderFlag，第 4 步为 MergeType=json
 
 GetLastLineDataUnittest
   ├── LastMatchedContainerdTextLineUnittest
   │   ├── TestLastContainerdTextLineSingleLine     [已有] CRI P/F needSingleLine=true
   │   └── TestLastContainerdTextLineMerge          [已有] CRI P/F needSingleLine=false
   ├── LastMatchedDockerJsonFileUnittest
-  │   ├── TestLastDockerJsonFile                   [已有] Docker 仅 Full，无 P 行
-+ │   ├── TestLastDockerJsonFileSingleLine         [新增] Docker P/F needSingleLine=true
-+ │   └── TestLastDockerJsonFileMerge              [新增] Docker P/F needSingleLine=false
+  │   └── TestLastDockerJsonFile                   [已有] Docker 仅 Full，无 P 行
   └── LastMatchedContainerdTextWithDockerJsonUnittest
       ├── TestContainerdTextWithDockerJson          [已有]
       └── TestDockerJsonWithContainerdText          [已有]
-
-ProcessorMergeMultilineLogNativeUnittest (Phase 4 新增)
-+ └── ProcessorMergeMultilineLogJsonUnittest
-+     ├── TestMergeJsonInit                          [新增] MergeType=json Init
-+     ├── TestMergeJsonSingleLineBlock               [新增] 单行 JSON 不合并
-+     ├── TestMergeJsonMultiLineBlock                [新增] 多行 JSON 块合并
-+     ├── TestMergeJsonMultipleBlocks                [新增] 连续多块各自合并
-+     ├── TestMergeJsonBraceInString                 [新增] 引号内大括号忽略（单事件）
-+     ├── TestMergeJsonBraceInStringCrossEvent       [新增] 引号内大括号跨事件持久化
-+     ├── TestMergeJsonEscapedQuote                  [新增] 转义引号处理
-+     ├── TestMergeJsonOversized                     [新增] 超限强制输出
-+     └── TestMergeJsonIncompleteAtEnd               [新增] 末尾未闭合
-
-InputContainerStdioUnittest
-  ├── OnSuccessfulInit                             [已有]
-  ├── OnEnableContainerDiscovery                   [已有]
-  ├── OnPipelineUpdate                             [已有]
-  ├── TestTryGetRealPath                           [已有]
-+ └── TestCreateInnerProcessorsJsonMultilineNoJsonReader  [新增/更新] Phase 3 + Phase 4
 ```
 
-新增 `+` 标记的共 **14 个测试方法**（Phase 1-3: 6 个 + Phase 4: 8 个），覆盖 3 个已知缺陷 + JSON 多行块合并功能。
+本分支共新增 **18 个测试方法**：
+- ProcessorParseContainerLogNativeUnittest: 4 个（Docker partial 检测 + 全链路合并）
+- ProcessorMergeMultilineLogJsonUnittest: 13 个（BY_JSON 合并全场景覆盖）
+- InputContainerStdioUnittest: 1 个（JSON 多行处理器创建验证）
