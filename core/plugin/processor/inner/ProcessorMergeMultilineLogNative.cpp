@@ -459,10 +459,10 @@ void ProcessorMergeMultilineLogNative::MergeLogsByJson(PipelineEventGroup& logGr
 
         if (braceDepth <= 0) {
             if (braceDepth < 0) {
-                LOG_DEBUG(mContext->GetLogger(),
-                          ("JSON brace depth went negative, possible malformed input",
-                           "")("braceDepth", braceDepth)("filepath", logPath.to_string())("processor", sName)(
-                              "config", mContext->GetConfigName()));
+                LOG_DEBUG(
+                    mContext->GetLogger(),
+                    ("JSON brace depth went negative, possible malformed input", "")("braceDepth", braceDepth)(
+                        "filepath", logPath.to_string())("processor", sName)("config", mContext->GetConfigName()));
             }
             MergeEvents(events, true);
             sourceEvents[newSize++] = std::move(sourceEvents[begin]);
@@ -485,8 +485,8 @@ void ProcessorMergeMultilineLogNative::MergeLogsByJson(PipelineEventGroup& logGr
                 LOG_WARNING(
                     mContext->GetLogger(),
                     ("JSON block too long, forced to split",
-                     "")("first 1KB", oversizedContent.substr(0, 1024).to_string())(
-                        "filepath", logPath.to_string())("processor", sName)("config", mContext->GetConfigName()));
+                     "")("first 1KB", oversizedContent.substr(0, 1024).to_string())("filepath", logPath.to_string())(
+                        "processor", sName)("config", mContext->GetConfigName()));
                 mContext->GetAlarm().SendAlarmWarning(SPLIT_LOG_FAIL_ALARM,
                                                       "JSON block too long and forced to split. processor: " + sName
                                                           + " config: " + mContext->GetConfigName(),
