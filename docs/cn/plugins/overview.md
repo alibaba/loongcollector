@@ -4,20 +4,26 @@
 
 ## 事件能力列说明
 
-下列说明适用于**扩展 Processor**与**扩展 Flusher**表格中的 StructureType / 事件能力列（随插件演进持续更新）：
+下列说明适用于插件概览表中的事件能力列（随插件演进持续更新）：
+
+**扩展 Processor / 扩展 Flusher**
 
 - **v1 接口 / v2 接口**：是否实现 v1（`ProcessLogs` / `Flush(LogGroup)`）或 v2（`Process(PipelineGroupEvents)` / `Export`）处理路径。
 - **Log / Metric / Span**：对该事件类型的支持；`v1`/`v1&v2`/`v2` 表示明确实现，`透传未知` 表示代码中无类型特化信号（可能随 Pipeline 透传）。
-- **占位符语义**：
-  - `—` 表示**不支持 / 未实现**。
+
+**原生 Input**
+
+- **Log / Metric / Span**：Native Input 产出的 `PipelineEvent` 类型。
+
+**占位符语义**
+
+- `✓` = 支持（Yes）；`—` = 不支持 / 未实现（No）。
 
 ## 输入
 
 ### 原生插件
 
-> **Log / Metric / Span**：Native Input 产出的 `PipelineEvent` 类型；随插件演进持续更新本表。
->
-> **图例**：`✓` = 支持（Yes）；`—` = 不支持（No）。
+> 各列含义见 [事件能力列说明](#事件能力列说明)。
 
 | 名称 | 提供方 | Log | Metric | Span | 简介 |
 | --- | --- | --- | --- | --- | --- |
