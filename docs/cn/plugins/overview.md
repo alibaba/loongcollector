@@ -2,6 +2,15 @@
 
 下文各表按插件 **Type（反引号内英文名）字典序** 升序排列。
 
+## 事件能力列说明
+
+下列说明适用于**扩展 Processor**与**扩展 Flusher**表格中的 StructureType / 事件能力列（随插件演进持续更新）：
+
+- **v1 接口 / v2 接口**：是否实现 v1（`ProcessLogs` / `Flush(LogGroup)`）或 v2（`Process(PipelineGroupEvents)` / `Export`）处理路径。
+- **Log / Metric / Span**：对该事件类型的支持；`v1`/`v1&v2`/`v2` 表示明确实现，`透传未知` 表示代码中无类型特化信号（可能随 Pipeline 透传）。
+- **占位符语义**：
+  - `—` 表示**不支持 / 未实现**。
+
 ## 输入
 
 ### 原生插件
@@ -79,35 +88,36 @@
 
 ### 扩展插件
 
-| 名称                                                                                                        | 提供方                                                  | 简介                                                                                                          |
-| ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| `processor_add_fields`<br>[添加字段](processor/extended/processor-add-fields.md)                            | SLS 官方                                                | 添加字段。                                                                                                    |
-| `processor_appender`<br>[追加字段](processor/extended/processor-appender.md)                                | SLS 官方                                                | 追加字段。                                                                                                    |
-| `processor_cloud_meta`<br>[添加云资产信息](processor/extended/processor-cloudmeta.md)                       | SLS 官方                                                | 为日志增加云平台元数据信息。                                                                                  |
-| `processor_default`<br>[原始数据](processor/extended/processor-default.md)                                  | SLS 官方                                                | 不对数据任何操作，只是简单的数据透传。                                                                        |
-| `processor_desensitize`<br>[数据脱敏](processor/extended/processor-desensitize.md)                          | SLS 官方<br>[Takuka0311](https://github.com/Takuka0311) | 对敏感数据进行脱敏处理。                                                                                      |
-| `processor_dict_map`<br>[字段值映射处理](processor/extended/processor-dict-map.md)                          | SLS 官方                                                | 对指定字段的值查表映射.                                                                                       |
-| `processor_drop`<br>[丢弃字段](processor/extended/processor-drop.md)                                        | SLS 官方                                                | 丢弃字段。                                                                                                    |
-| `processor_encrypt`<br>[字段加密](processor/extended/processor-encrypy.md)                                  | SLS 官方                                                | 加密字段                                                                                                      |
-| `processor_fields_with_conditions`<br>[条件字段处理](processor/extended/processor-fields-with-condition.md) | 社区<br>[pj1987111](https://github.com/pj1987111)       | 根据日志部分字段的取值，动态进行字段扩展或删除。                                                              |
-| `processor_filter_regex`<br>[日志过滤](processor/extended/processor-filter-regex.md)                        | SLS 官方                                                | 通过正则匹配过滤日志。                                                                                        |
-| `processor_gotime`<br>[时间提取（Go 时间格式）](processor/extended/processor-gotime.md)                     | SLS 官方                                                | 以 Go 语言时间格式解析原始日志中的时间字段。                                                                  |
-| `processor_grok`<br>[Grok](processor/extended/processor-grok.md)                                            | SLS 官方<br>[Takuka0311](https://github.com/Takuka0311) | 通过 Grok 语法对数据进行处理                                                                                  |
-| `processor_json`<br>[Json](processor/extended/processor-json.md)                                            | SLS 官方                                                | 实现对 Json 格式日志的解析。                                                                                  |
-| `processor_log_to_sls_metric`<br>[日志转 sls metric](processor/extended/processor-log-to-sls-metric.md)     | SLS 官方                                                | 将日志转 sls metric                                                                                           |
-| `processor_otel_metric`<br>[otel Metric格式转换](processor/extended/processor-otel-metric.md)                 | SLS 官方                                                | OpenTelemetry Metric 数据格式转换。                                                                           |
-| `processor_otel_trace`<br>[otel Trace格式转换](processor/extended/processor-otel-trace.md)                    | SLS 官方                                                | OpenTelemetry Trace 数据格式转换。                                                                            |
-| `processor_packjson`<br>[字段打包](processor/extended/processor-packjson.md)                                | SLS 官方                                                | 可添加指定的字段（支持多个）以 JSON 格式打包成单个字段。                                                      |
-| `processor_rate_limit`<br>[日志限速](processor/extended/processor-rate-limit.md)                            | SLS 官方                                                | 用于对日志进行限速处理，确保在设定的时间窗口内，具有相同索引值的日志条目的数量不超过预定的速率限制。          |
-| `processor_regex`<br>[正则](processor/extended/processor-regex.md)                                          | SLS 官方                                                | 通过正则匹配的模式实现文本日志的字段提取。                                                                    |
-| `processor_rename`<br>[重命名字段](processor/extended/processor-rename.md)                                  | SLS 官方                                                | 重命名字段。                                                                                                  |
-| `processor_split_char`<br>[分隔符](processor/extended/processor-delimiter.md)                               | SLS 官方                                                | 通过单字符的分隔符提取字段。                                                                                  |
-| `processor_split_key_value`<br>[键值对](processor/extended/processor-split-key-value.md)                    | SLS 官方                                                | 通过切分键值对的方式提取字段。                                                                                |
-| `processor_split_log_regex`<br>[多行切分](processor/extended/processor-split-log-regex.md)                  | SLS 官方                                                | 实现多行日志（例如 Java 程序日志）的采集。                                                                    |
-| `processor_split_string`<br>[分隔符](processor/extended/processor-delimiter.md)                             | SLS 官方                                                | 通过多字符的分隔符提取字段。                                                                                  |
-| `processor_string_replace`<br>[字符串替换](processor/extended/processor-string-replace.md)                  | SLS 官方<br>[pj1987111](https://github.com/pj1987111)   | 通过全文匹配、正则匹配、去转义字符等方式对文本日志进行内容替换。                                              |
-| `processor_strptime`<br>[时间提取（strptime 格式）](processor/extended/processor-strptime.md)                | SLS 官方                                                | 从指定字段中提取日志时间，时间格式为 [Linux strptime](http://man7.org/linux/man-pages/man3/strptime.3.html)。 |
+> 各列含义见 [事件能力列说明](#事件能力列说明)。
 
+| 名称 | 提供方 | v1 接口 | v2 接口 | Log | Metric | Span | 简介 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `processor_add_fields`<br>[添加字段](processor/extended/processor-add-fields.md) | SLS 官方 | ✓ | — | v1 | 透传未知 | 透传未知 | 添加字段。 |
+| `processor_appender`<br>[追加字段](processor/extended/processor-appender.md) | SLS 官方 | ✓ | — | v1 | 透传未知 | 透传未知 | 追加字段。 |
+| `processor_cloud_meta`<br>[添加云资产信息](processor/extended/processor-cloudmeta.md) | SLS 官方 | ✓ | — | v1 | 透传未知 | 透传未知 | 为日志增加云平台元数据信息。 |
+| `processor_default`<br>[原始数据](processor/extended/processor-default.md) | SLS 官方 | ✓ | ✓ | v1&v2 | 透传未知 | 透传未知 | 不对数据任何操作，只是简单的数据透传。 |
+| `processor_desensitize`<br>[数据脱敏](processor/extended/processor-desensitize.md) | SLS 官方<br>[Takuka0311](https://github.com/Takuka0311) | ✓ | — | v1 | 透传未知 | 透传未知 | 对敏感数据进行脱敏处理。 |
+| `processor_dict_map`<br>[字段值映射处理](processor/extended/processor-dict-map.md) | SLS 官方 | ✓ | — | v1 | 透传未知 | 透传未知 | 对指定字段的值查表映射. |
+| `processor_drop`<br>[丢弃字段](processor/extended/processor-drop.md) | SLS 官方 | ✓ | — | v1 | 透传未知 | 透传未知 | 丢弃字段。 |
+| `processor_encrypt`<br>[字段加密](processor/extended/processor-encrypy.md) | SLS 官方 | ✓ | — | v1 | 透传未知 | 透传未知 | 加密字段 |
+| `processor_fields_with_conditions`<br>[条件字段处理](processor/extended/processor-fields-with-condition.md) | 社区<br>[pj1987111](https://github.com/pj1987111) | ✓ | — | v1 | 透传未知 | 透传未知 | 根据日志部分字段的取值，动态进行字段扩展或删除。 |
+| `processor_filter_regex`<br>[日志过滤](processor/extended/processor-filter-regex.md) | SLS 官方 | ✓ | — | v1 | 透传未知 | 透传未知 | 通过正则匹配过滤日志。 |
+| `processor_gotime`<br>[时间提取（Go 时间格式）](processor/extended/processor-gotime.md) | SLS 官方 | ✓ | — | v1 | 透传未知 | 透传未知 | 以 Go 语言时间格式解析原始日志中的时间字段。 |
+| `processor_grok`<br>[Grok](processor/extended/processor-grok.md) | SLS 官方<br>[Takuka0311](https://github.com/Takuka0311) | ✓ | — | v1 | 透传未知 | 透传未知 | 通过 Grok 语法对数据进行处理 |
+| `processor_json`<br>[Json](processor/extended/processor-json.md) | SLS 官方 | ✓ | ✓ | v1&v2 | 透传未知 | 透传未知 | 实现对 Json 格式日志的解析。 |
+| `processor_log_to_sls_metric`<br>[日志转 sls metric](processor/extended/processor-log-to-sls-metric.md) | SLS 官方 | ✓ | — | v1 | 透传未知 | 透传未知 | 将日志转 sls metric |
+| `processor_otel_metric`<br>[otel Metric格式转换](processor/extended/processor-otel-metric.md) | SLS 官方 | ✓ | — | v1 | 透传未知 | 透传未知 | OpenTelemetry Metric 数据格式转换。 |
+| `processor_otel_trace`<br>[otel Trace格式转换](processor/extended/processor-otel-trace.md) | SLS 官方 | ✓ | — | v1 | 透传未知 | 透传未知 | OpenTelemetry Trace 数据格式转换。 |
+| `processor_packjson`<br>[字段打包](processor/extended/processor-packjson.md) | SLS 官方 | ✓ | — | v1 | 透传未知 | 透传未知 | 可添加指定的字段（支持多个）以 JSON 格式打包成单个字段。 |
+| `processor_rate_limit`<br>[日志限速](processor/extended/processor-rate-limit.md) | SLS 官方 | ✓ | — | v1 | 透传未知 | 透传未知 | 用于对日志进行限速处理，确保在设定的时间窗口内，具有相同索引值的日志条目的数量不超过预定的速率限制。 |
+| `processor_regex`<br>[正则](processor/extended/processor-regex.md) | SLS 官方 | ✓ | — | v1 | 透传未知 | 透传未知 | 通过正则匹配的模式实现文本日志的字段提取。 |
+| `processor_rename`<br>[重命名字段](processor/extended/processor-rename.md) | SLS 官方 | ✓ | ✓ | v1&v2 | 透传未知 | 透传未知 | 重命名字段。 |
+| `processor_split_char`<br>[分隔符](processor/extended/processor-delimiter.md) | SLS 官方 | ✓ | — | v1 | 透传未知 | 透传未知 | 通过单字符的分隔符提取字段。 |
+| `processor_split_key_value`<br>[键值对](processor/extended/processor-split-key-value.md) | SLS 官方 | ✓ | — | v1 | 透传未知 | 透传未知 | 通过切分键值对的方式提取字段。 |
+| `processor_split_log_regex`<br>[多行切分](processor/extended/processor-split-log-regex.md) | SLS 官方 | ✓ | — | v1 | 透传未知 | 透传未知 | 实现多行日志（例如 Java 程序日志）的采集。 |
+| `processor_split_string`<br>[分隔符](processor/extended/processor-delimiter.md) | SLS 官方 | ✓ | — | v1 | 透传未知 | 透传未知 | 通过多字符的分隔符提取字段。 |
+| `processor_string_replace`<br>[字符串替换](processor/extended/processor-string-replace.md) | SLS 官方<br>[pj1987111](https://github.com/pj1987111) | ✓ | — | v1 | 透传未知 | 透传未知 | 通过全文匹配、正则匹配、去转义字符等方式对文本日志进行内容替换。 |
+| `processor_strptime`<br>[时间提取（strptime 格式）](processor/extended/processor-strptime.md) | SLS 官方 | ✓ | — | v1 | 透传未知 | 透传未知 | 从指定字段中提取日志时间，时间格式为 [Linux strptime](http://man7.org/linux/man-pages/man3/strptime.3.html)。 |
 ## 聚合
 
 | 名称                                                                                            | 提供方                                              | 简介                                                    |
@@ -131,19 +141,21 @@
 
 ### 扩展插件
 
-| 名称                                                                                  | 提供方                                              | 简介                                                                                 |
-| ------------------------------------------------------------------------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| `flusher_clickhouse`<br>[ClickHouse](flusher/extended/flusher-clickhouse.md)          | 社区<br>[kl7sn](https://github.com/kl7sn)           | 将采集到的数据输出到 ClickHouse。                                                    |
-| `flusher_doris`<br>[Apache Doris](flusher/extended/flusher-doris.md)                  | 社区                                                | 通过 Stream Load 将数据写入 Apache Doris。                                             |
-| `flusher_elasticsearch`<br>[ElasticSearch](flusher/extended/flusher-elasticsearch.md) | 社区<br>[joeCarf](https://github.com/joeCarf)       | 将采集到的数据输出到 ElasticSearch。                                                 |
-| `flusher_http`<br>[HTTP](flusher/extended/flusher-http.md)                            | 社区<br>[snakorse](https://github.com/snakorse)     | 将采集到的数据以 http 方式输出到指定的后端。                                         |
-| `flusher_kafka`<br>[Kafka](flusher/extended/flusher-kafka.md)                         | 社区                                                | 将采集到的数据输出到 Kafka。推荐使用下面的 flusher_kafka_v2                          |
-| `flusher_kafka_v2`<br>[Kafka V2](flusher/extended/flusher-kafka-v2.md)                | 社区<br>[shalousun](https://github.com/shalousun)   | 将采集到的数据输出到 Kafka。                                                         |
-| `flusher_loki`<br>[Loki](flusher/extended/flusher-loki.md)                            | 社区<br>[abingcbc](https://github.com/abingcbc)     | 将采集到的数据输出到 Loki。                                                          |
-| `flusher_otlp_log`<br>[OTLP 日志](flusher/extended/flusher-otlp.md)                   | 社区<br>[liuhaoyang](https://github.com/liuhaoyang) | 将采集到的数据支持`Opentelemetry log protocol`的后端。                               |
-| `flusher_prometheus`<br>[Prometheus](flusher/extended/flusher-prometheus.md)          | 社区<br>                                            | 将采集到的数据，经过处理后，通过 http 格式发送到指定的 Prometheus RemoteWrite 地址。 |
-| `flusher_pulsar`<br>[Pulsar](flusher/extended/flusher-pulsar.md)                      | 社区<br>[shalousun](https://github.com/shalousun)   | 将采集到的数据输出到 Pulsar。                                                        |
-| `flusher_stdout`<br>[标准输出/文件](flusher/extended/flusher-stdout.md)               | SLS 官方                                            | 将采集到的数据输出到标准输出或文件。                                                 |
+> 各列含义见 [事件能力列说明](#事件能力列说明)。
+
+| 名称 | 提供方 | v1 接口 | v2 接口 | Log | Metric | Span | 简介 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `flusher_clickhouse`<br>[ClickHouse](flusher/extended/flusher-clickhouse.md) | 社区<br>[kl7sn](https://github.com/kl7sn) | ✓ | — | v1 | 透传未知 | 透传未知 | 将采集到的数据输出到 ClickHouse。 |
+| `flusher_doris`<br>[Apache Doris](flusher/extended/flusher-doris.md) | 社区 | ✓ | — | v1 | 透传未知 | 透传未知 | 通过 Stream Load 将数据写入 Apache Doris。 |
+| `flusher_elasticsearch`<br>[ElasticSearch](flusher/extended/flusher-elasticsearch.md) | 社区<br>[joeCarf](https://github.com/joeCarf) | ✓ | — | v1 | 透传未知 | 透传未知 | 将采集到的数据输出到 ElasticSearch。 |
+| `flusher_http`<br>[HTTP](flusher/extended/flusher-http.md) | 社区<br>[snakorse](https://github.com/snakorse) | ✓ | ✓ | v1&v2 | 透传未知 | 透传未知 | 将采集到的数据以 http 方式输出到指定的后端。 |
+| `flusher_kafka`<br>[Kafka](flusher/extended/flusher-kafka.md) | 社区 | ✓ | — | v1 | 透传未知 | 透传未知 | 将采集到的数据输出到 Kafka。推荐使用下面的 flusher_kafka_v2 |
+| `flusher_kafka_v2`<br>[Kafka V2](flusher/extended/flusher-kafka-v2.md) | 社区<br>[shalousun](https://github.com/shalousun) | ✓ | ✓ | v1&v2 | 透传未知 | 透传未知 | 将采集到的数据输出到 Kafka。 |
+| `flusher_loki`<br>[Loki](flusher/extended/flusher-loki.md) | 社区<br>[abingcbc](https://github.com/abingcbc) | ✓ | — | v1 | 透传未知 | 透传未知 | 将采集到的数据输出到 Loki。 |
+| `flusher_otlp_log`<br>[OTLP 日志](flusher/extended/flusher-otlp.md) | 社区<br>[liuhaoyang](https://github.com/liuhaoyang) | ✓ | ✓ | v1&v2 | 透传未知 | 透传未知 | 将采集到的数据支持`OpenTelemetry log protocol`的后端。 |
+| `flusher_prometheus`<br>[Prometheus](flusher/extended/flusher-prometheus.md) | 社区<br> | — | ✓ | — | v2 | — | 将采集到的数据，经过处理后，通过 http 格式发送到指定的 Prometheus RemoteWrite 地址。 |
+| `flusher_pulsar`<br>[Pulsar](flusher/extended/flusher-pulsar.md) | 社区<br>[shalousun](https://github.com/shalousun) | ✓ | — | v1 | 透传未知 | 透传未知 | 将采集到的数据输出到 Pulsar。 |
+| `flusher_stdout`<br>[标准输出/文件](flusher/extended/flusher-stdout.md) | SLS 官方 | ✓ | ✓ | v1&v2 | v2 | v2 | 将采集到的数据输出到标准输出或文件。 |
 
 ## 扩展
 

@@ -4,6 +4,14 @@
 
 `processor_log_to_sls_metric`插件可以根据配置将日志转换为sls metric。
 
+## 事件能力
+
+列含义见 [概览 · 事件能力列说明](../overview.md#事件能力列说明)。
+
+| v1 接口 | v2 接口 | Log | Metric | Span |
+| --- | --- | --- | --- | --- |
+| ✓ | — | v1 | 透传未知 | 透传未知 |
+
 ## 版本
 
 [Beta](../../stability-level.md)

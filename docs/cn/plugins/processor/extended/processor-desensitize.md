@@ -4,6 +4,14 @@
 
 `processor_desensitize`插件可以通过正则表达式匹配并实现文本日志中敏感数据的脱敏。[源代码](https://github.com/alibaba/loongcollector/tree/main/plugins/processor/processor_desensitize.go)
 
+## 事件能力
+
+列含义见 [概览 · 事件能力列说明](../overview.md#事件能力列说明)。
+
+| v1 接口 | v2 接口 | Log | Metric | Span |
+| --- | --- | --- | --- | --- |
+| ✓ | — | v1 | 透传未知 | 透传未知 |
+
 ## 版本
 
 [Beta](../../stability-level.md)

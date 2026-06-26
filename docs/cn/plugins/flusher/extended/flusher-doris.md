@@ -6,6 +6,14 @@
 
 源代码：[flusher_doris.go](https://github.com/alibaba/loongcollector/blob/main/plugins/flusher/doris/flusher_doris.go)
 
+## 事件能力
+
+列含义见 [概览 · 事件能力列说明](../overview.md#事件能力列说明)。
+
+| v1 接口 | v2 接口 | Log | Metric | Span |
+| --- | --- | --- | --- | --- |
+| ✓ | — | v1 | 透传未知 | 透传未知 |
+
 ## 版本
 
 [Alpha](../../stability-level.md)
