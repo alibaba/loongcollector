@@ -1,8 +1,15 @@
 # Agent 任务提示词模板
 
-> 用途：阶段 2 接单时复制并替换占位符。**一个提示词只对应一个子 Issue**。
-> 编排 Agent 并行派发时，每个子 Agent 各持一份；子 Agent 推到 draft PR / ReadyToMerge 后**直接返回结果，不等人工反馈**。
-> 该提示词应让 Agent 在范围锁内独立完成"开发 → 验收 → 自检 → 开 PR → 处理意见到可合并"。
+> 用途：阶段 2 接单时的**人工参考骨架**（占位符需手填）。  
+> **编排 Agent 派子 Agent 时勿手填本模板**——统一用脚本生成完整上下文：
+>
+> ```bash
+> ./scripts/epic/epic.sh dispatch-prompt --epic <EPIC> --issue <ISSUE>   # Develop
+> ./scripts/epic/epic.sh dispatch-prompt --epic <EPIC> <comment_id>     # AddressFeedback
+> ./scripts/epic/epic.sh inbox --epic <EPIC> --json                      # 全部 pending
+> ```
+>
+> 复制 **`dispatch_prompt` 全文** 到 Task。详见 `executor-dispatch-template.md`。
 
 ```text
 Preflight（失败则停手，打 needs-human）：
@@ -18,8 +25,8 @@ Preflight（失败则停手，打 needs-human）：
 
 约束：
 - <项目级约束，如不改默认配置项 X、保持向后兼容>
-- 构建与 C++ UT 必须遵循 .claude/skills/compile/SKILL.md（见下）
-- 提交信息遵循 .claude/skills/commit/SKILL.md
+- 构建与 C++ UT 必须遵循 .skill/skills/compile/SKILL.md（见下）
+- 提交信息遵循 .skill/skills/commit/SKILL.md
 
 开发：
 1. 先读 .skill/skills/project-knowledge/SKILL.md 建立架构认知
@@ -39,7 +46,7 @@ Preflight（失败则停手，打 needs-human）：
 - 改动较大时按 .skill/skills/code-review/SKILL.md 走完整评审并落盘
 
 完成动作：
-- 用 .claude/skills/commit 写 commit
+- 用 .skill/skills/commit/SKILL.md 写 commit
 - 先开 draft PR，body 含 Closes #<n> 与 Test plan（须含实际 PASS 命令输出）
 - PR 首评末尾带 footer：`[epic-delivery]` from=agent role=self-review action=none
 - 处理 CI 与人工评论直到可合并；人工评论无需 footer，Agent 回复必须带 footer

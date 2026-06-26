@@ -45,18 +45,15 @@ flowchart LR
 
 纯文字回复（无需改代码、已核查完毕）时，编排 Agent 可**仅** `reply --body-file` + `mark-handled`，但仍应简短，勿在长链路上阻塞。
 
-**派发模板**（每条 inbox 事件一条 Task）：
+**派发模板**（每条 inbox 事件一条 Task；**必须复制 `inbox --json` 的 `dispatch_prompt` 全文**，见 `references/executor-dispatch-template.md`）：
 
-```text
-按 epic-delivery 执行 AddressFeedback（Epic #<epic> · PR #<pr> · comment <id>）。
-
-要求：
-- 读 inbox 事件 URL / preview；在对应 GitHub thread 内 reply --body-file
-- 若需改代码：在独立 worktree/分支完成，push 到 PR 分支，勿在编排会话里改
-- 完成后回报：comment_id、是否已回复、是否需编排 mark-handled
-
-禁止：merge；禁止等人工确认（架构争议打 needs-human 并 @维护者）
+```bash
+./scripts/epic/epic.sh inbox --epic <N> --json   # pending → dispatch_prompt
+./scripts/epic/epic.sh dispatch-prompt --epic <N> [comment_id]   # 单条 pending
+./scripts/epic/epic.sh dispatch-prompt --epic <N> --issue <M>   # 新 Issue Develop
 ```
+
+编排 Agent：**禁止**手写精简 Task；子 Agent 无会话记忆，缺 Skills/范围锁/维护者原文会导致实现偏离。
 
 ---
 
@@ -82,7 +79,7 @@ flowchart LR
 ./scripts/epic/epic.sh inbox --epic <EPIC_NUMBER> --json
 ```
 
-对每条 inbox 事件：**派执行 Agent** 进入 AddressFeedback（见上节「编排 vs 执行」）；子 Agent 完成后编排 Agent：
+对每条事件：**复制 JSON 中的 `dispatch_prompt` 整段** 派 Task 执行 Agent（见 `executor-dispatch-template.md`）。**禁止**自行缩写为「处理 PR 评论」。
 
 ```bash
 ./scripts/epic/epic.sh events --epic <N> mark-handled <comment_id>
@@ -140,6 +137,7 @@ flowchart LR
 ### 辅助命令
 
 ```bash
+./scripts/epic/epic.sh label-sync --epic <EPIC>   # OPEN+PR → in-progress；CLOSED → 去掉 agent-ready/in-progress
 ./scripts/epic/epic.sh scope     --epic <EPIC_NUMBER>   # 查看扫描范围
 ./scripts/epic/epic.sh events    --epic <EPIC_NUMBER> list   # pending 事件 JSON
 ./scripts/epic/epic.sh poll-once --epic <EPIC_NUMBER>   # 手动单次扫描（--init 仅建基线）
@@ -197,10 +195,24 @@ Discussion 阶段表常写「A1–A2 ∥ B1–B2」，表示**同一阶段可同
 | 步骤 | 动作 |
 |------|------|
 | 1 | Epic checklist 勾选 `Closes #` 对应子 Issue |
-| 2 | `wt rm --id <1928-b2>` 清理已 merge 的 worktree |
-| 3 | 扫描 Epic 子 Issue：匹配 `Blocked by: <步骤>` / `#<issue>` 且 **无 open PR**、无 `in-progress` |
-| 4 | 在后续 Issue **评论**前置交付摘要（PR 标题/链接）；打 `in-progress` label |
-| 5 | stdout JSON 的 `unlocked[].dispatch.prompt` → **每条 Task 派执行 Agent**（`wt new` → draft PR） |
+| 2 | **立即释放资源**（见下表 `cleanup`） |
+| 3 | 扫描 Epic 子 Issue：匹配 `Blocked by` 且依赖已满足 → 更新/解锁 |
+| 4 | 在后续 Issue **评论**前置交付摘要；打 `in-progress` label |
+| 5 | stdout JSON 的 `unlocked[].dispatch_prompt` → **每条 Task 派执行 Agent**（与 `dispatch-prompt --issue` 同款） |
+
+**步骤 2 · merge 后资源清理（必遵，不可拖延）**
+
+| 资源 | 动作 |
+|------|------|
+| **worktree** | 按 `wt-{id}-*` 与 PR `headRefName` 定位；`git clean -fd` 后 `worktree remove`（必要时 `--force`）；`git worktree prune` |
+| **本地分支** | 删除 PR head 与 `feat/{id}-*` 本地分支 |
+| **远端分支** | 尝试删除 fork（`origin`）与主仓（`upstream`）上已 merge 的特性分支 |
+| **Issue label** | 移除已关闭子 Issue 的 `in-progress`、`agent-ready` |
+| **构建/临时文件** | worktree 内 `.tmp/` 等由 `git clean` 一并清掉 |
+
+`merge-followup --json` 输出 `cleanup` 字段供编排 Agent 核对；若有 `errors` 需在本轮处理或打 `needs-human`。
+
+手动清理：`./scripts/epic/epic.sh wt rm --id <1928-a2>`（含 force remove + 双远端删分支）。
 
 编排 Agent 收到 `merge-followup` 输出后**立即并行派发**所有 `unlocked` 项，不要等人工确认。
 

@@ -14,6 +14,7 @@
 #   reply       在评论 thread 内回复（review 行评真 thread；conversation 用 quote reply）
 #   stop        停止后台记录的 poll 循环
 #   merge-followup  PR merge 后：勾选 checklist、清理 worktree、解锁/更新后续 Issue、标记开工并输出派工 JSON
+#   label-sync    按 Issue 状态/PR 同步 agent-ready ↔ in-progress
 #
 # 全局参数：--epic <n>（多数子命令必填）、--repo owner/repo、--interval 秒、--state-dir 路径
 # reply 专用：--pr <n> --comment-id <id> (--body 文本 | --body-file 路径)
@@ -65,6 +66,60 @@ load_env() {
 require_epic() { [[ -n "${EPIC:-}" ]] || die "--epic <Issue编号> 必填"; }
 
 log() { echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) [epic=${EPIC}] $*" >> "${LOG_FILE}"; }
+
+# 从 MD 模版生成 dispatch_prompt（scripts/epic/dispatch-enrich.sh）
+enrich_dispatch_prompt() {
+  load_env
+  wt_cfg 2>/dev/null || true
+  export WT_ROOT_ABS="${WT_ROOT_ABS:-..}"
+  "${SCRIPT_DIR}/dispatch-enrich.sh" "$@"
+}
+
+merge_inbox_enrich() {
+  local event_line="$1" enrich_line
+  enrich_line="$2"
+  printf '%s' "${event_line}" | python3 -c '
+import json, sys
+ev = json.load(sys.stdin)
+en = json.loads(sys.argv[1])
+ev.update(en)
+print(json.dumps(ev, ensure_ascii=False))
+' "${enrich_line}"
+}
+
+enrich_inbox_event() {
+  local line="$1" kind target cid url preview task steps
+  kind="$(printf '%s' "${line}" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("kind",""))')"
+  if [[ "${kind}" == pr_state ]]; then
+    target="$(printf '%s' "${line}" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("target",""))')"
+    preview="$(printf '%s' "${line}" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("preview",""))')"
+    cid="$(printf '%s' "${line}" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("comment_id",""))')"
+    url="$(printf '%s' "${line}" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("url",""))')"
+    task="PR #${target} 状态变更：${preview}"
+    if [[ "${preview}" == *MERGED* ]]; then
+      steps="1) merge-followup --epic ${EPIC} --pr ${target} --json 2) 对 unlocked[] 每条复制 dispatch_prompt 派 Task 执行 Agent 3) mark-handled ${cid}"
+    else
+      steps="确认 PR 关闭原因；mark-handled ${cid}"
+    fi
+    printf '%s' "${line}" | python3 -c '
+import json, sys
+ev = json.load(sys.stdin)
+ev.update(task=sys.argv[1], steps=sys.argv[2], dispatch="orchestrator: merge-followup then Task sub-agents",
+          prompt="{} · url={} · {}".format(sys.argv[1], ev.get("url",""), sys.argv[2]))
+print(json.dumps(ev, ensure_ascii=False))
+' "${task}" "${steps}"
+    return 0
+  fi
+  target="$(printf '%s' "${line}" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("target",""))')"
+  cid="$(printf '%s' "${line}" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("comment_id",""))')"
+  url="$(printf '%s' "${line}" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("url",""))')"
+  preview="$(printf '%s' "${line}" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("preview",""))')"
+  local enrich_line
+  enrich_line="$(enrich_dispatch_prompt feedback \
+    --epic "${EPIC}" --repo "${REPO}" --kind "${kind}" --target "${target}" \
+    --comment-id "${cid}" --url "${url}" --preview "${preview}" --json)"
+  merge_inbox_enrich "${line}" "${enrich_line}"
+}
 
 # 仅看非引用行：避免人工评论「引用」了 Agent 带 footer 的回复而被误判为 Agent 信息
 is_actionable_body() {
@@ -321,37 +376,7 @@ cmd_inbox() {
     while IFS= read -r line; do
       [[ -z "${line}" ]] && continue
       if [[ "${json_mode}" == true ]]; then
-        printf '%s' "${line}" | EPIC="${EPIC}" REPO="${REPO}" python3 -c '
-import json, os, sys
-e = json.loads(sys.stdin.read())
-epic, repo = os.environ["EPIC"], os.environ["REPO"]
-kind, target = e["kind"], e["target"]
-action = e.get("action", "AddressFeedback")
-cid = e["comment_id"]
-if kind == "pr_state":
-    preview = e.get("preview", "")
-    task = "PR #{} 状态变更：{}".format(target, preview)
-    if "MERGED" in preview:
-        steps = (
-            "1) merge-followup --epic {} --pr {} --json "
-            "2) 对 unlocked[] 每条 Task 派执行 Agent（wt new + Develop→draft PR） "
-            "3) mark-handled {}".format(epic, target, cid)
-        )
-    else:
-        steps = "编排 Agent：确认 PR 关闭原因；必要时调整 Epic 计划；mark-handled {}".format(cid)
-elif kind == "issue":
-    task = "Issue #{} {}".format(target, action)
-    steps = "Task 派执行 Agent：AddressFeedback + reply --body-file；编排 mark-handled {}".format(cid)
-else:
-    task = "PR #{} {}".format(target, action)
-    steps = "Task 派执行 Agent：AddressFeedback + epic.sh reply；编排 mark-handled {}".format(cid)
-out = dict(e)
-out["task"] = task
-out["steps"] = steps
-out["dispatch"] = "orchestrator: Task sub-agent; do NOT edit code in orchestrator session"
-out["prompt"] = "{} · {} · url={} · {}".format(task, action, e.get("url", ""), steps)
-print(json.dumps(out, ensure_ascii=False))
-'
+        enrich_inbox_event "${line}"
       else
         print_triage_for_event "${line}"
       fi
@@ -433,6 +458,44 @@ cmd_dispatch() {
   fi
   echo "DISPATCH_SUMMARY epic=#${EPIC} total=${total} handled=${handled} deferred=${deferred} failed=${failed}"
   [[ "${failed}" -eq 0 ]]
+}
+
+# 输出 dispatch_prompt（编排 Agent 复制整段派 Task）
+#   dispatch-prompt [comment_id]           — pending 事件
+#   dispatch-prompt --issue <n>            — 新 Issue Develop（并行派发 / merge-followup 同款）
+cmd_dispatch_prompt() {
+  require_epic
+  if [[ -n "${ISSUE:-}" ]]; then
+    local args=(develop --epic "${EPIC}" --repo "${REPO}" --issue "${ISSUE}")
+    [[ -n "${PREREQ_ISSUE:-}" ]] && args+=(--prerequisite-issue "${PREREQ_ISSUE}")
+    [[ -n "${PREREQ_PR:-}" ]] && args+=(--prerequisite-pr "${PREREQ_PR}")
+    [[ -n "${PREREQ_TITLE:-}" ]] && args+=(--prerequisite-title "${PREREQ_TITLE}")
+    enrich_dispatch_prompt "${args[@]}"
+    return 0
+  fi
+  local want_id="${1:-}"
+  local line cid
+  while IFS= read -r line; do
+    [[ -z "${line}" ]] && continue
+    if [[ -n "${want_id}" ]]; then
+      cid="$(printf '%s' "${line}" | python3 -c 'import json,sys; print(json.loads(sys.stdin.read())["comment_id"])')"
+      [[ "${cid}" == "${want_id}" ]] || continue
+    fi
+    load_env
+    wt_cfg 2>/dev/null || true
+    export WT_ROOT_ABS="${WT_ROOT_ABS:-..}"
+    local kind target cid url preview
+    kind="$(printf '%s' "${line}" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("kind",""))')"
+    target="$(printf '%s' "${line}" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("target",""))')"
+    cid="$(printf '%s' "${line}" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("comment_id",""))')"
+    url="$(printf '%s' "${line}" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("url",""))')"
+    preview="$(printf '%s' "${line}" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("preview",""))')"
+    enrich_dispatch_prompt feedback \
+      --epic "${EPIC}" --repo "${REPO}" --kind "${kind}" --target "${target}" \
+      --comment-id "${cid}" --url "${url}" --preview "${preview}"
+    return 0
+  done < <(pending_events)
+  die "无匹配 pending 事件（comment_id=${want_id:-任意}）"
 }
 
 # ------------------------------------------------------------------ subcommands
@@ -578,26 +641,78 @@ cmd_stop() {
   fi
 }
 
+cmd_label_sync() {
+  require_epic
+  ensure_scope
+  gh label create in-progress --repo "${REPO}" --color fbca04 --description "执行 Agent 已接单开发" 2>/dev/null || true
+  local n state labels has_open_pr
+  while IFS= read -r n; do
+    [[ -n "${n}" ]] || continue
+    state="$(gh issue view "${n}" --repo "${REPO}" --json state --jq '.state')"
+    labels="$(gh issue view "${n}" --repo "${REPO}" --json labels --jq '[.labels[].name] | join("\n")')"
+    if [[ "${state}" == "CLOSED" ]]; then
+      if [[ "${labels}" == *agent-ready* ]]; then
+        gh issue edit "${n}" --repo "${REPO}" --remove-label agent-ready
+        echo "#${n} CLOSED → removed agent-ready"
+      fi
+      if [[ "${labels}" == *in-progress* ]]; then
+        gh issue edit "${n}" --repo "${REPO}" --remove-label in-progress
+        echo "#${n} CLOSED → removed in-progress"
+      fi
+    elif [[ "${state}" == "OPEN" ]]; then
+      has_open_pr="$(gh pr list --repo "${REPO}" --state open --search "Closes #${n}" --json number --jq 'length' 2>/dev/null || echo 0)"
+      if [[ "${has_open_pr:-0}" -gt 0 ]]; then
+        [[ "${labels}" == *agent-ready* ]] && gh issue edit "${n}" --repo "${REPO}" --remove-label agent-ready
+        [[ "${labels}" != *in-progress* ]] && gh issue edit "${n}" --repo "${REPO}" --add-label in-progress
+        echo "#${n} OPEN+PR → in-progress"
+      fi
+    fi
+  done < "${SCOPE_SUBS_FILE}"
+}
+
 cmd_reply() {
   : "${PR:?reply 需要 --pr <n>}"
   : "${COMMENT_ID:?reply 需要 --comment-id <id>}"
-  # 安全：先把 --body-file 内容读进 BODY，下面统一用 -f body="${BODY}"（字面值，已是内容）。
-  # 切勿对外暴露 -f body=@file 用法——gh 的 -f 会把 @路径 当字面字符串原样发送，
-  # 正文会变成路径而非内容；需要直接传文件时必须用 -F body=@file。
   if [[ -n "${BODY_FILE:-}" ]]; then BODY="$(cat "${BODY_FILE}")"; fi
   : "${BODY:?reply 需要 --body 或 --body-file}"
   local owner="${REPO%%/*}" repo="${REPO##*/}"
+  local rest_id="${COMMENT_ID}" parent quoted full
 
-  if gh api -X POST "repos/${owner}/${repo}/pulls/${PR}/comments/${COMMENT_ID}/replies" -f body="${BODY}" >/dev/null 2>&1; then
-    echo "replied in review thread (comment ${COMMENT_ID})"; return 0
+  # GraphQL node id（IC_...）须先解析为 REST numeric id；否则 issues/comments API 返回 404 JSON
+  if [[ "${COMMENT_ID}" == IC_* ]]; then
+    rest_id="$(gh api graphql -f query='query($id:ID!){node(id:$id){... on IssueComment{databaseId} ... on PullRequestReviewComment{databaseId}}}' \
+      -f id="${COMMENT_ID}" --jq '.data.node.databaseId // empty' 2>/dev/null || true)"
+    [[ -n "${rest_id}" ]] || die "无法解析 comment_id ${COMMENT_ID}（GraphQL node → databaseId）"
   fi
-  if gh api -X POST "repos/${owner}/${repo}/issues/comments/${COMMENT_ID}/replies" -f body="${BODY}" >/dev/null 2>&1; then
-    echo "replied in conversation thread (comment ${COMMENT_ID})"; return 0
+
+  # 统一 footer（子 Agent 漏写时自动补全）
+  if [[ "${BODY}" != *'from=agent'* ]]; then
+    BODY="${BODY}
+
+---
+\`[epic-delivery]\` from=agent role=feedback-handler action=none"
   fi
+
+  if gh api -X POST "repos/${owner}/${repo}/pulls/${PR}/comments/${rest_id}/replies" -f body="${BODY}" >/dev/null 2>&1; then
+    echo "replied in review thread (comment ${rest_id})"; return 0
+  fi
+  if gh api -X POST "repos/${owner}/${repo}/issues/comments/${rest_id}/replies" -f body="${BODY}" >/dev/null 2>&1; then
+    echo "replied in conversation thread (comment ${rest_id})"; return 0
+  fi
+
   # conversation 评论无 thread reply API：fallback 为 quote reply（引用原文）
-  local parent quoted full
-  parent="$(gh api "repos/${owner}/${repo}/issues/comments/${COMMENT_ID}" --jq '.body' 2>/dev/null || true)"
-  [[ -n "${parent}" ]] || die "评论 ${COMMENT_ID} 未找到"
+  if [[ "${COMMENT_ID}" == IC_* ]]; then
+    parent="$(gh api graphql -f query='query($id:ID!){node(id:$id){... on IssueComment{body} ... on PullRequestReviewComment{body}}}' \
+      -f id="${COMMENT_ID}" --jq '.data.node.body // empty' 2>/dev/null || true)"
+  else
+    parent="$(gh api "repos/${owner}/${repo}/issues/comments/${rest_id}" --jq '.body // empty' 2>/dev/null || true)"
+    if [[ -z "${parent}" ]]; then
+      parent="$(gh api "repos/${owner}/${repo}/pulls/comments/${rest_id}" --jq '.body // empty' 2>/dev/null || true)"
+    fi
+  fi
+  if [[ -z "${parent}" || "${parent}" == *'"message":"Not Found"'* ]]; then
+    die "评论 ${COMMENT_ID} 未找到（勿把 API 404 当引用正文）"
+  fi
   quoted="$(printf '%s' "${parent}" | python3 -c 'import sys; print("\n".join("> "+l for l in sys.stdin.read().strip().splitlines() or [""]))')"
   full="${quoted}
 
@@ -619,13 +734,21 @@ cmd_merge_followup() {
     esac
   done
 
+  load_env
+  wt_cfg 2>/dev/null || true
+  export FORK_REMOTE="${FORK_REMOTE:-origin}" UPSTREAM_REMOTE="${UPSTREAM_REMOTE:-upstream}" WT_ROOT_ABS="${WT_ROOT_ABS:-..}"
+  export SCRIPT_DIR="${SCRIPT_DIR}"
+
   EPIC="${EPIC}" REPO="${REPO}" PR="${PR}" DRY_RUN="${dry_run}" python3 - <<'PY'
-import json, os, re, subprocess, sys, tempfile
+import json, os, re, subprocess, sys, tempfile, glob
 
 repo = os.environ["REPO"]
 epic = int(os.environ["EPIC"])
 pr = int(os.environ["PR"])
 dry_run = os.environ.get("DRY_RUN", "false") == "true"
+fork_remote = os.environ.get("FORK_REMOTE", "origin")
+upstream_remote = os.environ.get("UPSTREAM_REMOTE", "upstream")
+wt_root = os.environ.get("WT_ROOT_ABS", "..")
 
 def gh_json(cmd):
     r = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
@@ -644,7 +767,7 @@ def run(cmd, check=True):
     return r.stdout
 
 pr_data = gh_json(["gh", "pr", "view", str(pr), "--repo", repo,
-                   "--json", "state,title,body,mergedAt,url"])
+                   "--json", "state,title,body,mergedAt,url,headRefName"])
 if not pr_data:
     sys.exit("PR #{} not found".format(pr))
 if pr_data.get("state") != "MERGED":
@@ -665,6 +788,104 @@ wt_epic = step_m.group(1) if step_m else None
 step_code = step_m.group(2) if step_m else None
 step_lower = step_code.lower() if step_code else None
 wt_id = "{}-{}".format(wt_epic, step_lower) if wt_epic and step_lower else None
+head_branch = pr_data.get("headRefName") or ""
+
+def repo_root():
+    return subprocess.run(["git", "rev-parse", "--show-toplevel"],
+                          stdout=subprocess.PIPE, universal_newlines=True).stdout.strip()
+
+def git_cmd(args, check=False, cwd=None):
+    if dry_run:
+        print("[dry-run] git " + " ".join(args), file=sys.stderr)
+        return subprocess.CompletedProcess(args, 0, stdout="", stderr="")
+    return subprocess.run(["git"] + args, cwd=cwd, stdout=subprocess.PIPE,
+                          stderr=subprocess.PIPE, universal_newlines=True, check=check)
+
+def cleanup_merged_resources(wt_id, head_branch, closed_issue):
+    """merge 后立即释放 worktree / 分支 / label 等占用资源。"""
+    report = {
+        "worktrees_removed": [],
+        "branches_local_deleted": [],
+        "branches_remote_deleted": [],
+        "labels_removed": [],
+        "worktree_prune": False,
+        "errors": [],
+    }
+    if dry_run:
+        report["dry_run"] = True
+        return report
+
+    root = repo_root()
+    wt_dirs = set()
+    if wt_id:
+        for d in glob.glob(os.path.join(wt_root, "wt-{}-*".format(wt_id))):
+            if os.path.isdir(d):
+                wt_dirs.add(os.path.abspath(d))
+    if head_branch:
+        r = git_cmd(["worktree", "list", "--porcelain"], cwd=root)
+        lines = r.stdout.splitlines()
+        i = 0
+        while i < len(lines):
+            if lines[i].startswith("worktree "):
+                wpath = lines[i].split(" ", 1)[1].strip()
+                branch = ""
+                j = i + 1
+                while j < len(lines) and not lines[j].startswith("worktree "):
+                    if lines[j].startswith("branch "):
+                        branch = lines[j].split(" ", 1)[1].strip().replace("refs/heads/", "")
+                    j += 1
+                if branch == head_branch:
+                    wt_dirs.add(os.path.abspath(wpath))
+                i = j
+            else:
+                i += 1
+
+    for d in sorted(wt_dirs):
+        if not os.path.isdir(d):
+            continue
+        git_cmd(["clean", "-fd"], cwd=d, check=False)
+        git_cmd(["clean", "-fdX"], cwd=d, check=False)
+        rm = git_cmd(["worktree", "remove", d], cwd=root, check=False)
+        if rm.returncode != 0:
+            rm = git_cmd(["worktree", "remove", "--force", d], cwd=root, check=False)
+        if rm.returncode == 0:
+            report["worktrees_removed"].append(d)
+        else:
+            report["errors"].append("worktree remove {}: {}".format(d, rm.stderr.strip()))
+
+    prn = git_cmd(["worktree", "prune"], cwd=root, check=False)
+    report["worktree_prune"] = prn.returncode == 0
+
+    branches = set()
+    if head_branch:
+        branches.add(head_branch)
+    if wt_id:
+        br = git_cmd(["branch", "--list", "feat/{}-*".format(wt_id), "--format=%(refname:short)"], cwd=root)
+        for b in br.stdout.splitlines():
+            b = b.strip()
+            if b:
+                branches.add(b)
+
+    for b in sorted(branches):
+        delb = git_cmd(["branch", "-D", b], cwd=root, check=False)
+        if delb.returncode == 0:
+            report["branches_local_deleted"].append(b)
+        for remote in (fork_remote, upstream_remote):
+            p = git_cmd(["push", remote, "--delete", b], cwd=root, check=False)
+            if p.returncode == 0:
+                report["branches_remote_deleted"].append("{}/{}".format(remote, b))
+
+    labels = [lb["name"] for lb in (issue_data.get("labels") or [])]
+    if "in-progress" in labels:
+        run(["gh", "issue", "edit", str(closed_issue), "--repo", repo, "--remove-label", "in-progress"])
+        report["labels_removed"].append("in-progress")
+    if "agent-ready" in labels:
+        run(["gh", "issue", "edit", str(closed_issue), "--repo", repo, "--remove-label", "agent-ready"])
+        report["labels_removed"].append("agent-ready")
+
+    return report
+
+cleanup_report = cleanup_merged_resources(wt_id, head_branch, closed_issue)
 
 epic_data = gh_json(["gh", "issue", "view", str(epic), "--repo", repo, "--json", "body"])
 epic_body = epic_data.get("body") or ""
@@ -677,13 +898,7 @@ if n and not dry_run:
     run(["gh", "issue", "edit", str(epic), "--repo", repo, "--body-file", tmp])
     os.unlink(tmp)
 
-if wt_id and not dry_run:
-    repo_root = subprocess.run(["git", "rev-parse", "--show-toplevel"],
-                               stdout=subprocess.PIPE, universal_newlines=True).stdout.strip()
-    epic_sh = os.path.join(repo_root, "scripts", "epic", "epic.sh")
-    if os.path.isfile(epic_sh):
-        subprocess.run([epic_sh, "wt", "rm", "--id", wt_id], cwd=repo_root,
-                         stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+# （worktree / 分支 / label 清理见 cleanup_merged_resources，merge 后立即执行）
 
 subs = [int(x) for x in re.findall(r"- \[[ xX]\] #(\d+)", epic_body)]
 sub_meta = {}
@@ -790,15 +1005,30 @@ for u in unlocked:
                         "--description", "执行 Agent 已接单开发"],
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         run(["gh", "issue", "edit", str(u["issue"]), "--repo", repo, "--add-label", "in-progress"])
+        if "agent-ready" in labels:
+            run(["gh", "issue", "edit", str(u["issue"]), "--repo", repo, "--remove-label", "agent-ready"])
+    enrich_script = os.path.join(os.environ.get("SCRIPT_DIR", "scripts/epic"), "dispatch-enrich.sh")
+    enrich_cmd = [
+        enrich_script, "develop",
+        "--issue", str(u["issue"]),
+        "--epic", str(epic),
+        "--repo", repo,
+        "--prerequisite-issue", str(closed_issue),
+        "--prerequisite-pr", str(pr),
+        "--prerequisite-title", (pr_data.get("title") or "").strip(),
+        "--json",
+    ]
+    er = subprocess.run(enrich_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+    if er.returncode == 0 and er.stdout.strip():
+        enriched = json.loads(er.stdout)
+        u["dispatch_prompt"] = enriched.get("dispatch_prompt", "")
+    else:
+        u["dispatch_prompt"] = ""
+        u["enrich_error"] = (er.stderr or er.stdout or "dispatch-enrich failed")[:300]
     u["dispatch"] = {
         "task": "Issue #{} · Epic #{} · 依赖 #{} 已 merge，立即开工".format(u["issue"], epic, closed_issue),
         "wt_new": "./scripts/epic/epic.sh wt new --id {} --slug <short-desc>".format(u["wt_id"] or "EPIC-STEP"),
-        "prompt": (
-            "按 epic-delivery 执行 Issue #{}（Epic #{}）。\n"
-            "前置 #{} / PR #{} 已 merge；Issue 评论含交付摘要。\n"
-            "要求：wt new → Develop → SelfReview → draft PR（Closes #{}）→ ReadyToMerge 后停。\n"
-            "禁止 merge。"
-        ).format(u["issue"], epic, closed_issue, pr, u["issue"]),
+        "dispatch_prompt": u.get("dispatch_prompt", ""),
     }
 
 out = {
@@ -806,7 +1036,9 @@ out = {
     "merged_pr": pr,
     "closed_issue": closed_issue,
     "closed_title": issue_data.get("title", ""),
+    "head_branch": head_branch,
     "wt_id_cleaned": wt_id,
+    "cleanup": cleanup_report,
     "checklist_updated": bool(n),
     "unlocked": unlocked,
     "dispatch_count": len(unlocked),
@@ -900,14 +1132,27 @@ wt_rm() {
   dir="$(wt_dir_for "${id}")"
   branch="$(wt_branch_for "${id}")"
   [[ -n "${dir}" || -n "${branch}" ]] || die "未找到 worktree/分支（id=${id}）"
-  if [[ -n "${dir}" ]]; then git worktree remove "${dir}" && echo "✓ removed worktree ${dir}"; fi
+  if [[ -n "${dir}" ]]; then
+    git -C "${dir}" clean -fd .tmp 2>/dev/null || true
+    git -C "${dir}" clean -fd 2>/dev/null || true
+    if git worktree remove "${dir}" 2>/dev/null; then
+      echo "✓ removed worktree ${dir}"
+    elif git worktree remove --force "${dir}"; then
+      echo "✓ removed worktree ${dir} (force)"
+    else
+      die "无法移除 worktree：${dir}"
+    fi
+    git worktree prune && echo "✓ worktree prune"
+  fi
   if [[ -n "${branch}" ]]; then
     git branch -D "${branch}" && echo "✓ deleted local branch ${branch}"
-    if git push "${FORK_REMOTE}" --delete "${branch}" 2>/dev/null; then
-      echo "✓ deleted ${FORK_REMOTE} branch ${branch}"
-    else
-      echo "  (${FORK_REMOTE} 无该分支或已删)"
-    fi
+    for remote in "${FORK_REMOTE}" "${UPSTREAM_REMOTE}"; do
+      if git push "${remote}" --delete "${branch}" 2>/dev/null; then
+        echo "✓ deleted ${remote} branch ${branch}"
+      else
+        echo "  (${remote} 无该分支或已删)"
+      fi
+    done
   fi
 }
 
@@ -940,6 +1185,7 @@ SUBCMD="$1"; shift
 
 EPIC=""; REPO=""; STATE_DIR=""; INTERVAL=""; PR=""; COMMENT_ID=""; BODY=""; BODY_FILE=""; INIT=false
 STEP=""; SLUG=""; ID=""; BASE=""; DRAFT=false; TITLE=""; NO_AUTO_DISPATCH=false
+ISSUE=""; PREREQ_ISSUE=""; PREREQ_PR=""; PREREQ_TITLE=""
 REST=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -959,6 +1205,10 @@ while [[ $# -gt 0 ]]; do
     --base) BASE="$2"; shift 2 ;;
     --draft) DRAFT=true; shift ;;
     --title) TITLE="$2"; shift 2 ;;
+    --issue) ISSUE="$2"; shift 2 ;;
+    --prerequisite-issue) PREREQ_ISSUE="$2"; shift 2 ;;
+    --prerequisite-pr) PREREQ_PR="$2"; shift 2 ;;
+    --prerequisite-title) PREREQ_TITLE="$2"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     --) shift; REST+=("$@"); break ;;
     *) REST+=("$1"); shift ;;
@@ -979,7 +1229,9 @@ case "${SUBCMD}" in
   reply)      cmd_reply ;;
   stop)       cmd_stop ;;
   merge-followup) cmd_merge_followup ${REST[@]+"${REST[@]}"} ;;
+  label-sync)   cmd_label_sync ;;
+  dispatch-prompt) cmd_dispatch_prompt ${REST[@]+"${REST[@]}"} ;;
   wt)         cmd_wt ${REST[@]+"${REST[@]}"} ;;
   -h|--help|help) usage ;;
-  *) die "未知子命令：${SUBCMD}（poll|poll-once|triage|dispatch|inbox|events|scope|reply|stop|merge-followup|wt）" ;;
+  *) die "未知子命令：${SUBCMD}（poll|poll-once|triage|dispatch|inbox|events|scope|reply|stop|merge-followup|label-sync|dispatch-prompt|wt）" ;;
 esac

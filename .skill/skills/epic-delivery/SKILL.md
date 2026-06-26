@@ -147,20 +147,20 @@ ssh -T git@github.com 2>&1 | head -1   # push 走 SSH 时必须通
 
 > 子 Agent 与编排 Agent **共用同一台机器上的 `gh` 配置**（`~/.config/gh/hosts.yml`）和 SSH key；无需单独登录，但 Preflight 失败时必须停止并上报，不得静默跳过 GitHub 操作。
 
-**编排 Agent 派发模板**（同一轮并行启动多个子 Agent，每个一条）：
+**编排 Agent 派发（所有路径统一用 `dispatch_prompt`）**：
 
-```text
-按 epic-delivery skill 执行 Issue #<n>（Epic #<epic> · 步骤 <Xn>）。
+| 场景 | 生成命令 | 编排动作 |
+|------|----------|----------|
+| PR 评论 / CI 反馈 | `inbox --json` 或 `dispatch-prompt --epic N IC_...` | 复制 `dispatch_prompt` 派 Task |
+| 并行新开工（无依赖 Issue） | `dispatch-prompt --epic N --issue M` | 复制输出派 Task |
+| merge 解锁后续 Issue | `merge-followup --pr P --json` → `unlocked[].dispatch_prompt` | 每条立即派 Task |
 
-要求：
-- 在独立 git worktree 开发（../wt-<epic>-<step>）
-- 加载 agent-prompt-template 中该 Issue 的范围锁与验收命令
-- 完成 Develop → SelfReview → 开 draft PR（Closes #<n>）
-- 在 Issue 评论贴 PR 链接 + 自检摘要
-- 推到 ReadyToMerge 后停止，不要 merge，不要等人工反馈
-- gh/git Preflight 失败则打 needs-human 并说明原因
+**禁止**手写精简 Task（如「处理 PR #2623 评论」）；子 Agent 无会话记忆，缺 Skills/范围锁/维护者原文会导致实现偏离。详见 `references/executor-dispatch-template.md`。
 
-返回：Issue 号、分支名、PR URL、验收命令结果、是否 ReadyToMerge / Blocked
+```bash
+# 并行派发 agent-ready 且无 Blocked by 的 Issue（每个 Issue 一条 Task）
+./scripts/epic/epic.sh dispatch-prompt --epic <EPIC> --issue <ISSUE_NUMBER>
+# 复制 stdout 全文派 Task；子 Agent 回报后再派下一个
 ```
 
 **编排 Agent 禁止**：
@@ -204,8 +204,9 @@ wake 后读 inbox 并处理：
 
 > 不要用 `nohup`/`&` 脱离会话后台跑 poll——须 IDE 可见以便 monitor 唤醒。
 
-2. **读 `inbox --json` 后派执行 Agent**（代码/长验收由子 Agent 做）；编排 Agent **禁止**亲自 checkout、改代码、跑长构建。纯文字回复可简短代劳。派前读 **`Blocked by`**。
-   - **`pr_state` MERGED**：先 `merge-followup --pr <n> --json`，对 `unlocked[]` **每条立即 Task 派执行 Agent**，再 `mark-handled`。
+2. **读 `inbox --json` 后派执行 Agent**：复制 **`dispatch_prompt` 全文** 到 Task（含 Skills、worktree、范围锁、维护者意见）；编排 Agent **禁止**亲自改代码。详见 `references/executor-dispatch-template.md`。
+   - **`pr_state` MERGED**：先 `merge-followup --pr <n> --json`（含 cleanup），对 `unlocked[]` 每条复制其 `dispatch_prompt` 派执行 Agent，再 `mark-handled`。
+   - 派前读子 Issue **`Blocked by`**。
 
 3. **子 Agent 完成后**编排 Agent `mark-handled`（或按回报代 mark）：
 
@@ -363,7 +364,7 @@ make core PATH_IN_DOCKER=$(pwd)
 | 阶段 | 子 skill |
 |------|----------|
 | DraftDiscussion | `.skill/skills/design-document`、`.skill/skills/mermaid` |
-| Develop | `.skill/skills/project-knowledge`、`.claude/skills/compile`、`.skill/skills/testing-standards`、`.skill/skills/e2e`、`.skill/skills/e2e-manual`、`.skill/skills/e2e-develop-guide`、`.skill/skills/selfmonitor` |
+| Develop | `.skill/skills/project-knowledge`、`.skill/skills/compile`、`.skill/skills/testing-standards`、`.skill/skills/e2e`、`.skill/skills/e2e-manual`、`.skill/skills/e2e-develop-guide`、`.skill/skills/selfmonitor` |
 | SelfReview / AddressFeedback | `.skill/skills/review-standards`、`.skill/skills/code-review`、`.skill/skills/security-check` |
 | OpenPR | `.skill/skills/commit` |
 
@@ -375,9 +376,12 @@ make core PATH_IN_DOCKER=$(pwd)
 |------|------|
 | `SKILL.md` | 状态机、并行编排、**编排 Agent 必执行轮询** |
 | `references/orchestration-model.md` | 轮询 / Triage / 派发 / 脚本参考 |
+| `references/executor-dispatch-template.md` | **执行 Agent 派发 + Skills 清单** |
 | `references/comment-convention.md` | **PR/Issue 评论标识**（Agent footer） |
 | `references/github-templates.md` | Issue / PR 模板 |
-| `scripts/epic/epic.sh` | **单一入口**：`poll`/`inbox`/`triage`/`dispatch`/`merge-followup`/`events`/`scope`/`reply`/`stop` |
+| `scripts/epic/epic.sh` | **单一入口**：`poll`/`inbox`/`dispatch-prompt`/`merge-followup`/… |
+| `scripts/epic/dispatch-enrich.sh` | MD 模版 + `gh` 生成 `dispatch_prompt`（纯 shell） |
+| `references/dispatch-*.md.tpl` | **派发正文模版**（AddressFeedback / Develop） |
 | `scripts/epic/dispatch-hook.sh` | 可选 bash hook（`AUTO_DISPATCH=true` 时） |
 
 默认部署：**poll + monitor `AGENT_TRIGGER` → 编排 Agent 只 triage/派发 → 执行 Agent 改代码/回复**。
