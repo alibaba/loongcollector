@@ -6,6 +6,14 @@
 
 备注：当作为第一个日志解析插件时，建议使用[正则解析原生处理插件](../native/processor-parse-regex-native.md)替代。
 
+## 事件能力
+
+列含义见 [概览 · 事件能力列说明](../overview.md#事件能力列说明)。
+
+| v1 接口 | v2 接口 | Log | Metric | Span |
+| --- | --- | --- | --- | --- |
+| ✓ | — | v1 | 透传未知 | 透传未知 |
+
 ## 版本
 
 [Stable](../../stability-level.md)
