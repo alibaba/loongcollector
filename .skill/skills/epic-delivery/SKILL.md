@@ -188,22 +188,25 @@ ssh -T git@github.com 2>&1 | head -1   # push 走 SSH 时必须通
 
 #### 编排 Agent 必做（接管 Epic 起）
 
-1. **前台启动轮询**（在编排 Agent 自己的终端里运行，**与会话同生死**：会话/终端关闭即停，不留孤儿进程）：
+1. **前台启动 poll** + **监听 `AGENT_TRIGGER_EPIC<N>`**（编排 Agent 会话对 poll 终端 `notify_on_output`）：
 
 ```bash
 ./scripts/epic/epic.sh poll --epic <EPIC_NUMBER>
-# 可选：--repo owner/repo（默认 epic.env 或 gh repo view）；Ctrl-C 停止
 ```
 
-> 不要用 `nohup`/`&` 脱离会话后台运行——轮询必须**依赖编排 Agent 存活**，IDE 终端可见。
-
-2. **每轮工作前 Triage**（含用户新消息、派子 Agent 前）：
+wake 后读 inbox 并处理：
 
 ```bash
-./scripts/epic/epic.sh triage --epic <EPIC_NUMBER>
+./scripts/epic/epic.sh inbox --epic <EPIC_NUMBER> --json
 ```
 
-3. **有 pending 事件** → 按输出 `DISPATCH` 提示派**执行 Agent**进入阶段 6（AddressFeedback）；处理完：
+无 poll 终端时 Agent 可自驱：`inbox --epic <N> --wait 60 --json`。
+
+> 不要用 `nohup`/`&` 脱离会话后台跑 poll——须 IDE 可见以便 monitor 唤醒。
+
+2. **按 inbox JSON 的 `prompt` 处理**；派执行 Agent 进入阶段 6（AddressFeedback）。派前读 **`Blocked by`**。
+
+3. **处理完毕**：
 
 ```bash
 ./scripts/epic/epic.sh events --epic <EPIC_NUMBER> mark-handled <comment_id>
@@ -218,12 +221,13 @@ ssh -T git@github.com 2>&1 | head -1   # push 走 SSH 时必须通
 | 扫描范围 | Epic Issue + checklist 子 Issue + 关联 PR（Issue/PR/Review 评论 **+ PR 状态 OPEN/MERGED/CLOSED**） |
 | 判读 | 无 `from=agent` → 待处理；`action=none/fyi` 的 Agent 评 → 跳过（见 `comment-convention.md`） |
 | **PR 状态事件** | PR 合并/关闭产生 `pr_state` 事件 → 编排 Agent 勾选 Epic checklist、清理 worktree、解锁被 `Blocked by` 此 PR 的后续 Issue |
+| **Agent 唤醒** | 有 pending 时 poll 打印 `AGENT_TRIGGER_EPIC<N>` JSON → 编排 Agent monitor 后读 `inbox --json` |
 | 状态目录 | `/tmp/epic-<EPIC>-poll/`（`seen-ids.txt`、`events.jsonl`、`poll.log`） |
 | 间隔 | 默认 60s（`epic.env` 的 `INTERVAL` 或 `--interval`） |
 
 人工在 PR/Issue 评论后的路径：
 
-1. `epic.sh poll` 写入 `events.jsonl` → 2. 编排 Agent `epic.sh triage` → 3. 派子 Agent AddressFeedback → 4. `mark-handled` → 5. ReadyToMerge 后停止，等人工 Merge。
+1. `epic.sh poll` 写入 `events.jsonl` + **`AGENT_TRIGGER`** → 2. 编排 Agent wake → **`inbox --json`** → 3. AddressFeedback → 4. `mark-handled` → 5. ReadyToMerge 后等人工 Merge。
 
 「并行不等反馈」仅指：**不因某个 PR 被 comment 就阻塞其它并行 Issue 的开发**；评论处理由轮询 + 编排派发完成。
 
@@ -371,9 +375,10 @@ make core PATH_IN_DOCKER=$(pwd)
 | `references/orchestration-model.md` | 轮询 / Triage / 派发 / 脚本参考 |
 | `references/comment-convention.md` | **PR/Issue 评论标识**（Agent footer） |
 | `references/github-templates.md` | Issue / PR 模板 |
-| `scripts/epic/epic.sh` | **单一入口**：`poll`/`poll-once`/`triage`/`events`/`scope`/`reply`/`stop`（`--epic` 驱动，与具体 Epic 解耦） |
+| `scripts/epic/epic.sh` | **单一入口**：`poll`/`inbox`/`triage`/`dispatch`/`events`/`scope`/`reply`/`stop` |
+| `scripts/epic/dispatch-hook.sh` | 可选 bash hook（`AUTO_DISPATCH=true` 时） |
 
-默认部署：**编排 Agent 在自己终端前台跑 `epic.sh poll`（与会话同生死）+ 周期 `epic.sh triage` + 派子 Agent**。
+默认部署：**poll 前台 + 编排 Agent monitor `AGENT_TRIGGER` + `inbox --json` 驱动处理**。
 
 ## 禁止行为
 

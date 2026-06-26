@@ -4,8 +4,11 @@
 #
 # 子命令：
 #   poll        前台轮询循环（与编排 Agent 会话同生死；Ctrl-C 停止）
+#               检测到新事件时默认自动 dispatch（可用 --no-auto-dispatch 关闭）
 #   poll-once   单次扫描；--init 仅建立 baseline 不报事件
-#   triage      读取 pending 事件并输出派发提示（编排 Agent 每轮调用）
+#   triage      读取 pending 事件并输出派发提示
+#   dispatch    对 pending 事件执行 triage + DISPATCH_HOOK
+#   inbox       编排 Agent 读取 pending（--json 含 prompt）；--wait 阻塞直到有新事件
 #   events      list | count | mark-handled <comment_id>
 #   scope       打印 Epic 范围（子 Issue + 关联 PR）
 #   reply       在评论 thread 内回复（review 行评真 thread；conversation 用 quote reply）
@@ -41,6 +44,9 @@ load_env() {
   # scope（子 Issue / PR 列表）缓存有效期（秒）：TTL 内复用缓存，避免每个轮询周期都重算范围
   # 而打爆 GitHub 搜索 API（30/min）与触发二级限流。
   : "${SCOPE_TTL:=600}"
+  : "${AUTO_DISPATCH:=false}"
+  : "${DISPATCH_RETRY_PENDING:=true}"
+  : "${AGENT_NOTIFY:=true}"
   if [[ -n "${EPIC:-}" ]]; then
     : "${STATE_DIR:=/tmp/epic-${EPIC}-poll}"
     EVENTS_FILE="${STATE_DIR}/events.jsonl"
@@ -185,6 +191,235 @@ discover_prs() {
   cat "${SCOPE_PRS_FILE}" 2>/dev/null || true
 }
 
+# 未 mark-handled 的 pending 事件（stdout 每行一条 JSON）
+pending_events() {
+  while IFS= read -r line; do
+    [[ -z "${line}" ]] && continue
+    local id
+    id="$(printf '%s' "${line}" | python3 -c 'import json,sys; print(json.loads(sys.stdin.read())["comment_id"])')"
+    grep -Fxq "${id}" "${HANDLED_FILE}" 2>/dev/null || echo "${line}"
+  done < "${EVENTS_FILE}"
+}
+
+count_pending() {
+  pending_events | wc -l | tr -d ' '
+}
+
+# 对单条 pending 事件打印 triage 提示（stdout）
+print_triage_for_event() {
+  local line="$1"
+  printf '%s' "${line}" | python3 -c '
+import json, sys
+e = json.loads(sys.stdin.read())
+repo, epic = sys.argv[1], sys.argv[2]
+kind, target = e["kind"], e["target"]
+if kind == "pr_state":
+    preview = e.get("preview", "")
+    print("DISPATCH PR #{} STATE-CHANGE: {} (epic #{})".format(target, preview, epic))
+    if "MERGED" in preview:
+        print("  action: 勾选 Epic checklist；清理 worktree；解锁被 Blocked by 此 PR 的后续 Issue")
+    elif "CLOSED" in preview:
+        print("  action: 确认是否需重开 / 调整 Epic 计划")
+    print("  hint: gh pr view {} --repo {}".format(target, repo))
+elif kind == "issue":
+    print("DISPATCH issue #{} AddressFeedback (epic #{})".format(target, epic))
+    print("  hint: gh issue view {} --repo {}".format(target, repo))
+else:
+    print("DISPATCH PR #{} AddressFeedback (epic #{})".format(target, epic))
+    print("  hint: gh pr view {} --repo {}".format(target, repo))
+print("  url: {}".format(e["url"]))
+print("  author: {}".format(e["author"]))
+print("  preview: {}".format(e.get("preview", "")[:120]))
+print("  mark: ./scripts/epic/epic.sh events --epic {} mark-handled {}".format(epic, e["comment_id"]))
+print("")
+' "${REPO}" "${EPIC}"
+}
+
+resolve_dispatch_hook() {
+  if [[ -n "${DISPATCH_HOOK:-}" ]]; then
+    echo "${DISPATCH_HOOK}"
+    return 0
+  fi
+  if [[ -x "${SCRIPT_DIR}/dispatch-hook.sh" ]]; then
+    echo "${SCRIPT_DIR}/dispatch-hook.sh"
+    return 0
+  fi
+  echo ""
+}
+
+# 对单条事件注入环境变量并调用 DISPATCH_HOOK
+run_dispatch_hook() {
+  local line="$1" hook
+  hook="$(resolve_dispatch_hook)"
+  [[ -n "${hook}" ]] || return 2
+
+  eval "$(printf '%s' "${line}" | python3 -c '
+import json, shlex, sys
+e = json.loads(sys.stdin.read())
+fields = {
+    "COMMENT_ID": e["comment_id"],
+    "KIND": e["kind"],
+    "TARGET": str(e["target"]),
+    "ACTION": e.get("action", ""),
+    "URL": e.get("url", ""),
+    "AUTHOR": e.get("author", ""),
+    "PREVIEW": e.get("preview", "")[:500],
+    "EVENT_JSON": json.dumps(e, ensure_ascii=False),
+}
+for k, v in fields.items():
+    print("export {}={}".format(k, shlex.quote(v)))
+')"
+  "${hook}"
+}
+
+# 编排 Agent 唤醒信号（Cursor 等 IDE 可对 stdout 做 notify_on_output 匹配 ^AGENT_TRIGGER_EPIC）
+notify_agent_trigger() {
+  local new_count="${1:-0}" pending_count="${2:-0}"
+  [[ "${AGENT_NOTIFY:-true}" != false ]] || return 0
+  local payload
+  payload="$(NEW="${new_count}" PENDING="${pending_count}" EPIC="${EPIC}" REPO="${REPO}" python3 -c '
+import json, os
+epic, repo = os.environ["EPIC"], os.environ["REPO"]
+new, pending = int(os.environ["NEW"]), int(os.environ["PENDING"])
+print(json.dumps({
+    "epic": int(epic),
+    "repo": repo,
+    "new": new,
+    "pending": pending,
+    "prompt": (
+        "Epic #{} 有 {} 条待处理 GitHub 事件（本轮新增 {}）。"
+        "按 epic-delivery 执行 AddressFeedback："
+        "./scripts/epic/epic.sh inbox --epic {} --json 读取详情，"
+        "处理完每条后 mark-handled。".format(epic, pending, new, epic)
+    ),
+    "cmd": "./scripts/epic/epic.sh inbox --epic {} --json".format(epic),
+}, ensure_ascii=False))')"
+  echo "AGENT_TRIGGER_EPIC${EPIC} ${payload}"
+  log "agent trigger new=${new_count} pending=${pending_count}"
+}
+
+# inbox：为编排 Agent 输出 pending 事件（含可执行 prompt）
+cmd_inbox() {
+  require_epic
+  local wait_sec=0 json_mode=false
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --json) json_mode=true; shift ;;
+      --wait) wait_sec="${2:-60}"; shift 2 ;;
+      *) die "inbox 用法：inbox [--json] [--wait <秒>]" ;;
+    esac
+  done
+
+  emit_inbox() {
+    local line
+    while IFS= read -r line; do
+      [[ -z "${line}" ]] && continue
+      if [[ "${json_mode}" == true ]]; then
+        printf '%s' "${line}" | EPIC="${EPIC}" REPO="${REPO}" python3 -c '
+import json, os, sys
+e = json.loads(sys.stdin.read())
+epic, repo = os.environ["EPIC"], os.environ["REPO"]
+kind, target = e["kind"], e["target"]
+action = e.get("action", "AddressFeedback")
+cid = e["comment_id"]
+if kind == "pr_state":
+    task = "PR #{} 状态变更：{}".format(target, e.get("preview", ""))
+    steps = "勾选 Epic checklist；清理 worktree；解锁 Blocked by 后续 Issue"
+elif kind == "issue":
+    task = "Issue #{} {}".format(target, action)
+    steps = "gh issue view {} --repo {}; thread 内 reply --body-file; mark-handled {}".format(target, repo, cid)
+else:
+    task = "PR #{} {}".format(target, action)
+    steps = "gh pr view {} --repo {}; epic.sh reply; mark-handled {}".format(target, repo, cid)
+out = dict(e)
+out["task"] = task
+out["steps"] = steps
+out["prompt"] = "{} · {} · url={} · {}".format(task, action, e.get("url", ""), steps)
+print(json.dumps(out, ensure_ascii=False))
+'
+      else
+        print_triage_for_event "${line}"
+      fi
+    done < <(pending_events)
+  }
+
+  if [[ "${wait_sec}" -gt 0 ]]; then
+    local deadline now pending
+    deadline=$(( $(date +%s) + wait_sec ))
+    while true; do
+      now="$(date +%s)"
+      if [[ "${now}" -ge "${deadline}" ]]; then
+        echo "INBOX_TIMEOUT epic=#${EPIC} wait=${wait_sec}s" >&2
+        return 1
+      fi
+      QUIET=true cmd_poll_once >/dev/null 2>&1 || true
+      pending="$(count_pending)"
+      if [[ "${pending}" -gt 0 ]]; then
+        emit_inbox
+        notify_agent_trigger 0 "${pending}"
+        return 0
+      fi
+      sleep 5
+    done
+  fi
+
+  pending="$(count_pending)"
+  if [[ "${pending}" -eq 0 ]]; then
+    echo "NO_PENDING_EVENTS epic=#${EPIC}"
+  else
+    emit_inbox
+    echo "INBOX_COUNT=${pending} epic=#${EPIC}"
+  fi
+}
+
+cmd_dispatch() {
+  require_epic
+  local hook handled=0 deferred=0 failed=0 total=0
+  hook="$(resolve_dispatch_hook)"
+  local line id rc
+  while IFS= read -r line; do
+    [[ -z "${line}" ]] && continue
+    total=$((total + 1))
+    id="$(printf '%s' "${line}" | python3 -c 'import json,sys; print(json.loads(sys.stdin.read())["comment_id"])')"
+    echo "--- dispatch #${total} (comment ${id}) ---"
+    print_triage_for_event "${line}"
+    if [[ -z "${hook}" ]]; then
+      echo "  (无 DISPATCH_HOOK，仅 triage；配置 epic.env 的 AGENT_CMD 或 DISPATCH_HOOK 以自动处理)"
+      deferred=$((deferred + 1))
+      continue
+    fi
+    set +e
+    run_dispatch_hook "${line}"
+    rc=$?
+    set -e
+    case "${rc}" in
+      0)
+        echo "${id}" >> "${HANDLED_FILE}"
+        log "dispatch handled comment_id=${id}"
+        echo "  ✓ handled (mark-handled ${id})"
+        handled=$((handled + 1))
+        ;;
+      2)
+        log "dispatch deferred comment_id=${id} (needs agent)"
+        echo "  → deferred (需编排/执行 Agent 处理)"
+        deferred=$((deferred + 1))
+        ;;
+      *)
+        log "dispatch failed comment_id=${id} exit=${rc}"
+        echo "  ✗ dispatch hook failed (exit ${rc})，下轮重试"
+        failed=$((failed + 1))
+        ;;
+    esac
+  done < <(pending_events)
+
+  if [[ "${total}" -eq 0 ]]; then
+    echo "NO_PENDING_EVENTS epic=#${EPIC}"
+    return 0
+  fi
+  echo "DISPATCH_SUMMARY epic=#${EPIC} total=${total} handled=${handled} deferred=${deferred} failed=${failed}"
+  [[ "${failed}" -eq 0 ]]
+}
+
 # ------------------------------------------------------------------ subcommands
 cmd_poll_once() {
   require_epic
@@ -226,8 +461,9 @@ print(json.dumps(d, ensure_ascii=False))')"
     log "init baseline: ${tracked} ids tracked"
     echo "{\"init\":true,\"epic\":${EPIC},\"tracked\":${tracked}}"
   else
-    echo "{\"poll\":true,\"epic\":${EPIC},\"new_events\":${new_count}}" >&2
+    [[ "${QUIET:-false}" == true ]] || echo "{\"poll\":true,\"epic\":${EPIC},\"new_events\":${new_count}}" >&2
   fi
+  return 0
 }
 
 cmd_poll() {
@@ -253,15 +489,29 @@ cmd_poll() {
   echo "[$(date -u +%H:%M:%S)] poll-loop started (epic #${EPIC}, every ${INTERVAL}s). Ctrl-C to stop."
 
   while true; do
-    local new count ts
+    local new count pending ts
     new="$(cmd_poll_once 2>/dev/null || true)"
     count="$(printf '%s\n' "${new}" | grep -c '"comment_id"' || true)"
+    pending="$(count_pending)"
     ts="[$(date -u +%H:%M:%S)]"
     if [[ "${count}" -gt 0 ]]; then
-      echo "${ts} ACTIONABLE x${count} -> run: ./scripts/epic/epic.sh triage --epic ${EPIC}"
+      echo "${ts} ACTIONABLE x${count} (pending total=${pending})"
       printf '%s\n' "${new}" | grep '"comment_id"' | sed 's/^/    /'
+      notify_agent_trigger "${count}" "${pending}"
+      if [[ "${AUTO_DISPATCH}" != false ]]; then
+        echo "${ts} auto-dispatch ..."
+        cmd_dispatch || true
+      fi
+    elif [[ "${pending}" -gt 0 ]]; then
+      notify_agent_trigger 0 "${pending}"
+      if [[ "${DISPATCH_RETRY_PENDING}" != false && "${AUTO_DISPATCH}" != false ]]; then
+        echo "${ts} retry dispatch (${pending} pending unhandled)"
+        cmd_dispatch || true
+      elif [[ "${pending}" -gt 0 ]]; then
+        echo "${ts} pending=${pending} (agent notified; run inbox --json to handle)"
+      fi
     else
-      echo "${ts} idle, no pending (epic #${EPIC})"
+      echo "${ts} idle (no new, no pending)"
     fi
     sleep "${INTERVAL}"
   done
@@ -269,39 +519,12 @@ cmd_poll() {
 
 cmd_triage() {
   require_epic
-  local count=0
+  local count=0 line
   while IFS= read -r line; do
     [[ -z "${line}" ]] && continue
-    local id
-    id="$(printf '%s' "${line}" | python3 -c 'import json,sys; print(json.loads(sys.stdin.read())["comment_id"])')"
-    if grep -Fxq "${id}" "${HANDLED_FILE}" 2>/dev/null; then continue; fi
     count=$((count + 1))
-    printf '%s' "${line}" | python3 -c '
-import json, sys
-e = json.loads(sys.stdin.read())
-repo, epic = sys.argv[1], sys.argv[2]
-kind, target = e["kind"], e["target"]
-if kind == "pr_state":
-    preview = e.get("preview", "")
-    print("DISPATCH PR #{} STATE-CHANGE: {} (epic #{})".format(target, preview, epic))
-    if "MERGED" in preview:
-        print("  action: 勾选 Epic checklist；清理 worktree；解锁被 Blocked by 此 PR 的后续 Issue")
-    elif "CLOSED" in preview:
-        print("  action: 确认是否需重开 / 调整 Epic 计划")
-    print("  hint: gh pr view {} --repo {}".format(target, repo))
-elif kind == "issue":
-    print("DISPATCH issue #{} AddressFeedback (epic #{})".format(target, epic))
-    print("  hint: gh issue view {} --repo {}".format(target, repo))
-else:
-    print("DISPATCH PR #{} AddressFeedback (epic #{})".format(target, epic))
-    print("  hint: gh pr view {} --repo {}".format(target, repo))
-print("  url: {}".format(e["url"]))
-print("  author: {}".format(e["author"]))
-print("  preview: {}".format(e.get("preview", "")[:120]))
-print("  mark: ./scripts/epic/epic.sh events --epic {} mark-handled {}".format(epic, e["comment_id"]))
-print("")
-' "${REPO}" "${EPIC}"
-  done < "${EVENTS_FILE}"
+    print_triage_for_event "${line}"
+  done < <(pending_events)
   if [[ "${count}" -eq 0 ]]; then
     echo "NO_PENDING_EVENTS epic=#${EPIC}"
   else
@@ -312,17 +535,9 @@ print("")
 cmd_events() {
   require_epic
   local action="${1:-list}"
-  pending() {
-    while IFS= read -r line; do
-      [[ -z "${line}" ]] && continue
-      local id
-      id="$(printf '%s' "${line}" | python3 -c 'import json,sys; print(json.loads(sys.stdin.read())["comment_id"])')"
-      grep -Fxq "${id}" "${HANDLED_FILE}" 2>/dev/null || echo "${line}"
-    done < "${EVENTS_FILE}"
-  }
   case "${action}" in
-    list) pending ;;
-    count) pending | wc -l ;;
+    list) pending_events ;;
+    count) count_pending ;;
     mark-handled) [[ -n "${2:-}" ]] || die "mark-handled 需要 <comment_id>"; echo "$2" >> "${HANDLED_FILE}"; log "marked handled $2" ;;
     *) die "events 用法：list | count | mark-handled <comment_id>" ;;
   esac
@@ -500,7 +715,7 @@ cmd_wt() {
 SUBCMD="$1"; shift
 
 EPIC=""; REPO=""; STATE_DIR=""; INTERVAL=""; PR=""; COMMENT_ID=""; BODY=""; BODY_FILE=""; INIT=false
-STEP=""; SLUG=""; ID=""; BASE=""; DRAFT=false; TITLE=""
+STEP=""; SLUG=""; ID=""; BASE=""; DRAFT=false; TITLE=""; NO_AUTO_DISPATCH=false
 REST=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -513,6 +728,7 @@ while [[ $# -gt 0 ]]; do
     --body) BODY="$2"; shift 2 ;;
     --body-file) BODY_FILE="$2"; shift 2 ;;
     --init) INIT=true; shift ;;
+    --no-auto-dispatch) NO_AUTO_DISPATCH=true; shift ;;
     --step) STEP="$2"; shift 2 ;;
     --slug) SLUG="$2"; shift 2 ;;
     --id) ID="$2"; shift 2 ;;
@@ -526,16 +742,19 @@ while [[ $# -gt 0 ]]; do
 done
 
 load_env
+[[ "${NO_AUTO_DISPATCH}" == true ]] && AUTO_DISPATCH=false
 
 case "${SUBCMD}" in
   poll)       cmd_poll ;;
   poll-once)  cmd_poll_once ;;
   triage)     cmd_triage ;;
+  dispatch)   cmd_dispatch ;;
+  inbox)      cmd_inbox ${REST[@]+"${REST[@]}"} ;;
   events)     cmd_events ${REST[@]+"${REST[@]}"} ;;
   scope)      cmd_scope ;;
   reply)      cmd_reply ;;
   stop)       cmd_stop ;;
   wt)         cmd_wt ${REST[@]+"${REST[@]}"} ;;
   -h|--help|help) usage ;;
-  *) die "未知子命令：${SUBCMD}（poll|poll-once|triage|events|scope|reply|stop|wt）" ;;
+  *) die "未知子命令：${SUBCMD}（poll|poll-once|triage|dispatch|inbox|events|scope|reply|stop|wt）" ;;
 esac

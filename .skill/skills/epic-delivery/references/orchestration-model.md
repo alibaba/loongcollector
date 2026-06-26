@@ -10,58 +10,85 @@
 | 编排 Agent 要常驻吗？ | **轮询 `poll-loop` 在编排 Agent 终端前台运行**，与会话同生死（会话关→轮询停），不留孤儿进程。 |
 | 跟踪范围？ | **仅该 Epic** 的 Issue / 子 Issue / 关联 PR，不扫全仓。 |
 
-推荐模型：**编排 Agent 启动 `epic.sh poll` → 周期 `epic.sh triage` → 派执行 Agent → mark-handled**。
-
----
-
-## 架构
+推荐模型：**`poll` 打印 `AGENT_TRIGGER_EPIC<N>` → 编排 Agent（IDE monitor）唤醒 → `inbox --json` 读取 → AddressFeedback → mark-handled**。
 
 ```mermaid
 flowchart LR
-  Poll["epic.sh poll\n--epic N"]
+  Poll["epic.sh poll"]
   GH["GitHub"]
   Events["events.jsonl"]
-  Orch["编排 Agent"]
-  Sub["执行 Agent"]
+  Trigger["AGENT_TRIGGER\n(stdout)"]
+  Agent["编排 Agent\n(monitor wake)"]
+  Inbox["inbox --json"]
+  Sub["执行 / 回复"]
 
-  Poll -->|gh 每分钟| GH
+  Poll -->|scan| GH
   Poll --> Events
-  Orch -->|triage| Events
-  Orch --> Sub
-  Sub -->|push + 回复| GH
+  Poll --> Trigger
+  Trigger --> Agent
+  Agent --> Inbox
+  Inbox --> Events
+  Agent --> Sub
+  Sub -->|reply| GH
 ```
 
 ---
 
 ## 编排 Agent 必执行流程
 
-所有操作走单一入口 **`scripts/epic/epic.sh <子命令> --epic <n>`**。
+### 1. 启动 poll + 监听 AGENT_TRIGGER（推荐）
 
-### 1. 接管 Epic：前台启动轮询（与会话同生死）
-
-在编排 Agent 自己的终端里**前台**运行（不要 `nohup`/`&`）：
+**终端 A**（前台 poll，与会话同生死）：
 
 ```bash
-./scripts/epic/epic.sh poll --epic <EPIC_NUMBER> [--repo owner/repo]
+./scripts/epic/epic.sh poll --epic <EPIC_NUMBER>
 ```
 
-- 在 IDE 终端可见，每 `INTERVAL` 秒打印心跳；`Ctrl-C` 或关闭会话即停。
-- 首次启动会对当前评论 + PR 状态做 **baseline**（`seen-ids.txt`），之后只报**新增**事件。
-- 状态目录：`/tmp/epic-<EPIC>-poll/`（与 Epic 号一一对应，可并存多个 Epic）。
-- **同一 Epic 只能有一个 poll-loop**（脚本有单实例守卫，PID 文件存活时拒绝再起）。切换会话前务必 `stop`/`Ctrl-C` 旧轮询——**多个轮询并发全量扫描会成倍放大 GitHub API 调用，触发限流**（这是历史上 rate limit 的主因）。
-- **限流优化**：Epic 范围（子 Issue / PR）按 `SCOPE_TTL`（默认 600s）缓存到状态目录，轮询周期内复用；搜索 API（30/min）仅在缓存过期时调用，`scope` 子命令强制刷新。怀疑范围漏了新 PR 时手动跑一次 `scope`。
+**编排 Agent 会话**（Cursor 等）：对 poll 终端 stdout 配置 `notify_on_output`，匹配：
 
-### 2. 每轮工作：Triage + 派发
+```text
+^AGENT_TRIGGER_EPIC<EPIC_NUMBER>
+```
+
+收到 wake 后**立即**：
 
 ```bash
-./scripts/epic/epic.sh triage --epic <EPIC_NUMBER>
+./scripts/epic/epic.sh inbox --epic <EPIC_NUMBER> --json
 ```
 
-输出 `DISPATCH PR #…` / `DISPATCH issue #…` / `DISPATCH PR # STATE-CHANGE` 时，派**执行 Agent**（单 Issue / 单 PR）进入 AddressFeedback，或按提示推进 Epic（合并）。
+按每条 JSON 的 `prompt` / `steps` 进入 AddressFeedback；完成后：
 
-派子 Agent 前仍须读 **`Blocked by`**（B2 不得与 B1 并行派发开发，见下节）。
+```bash
+./scripts/epic/epic.sh events --epic <N> mark-handled <comment_id>
+```
 
-### 3. 处理完毕：回复 + 标记已消费
+**无 poll 终端时**（Agent 自驱轮询）：
+
+```bash
+./scripts/epic/epic.sh inbox --epic <N> --wait 60 --json
+# 内部 poll-once + 阻塞直到有 pending
+```
+
+### 2. poll 行为摘要
+
+| 配置 | 默认 | 说明 |
+|------|------|------|
+| `AGENT_NOTIFY` | true | 有 pending 时打印 `AGENT_TRIGGER_EPIC<N> {json}` |
+| `AUTO_DISPATCH` | false | true 时额外跑 bash `dispatch` hook |
+| `DISPATCH_RETRY_PENDING` | true | pending 时每轮继续 notify（避免漏 wake） |
+
+- 单实例守卫、SCOPE_TTL 缓存等同前。
+- `--no-auto-dispatch` 关闭 bash hook；`AGENT_NOTIFY=false` 关闭 Agent 唤醒行。
+
+### 3. 手动 triage / dispatch / inbox
+
+```bash
+./scripts/epic/epic.sh triage --epic <N>
+./scripts/epic/epic.sh dispatch --epic <N>   # bash hook（AUTO_DISPATCH=true 时 poll 自动调）
+./scripts/epic/epic.sh inbox --epic <N> --json
+```
+
+### 4. 处理完毕 + 停止 poll
 
 处理人工 PR 意见时，**在该评论下回复**（禁止另开顶层汇总评）：
 
@@ -76,7 +103,7 @@ flowchart LR
 ./scripts/epic/epic.sh events --epic <EPIC_NUMBER> mark-handled <comment_id>
 ```
 
-### 4. Epic 结束：停止轮询
+### 5. Epic 结束：停止轮询
 
 前台 `Ctrl-C`；或从另一终端：
 
