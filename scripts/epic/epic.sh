@@ -177,7 +177,19 @@ cmd_poll_once() {
       continue
     fi
     local event
-    event="$(printf '%s' "${row}" | python3 -c 'import json,sys; r=json.loads(sys.stdin.read()); print(json.dumps({k:r[k] for k in ("kind","target","id","author","created_at","url")} | {"comment_id": r["id"], "preview": r["body"].replace(chr(10)," ")[:200], "action":"AddressFeedback", "epic": '"${EPIC}"'}, ensure_ascii=False))')"
+    event="$(printf '%s' "${row}" | python3 -c 'import json,sys
+r = json.loads(sys.stdin.read())
+d = {k: r[k] for k in ("kind", "target", "id", "author", "created_at", "url")}
+d["comment_id"] = r["id"]
+d["preview"] = r["body"].replace(chr(10), " ")[:200]
+d["action"] = "AddressFeedback"
+d["epic"] = '"${EPIC}"'
+print(json.dumps(d, ensure_ascii=False))')"
+    if [[ -z "${event}" ]]; then
+      log "WARN event build failed id=${id} (kept unseen for retry)"
+      sed -i "/^${id}\$/d" "${STATE_FILE}" 2>/dev/null || true
+      continue
+    fi
     echo "${event}"
     echo "${event}" >> "${EVENTS_FILE}"
     log "NEW event id=${id}"
@@ -213,10 +225,10 @@ cmd_poll() {
     count="$(printf '%s\n' "${new}" | grep -c '"comment_id"' || true)"
     ts="[$(date -u +%H:%M:%S)]"
     if [[ "${count}" -gt 0 ]]; then
-      echo "${ts} ${count} new event(s) -> run: ./scripts/epic/epic.sh triage --epic ${EPIC}"
+      echo "${ts} ACTIONABLE x${count} -> run: ./scripts/epic/epic.sh triage --epic ${EPIC}"
       printf '%s\n' "${new}" | grep '"comment_id"' | sed 's/^/    /'
     else
-      echo "${ts} no new events (epic #${EPIC})"
+      echo "${ts} idle, no pending (epic #${EPIC})"
     fi
     sleep "${INTERVAL}"
   done
@@ -305,6 +317,9 @@ cmd_stop() {
 cmd_reply() {
   : "${PR:?reply 需要 --pr <n>}"
   : "${COMMENT_ID:?reply 需要 --comment-id <id>}"
+  # 安全：先把 --body-file 内容读进 BODY，下面统一用 -f body="${BODY}"（字面值，已是内容）。
+  # 切勿对外暴露 -f body=@file 用法——gh 的 -f 会把 @路径 当字面字符串原样发送，
+  # 正文会变成路径而非内容；需要直接传文件时必须用 -F body=@file。
   if [[ -n "${BODY_FILE:-}" ]]; then BODY="$(cat "${BODY_FILE}")"; fi
   : "${BODY:?reply 需要 --body 或 --body-file}"
   local owner="${REPO%%/*}" repo="${REPO##*/}"
@@ -327,11 +342,131 @@ ${BODY}"
   echo "replied via quote-reply (conversation comment ${COMMENT_ID})"
 }
 
+# ------------------------------------------------------------------ wt (fork-based worktree)
+wt_cfg() {
+  UPSTREAM_REMOTE="${UPSTREAM_REMOTE:-upstream}"
+  FORK_REMOTE="${FORK_REMOTE:-origin}"
+  WT_ROOT="${WT_ROOT:-..}"
+  [[ -n "${FORK_OWNER:-}" ]] || die "wt 需要 FORK_OWNER（在 scripts/epic/epic.env 设置，如 Takuka0311）"
+  git rev-parse --is-inside-work-tree >/dev/null 2>&1 || die "请在主仓 checkout 内执行 wt 命令"
+  git remote get-url "${UPSTREAM_REMOTE}" >/dev/null 2>&1 || die "缺少远端 ${UPSTREAM_REMOTE}（主仓）"
+  git remote get-url "${FORK_REMOTE}" >/dev/null 2>&1 || die "缺少远端 ${FORK_REMOTE}（fork）"
+  REPO_ROOT="$(git rev-parse --show-toplevel)"
+  WT_ROOT_ABS="$(cd "${REPO_ROOT}/${WT_ROOT}" 2>/dev/null && pwd || echo "${WT_ROOT}")"
+  if [[ -z "${BASE}" ]]; then
+    BASE="$(git symbolic-ref --quiet --short "refs/remotes/${UPSTREAM_REMOTE}/HEAD" 2>/dev/null | sed "s#^${UPSTREAM_REMOTE}/##")"
+    BASE="${BASE:-main}"
+  fi
+}
+
+wt_resolve_id() {
+  if [[ -n "${ID}" ]]; then echo "${ID}"; return; fi
+  [[ -n "${EPIC}" && -n "${STEP}" ]] || die "wt 需要 --id <epic>-<step>，或 --epic + --step"
+  echo "${EPIC}-${STEP}"
+}
+
+wt_dir_for() {  # 按 id 找已存在 worktree 目录
+  local id="$1"
+  ls -d "${WT_ROOT_ABS}"/wt-"${id}"-* 2>/dev/null | head -1
+}
+
+wt_branch_for() {  # 按 id 找已存在本地分支
+  local id="$1"
+  git branch --list "feat/${id}-*" --format='%(refname:short)' 2>/dev/null | head -1
+}
+
+wt_new() {
+  local id branch dir
+  id="$(wt_resolve_id)"
+  [[ -n "${SLUG}" ]] || die "wt new 需要 --slug <短描述>"
+  branch="feat/${id}-${SLUG}"
+  dir="${WT_ROOT_ABS}/wt-${id}-${SLUG}"
+  [[ -e "${dir}" ]] && die "目录已存在：${dir}"
+  git show-ref --verify --quiet "refs/heads/${branch}" && die "分支已存在：${branch}"
+  echo "[wt new] git fetch ${UPSTREAM_REMOTE} ..."
+  git fetch "${UPSTREAM_REMOTE}" --quiet
+  git worktree add "${dir}" -b "${branch}" "${UPSTREAM_REMOTE}/${BASE}"
+  echo "✓ worktree : ${dir}"
+  echo "✓ branch   : ${branch}（base=${UPSTREAM_REMOTE}/${BASE}）"
+  echo "  检索键   : ${id}"
+  echo "  下一步   : cd ${dir} 开发；完成后 ./scripts/epic/epic.sh wt push --id ${id}"
+}
+
+wt_push() {
+  local id dir branch local_head fork_head
+  id="$(wt_resolve_id)"
+  dir="$(wt_dir_for "${id}")"; [[ -n "${dir}" ]] || die "未找到 worktree（id=${id}）"
+  branch="$(git -C "${dir}" rev-parse --abbrev-ref HEAD)"
+  echo "[wt push] ${branch} -> ${FORK_REMOTE}（fork）"
+  git -C "${dir}" push -u "${FORK_REMOTE}" "${branch}"
+  local_head="$(git -C "${dir}" rev-parse HEAD)"
+  fork_head="$(git -C "${dir}" rev-parse "${FORK_REMOTE}/${branch}" 2>/dev/null || true)"
+  [[ "${local_head}" == "${fork_head}" ]] \
+    || die "推送后 ${FORK_REMOTE}/${branch} head 与本地 HEAD 不一致，请检查"
+  echo "✓ ${FORK_REMOTE}/${branch} head == 本地 HEAD (${local_head:0:12})"
+}
+
+wt_pr() {
+  local id dir branch
+  id="$(wt_resolve_id)"
+  dir="$(wt_dir_for "${id}")"; [[ -n "${dir}" ]] || die "未找到 worktree（id=${id}）"
+  branch="$(git -C "${dir}" rev-parse --abbrev-ref HEAD)"
+  git -C "${dir}" rev-parse "${FORK_REMOTE}/${branch}" >/dev/null 2>&1 \
+    || die "分支未推送到 fork，请先：./scripts/epic/epic.sh wt push --id ${id}"
+  local args=(--repo "${REPO}" --head "${FORK_OWNER}:${branch}" --base "${BASE}")
+  [[ "${DRAFT}" == true ]] && args+=(--draft)
+  [[ -n "${TITLE}" ]] && args+=(--title "${TITLE}")
+  [[ -n "${BODY_FILE:-}" ]] && args+=(--body-file "${BODY_FILE}")
+  echo "[wt pr] head=${FORK_OWNER}:${branch} base=${BASE} repo=${REPO}"
+  ( cd "${dir}" && gh pr create "${args[@]}" )
+}
+
+wt_rm() {
+  local id dir branch
+  id="$(wt_resolve_id)"
+  dir="$(wt_dir_for "${id}")"
+  branch="$(wt_branch_for "${id}")"
+  [[ -n "${dir}" || -n "${branch}" ]] || die "未找到 worktree/分支（id=${id}）"
+  if [[ -n "${dir}" ]]; then git worktree remove "${dir}" && echo "✓ removed worktree ${dir}"; fi
+  if [[ -n "${branch}" ]]; then
+    git branch -D "${branch}" && echo "✓ deleted local branch ${branch}"
+    if git push "${FORK_REMOTE}" --delete "${branch}" 2>/dev/null; then
+      echo "✓ deleted ${FORK_REMOTE} branch ${branch}"
+    else
+      echo "  (${FORK_REMOTE} 无该分支或已删)"
+    fi
+  fi
+}
+
+wt_ls() {
+  echo "工作单元（${WT_ROOT_ABS}/wt-*）："
+  local d b
+  for d in "${WT_ROOT_ABS}"/wt-*; do
+    [[ -d "${d}" ]] || continue
+    b="$(git -C "${d}" rev-parse --abbrev-ref HEAD 2>/dev/null || echo '?')"
+    printf "  %-34s %s\n" "$(basename "${d}")" "${b}"
+  done
+}
+
+cmd_wt() {
+  local action="${1:-}"
+  wt_cfg
+  case "${action}" in
+    new)  wt_new ;;
+    push) wt_push ;;
+    pr)   wt_pr ;;
+    rm)   wt_rm ;;
+    ls)   wt_ls ;;
+    *)    die "wt 用法：new|push|pr|rm|ls（详见脚本头注释）" ;;
+  esac
+}
+
 # ------------------------------------------------------------------ dispatch
 [[ $# -ge 1 ]] || { usage; exit 1; }
 SUBCMD="$1"; shift
 
 EPIC=""; REPO=""; STATE_DIR=""; INTERVAL=""; PR=""; COMMENT_ID=""; BODY=""; BODY_FILE=""; INIT=false
+STEP=""; SLUG=""; ID=""; BASE=""; DRAFT=false; TITLE=""
 REST=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -344,6 +479,12 @@ while [[ $# -gt 0 ]]; do
     --body) BODY="$2"; shift 2 ;;
     --body-file) BODY_FILE="$2"; shift 2 ;;
     --init) INIT=true; shift ;;
+    --step) STEP="$2"; shift 2 ;;
+    --slug) SLUG="$2"; shift 2 ;;
+    --id) ID="$2"; shift 2 ;;
+    --base) BASE="$2"; shift 2 ;;
+    --draft) DRAFT=true; shift ;;
+    --title) TITLE="$2"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     --) shift; REST+=("$@"); break ;;
     *) REST+=("$1"); shift ;;
@@ -360,6 +501,7 @@ case "${SUBCMD}" in
   scope)      cmd_scope ;;
   reply)      cmd_reply ;;
   stop)       cmd_stop ;;
+  wt)         cmd_wt ${REST[@]+"${REST[@]}"} ;;
   -h|--help|help) usage ;;
-  *) die "未知子命令：${SUBCMD}（poll|poll-once|triage|events|scope|reply|stop）" ;;
+  *) die "未知子命令：${SUBCMD}（poll|poll-once|triage|events|scope|reply|stop|wt）" ;;
 esac

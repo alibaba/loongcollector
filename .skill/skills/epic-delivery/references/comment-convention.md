@@ -57,14 +57,16 @@ Agent 在 Issue / PR 评论**末尾**附加 footer（与正文空一行）：
 | **Review 行评**（Files changed 线程） | 在该 thread 内回复：`scripts/epic/epic.sh reply --pr <n> --comment-id <review_comment_id> --body-file …` 或 `POST .../pulls/{pr}/comments/{id}/replies` |
 | **Conversation 评论**（PR 讨论区） | `epic.sh reply` 优先 `issues/comments/{id}/replies`；若 API 不可用，自动 **Quote reply**（引用原文 `>`），**禁止**无引用的顶层「已按意见修改 / Test plan 更新」类汇总评 |
 
-回复正文末尾仍须带 Agent footer（`role=feedback-handler action=none`）。处理完成后用 `events.sh mark-handled` 标记，**不要**再额外发一条顶层 PR 评论重复说明。
+回复正文末尾仍须带 Agent footer（`role=feedback-handler action=none`）。处理完成后用 `scripts/epic/epic.sh events --epic <n> mark-handled <comment_id>` 标记，**不要**再额外发一条顶层 PR 评论重复说明。
+
+**工具用法（必遵，避免正文变成字面路径）**：回复正文一律用 `epic.sh reply --body-file <f>`、`gh pr comment --body-file <f>` 或 `gh api … -F body=@<f>`；**禁止** `gh api -f body=@<f>`——`-f` 把 `@路径` 当字面字符串原样发送，正文会变成路径而非内容（只有 `-F` 才会读取文件）。
 
 ## 在哪里回答评论里的问题（必遵）
 
 评论里的**提问 / 质疑 / 选型**（如「这段代码未来怎么用？」「为什么这么实现？」），**回应必须回到对应的 GitHub 评论 thread**，与维护者在 GitHub 上闭环。
 
 - **禁止**把评论里的问题搬到本地 Agent 对话里向人确认（提问发生在 GitHub，回答也应在 GitHub）。
-- 需要维护者拍板的方向选择：在 GitHub 评论里**给出选项 + 推荐方案 + 依据**并 `@maintainer`，靠下一轮轮询捕获其答复，**不在本地阻塞确认**。
+- 需要维护者拍板的方向选择：在 GitHub 评论里**给出选项 + 推荐方案 + 依据**并 `@`（at 仓库实际维护者的 GitHub 账号，如 `@Takuka0311`；不要写 `@maintainer` 这类占位，那会误 at 到真实的同名用户），靠下一轮轮询捕获其答复，**不在本地阻塞确认**。
 - 仅当问题与本 Epic 无关、或属于「本地环境 / 凭证 / 工具」类编排自身障碍时，才在本地与发起人沟通。
 
 ## 编排 Agent 判读

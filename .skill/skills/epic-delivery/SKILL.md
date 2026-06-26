@@ -58,7 +58,7 @@ stateDiagram-v2
 | SelfReview | 自查 diff、安全、范围 | `review-standards`、`code-review`、`security-check` | 自检清单全绿 |
 | OpenPR | commit + push + 开 PR（先 draft） | `commit` | PR 链回 Issue（`Closes #`） |
 | AddressFeedback | 处理评论 / CI，先验证再采纳 | `code-review`、`security-check` | CI 绿 + 无未解决意见 |
-| ReadyToMerge | 汇总 test plan，@maintainer | — | 停止，等人工 Merge |
+| ReadyToMerge | 汇总 test plan，@维护者账号 | — | 停止，等人工 Merge |
 
 ## 阶段 0 · 写目标 Discussion
 
@@ -223,7 +223,7 @@ ssh -T git@github.com 2>&1 | head -1   # push 走 SSH 时必须通
 
 人工在 PR/Issue 评论后的路径：
 
-1. `poll-loop` 写入 `events.jsonl` → 2. 编排 Agent `orchestrate-once` → 3. 派子 Agent AddressFeedback → 4. `mark-handled` → 5. ReadyToMerge 后停止，等人工 Merge。
+1. `epic.sh poll` 写入 `events.jsonl` → 2. 编排 Agent `epic.sh triage` → 3. 派子 Agent AddressFeedback → 4. `mark-handled` → 5. ReadyToMerge 后停止，等人工 Merge。
 
 「并行不等反馈」仅指：**不因某个 PR 被 comment 就阻塞其它并行 Issue 的开发**；评论处理由轮询 + 编排派发完成。
 
@@ -231,28 +231,39 @@ ssh -T git@github.com 2>&1 | head -1   # push 走 SSH 时必须通
 
 ## 阶段 3 · 开发
 
-1. 从默认分支拉特性分支：`<type>/<epic>-<step>-<slug>`（如 `feat/pipeline-b1-passthrough`）。并行推进多个步骤时，为每个步骤建独立 worktree（见下）。
+1. 建特性分支：`<type>/<epic>-<step>-<slug>`（如 `feat/pipeline-b1-passthrough`），**分支建在个人 fork（`origin`）**，由 fork 向主仓提 PR；**禁止**直接在主仓建远端分支（见下「分支与推送」）。并行推进多个步骤时，为每个步骤建独立 worktree（见下）。
 2. 先读 `.skill/skills/project-knowledge` 建立架构认知；按改动范围读 `.claude/skills/compile`、`testing-standards`、`e2e`、`selfmonitor`。
 3. 严格在 Issue 范围内实现，不顺手改其它目录。
 4. 本地验收（见矩阵），全部通过再进入自检。
 
 ### 并行开发（git worktree）
 
-多个互不依赖的 Issue 可在**各自的 worktree** 内并行开发：每个 worktree 一条分支、一次会话、一个 PR，工作区与构建产物互相隔离，无需来回切分支。
+多个互不依赖的 Issue 可在**各自的 worktree** 内并行开发：每个 worktree 一条分支、一次会话、一个 PR，工作区与构建产物互相隔离，无需来回切分支。优先用 `epic.sh wt` 统一创建/推送/开 PR/清理（自动按约定命名、推 fork、从 fork 提 PR）：
 
 ```bash
-# 为某步骤创建独立 worktree + 分支（origin/main 为默认分支）
-git worktree add ../wt-<epic>-<step> -b <type>/<epic>-<step>-<slug> origin/main
-
-git worktree list                        # 查看所有 worktree
-git worktree remove ../wt-<epic>-<step>  # PR 合并后清理
+# 为某步骤创建独立 worktree + 分支（基于 upstream 默认分支）
+./scripts/epic/epic.sh wt new --epic <EPIC> --step <step> --slug <slug>
+./scripts/epic/epic.sh wt push --epic <EPIC> --step <step>      # 推到 fork（origin）
+./scripts/epic/epic.sh wt pr   --epic <EPIC> --step <step> [--draft]  # 从 fork 向 upstream 开 PR
+./scripts/epic/epic.sh wt ls                                     # 列出 worktree
+./scripts/epic/epic.sh wt rm   --epic <EPIC> --step <step>       # PR 合并后清理
 ```
+
+> 历史遗留：分支若已建在主仓，则后续仍推主仓远端维护，不要中途搬家。新分支一律走 fork。
 
 约束：
 
 - 一个分支只在一个 worktree 检出；不同 worktree 不要切到同一分支。
 - 构建产物（`build/`、`*.gcda`、插件 so）按 worktree 隔离，避免并行构建互相污染。
 - 仍遵守"一个会话只做一个 Issue"：并行的是多个 worktree，不是一个会话里连做多步。
+
+### 分支与推送（必遵，避免推错远端 / 污染主仓）
+
+- 新建远端分支一律建在**个人 fork**（`origin` 指向 fork），由 fork 向主仓（`upstream`）提 PR；不要直接在主仓建分支。
+- 推送前**二次确认目标远端**，不要想当然 `git push origin`：
+  - `git remote -v` 区分 fork 与主仓；`git rev-parse --abbrev-ref @{u}` 确认上游指向正确。
+  - 已有 PR 的分支：`gh pr view <pr> --json headRepositoryOwner,headRefName` 查 PR head 实际所在 repo，推到该远端（历史遗留分支即便在主仓也照旧）。
+  - push 后用 `gh pr view <pr> --json headRefOid` 核对远端 head == 本地 HEAD，确认推送真正生效。
 
 ### 验收命令矩阵
 
@@ -298,7 +309,7 @@ make core PATH_IN_DOCKER=$(pwd)
 ## 阶段 5 · 开 PR
 
 1. 用 `.skill/skills/commit` 写提交信息（Conventional Commits）。
-2. push 后**先开 draft PR**，body 套用 `references/github-templates.md` 的 PR 模板：`Closes #<issue>`、对应 Discussion 步骤、Test plan（命令 + case 名）、影响面 / 回滚、stacked 顺序（如有）。
+2. **推到 fork（`origin`）**——推送前按「阶段 3 · 分支与推送」二次确认目标远端；优先 `epic.sh wt push` / `wt pr`。push 后**先开 draft PR**（从 fork 向 `upstream` 提），body 套用 `references/github-templates.md` 的 PR 模板：`Closes #<issue>`、对应 Discussion 步骤、Test plan（命令 + case 名）、影响面 / 回滚、stacked 顺序（如有）。
 3. 把阶段 4 的自检结论作为首条 PR 评论（**必须带评论标识**，见下）。
 4. 自检与本地验收齐全后再转 ready for review，触发 CI 与人工 review。
 
@@ -309,25 +320,25 @@ make core PATH_IN_DOCKER=$(pwd)
 
 ## 阶段 6 · 自主处理 PR 意见与 CI
 
-**入口**：编排 Agent 先 `orchestrate-once.sh --epic <n>` 读 pending 事件；无事件时可用 `gh` 手动拉取该 PR 的 review comments、CI（见 `orchestration-model.md`），再派执行 Agent 或自行处理。
+**入口**：编排 Agent 先 `epic.sh triage --epic <n>` 读 pending 事件；无事件时可用 `gh` 手动拉取该 PR 的 review comments、CI（见 `orchestration-model.md`），再派执行 Agent 或自行处理。
 
 循环直到"可合并"：
 
-1. **冲突**：智能合并，保留双方意图；意图冲突则停手、打 `needs-human`、@maintainer。
-2. **评论**：处理未解决评论；对每条意见**先验证再采纳**——用 `code-review` / `review-standards` 复核被指出的代码，有效则修复并回复证据，无效则在 thread 内解释，不盲从。评论里的**提问 / 质疑 / 选型**一律在**该 GitHub thread 内回答**（需决策时给选项+建议并 @maintainer，靠轮询取答复）；**禁止**把评论里的问题搬到本地 Agent 对话向人确认（见 `comment-convention.md`「在哪里回答评论里的问题」）。
+1. **冲突**：智能合并，保留双方意图；意图冲突则停手、打 `needs-human`、@维护者账号。
+2. **评论**：处理未解决评论；对每条意见**先验证再采纳**——用 `code-review` / `review-standards` 复核被指出的代码，有效则修复并回复证据，无效则在 thread 内解释，不盲从。评论里的**提问 / 质疑 / 选型**一律在**该 GitHub thread 内回答**（需决策时给选项+建议并 @维护者账号，靠轮询取答复）；**禁止**把评论里的问题搬到本地 Agent 对话向人确认（见 `comment-convention.md`「在哪里回答评论里的问题」）。回复一律用 `epic.sh reply --body-file` / `gh pr comment --body-file` / `gh api … -F body=@file`，**禁止** `gh api -f body=@file`（`-f` 会把 `@路径` 当字面字符串发送，正文会变成路径）。
 3. **CI**：只修本 PR 范围内导致的失败；**禁止改 CI workflow 骗绿**；疑似与本 PR 无关的失败，先把分支与默认分支同步（可能他人已修）再判断。
 4. 所有修复 push 到**同一 PR 分支**；每轮修复后回到阶段 4 复检。
 
 ## 阶段 7 · 推进到可合并
 
-1. CI 全绿 + 无未解决评论后，在 PR 评论汇总最终 test plan，@maintainer。
+1. CI 全绿 + 无未解决评论后，在 PR 评论汇总最终 test plan，@维护者账号。
 2. 在 Epic Issue 勾选对应步骤（或评论进度），保持 checklist 与实际一致。
 3. **停止**。Merge 由人工执行。
 
 ## 进度回写
 
 - **唯一事实来源**：Epic Issue 的 checklist。
-- 关键时机用 `gh` 回写：接单（子 Issue → 进行中）、开 PR（Epic 勾选 + 贴 PR 链接）、ReadyToMerge（@maintainer）、阻塞（打 `needs-human`）。
+- 关键时机用 `gh` 回写：接单（子 Issue → 进行中）、开 PR（Epic 勾选 + 贴 PR 链接）、ReadyToMerge（@维护者账号）、阻塞（打 `needs-human`）。
 - Discussion 仅作静态总纲，按里程碑手动同步快照，不逐 PR 更新。
 
 ## 护栏（Agent 必须遵守）
@@ -335,7 +346,7 @@ make core PATH_IN_DOCKER=$(pwd)
 - 不得 merge、不得 approve 自己的 PR。
 - 不得 force-push（除非人工显式要求）、不得 skip hooks。
 - 不得修改 CI workflow 使检查通过。
-- 范围扩大、架构争议、需产品决策 → 立即停止，打 `needs-human`，@maintainer，不擅自扩大改动。
+- 范围扩大、架构争议、需产品决策 → 立即停止，打 `needs-human`，@维护者账号，不擅自扩大改动。
 - 每个 PR 必须带 UT 或 E2E；无测试不进入 ReadyToMerge。
 - 一个会话只做一个 Issue；不在同一分支堆叠多个不相关步骤。
 - 涉及 `.github/workflows/` 等需要 **`workflow` scope** 的改动，Preflight 确认无权限则停手打 `needs-human`。
@@ -362,7 +373,7 @@ make core PATH_IN_DOCKER=$(pwd)
 | `references/github-templates.md` | Issue / PR 模板 |
 | `scripts/epic/epic.sh` | **单一入口**：`poll`/`poll-once`/`triage`/`events`/`scope`/`reply`/`stop`（`--epic` 驱动，与具体 Epic 解耦） |
 
-默认部署：**编排 Agent 在自己终端前台跑 `poll-loop`（与会话同生死）+ 周期 `orchestrate-once` + 派子 Agent**。
+默认部署：**编排 Agent 在自己终端前台跑 `epic.sh poll`（与会话同生死）+ 周期 `epic.sh triage` + 派子 Agent**。
 
 ## 禁止行为
 

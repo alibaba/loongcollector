@@ -46,8 +46,19 @@ Preflight（失败则停手，打 needs-human）：
 - 在 Epic Issue 评论 PR 链接（或回复编排 Agent 汇总）
 - 推到 ReadyToMerge 后停止；**不要 merge，不要等人工确认再继续**
 
+分支与推送（必遵，避免推错远端 / 污染主仓）：
+- 新建远端分支一律建在**个人 fork**（origin 指向 fork），由 fork 向主仓提 PR；不要直接在主仓建分支。
+- 推送前**二次确认目标远端**，不要想当然 git push origin：
+  - 已有 PR 的分支：gh pr view <pr> --json headRepositoryOwner,headRefName 查 PR head 实际所在 repo，推到该远端（历史遗留：分支若已建在主仓，则后续仍推主仓远端）。
+  - git remote -v 区分 fork 与主仓；git rev-parse --abbrev-ref @{u} 确认上游指向正确。
+  - push 后用 gh pr view <pr> --json headRefOid 核对远端 head == 本地 HEAD，确认推送真正生效。
+
+回复评论（必遵，避免正文变成字面路径）：
+- 用 scripts/epic/epic.sh reply --pr <n> --comment-id <id> --body-file <f>、gh pr comment --body-file <f> 或 gh api ... -F body=@<f>。
+- 禁止 gh api -f body=@<f>：-f 把 @路径 当字面字符串原样发送，正文会变成路径而非内容；只有 -F 才会读取文件内容。
+
 禁止：
 - 不要 merge、不要 approve、不要 force-push、不要改 CI workflow
 - 不要用「本地无 cmake / 待 CI 验证」跳过 compile skill
-- 范围扩大或需架构决策时停手，打 needs-human 并 @maintainer
+- 范围扩大或需架构决策时停手，打 needs-human 并 @维护者账号
 ```

@@ -10,7 +10,7 @@
 | 编排 Agent 要常驻吗？ | **轮询 `poll-loop` 在编排 Agent 终端前台运行**，与会话同生死（会话关→轮询停），不留孤儿进程。 |
 | 跟踪范围？ | **仅该 Epic** 的 Issue / 子 Issue / 关联 PR，不扫全仓。 |
 
-推荐模型：**编排 Agent 启动 poll-loop → 周期 orchestrate-once → 派执行 Agent → mark-handled**。
+推荐模型：**编排 Agent 启动 `epic.sh poll` → 周期 `epic.sh triage` → 派执行 Agent → mark-handled**。
 
 ---
 
@@ -26,7 +26,7 @@ flowchart LR
 
   Poll -->|gh 每分钟| GH
   Poll --> Events
-  Orch -->|orchestrate-once| Events
+  Orch -->|triage| Events
   Orch --> Sub
   Sub -->|push + 回复| GH
 ```
