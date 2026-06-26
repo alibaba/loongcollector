@@ -23,7 +23,10 @@ import (
 //   - Plugins that only handle a subset of event kinds MUST NOT silently drop the rest.
 //   - Log-only processors MUST pass Metric and Span events through unchanged.
 //   - Prefer CollectGroupEvents or ProcessLogEventsOnly to satisfy the contract.
-//   - When matched events are transformed or filtered, use RecombineEvents to preserve order.
+//   - When matched events are transformed 1:1 (one processed event per matched event),
+//     use RecombineEvents to preserve original order. RecombineEvents does NOT support
+//     filtering/dropping matched events; for that, use PartitionEvents and rebuild the
+//     output slice manually.
 type EventKindSet struct {
 	Log    bool
 	Metric bool
@@ -70,11 +73,25 @@ func PassThroughEvents(events []models.PipelineEvent, handledKinds EventKindSet)
 	return passThrough
 }
 
-// RecombineEvents merges processed matched events back into original positions.
-// processedMatched must contain one entry per matched event in original order.
+// RecombineEvents merges processed matched events back into their original positions,
+// preserving the order and identity of pass-through (unhandled) events.
+//
+// Contract: processedMatched MUST contain exactly one entry per matched event, in original
+// order (strict 1:1 transformation). RecombineEvents is NOT a filtering primitive and cannot
+// represent dropped events; callers that filter must rebuild the slice via PartitionEvents.
+//
+// If original is empty, it is returned as-is (including an empty-but-non-nil slice) so the
+// caller's slice identity and emptiness are preserved rather than collapsed to nil.
+//
+// Defensive fallback when the 1:1 precondition is violated (indicates a caller bug, never
+// panics):
+//   - If processedMatched is shorter than the matched count, the surplus matched positions
+//     keep their original events.
+//   - If processedMatched is longer than the matched count, the extra trailing entries are
+//     ignored.
 func RecombineEvents(original []models.PipelineEvent, handledKinds EventKindSet, processedMatched []models.PipelineEvent) []models.PipelineEvent {
 	if len(original) == 0 {
-		return nil
+		return original
 	}
 	result := make([]models.PipelineEvent, len(original))
 	matchedIdx := 0

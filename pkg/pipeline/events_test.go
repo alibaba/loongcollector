@@ -78,6 +78,47 @@ func TestRecombineEvents_PreservesOrder(t *testing.T) {
 	assert.Equal(t, "B", string(recombined[3].(*models.Log).GetBody()))
 }
 
+func TestRecombineEvents_EmptyOriginal(t *testing.T) {
+	var nilOriginal []models.PipelineEvent
+	assert.Nil(t, RecombineEvents(nilOriginal, LogOnlyEventKinds, nil))
+
+	emptyOriginal := []models.PipelineEvent{}
+	result := RecombineEvents(emptyOriginal, LogOnlyEventKinds, nil)
+	require.NotNil(t, result)
+	assert.Len(t, result, 0)
+}
+
+func TestRecombineEvents_FewerProcessedThanMatched(t *testing.T) {
+	log1 := models.NewLog("", []byte("a"), "info", "", "", models.NewTags(), 1)
+	log2 := models.NewLog("", []byte("b"), "info", "", "", models.NewTags(), 2)
+	metric := models.NewSingleValueMetric("m", models.MetricTypeGauge, models.NewTags(), 3, 1.0)
+	original := []models.PipelineEvent{metric, log1, log2}
+
+	processedLog1 := models.NewLog("", []byte("A"), "info", "", "", models.NewTags(), 1)
+	recombined := RecombineEvents(original, LogOnlyEventKinds, []models.PipelineEvent{processedLog1})
+
+	require.Len(t, recombined, 3)
+	assert.Equal(t, models.EventTypeMetric, recombined[0].GetType())
+	assert.Equal(t, "A", string(recombined[1].(*models.Log).GetBody()))
+	// Surplus matched position keeps its original event when processedMatched is short.
+	assert.Equal(t, "b", string(recombined[2].(*models.Log).GetBody()))
+}
+
+func TestRecombineEvents_MoreProcessedThanMatched(t *testing.T) {
+	log1 := models.NewLog("", []byte("a"), "info", "", "", models.NewTags(), 1)
+	metric := models.NewSingleValueMetric("m", models.MetricTypeGauge, models.NewTags(), 2, 1.0)
+	original := []models.PipelineEvent{metric, log1}
+
+	processedLog1 := models.NewLog("", []byte("A"), "info", "", "", models.NewTags(), 1)
+	extraLog := models.NewLog("", []byte("X"), "info", "", "", models.NewTags(), 3)
+	recombined := RecombineEvents(original, LogOnlyEventKinds, []models.PipelineEvent{processedLog1, extraLog})
+
+	require.Len(t, recombined, 2)
+	assert.Equal(t, models.EventTypeMetric, recombined[0].GetType())
+	// Extra trailing processed entries are ignored.
+	assert.Equal(t, "A", string(recombined[1].(*models.Log).GetBody()))
+}
+
 func TestApplyToSupportedEvents_OnlyTouchesLogs(t *testing.T) {
 	log := models.NewLog("", []byte("before"), "info", "", "", models.NewTags(), 1)
 	metric := models.NewSingleValueMetric("m", models.MetricTypeGauge, models.NewTags(), 2, 1.0)
