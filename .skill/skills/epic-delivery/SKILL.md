@@ -188,37 +188,36 @@ ssh -T git@github.com 2>&1 | head -1   # push 走 SSH 时必须通
 
 #### 编排 Agent 必做（接管 Epic 起）
 
-1. **启动轮询**（未运行时）：
+1. **前台启动轮询**（在编排 Agent 自己的终端里运行，**与会话同生死**：会话/终端关闭即停，不留孤儿进程）：
 
 ```bash
-./scripts/epic/poll-start.sh --epic <EPIC_NUMBER>
-# 可选：--repo owner/repo（默认 epic.env 或 gh repo view）
+./scripts/epic/epic.sh poll --epic <EPIC_NUMBER>
+# 可选：--repo owner/repo（默认 epic.env 或 gh repo view）；Ctrl-C 停止
 ```
+
+> 不要用 `nohup`/`&` 脱离会话后台运行——轮询必须**依赖编排 Agent 存活**，IDE 终端可见。
 
 2. **每轮工作前 Triage**（含用户新消息、派子 Agent 前）：
 
 ```bash
-./scripts/epic/orchestrate-once.sh --epic <EPIC_NUMBER>
+./scripts/epic/epic.sh triage --epic <EPIC_NUMBER>
 ```
 
 3. **有 pending 事件** → 按输出 `DISPATCH` 提示派**执行 Agent**进入阶段 6（AddressFeedback）；处理完：
 
 ```bash
-./scripts/epic/events.sh --epic <EPIC_NUMBER> mark-handled <comment_id>
+./scripts/epic/epic.sh events --epic <EPIC_NUMBER> mark-handled <comment_id>
 ```
 
-4. **Epic 交付结束或交还人工** → 停止轮询：
-
-```bash
-./scripts/epic/poll-stop.sh --epic <EPIC_NUMBER>
-```
+4. **Epic 交付结束或交还人工** → 停止轮询：前台 `Ctrl-C` 即可；如需从另一终端停，用 `./scripts/epic/epic.sh stop --epic <EPIC_NUMBER>`。
 
 #### 轮询机制摘要
 
 | 项 | 说明 |
 |----|------|
-| 扫描范围 | Epic Issue + checklist 子 Issue + 关联 PR（Issue/PR/Review 评论） |
+| 扫描范围 | Epic Issue + checklist 子 Issue + 关联 PR（Issue/PR/Review 评论 **+ PR 状态 OPEN/MERGED/CLOSED**） |
 | 判读 | 无 `from=agent` → 待处理；`action=none/fyi` 的 Agent 评 → 跳过（见 `comment-convention.md`） |
+| **PR 状态事件** | PR 合并/关闭产生 `pr_state` 事件 → 编排 Agent 勾选 Epic checklist、清理 worktree、解锁被 `Blocked by` 此 PR 的后续 Issue |
 | 状态目录 | `/tmp/epic-<EPIC>-poll/`（`seen-ids.txt`、`events.jsonl`、`poll.log`） |
 | 间隔 | 默认 60s（`epic.env` 的 `INTERVAL` 或 `--interval`） |
 
@@ -361,9 +360,9 @@ make core PATH_IN_DOCKER=$(pwd)
 | `references/orchestration-model.md` | 轮询 / Triage / 派发 / 脚本参考 |
 | `references/comment-convention.md` | **PR/Issue 评论标识**（Agent footer） |
 | `references/github-templates.md` | Issue / PR 模板 |
-| `scripts/epic/` | **`--epic` 驱动的 gh 轮询**（与具体 Epic 解耦） |
+| `scripts/epic/epic.sh` | **单一入口**：`poll`/`poll-once`/`triage`/`events`/`scope`/`reply`/`stop`（`--epic` 驱动，与具体 Epic 解耦） |
 
-默认部署：**编排 Agent 启动 `poll-start` + 周期 `orchestrate-once` + 派子 Agent**。
+默认部署：**编排 Agent 在自己终端前台跑 `poll-loop`（与会话同生死）+ 周期 `orchestrate-once` + 派子 Agent**。
 
 ## 禁止行为
 

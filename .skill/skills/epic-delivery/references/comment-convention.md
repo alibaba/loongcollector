@@ -54,8 +54,8 @@ Agent 在 Issue / PR 评论**末尾**附加 footer（与正文空一行）：
 
 | 评论类型 | 正确回复方式 |
 |----------|--------------|
-| **Review 行评**（Files changed 线程） | 在该 thread 内回复：`scripts/epic/gh-reply.sh --pr <n> --comment-id <review_comment_id> --body-file …` 或 `POST .../pulls/{pr}/comments/{id}/replies` |
-| **Conversation 评论**（PR 讨论区） | 优先 `issues/comments/{id}/replies`；若 API 不可用，用 `gh-reply.sh` 的 **Quote reply**（引用原文 `>`），**禁止**无引用的顶层「已按意见修改 / Test plan 更新」类汇总评 |
+| **Review 行评**（Files changed 线程） | 在该 thread 内回复：`scripts/epic/epic.sh reply --pr <n> --comment-id <review_comment_id> --body-file …` 或 `POST .../pulls/{pr}/comments/{id}/replies` |
+| **Conversation 评论**（PR 讨论区） | `epic.sh reply` 优先 `issues/comments/{id}/replies`；若 API 不可用，自动 **Quote reply**（引用原文 `>`），**禁止**无引用的顶层「已按意见修改 / Test plan 更新」类汇总评 |
 
 回复正文末尾仍须带 Agent footer（`role=feedback-handler action=none`）。处理完成后用 `events.sh mark-handled` 标记，**不要**再额外发一条顶层 PR 评论重复说明。
 

@@ -7,7 +7,7 @@
 | 问题 | 答案 |
 |------|------|
 | 脚本绑定某个 Epic 吗？ | **否**。只传 Epic Issue 号；子 Issue / PR 从 checklist 与 `Closes #` 自动发现。 |
-| 编排 Agent 要常驻吗？ | **Agent 会话不常驻**；**轮询 shell 后台常驻**（`poll-loop`），由编排 Agent 启动/停止。 |
+| 编排 Agent 要常驻吗？ | **轮询 `poll-loop` 在编排 Agent 终端前台运行**，与会话同生死（会话关→轮询停），不留孤儿进程。 |
 | 跟踪范围？ | **仅该 Epic** 的 Issue / 子 Issue / 关联 PR，不扫全仓。 |
 
 推荐模型：**编排 Agent 启动 poll-loop → 周期 orchestrate-once → 派执行 Agent → mark-handled**。
@@ -18,7 +18,7 @@
 
 ```mermaid
 flowchart LR
-  Poll["poll-loop.sh\n--epic N"]
+  Poll["epic.sh poll\n--epic N"]
   GH["GitHub"]
   Events["events.jsonl"]
   Orch["编排 Agent"]
@@ -35,53 +35,60 @@ flowchart LR
 
 ## 编排 Agent 必执行流程
 
-### 1. 接管 Epic：启动轮询
+所有操作走单一入口 **`scripts/epic/epic.sh <子命令> --epic <n>`**。
+
+### 1. 接管 Epic：前台启动轮询（与会话同生死）
+
+在编排 Agent 自己的终端里**前台**运行（不要 `nohup`/`&`）：
 
 ```bash
-./scripts/epic/poll-start.sh --epic <EPIC_NUMBER> [--repo owner/repo]
+./scripts/epic/epic.sh poll --epic <EPIC_NUMBER> [--repo owner/repo]
 ```
 
-- 首次启动会对当前评论做 **baseline**（`seen-ids.txt`），之后只报**新增**可处理评论。
+- 在 IDE 终端可见，每 `INTERVAL` 秒打印心跳；`Ctrl-C` 或关闭会话即停。
+- 首次启动会对当前评论 + PR 状态做 **baseline**（`seen-ids.txt`），之后只报**新增**事件。
 - 状态目录：`/tmp/epic-<EPIC>-poll/`（与 Epic 号一一对应，可并存多个 Epic）。
 
 ### 2. 每轮工作：Triage + 派发
 
 ```bash
-./scripts/epic/orchestrate-once.sh --epic <EPIC_NUMBER>
+./scripts/epic/epic.sh triage --epic <EPIC_NUMBER>
 ```
 
-输出 `DISPATCH PR #…` / `DISPATCH issue #…` 时，派**执行 Agent**（单 Issue / 单 PR）进入 AddressFeedback。
+输出 `DISPATCH PR #…` / `DISPATCH issue #…` / `DISPATCH PR # STATE-CHANGE` 时，派**执行 Agent**（单 Issue / 单 PR）进入 AddressFeedback，或按提示推进 Epic（合并）。
 
 派子 Agent 前仍须读 **`Blocked by`**（B2 不得与 B1 并行派发开发，见下节）。
 
-### 3. 处理完毕：标记已消费
-
-```bash
-./scripts/epic/events.sh --epic <EPIC_NUMBER> mark-handled <comment_id>
-```
+### 3. 处理完毕：回复 + 标记已消费
 
 处理人工 PR 意见时，**在该评论下回复**（禁止另开顶层汇总评）：
 
 ```bash
-./scripts/epic/gh-reply.sh --repo <owner>/<repo> --pr <pr> --comment-id <id> --body-file reply.md
+./scripts/epic/epic.sh reply --pr <pr> --comment-id <id> --body-file reply.md
 ```
 
 - Review 行评：`pulls/{pr}/comments/{id}/replies`（真 thread）
-- Conversation 评论：API 不支持 thread 时用 **Quote reply**（`gh-reply.sh` 自动引用原文）
+- Conversation 评论：API 不支持 thread 时自动 **Quote reply**（引用原文）
+
+```bash
+./scripts/epic/epic.sh events --epic <EPIC_NUMBER> mark-handled <comment_id>
+```
 
 ### 4. Epic 结束：停止轮询
 
+前台 `Ctrl-C`；或从另一终端：
+
 ```bash
-./scripts/epic/poll-stop.sh --epic <EPIC_NUMBER>
+./scripts/epic/epic.sh stop --epic <EPIC_NUMBER>
 ```
 
 ### 辅助命令
 
 ```bash
-./scripts/epic/scan-scope.sh --epic <EPIC_NUMBER>     # 查看扫描范围
-./scripts/epic/events.sh --epic <EPIC_NUMBER> list    # pending 事件 JSON
-./scripts/epic/poll-once.sh --epic <EPIC_NUMBER>      # 手动单次扫描
-tail -f /tmp/epic-<EPIC>-poll/poll.log                # 轮询日志
+./scripts/epic/epic.sh scope     --epic <EPIC_NUMBER>   # 查看扫描范围
+./scripts/epic/epic.sh events    --epic <EPIC_NUMBER> list   # pending 事件 JSON
+./scripts/epic/epic.sh poll-once --epic <EPIC_NUMBER>   # 手动单次扫描（--init 仅建基线）
+tail -f /tmp/epic-<EPIC>-poll/poll.log                  # 轮询日志
 ```
 
 可选默认：`scripts/epic/epic.env`（仅 `REPO`、`INTERVAL`，**不含 Epic 号**）。
@@ -111,6 +118,8 @@ Discussion 阶段表常写「A1–A2 ∥ B1–B2」，表示**同一阶段可同
 | 新增人工评论（无 `from=agent`） | AddressFeedback |
 | Agent 评论 `action=required` | AddressFeedback |
 | Agent 评论 `action=none/fyi` | 跳过（仅信息） |
+| **PR 合并**（`pr_state` → MERGED） | 勾选 Epic checklist、清理 worktree、解锁被 `Blocked by` 此 PR 的后续 Issue |
+| **PR 关闭**（`pr_state` → CLOSED） | 确认是否需重开 / 调整 Epic 计划 |
 | 仅 CI 红、无新 comment | 修 CI（本 PR 范围） |
 | ReadyToMerge、无新 comment | 不动，@人工 Merge |
 | 需架构决策 | `needs-human` |
