@@ -2462,7 +2462,8 @@ void CollectionConfigUnittest::NativeInputWithGoPlugin() const {
             {
                 "inputs": [
                     {
-                        "Type": ")" + inputType + R"("
+                        "Type": ")"
+            + inputType + R"("
                     }
                 ],
                 "processors": [
@@ -2486,7 +2487,8 @@ void CollectionConfigUnittest::NativeInputWithGoPlugin() const {
             {
                 "inputs": [
                     {
-                        "Type": ")" + inputType + R"("
+                        "Type": ")"
+            + inputType + R"("
                     }
                 ],
                 "flushers": [
