@@ -14,6 +14,9 @@
 # 全局参数：--epic <n>（多数子命令必填）、--repo owner/repo、--interval 秒、--state-dir 路径
 # reply 专用：--pr <n> --comment-id <id> (--body 文本 | --body-file 路径)
 #
+# 限流优化：Epic 范围（子 Issue / PR）按 SCOPE_TTL（默认 600s）缓存到 state 目录，
+#   轮询周期内复用；搜索 API（30/min）仅在缓存过期时调用。`scope` 子命令强制刷新。
+#
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -35,6 +38,9 @@ load_env() {
   fi
   : "${REPO:?REPO 必须经 --repo / epic.env / gh repo view 提供}"
   : "${INTERVAL:=60}"
+  # scope（子 Issue / PR 列表）缓存有效期（秒）：TTL 内复用缓存，避免每个轮询周期都重算范围
+  # 而打爆 GitHub 搜索 API（30/min）与触发二级限流。
+  : "${SCOPE_TTL:=600}"
   if [[ -n "${EPIC:-}" ]]; then
     : "${STATE_DIR:=/tmp/epic-${EPIC}-poll}"
     EVENTS_FILE="${STATE_DIR}/events.jsonl"
@@ -42,6 +48,8 @@ load_env() {
     HANDLED_FILE="${STATE_DIR}/handled-ids.txt"
     LOG_FILE="${STATE_DIR}/poll.log"
     PID_FILE="${STATE_DIR}/poll-loop.pid"
+    SCOPE_SUBS_FILE="${STATE_DIR}/scope-subs.txt"
+    SCOPE_PRS_FILE="${STATE_DIR}/scope-prs.txt"
     mkdir -p "${STATE_DIR}"
     touch "${EVENTS_FILE}" "${STATE_FILE}" "${HANDLED_FILE}" "${LOG_FILE}"
   fi
@@ -71,13 +79,55 @@ discover_sub_issues() {
     | grep -E '^- \[[ xX]\] #[0-9]+' | grep -oE '#[0-9]+' | tr -d '#' | sort -un
 }
 
+# scope 缓存是否仍新鲜（TTL 内）。范围（子 Issue / PR）变动很慢，无需每周期重算。
+scope_fresh() {
+  [[ -f "${SCOPE_PRS_FILE}" ]] || return 1
+  local mtime now age
+  mtime="$(stat -c %Y "${SCOPE_PRS_FILE}" 2>/dev/null || echo 0)"
+  now="$(date +%s)"
+  age=$(( now - mtime ))
+  [[ "${age}" -lt "${SCOPE_TTL}" ]]
+}
+
+# 重算 Epic 范围并写入缓存：子 Issue 来自 Epic body；PR 仅靠「Closes #<sub>」搜索确定。
+# 搜索 API（30/min）只在此处调用，且受 TTL 节流，不再每个轮询周期触发。
+refresh_scope() {
+  discover_sub_issues > "${SCOPE_SUBS_FILE}.tmp" 2>/dev/null || true
+  mv -f "${SCOPE_SUBS_FILE}.tmp" "${SCOPE_SUBS_FILE}"
+  : > "${SCOPE_PRS_FILE}.tmp"
+  local n
+  while IFS= read -r n; do
+    [[ -n "${n}" ]] || continue
+    gh pr list --repo "${REPO}" --state all --limit 100 \
+      --search "Closes #${n}" --json number --jq '.[].number' 2>/dev/null \
+      >> "${SCOPE_PRS_FILE}.tmp" || true
+  done < "${SCOPE_SUBS_FILE}"
+  sort -un "${SCOPE_PRS_FILE}.tmp" -o "${SCOPE_PRS_FILE}.tmp"
+  # 限流保护：搜索若因限流整体失败会得到空结果；此时**不要**用空覆盖已有非空缓存，
+  # 否则轮询会误判「无 PR」而漏掉所有 PR 评论。仅在确有结果、或旧缓存本就为空时才替换。
+  if [[ -s "${SCOPE_PRS_FILE}.tmp" ]] || [[ ! -s "${SCOPE_PRS_FILE}" ]]; then
+    mv -f "${SCOPE_PRS_FILE}.tmp" "${SCOPE_PRS_FILE}"
+  else
+    rm -f "${SCOPE_PRS_FILE}.tmp"
+    # 续上旧缓存的 mtime 已过期，touch 一下避免反复重试加剧限流
+    touch "${SCOPE_PRS_FILE}"
+    log "scope refresh got 0 prs (likely rate-limited); kept existing $(wc -l < "${SCOPE_PRS_FILE}" | tr -d ' ') prs"
+    return 0
+  fi
+  log "scope refreshed: $(wc -l < "${SCOPE_SUBS_FILE}" | tr -d ' ') subs, $(wc -l < "${SCOPE_PRS_FILE}" | tr -d ' ') prs"
+}
+
+ensure_scope() { scope_fresh || refresh_scope; }
+
 # stdout: JSON 行 {kind,target,id,author,created_at,url,body}
 # kind: issue | pr | review | pr_state
+# 只拉评论（issue 评论 + PR 评论/状态 + review 行评），范围用缓存，避免逐个 #数字 探测。
 scan_all_comments() {
-  python3 - "${REPO}" "${EPIC}" <<'PY'
-import json, re, subprocess, sys
+  ensure_scope
+  python3 - "${REPO}" "${EPIC}" "${SCOPE_SUBS_FILE}" "${SCOPE_PRS_FILE}" <<'PY'
+import json, subprocess, sys
 
-repo, epic = sys.argv[1], sys.argv[2]
+repo, epic, subs_file, prs_file = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
 
 def gh_json(cmd):
     r = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
@@ -85,12 +135,16 @@ def gh_json(cmd):
         return None
     return json.loads(r.stdout)
 
-body = subprocess.check_output(
-    ["gh", "issue", "view", epic, "--repo", repo, "--json", "body", "--jq", ".body"],
-    universal_newlines=True,
-)
-issues = sorted(set(re.findall(r"^- \[[ xX]\] #(\d+)", body, re.M)))
-targets = [int(epic)] + [int(x) for x in issues]
+def read_lines(path):
+    try:
+        with open(path) as fh:
+            return [x.strip() for x in fh if x.strip()]
+    except FileNotFoundError:
+        return []
+
+subs = read_lines(subs_file)
+prs = read_lines(prs_file)
+targets = [epic] + subs
 
 def emit(d):
     print(json.dumps(d, ensure_ascii=False))
@@ -100,64 +154,35 @@ for n in targets:
     if not data:
         continue
     for c in data.get("comments", []):
-        emit({"kind": "issue", "target": n, "id": c["id"], "author": c["author"]["login"],
+        emit({"kind": "issue", "target": int(n), "id": c["id"], "author": c["author"]["login"],
               "created_at": c["createdAt"], "url": c["url"], "body": c["body"]})
 
-prs = set()
-for n in issues:
-    out = subprocess.run(
-        ["gh", "pr", "list", "--repo", repo, "--state", "all", "--limit", "100",
-         "--search", "Closes #{}".format(n), "--json", "number"],
-        stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
-    if out.returncode == 0 and out.stdout.strip():
-        for row in json.loads(out.stdout):
-            prs.add(row["number"])
-    icom = subprocess.run(
-        ["gh", "issue", "view", str(n), "--repo", repo, "--json", "comments"],
-        stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
-    if icom.returncode == 0 and icom.stdout.strip():
-        for c in json.loads(icom.stdout).get("comments", []):
-            for m in re.finditer(r"#(\d+)", c.get("body", "")):
-                chk = subprocess.run(
-                    ["gh", "pr", "view", m.group(1), "--repo", repo, "--json", "number"],
-                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
-                if chk.returncode == 0 and chk.stdout.strip():
-                    prs.add(json.loads(chk.stdout)["number"])
-
-for pr in sorted(prs):
+for pr in prs:
     data = gh_json(["gh", "pr", "view", str(pr), "--repo", repo,
                     "--json", "comments,state,mergedAt,updatedAt"])
     if data:
         state = data.get("state", "")
         if state:
-            emit({"kind": "pr_state", "target": pr, "id": "prstate-{}-{}".format(pr, state),
+            emit({"kind": "pr_state", "target": int(pr), "id": "prstate-{}-{}".format(pr, state),
                   "author": "", "created_at": data.get("mergedAt") or data.get("updatedAt") or "",
                   "url": "https://github.com/{}/pull/{}".format(repo, pr),
                   "body": "PR #{} state={}".format(pr, state)})
         for c in data.get("comments", []):
-            emit({"kind": "pr", "target": pr, "id": c["id"], "author": c["author"]["login"],
+            emit({"kind": "pr", "target": int(pr), "id": c["id"], "author": c["author"]["login"],
                   "created_at": c["createdAt"], "url": c["url"], "body": c["body"]})
     rc = subprocess.run(
         ["gh", "api", "repos/{}/pulls/{}/comments".format(repo, pr)],
         stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
     if rc.returncode == 0 and rc.stdout.strip():
         for c in json.loads(rc.stdout):
-            emit({"kind": "review", "target": pr, "id": str(c["id"]), "author": c["user"]["login"],
+            emit({"kind": "review", "target": int(pr), "id": str(c["id"]), "author": c["user"]["login"],
                   "created_at": c["created_at"], "url": c["html_url"], "body": c["body"]})
 PY
 }
 
 discover_prs() {
-  scan_all_comments | python3 -c '
-import json, sys
-seen=set()
-for line in sys.stdin:
-    line=line.strip()
-    if not line: continue
-    r=json.loads(line)
-    if r["kind"] in ("pr","review","pr_state"):
-        seen.add(r["target"])
-for n in sorted(seen): print(n)'
+  ensure_scope
+  cat "${SCOPE_PRS_FILE}" 2>/dev/null || true
 }
 
 # ------------------------------------------------------------------ subcommands
@@ -207,6 +232,14 @@ print(json.dumps(d, ensure_ascii=False))')"
 
 cmd_poll() {
   require_epic
+  # 单实例守卫：已有活跃 poll-loop 时拒绝再起一个，避免多个轮询并发全量扫描打爆 GitHub 限流。
+  if [[ -f "${PID_FILE}" ]]; then
+    local existing; existing="$(cat "${PID_FILE}" 2>/dev/null || true)"
+    if [[ -n "${existing}" ]] && kill -0 "${existing}" 2>/dev/null; then
+      die "已有 poll-loop 在运行（pid ${existing}, epic #${EPIC}）；先 ./scripts/epic/epic.sh stop --epic ${EPIC} 再启动"
+    fi
+    rm -f "${PID_FILE}"  # 陈旧 pid 文件（进程已死），清理后继续
+  fi
   cleanup() { rm -f "${PID_FILE}"; log "poll-loop stopped pid=$$"; echo "[$(date -u +%H:%M:%S)] poll-loop stopped (epic #${EPIC})"; exit 0; }
   trap cleanup INT TERM
 
@@ -297,9 +330,10 @@ cmd_events() {
 
 cmd_scope() {
   require_epic
+  refresh_scope   # scope 子命令强制刷新缓存（其余路径走 TTL 缓存）
   echo "Epic #${EPIC} (${REPO})"
-  echo "Sub-issues:"; discover_sub_issues | sed 's/^/  #/'
-  echo "PRs:"; discover_prs | sed 's/^/  #/' || echo "  (none)"
+  echo "Sub-issues:"; sed 's/^/  #/' "${SCOPE_SUBS_FILE}"
+  echo "PRs:"; if [[ -s "${SCOPE_PRS_FILE}" ]]; then sed 's/^/  #/' "${SCOPE_PRS_FILE}"; else echo "  (none)"; fi
 }
 
 cmd_stop() {

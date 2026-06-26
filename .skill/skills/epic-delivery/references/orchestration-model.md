@@ -48,6 +48,8 @@ flowchart LR
 - 在 IDE 终端可见，每 `INTERVAL` 秒打印心跳；`Ctrl-C` 或关闭会话即停。
 - 首次启动会对当前评论 + PR 状态做 **baseline**（`seen-ids.txt`），之后只报**新增**事件。
 - 状态目录：`/tmp/epic-<EPIC>-poll/`（与 Epic 号一一对应，可并存多个 Epic）。
+- **同一 Epic 只能有一个 poll-loop**（脚本有单实例守卫，PID 文件存活时拒绝再起）。切换会话前务必 `stop`/`Ctrl-C` 旧轮询——**多个轮询并发全量扫描会成倍放大 GitHub API 调用，触发限流**（这是历史上 rate limit 的主因）。
+- **限流优化**：Epic 范围（子 Issue / PR）按 `SCOPE_TTL`（默认 600s）缓存到状态目录，轮询周期内复用；搜索 API（30/min）仅在缓存过期时调用，`scope` 子命令强制刷新。怀疑范围漏了新 PR 时手动跑一次 `scope`。
 
 ### 2. 每轮工作：Triage + 派发
 
