@@ -4,6 +4,15 @@
 
 `metric_debug_file` 插件是一个用于调试的插件，它可以逐行读取指定文件的内容，并将其与指定的名称绑定在一起成为一个字段，用于模拟文件输入。[源代码](https://github.com/alibaba/loongcollector/blob/main/plugins/input/debugfile/input_debug_file.go)
 
+
+## 事件能力
+
+列含义见 [概览 · 事件能力列说明](../../overview.md#事件能力列说明)。
+
+| Log | Metric | Span |
+| --- | --- | --- |
+| ✓ | — | — |
+
 ## 版本
 
 [Stable](../../stability-level.md)

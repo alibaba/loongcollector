@@ -4,6 +4,15 @@
 
 `processor_parse_json_native`插件解析事件中`Json`格式字段内容并提取新字段。
 
+
+## 事件能力
+
+列含义见 [概览 · 事件能力列说明](../overview.md#事件能力列说明)。
+
+| Log | Metric | Span |
+| --- | --- | --- |
+| ✓ | — | — |
+
 ## 版本
 
 [Stable](../../stability-level.md)

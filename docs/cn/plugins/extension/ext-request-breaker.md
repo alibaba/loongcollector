@@ -4,6 +4,15 @@
 
 `ext_request_breaker` 扩展插件，实现了 [extensions.RequestInterceptor](https://github.com/alibaba/loongcollector/blob/main/pkg/pipeline/extensions/request_interceptor.go) 接口，课题在 http_flusher 插件中引用，提供请求熔断的能力。
 
+
+## 事件能力
+
+列含义见 [概览 · 事件能力列说明](../overview.md#事件能力列说明)。
+
+| v1 接口 | v2 接口 | Log | Metric | Span |
+| --- | --- | --- | --- | --- |
+| — | — | 透传未知 | 透传未知 | 透传未知 |
+
 ## 版本
 
 [Alpha](../stability-level.md)

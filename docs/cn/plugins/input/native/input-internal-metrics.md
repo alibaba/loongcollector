@@ -4,6 +4,14 @@
 
 `input_internal_metrics` 插件收集 LoongCollector 自身运行时的指标数据，并以[多值MetricEvent](../../../developer-guide/data-model-cpp.md)的格式暴露出去。
 
+## 事件能力
+
+列含义见 [概览 · 事件能力列说明](../../overview.md#事件能力列说明)。
+
+| Log | Metric | Span |
+| --- | --- | --- |
+| — | ✓ | — |
+
 ## 版本
 
 [Stable](../../stability-level.md)
