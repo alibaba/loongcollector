@@ -394,6 +394,7 @@ void ProcessorMergeMultilineLogNative::MergeLogsByJson(PipelineEventGroup& logGr
     size_t begin = 0;
     int braceDepth = 0;
     bool inQuote = false;
+    bool pendingEscape = false;
     size_t accumulatedSize = 0;
     size_t maxSize = mMaxJsonBlockSize > 0 ? mMaxJsonBlockSize : LogFileReader::BUFFER_SIZE;
     StringView logPath = logGroup.GetMetadata(EventGroupMetaKey::LOG_FILE_PATH_RESOLVED);
@@ -417,11 +418,19 @@ void ProcessorMergeMultilineLogNative::MergeLogsByJson(PipelineEventGroup& logGr
         StringView content = sourceEvent->GetContent(mSourceKey);
 
         for (size_t i = 0; i < content.size(); ++i) {
+            if (pendingEscape) {
+                pendingEscape = false;
+                continue;
+            }
             char c = content[i];
             switch (c) {
                 case '\\':
                     if (inQuote) {
-                        ++i;
+                        if (i + 1 < content.size()) {
+                            ++i;
+                        } else {
+                            pendingEscape = true;
+                        }
                     }
                     break;
                 case '"':
@@ -449,11 +458,18 @@ void ProcessorMergeMultilineLogNative::MergeLogsByJson(PipelineEventGroup& logGr
         accumulatedSize += content.size();
 
         if (braceDepth <= 0) {
+            if (braceDepth < 0) {
+                LOG_DEBUG(mContext->GetLogger(),
+                          ("JSON brace depth went negative, possible malformed input",
+                           "")("braceDepth", braceDepth)("filepath", logPath.to_string())("processor", sName)(
+                              "config", mContext->GetConfigName()));
+            }
             MergeEvents(events, true);
             sourceEvents[newSize++] = std::move(sourceEvents[begin]);
             events.clear();
             braceDepth = 0;
             inQuote = false;
+            pendingEscape = false;
             accumulatedSize = 0;
         } else if (accumulatedSize > maxSize) {
             MergeEvents(events, true);
@@ -461,20 +477,24 @@ void ProcessorMergeMultilineLogNative::MergeLogsByJson(PipelineEventGroup& logGr
             events.clear();
             braceDepth = 0;
             inQuote = false;
+            pendingEscape = false;
             accumulatedSize = 0;
 
-            StringView oversizedContent = sourceEvents[newSize - 1].Cast<LogEvent>().GetContent(mSourceKey);
-            LOG_WARNING(
-                mContext->GetLogger(),
-                ("JSON block too long, forced to split", "")("first 1KB", oversizedContent.substr(0, 1024).to_string())(
-                    "filepath", logPath.to_string())("processor", sName)("config", mContext->GetConfigName()));
-            mContext->GetAlarm().SendAlarmWarning(SPLIT_LOG_FAIL_ALARM,
-                                                  "JSON block too long and forced to split. processor: " + sName
-                                                      + " config: " + mContext->GetConfigName(),
-                                                  mContext->GetRegion(),
-                                                  mContext->GetProjectName(),
-                                                  mContext->GetConfigName(),
-                                                  mContext->GetLogstoreName());
+            if (AlarmManager::GetInstance()->IsLowLevelAlarmValid()) {
+                StringView oversizedContent = sourceEvents[newSize - 1].Cast<LogEvent>().GetContent(mSourceKey);
+                LOG_WARNING(
+                    mContext->GetLogger(),
+                    ("JSON block too long, forced to split",
+                     "")("first 1KB", oversizedContent.substr(0, 1024).to_string())(
+                        "filepath", logPath.to_string())("processor", sName)("config", mContext->GetConfigName()));
+                mContext->GetAlarm().SendAlarmWarning(SPLIT_LOG_FAIL_ALARM,
+                                                      "JSON block too long and forced to split. processor: " + sName
+                                                          + " config: " + mContext->GetConfigName(),
+                                                      mContext->GetRegion(),
+                                                      mContext->GetProjectName(),
+                                                      mContext->GetConfigName(),
+                                                      mContext->GetLogstoreName());
+            }
         }
     }
 

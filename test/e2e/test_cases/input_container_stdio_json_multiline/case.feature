@@ -31,6 +31,6 @@ Feature: input container stdio json multiline
     """
     Then the log fields match kv
     """
-    content: ".*name.*test_multiline.*"
+    content: ".*name.*test_multiline.*nested.*key.*"
     _source_: "^stdout$"
     """

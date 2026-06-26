@@ -349,7 +349,7 @@ bool InputContainerStdio::CreateInnerProcessors() {
         }
         mInnerProcessors.emplace_back(std::move(processor));
     }
-    if (mMultiline.IsMultiline()) {
+    if (mMultiline.IsMultiline() && mMultiline.mMode != MultilineOptions::Mode::WHOLE_FILE) {
         Json::Value detail;
         if (mContext->IsFirstProcessorJson() || mMultiline.mMode == MultilineOptions::Mode::JSON) {
             processor = PluginRegistry::GetInstance()->CreateProcessor(

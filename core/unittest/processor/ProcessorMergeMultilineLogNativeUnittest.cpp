@@ -4335,6 +4335,7 @@ public:
     void TestMergeJsonBraceInString();
     void TestMergeJsonBraceInStringCrossEvent();
     void TestMergeJsonEscapedQuote();
+    void TestMergeJsonEscapedQuoteCrossEvent();
     void TestMergeJsonOversized();
     void TestMergeJsonIncompleteAtEnd();
     CollectionPipelineContext mContext;
@@ -4347,6 +4348,7 @@ UNIT_TEST_CASE(ProcessorMergeMultilineLogJsonUnittest, TestMergeJsonMultipleBloc
 UNIT_TEST_CASE(ProcessorMergeMultilineLogJsonUnittest, TestMergeJsonBraceInString);
 UNIT_TEST_CASE(ProcessorMergeMultilineLogJsonUnittest, TestMergeJsonBraceInStringCrossEvent);
 UNIT_TEST_CASE(ProcessorMergeMultilineLogJsonUnittest, TestMergeJsonEscapedQuote);
+UNIT_TEST_CASE(ProcessorMergeMultilineLogJsonUnittest, TestMergeJsonEscapedQuoteCrossEvent);
 UNIT_TEST_CASE(ProcessorMergeMultilineLogJsonUnittest, TestMergeJsonOversized);
 UNIT_TEST_CASE(ProcessorMergeMultilineLogJsonUnittest, TestMergeJsonIncompleteAtEnd);
 
@@ -4712,6 +4714,84 @@ void ProcessorMergeMultilineLogJsonUnittest::TestMergeJsonEscapedQuote() {
         "events": [
             {
                 "contents": {"content": "{\"key\": \"he said \\\"hello\\\"\"}"},
+                "timestamp": 12345678901,
+                "timestampNanosecond": 0,
+                "type": 1
+            }
+        ]
+    })";
+    std::string outJson = eventGroup.ToJsonString();
+    APSARA_TEST_STREQ(CompactJson(expectJson.str()).c_str(), CompactJson(outJson).c_str());
+}
+
+void ProcessorMergeMultilineLogJsonUnittest::TestMergeJsonEscapedQuoteCrossEvent() {
+    Json::Value config;
+    config["MergeType"] = "json";
+    ProcessorMergeMultilineLogNative processor;
+    processor.SetContext(mContext);
+    processor.CreateMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
+    APSARA_TEST_TRUE_FATAL(processor.Init(config));
+    processor.CommitMetricsRecordRef();
+
+    auto sourceBuffer = std::make_shared<SourceBuffer>();
+    PipelineEventGroup eventGroup(sourceBuffer);
+    // Scenario: an escape sequence \" is split across two events at a line boundary.
+    //
+    // Real-world example: application prints multi-line JSON to stdout, and Docker
+    // json-file driver records each line as a separate log entry. The JSON contains
+    // an escaped quote \" whose backslash lands at the end of one line and the quote
+    // lands at the start of the next line.
+    //
+    // Input events (3 lines of application output):
+    //   E1: {"msg": "\          ← ends with \, first byte of escape sequence \"
+    //   E2: "}                  ← starts with ", second byte of \" ; then } still in string
+    //   E3: {"b": 2}           ← next JSON object in the log stream
+    //
+    // Bug without pendingEscape (produces 2 events — wrong):
+    //   E1: { → depth=1, "msg" in/out quotes, "\ → inQuote=true.
+    //        \ is last byte, ++i skips nothing.
+    //   E2: " → treated as normal quote, flips inQuote to false (WRONG!).
+    //        } → depth-- = 0 → premature merge of E1+E2.
+    //   E3: processed as separate block → second event.
+    //   Result: 2 events — the stream is incorrectly split.
+    //
+    // Fix with pendingEscape (produces 1 event — correct):
+    //   E1: \ at end → pendingEscape=true. inQuote=true.
+    //   E2: " skipped (pendingEscape consumed). } ignored (inQuote=true).
+    //   E3: all chars processed inside unclosed string, depth stays 1.
+    //   End of batch: all 3 events merged into 1.
+    std::string inJson = R"({
+        "events": [
+            {
+                "contents": {"content": "{\"msg\": \"\\"},
+                "timestamp": 12345678901,
+                "timestampNanosecond": 0,
+                "type": 1
+            },
+            {
+                "contents": {"content": "\"}"},
+                "timestamp": 12345678901,
+                "timestampNanosecond": 0,
+                "type": 1
+            },
+            {
+                "contents": {"content": "{\"b\": 2}"},
+                "timestamp": 12345678901,
+                "timestampNanosecond": 0,
+                "type": 1
+            }
+        ]
+    })";
+    eventGroup.FromJsonString(inJson);
+
+    processor.Process(eventGroup);
+
+    APSARA_TEST_EQUAL(1UL, eventGroup.GetEvents().size());
+    std::stringstream expectJson;
+    expectJson << R"({
+        "events": [
+            {
+                "contents": {"content": "{\"msg\": \"\\\n\"}\n{\"b\": 2}"},
                 "timestamp": 12345678901,
                 "timestampNanosecond": 0,
                 "type": 1
