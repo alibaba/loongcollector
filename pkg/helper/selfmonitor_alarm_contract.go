@@ -65,17 +65,51 @@ func AlarmContractOptionalFields() []string {
 	}
 }
 
-// TransferAlarmExportMessageToPBLogEvent converts an AlarmExportMessage to a
-// protocol.LogEvent following the self-monitor alarm PB contract.
+// TransferAlarmsToPipelineEventGroup converts a batch of AlarmExportMessage to a
+// PipelineEventGroup containing LogEvents, using the existing PipelineEventGroup PB
+// as the transport format. Each alarm becomes one LogEvent with key-value Contents.
+//
 // Field mapping aligns with C++ AlarmManager::FlushAllRegionAlarm:
-//   AlarmType    -> "alarm_type"    (C++ AlarmMessage.mMessageType)
-//   AlarmLevel   -> "alarm_level"   (C++ AlarmMessage.mLevel)
-//   AlarmMessage -> "alarm_message" (C++ AlarmMessage.mMessage)
-//   Count        -> "alarm_count"   (C++ AlarmMessage.mCount)
-//   ProjectName  -> "project_name"  (C++ AlarmMessage.mProjectName, optional)
-//   Category     -> "category"      (C++ AlarmMessage.mCategory, optional)
-//   Config       -> "config"        (C++ AlarmMessage.mConfig, optional)
-func TransferAlarmExportMessageToPBLogEvent(msg *selfmonitor.AlarmExportMessage, t time.Time) (*protocol.LogEvent, error) {
+//
+//	AlarmType    -> "alarm_type"    (C++ AlarmMessage.mMessageType)
+//	AlarmLevel   -> "alarm_level"   (C++ AlarmMessage.mLevel)
+//	AlarmMessage -> "alarm_message" (C++ AlarmMessage.mMessage)
+//	Count        -> "alarm_count"   (C++ AlarmMessage.mCount, as decimal string)
+//	ProjectName  -> "project_name"  (C++ AlarmMessage.mProjectName, optional)
+//	Category     -> "category"      (C++ AlarmMessage.mCategory, optional)
+//	Config       -> "config"        (C++ AlarmMessage.mConfig, optional)
+func TransferAlarmsToPipelineEventGroup(alarms []selfmonitor.AlarmExportMessage, t time.Time) (*protocol.PipelineEventGroup, error) {
+	logEvents := make([]*protocol.LogEvent, 0, len(alarms))
+	for i := range alarms {
+		logEvent, err := transferAlarmToLogEvent(&alarms[i], t)
+		if err != nil {
+			return nil, err
+		}
+		logEvents = append(logEvents, logEvent)
+	}
+	group := &protocol.PipelineEventGroup{
+		PipelineEvents: &protocol.PipelineEventGroup_Logs{
+			Logs: &protocol.PipelineEventGroup_LogEvents{Events: logEvents},
+		},
+	}
+	return group, nil
+}
+
+// TransferPipelineEventGroupToAlarms converts a PipelineEventGroup (containing LogEvents)
+// back to a slice of AlarmExportMessage. This is the inverse of TransferAlarmsToPipelineEventGroup.
+func TransferPipelineEventGroupToAlarms(group *protocol.PipelineEventGroup) []selfmonitor.AlarmExportMessage {
+	logsWrapper := group.GetLogs()
+	if logsWrapper == nil {
+		return nil
+	}
+	alarms := make([]selfmonitor.AlarmExportMessage, 0, len(logsWrapper.Events))
+	for _, logEvent := range logsWrapper.Events {
+		alarms = append(alarms, transferLogEventToAlarm(logEvent))
+	}
+	return alarms
+}
+
+func transferAlarmToLogEvent(msg *selfmonitor.AlarmExportMessage, t time.Time) (*protocol.LogEvent, error) {
 	fields := make(map[string]string, 10)
 	fields[AlarmFieldType] = msg.AlarmType
 	fields[AlarmFieldLevel] = msg.AlarmLevel
@@ -96,10 +130,8 @@ func TransferAlarmExportMessageToPBLogEvent(msg *selfmonitor.AlarmExportMessage,
 	return CreateLogEvent(t, false, fields)
 }
 
-// TransferPBLogEventToAlarmExportMessage converts a protocol.LogEvent back to
-// an AlarmExportMessage, the inverse of TransferAlarmExportMessageToPBLogEvent.
-func TransferPBLogEventToAlarmExportMessage(logEvent *protocol.LogEvent) *selfmonitor.AlarmExportMessage {
-	msg := &selfmonitor.AlarmExportMessage{}
+func transferLogEventToAlarm(logEvent *protocol.LogEvent) selfmonitor.AlarmExportMessage {
+	msg := selfmonitor.AlarmExportMessage{}
 	for _, content := range logEvent.Contents {
 		key := string(content.Key)
 		val := string(content.Value)

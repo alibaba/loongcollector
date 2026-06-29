@@ -33,7 +33,6 @@ import (
 // AlarmManager::FlushAllRegionAlarm log event content keys exactly.
 // C++ reference: core/monitor/AlarmManager.cpp lines 126-140.
 func TestAlarmContractFieldNames(t *testing.T) {
-	// These are the exact string keys used by C++ logEvent->SetContent(...)
 	cppFields := map[string]bool{
 		"alarm_type":    true,
 		"alarm_level":   true,
@@ -66,57 +65,29 @@ func TestAlarmContractFieldNames(t *testing.T) {
 	}
 }
 
-// TestAlarmExportMessageFieldAlignment verifies that AlarmExportMessage struct
-// fields map 1:1 to InnerGoAlarm C struct fields (core/go_pipeline/LogtailPlugin.h)
-// and to AlarmManager::SendExternalAlarm parameters.
-//
-// InnerGoAlarm:
-//   alarmType    -> AlarmExportMessage.AlarmType
-//   alarmLevel   -> AlarmExportMessage.AlarmLevel
-//   alarmMessage -> AlarmExportMessage.AlarmMessage
-//   projectName  -> AlarmExportMessage.ProjectName
-//   category     -> AlarmExportMessage.Category
-//   config       -> AlarmExportMessage.Config
-//   count        -> AlarmExportMessage.Count
-func TestAlarmExportMessageFieldAlignment(t *testing.T) {
-	msg := selfmonitor.AlarmExportMessage{
-		AlarmType:    "TEST_ALARM",
-		AlarmLevel:   "2",
-		AlarmMessage: "test message",
-		ProjectName:  "test-project",
-		Category:     "test-logstore",
-		Config:       "test-config",
-		Count:        5,
-	}
-
-	assert.Equal(t, "TEST_ALARM", msg.AlarmType)
-	assert.Equal(t, "2", msg.AlarmLevel)
-	assert.Equal(t, "test message", msg.AlarmMessage)
-	assert.Equal(t, "test-project", msg.ProjectName)
-	assert.Equal(t, "test-logstore", msg.Category)
-	assert.Equal(t, "test-config", msg.Config)
-	assert.Equal(t, 5, msg.Count)
-}
-
-// TestTransferAlarmExportMessageToPBLogEvent_AllFields verifies round-trip
-// with all fields populated.
-func TestTransferAlarmExportMessageToPBLogEvent_AllFields(t *testing.T) {
-	msg := &selfmonitor.AlarmExportMessage{
-		AlarmType:    "PLUGIN_ALARM",
-		AlarmLevel:   "3",
-		AlarmMessage: "plugin crashed",
-		ProjectName:  "my-project",
-		Category:     "my-logstore",
-		Config:       "my-config",
-		Count:        10,
+// TestTransferAlarmsToPipelineEventGroup_AllFields verifies conversion with all
+// fields populated produces a PipelineEventGroup containing correct LogEvents.
+func TestTransferAlarmsToPipelineEventGroup_AllFields(t *testing.T) {
+	alarms := []selfmonitor.AlarmExportMessage{
+		{
+			AlarmType:    "PLUGIN_ALARM",
+			AlarmLevel:   "3",
+			AlarmMessage: "plugin crashed",
+			ProjectName:  "my-project",
+			Category:     "my-logstore",
+			Config:       "my-config",
+			Count:        10,
+		},
 	}
 	ts := time.Unix(1700000000, 0)
 
-	logEvent, err := TransferAlarmExportMessageToPBLogEvent(msg, ts)
+	group, err := TransferAlarmsToPipelineEventGroup(alarms, ts)
 	require.NoError(t, err)
-	require.NotNil(t, logEvent)
+	require.NotNil(t, group)
+	require.NotNil(t, group.GetLogs())
+	require.Len(t, group.GetLogs().Events, 1)
 
-	contentMap := logEventToMap(logEvent)
+	contentMap := logEventToMap(group.GetLogs().Events[0])
 	assert.Equal(t, "PLUGIN_ALARM", contentMap[AlarmFieldType])
 	assert.Equal(t, "3", contentMap[AlarmFieldLevel])
 	assert.Equal(t, "plugin crashed", contentMap[AlarmFieldMessage])
@@ -129,22 +100,24 @@ func TestTransferAlarmExportMessageToPBLogEvent_AllFields(t *testing.T) {
 	assert.Equal(t, "my-config", contentMap[AlarmFieldConfig])
 }
 
-// TestTransferAlarmExportMessageToPBLogEvent_OptionalFieldsOmitted verifies
-// that empty optional fields are not included in the log event, matching
-// C++ behavior where empty strings skip SetContent.
-func TestTransferAlarmExportMessageToPBLogEvent_OptionalFieldsOmitted(t *testing.T) {
-	msg := &selfmonitor.AlarmExportMessage{
-		AlarmType:    "BOOT_INIT_ALARM",
-		AlarmLevel:   "1",
-		AlarmMessage: "init warning",
-		Count:        1,
+// TestTransferAlarmsToPipelineEventGroup_OptionalFieldsOmitted verifies that
+// empty optional fields are not included in the log event, matching C++ behavior.
+func TestTransferAlarmsToPipelineEventGroup_OptionalFieldsOmitted(t *testing.T) {
+	alarms := []selfmonitor.AlarmExportMessage{
+		{
+			AlarmType:    "BOOT_INIT_ALARM",
+			AlarmLevel:   "1",
+			AlarmMessage: "init warning",
+			Count:        1,
+		},
 	}
 	ts := time.Unix(1700000000, 0)
 
-	logEvent, err := TransferAlarmExportMessageToPBLogEvent(msg, ts)
+	group, err := TransferAlarmsToPipelineEventGroup(alarms, ts)
 	require.NoError(t, err)
+	require.Len(t, group.GetLogs().Events, 1)
 
-	contentMap := logEventToMap(logEvent)
+	contentMap := logEventToMap(group.GetLogs().Events[0])
 	assert.Equal(t, "BOOT_INIT_ALARM", contentMap[AlarmFieldType])
 	assert.Equal(t, "1", contentMap[AlarmFieldLevel])
 	assert.Equal(t, "init warning", contentMap[AlarmFieldMessage])
@@ -158,45 +131,80 @@ func TestTransferAlarmExportMessageToPBLogEvent_OptionalFieldsOmitted(t *testing
 	assert.False(t, hasConfig, "empty config should be omitted")
 }
 
-// TestTransferPBLogEventToAlarmExportMessage_RoundTrip verifies lossless
-// conversion from AlarmExportMessage -> PB LogEvent -> AlarmExportMessage.
-func TestTransferPBLogEventToAlarmExportMessage_RoundTrip(t *testing.T) {
-	original := &selfmonitor.AlarmExportMessage{
-		AlarmType:    "FLUSHER_FLUSH_ALARM",
-		AlarmLevel:   "2",
-		AlarmMessage: "http 500",
-		ProjectName:  "proj-x",
-		Category:     "logstore-y",
-		Config:       "config-z",
-		Count:        7,
+// TestTransferPipelineEventGroupToAlarms_RoundTrip verifies lossless round-trip
+// conversion: []AlarmExportMessage -> PipelineEventGroup -> []AlarmExportMessage.
+func TestTransferPipelineEventGroupToAlarms_RoundTrip(t *testing.T) {
+	original := []selfmonitor.AlarmExportMessage{
+		{
+			AlarmType:    "FLUSHER_FLUSH_ALARM",
+			AlarmLevel:   "2",
+			AlarmMessage: "http 500",
+			ProjectName:  "proj-x",
+			Category:     "logstore-y",
+			Config:       "config-z",
+			Count:        7,
+		},
+		{
+			AlarmType:    "PLUGIN_ALARM",
+			AlarmLevel:   "1",
+			AlarmMessage: "timeout",
+			Count:        3,
+		},
 	}
 	ts := time.Unix(1700000000, 0)
 
-	logEvent, err := TransferAlarmExportMessageToPBLogEvent(original, ts)
+	group, err := TransferAlarmsToPipelineEventGroup(original, ts)
 	require.NoError(t, err)
 
-	restored := TransferPBLogEventToAlarmExportMessage(logEvent)
-	assert.Equal(t, original.AlarmType, restored.AlarmType)
-	assert.Equal(t, original.AlarmLevel, restored.AlarmLevel)
-	assert.Equal(t, original.AlarmMessage, restored.AlarmMessage)
-	assert.Equal(t, original.ProjectName, restored.ProjectName)
-	assert.Equal(t, original.Category, restored.Category)
-	assert.Equal(t, original.Config, restored.Config)
-	assert.Equal(t, original.Count, restored.Count)
+	restored := TransferPipelineEventGroupToAlarms(group)
+	require.Len(t, restored, 2)
+
+	assert.Equal(t, original[0].AlarmType, restored[0].AlarmType)
+	assert.Equal(t, original[0].AlarmLevel, restored[0].AlarmLevel)
+	assert.Equal(t, original[0].AlarmMessage, restored[0].AlarmMessage)
+	assert.Equal(t, original[0].ProjectName, restored[0].ProjectName)
+	assert.Equal(t, original[0].Category, restored[0].Category)
+	assert.Equal(t, original[0].Config, restored[0].Config)
+	assert.Equal(t, original[0].Count, restored[0].Count)
+
+	assert.Equal(t, original[1].AlarmType, restored[1].AlarmType)
+	assert.Equal(t, original[1].AlarmLevel, restored[1].AlarmLevel)
+	assert.Equal(t, original[1].AlarmMessage, restored[1].AlarmMessage)
+	assert.Equal(t, "", restored[1].ProjectName)
+	assert.Equal(t, "", restored[1].Category)
+	assert.Equal(t, "", restored[1].Config)
+	assert.Equal(t, original[1].Count, restored[1].Count)
+}
+
+// TestTransferAlarmsToPipelineEventGroup_MultipleAlarms verifies batch conversion
+// produces one LogEvent per alarm in the PipelineEventGroup.
+func TestTransferAlarmsToPipelineEventGroup_MultipleAlarms(t *testing.T) {
+	alarms := []selfmonitor.AlarmExportMessage{
+		{AlarmType: "TYPE_A", AlarmLevel: "1", AlarmMessage: "msg-a", Count: 1},
+		{AlarmType: "TYPE_B", AlarmLevel: "2", AlarmMessage: "msg-b", Count: 2},
+		{AlarmType: "TYPE_C", AlarmLevel: "3", AlarmMessage: "msg-c", Count: 3},
+	}
+	ts := time.Unix(1700000000, 0)
+
+	group, err := TransferAlarmsToPipelineEventGroup(alarms, ts)
+	require.NoError(t, err)
+	require.Len(t, group.GetLogs().Events, 3)
+
+	for i, logEvent := range group.GetLogs().Events {
+		contentMap := logEventToMap(logEvent)
+		assert.Equal(t, alarms[i].AlarmType, contentMap[AlarmFieldType])
+		assert.Equal(t, alarms[i].AlarmLevel, contentMap[AlarmFieldLevel])
+		assert.Equal(t, alarms[i].AlarmMessage, contentMap[AlarmFieldMessage])
+		assert.Equal(t, strconv.Itoa(alarms[i].Count), contentMap[AlarmFieldCount])
+	}
 }
 
 // TestAlarmLevelValues verifies Go AlarmLevel constants produce the same string
 // values as C++ AlarmLevel enum (1=warning, 2=error, 3=critical).
-// C++ reference: core/monitor/AlarmManager.h enum AlarmLevel.
 func TestAlarmLevelValues(t *testing.T) {
 	assert.Equal(t, "1", selfmonitor.AlarmLevelWaring.String())
 	assert.Equal(t, "2", selfmonitor.AlarmLevelError.String())
 	assert.Equal(t, "3", selfmonitor.AlarmLevelCritical.String())
-
-	// Verify C++ ToString(level) produces the same: "1", "2", "3"
-	assert.Equal(t, "1", strconv.Itoa(1)) // ALARM_LEVEL_WARNING = 1
-	assert.Equal(t, "2", strconv.Itoa(2)) // ALARM_LEVEL_ERROR = 2
-	assert.Equal(t, "3", strconv.Itoa(3)) // ALARM_LEVEL_CRITICAL = 3
 }
 
 // TestAlarmLevelIsValid verifies only valid levels pass validation.
@@ -212,29 +220,24 @@ func TestAlarmLevelIsValid(t *testing.T) {
 // TestAlarmCountSerialization verifies count is serialized as a decimal string,
 // matching C++ ToString(messagePtr->mCount).
 func TestAlarmCountSerialization(t *testing.T) {
-	msg := &selfmonitor.AlarmExportMessage{
-		AlarmType:    "TEST_ALARM",
-		AlarmLevel:   "1",
-		AlarmMessage: "test",
-		Count:        42,
+	alarms := []selfmonitor.AlarmExportMessage{
+		{AlarmType: "TEST_ALARM", AlarmLevel: "1", AlarmMessage: "test", Count: 42},
 	}
 	ts := time.Unix(1700000000, 0)
 
-	logEvent, err := TransferAlarmExportMessageToPBLogEvent(msg, ts)
+	group, err := TransferAlarmsToPipelineEventGroup(alarms, ts)
 	require.NoError(t, err)
 
-	contentMap := logEventToMap(logEvent)
+	contentMap := logEventToMap(group.GetLogs().Events[0])
 	assert.Equal(t, "42", contentMap[AlarmFieldCount])
 
-	restored := TransferPBLogEventToAlarmExportMessage(logEvent)
-	assert.Equal(t, 42, restored.Count)
+	restored := TransferPipelineEventGroupToAlarms(group)
+	assert.Equal(t, 42, restored[0].Count)
 }
 
 // TestCppAlarmTypeStringAlignment verifies that Go AlarmType string values
 // match C++ mMessageType vector entries.
-// C++ reference: AlarmManager constructor in core/monitor/AlarmManager.cpp.
 func TestCppAlarmTypeStringAlignment(t *testing.T) {
-	// A subset of C++ internal alarm types that are also used in Go
 	cppInternalTypes := []string{
 		"USER_CONFIG_ALARM",
 		"CATEGORY_CONFIG_ALARM",
@@ -253,12 +256,10 @@ func TestCppAlarmTypeStringAlignment(t *testing.T) {
 			}
 		}
 		if !found {
-			// Not all C++ internal types need a Go counterpart, but shared ones must match
 			t.Logf("C++ alarm type %q has no matching Go constant (may be C++-only)", cppType)
 		}
 	}
 
-	// Verify Go-only alarm types exported via SendExternalAlarm are valid strings
 	goOnlyTypes := []selfmonitor.AlarmType{
 		selfmonitor.PluginAlarm,
 		selfmonitor.FlusherFlushAlarm,
@@ -269,6 +270,13 @@ func TestCppAlarmTypeStringAlignment(t *testing.T) {
 	for _, at := range goOnlyTypes {
 		assert.NotEmpty(t, at.String(), "Go AlarmType must produce a non-empty string")
 	}
+}
+
+// TestTransferPipelineEventGroupToAlarms_NilLogs verifies nil logs returns nil.
+func TestTransferPipelineEventGroupToAlarms_NilLogs(t *testing.T) {
+	group := &protocol.PipelineEventGroup{}
+	result := TransferPipelineEventGroupToAlarms(group)
+	assert.Nil(t, result)
 }
 
 func knownGoAlarmTypes() []string {
