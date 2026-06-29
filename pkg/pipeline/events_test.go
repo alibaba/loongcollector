@@ -23,6 +23,36 @@ import (
 	"github.com/alibaba/ilogtail/pkg/models"
 )
 
+type mockCollector struct {
+	collected []*models.PipelineGroupEvents
+}
+
+func (c *mockCollector) Collect(groupInfo *models.GroupInfo, eventList ...models.PipelineEvent) {
+	c.collected = append(c.collected, &models.PipelineGroupEvents{
+		Group:  groupInfo,
+		Events: eventList,
+	})
+}
+
+func (c *mockCollector) CollectList(groupEventsList ...*models.PipelineGroupEvents) {
+	c.collected = append(c.collected, groupEventsList...)
+}
+
+func (c *mockCollector) ToArray() []*models.PipelineGroupEvents { return c.collected }
+func (c *mockCollector) Observe() chan *models.PipelineGroupEvents { return nil }
+func (c *mockCollector) Close()                                    {}
+
+type mockContext struct {
+	collector *mockCollector
+}
+
+func (ctx *mockContext) Collector() PipelineCollector { return ctx.collector }
+
+func newMockContext() (*mockContext, *mockCollector) {
+	c := &mockCollector{}
+	return &mockContext{collector: c}, c
+}
+
 func TestEventKindSet_Supports(t *testing.T) {
 	assert.True(t, LogOnlyEventKinds.Supports(models.EventTypeLogging))
 	assert.False(t, LogOnlyEventKinds.Supports(models.EventTypeMetric))
@@ -130,4 +160,65 @@ func TestApplyToSupportedEvents_OnlyTouchesLogs(t *testing.T) {
 
 	assert.Equal(t, "after", string(log.GetBody()))
 	assert.Equal(t, 1.0, metric.GetValue().GetSingleValue())
+}
+
+func TestCollectGroupEvents_NilInput(t *testing.T) {
+	ctx, collector := newMockContext()
+	CollectGroupEvents(ctx, nil)
+	assert.Empty(t, collector.collected)
+}
+
+func TestCollectGroupEvents_EmptyEvents(t *testing.T) {
+	ctx, collector := newMockContext()
+	in := &models.PipelineGroupEvents{
+		Group:  models.NewGroup(models.NewMetadata(), models.NewTags()),
+		Events: []models.PipelineEvent{},
+	}
+	CollectGroupEvents(ctx, in)
+	assert.Empty(t, collector.collected)
+}
+
+func TestCollectGroupEvents_MixedEvents(t *testing.T) {
+	ctx, collector := newMockContext()
+	log := models.NewLog("", []byte("log"), "info", "", "", models.NewTags(), 1)
+	metric := models.NewSingleValueMetric("m", models.MetricTypeGauge, models.NewTags(), 2, 1.0)
+	group := models.NewGroup(models.NewMetadata(), models.NewTags())
+	in := &models.PipelineGroupEvents{
+		Group:  group,
+		Events: []models.PipelineEvent{log, metric},
+	}
+	CollectGroupEvents(ctx, in)
+	require.Len(t, collector.collected, 1)
+	assert.Len(t, collector.collected[0].Events, 2)
+}
+
+func TestProcessLogEventsOnly_NilInput(t *testing.T) {
+	ctx, collector := newMockContext()
+	ProcessLogEventsOnly(nil, ctx, func(l *models.Log) {
+		t.Fatal("processLog should not be called for nil input")
+	})
+	assert.Empty(t, collector.collected)
+}
+
+func TestProcessLogEventsOnly_ProcessesOnlyLogs(t *testing.T) {
+	ctx, collector := newMockContext()
+	log := models.NewLog("", []byte("before"), "info", "", "", models.NewTags(), 1)
+	metric := models.NewSingleValueMetric("m", models.MetricTypeGauge, models.NewTags(), 2, 1.0)
+	span := models.NewSpan("op", "trace", "span", models.SpanKindServer, 3, 4, models.NewTags(), nil, nil)
+	group := models.NewGroup(models.NewMetadata(), models.NewTags())
+	in := &models.PipelineGroupEvents{
+		Group:  group,
+		Events: []models.PipelineEvent{metric, log, span},
+	}
+
+	var processedCount int
+	ProcessLogEventsOnly(in, ctx, func(l *models.Log) {
+		processedCount++
+		l.SetBody([]byte("after"))
+	})
+
+	assert.Equal(t, 1, processedCount)
+	assert.Equal(t, "after", string(log.GetBody()))
+	require.Len(t, collector.collected, 1)
+	assert.Len(t, collector.collected[0].Events, 3)
 }
