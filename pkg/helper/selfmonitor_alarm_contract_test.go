@@ -48,7 +48,9 @@ func TestAlarmContractFieldNames(t *testing.T) {
 
 	required := AlarmContractFields()
 	optional := AlarmContractOptionalFields()
-	all := append(required, optional...)
+	all := make([]string, 0, len(required)+len(optional))
+	all = append(all, required...)
+	all = append(all, optional...)
 
 	for _, field := range all {
 		assert.True(t, cppFields[field], "Go contract field %q not found in C++ AlarmManager", field)

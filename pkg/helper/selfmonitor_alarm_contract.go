@@ -29,16 +29,16 @@ import (
 // These MUST stay aligned with C++ AlarmManager::FlushAllRegionAlarm (core/monitor/AlarmManager.cpp)
 // and the InnerGoAlarm struct (core/go_pipeline/LogtailPlugin.h).
 const (
-	AlarmFieldType    = "alarm_type"
-	AlarmFieldLevel   = "alarm_level"
-	AlarmFieldMessage = "alarm_message"
-	AlarmFieldCount   = "alarm_count"
-	AlarmFieldIP      = "ip"
-	AlarmFieldOS      = "os"
-	AlarmFieldVersion = "ver"
-	AlarmFieldProject = "project_name"
+	AlarmFieldType     = "alarm_type"
+	AlarmFieldLevel    = "alarm_level"
+	AlarmFieldMessage  = "alarm_message"
+	AlarmFieldCount    = "alarm_count"
+	AlarmFieldIP       = "ip"
+	AlarmFieldOS       = "os"
+	AlarmFieldVersion  = "ver"
+	AlarmFieldProject  = "project_name"
 	AlarmFieldCategory = "category"
-	AlarmFieldConfig  = "config"
+	AlarmFieldConfig   = "config"
 )
 
 // AlarmContractFields returns the ordered list of required field keys in the
