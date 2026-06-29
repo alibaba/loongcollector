@@ -20,6 +20,7 @@
 
 ## 2) Public Capability Entrances（优先复用，避免重复造轮子）
 
+- LRU cache: `core/common/LRUCache.h` (`lru11::Cache`，参考 `core/metadata/K8sMetadata.h`)
 - String and parse utils:
   - `core/common/StringTools.h`
     - 常用能力：`StringViewSplitter`（零拷贝切分）、`Trim`（统一裁剪语义）、`StringTo`（返回值判错的数值转换）
@@ -32,6 +33,10 @@
 - Alarm and metrics:
   - `core/monitor/*`
   - `core/monitor/metric_constants/*`
+
+## 2b) GenAI 数据层级（AgentSight / `gen_ai.*`）
+
+`session.id` → `turn.id` → `step.id`：delta 基线通常挂在 session；`step` 在同一 turn 内递增，turn 切换时归零。
 
 ## 3) Lifecycle & Resource Invariants（评审时必须核对）
 
