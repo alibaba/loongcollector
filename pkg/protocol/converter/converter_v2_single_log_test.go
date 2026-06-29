@@ -39,8 +39,10 @@ func TestConvertToSingleProtocolStreamV2MixedEvents(t *testing.T) {
 	stream, _, err := c.ConvertToSingleProtocolStreamV2(groupEvents, nil)
 	require.NoError(t, err)
 	assert.Len(t, stream, 3)
-	assert.Contains(t, string(stream[1]), `"eventType":"metric"`)
-	assert.Contains(t, string(stream[2]), `"eventType":"span"`)
+	assert.Contains(t, string(stream[1]), passthroughLogKey)
+	assert.Contains(t, string(stream[1]), `\"eventType\":\"metric\"`)
+	assert.Contains(t, string(stream[2]), passthroughLogKey)
+	assert.Contains(t, string(stream[2]), `\"eventType\":\"span\"`)
 }
 
 func TestPipelineGroupEventsToLogGroupPreservesPassthrough(t *testing.T) {
