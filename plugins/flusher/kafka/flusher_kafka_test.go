@@ -16,6 +16,7 @@ package kafka
 
 import (
 	"encoding/json"
+	"sort"
 	"strconv"
 	"testing"
 
@@ -113,6 +114,9 @@ func TestFlusherKafka_FlushExportParity(t *testing.T) {
 		return func(_ string, _ string, _ string, logGroupList []*protocol.LogGroup) error {
 			for _, lg := range logGroupList {
 				for _, log := range lg.Logs {
+					sort.Slice(log.Contents, func(i, j int) bool {
+						return log.Contents[i].Key < log.Contents[j].Key
+					})
 					buf, err := json.Marshal(log)
 					require.NoError(t, err)
 					*dst = append(*dst, string(buf))
