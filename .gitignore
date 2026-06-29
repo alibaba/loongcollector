@@ -113,6 +113,3 @@ license_coverage.txt
 /core/.clangd
 /.claude/settings.local.json
 /code-review/
-
-# epic-delivery local config (personal FORK_OWNER etc.)
-scripts/epic/epic.env
