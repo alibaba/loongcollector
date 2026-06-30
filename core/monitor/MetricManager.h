@@ -16,10 +16,7 @@
 
 #pragma once
 
-#include <atomic>
 #include <mutex>
-#include <string>
-#include <unordered_map>
 #include <vector>
 
 #include "common/Lock.h"
@@ -42,8 +39,8 @@ private:
 public:
     ~WriteMetrics();
     static WriteMetrics* GetInstance() {
-        static WriteMetrics* ptr = new WriteMetrics();
-        return ptr;
+        static auto* sPtr = new WriteMetrics();
+        return sPtr;
     }
 
     // First, create a MetricsRecordRef using the CreateMetricsRecordRef method and Labels. Then add counter and gauge
@@ -75,8 +72,8 @@ private:
 public:
     ~ReadMetrics();
     static ReadMetrics* GetInstance() {
-        static ReadMetrics* ptr = new ReadMetrics();
-        return ptr;
+        static auto* sPtr = new ReadMetrics();
+        return sPtr;
     }
     void ReadAsSelfMonitorMetricEvents(std::vector<SelfMonitorMetricEvent>& metricEventList) const;
     void UpdateMetrics();

@@ -16,9 +16,12 @@
 
 #include "monitor/SelfMonitorServer.h"
 
-#include "MetricConstants.h"
-#include "Monitor.h"
+#include "constants/TagConstants.h"
 #include "go_pipeline/LogtailPlugin.h"
+#include "logger/Logger.h"
+#include "monitor/AlarmManager.h"
+#include "monitor/Monitor.h"
+#include "monitor/metric_constants/MetricConstants.h"
 #include "runner/ProcessorRunner.h"
 
 using namespace std;
@@ -113,7 +116,7 @@ void SelfMonitorServer::SendMetrics() {
     // new pipeline
     vector<SelfMonitorMetricEvent> metricEventList;
     ReadMetrics::GetInstance()->ReadAsSelfMonitorMetricEvents(metricEventList);
-    PushSelfMonitorMetricEvents(metricEventList);
+    PushSelfMonitorMetricEvents(std::move(metricEventList));
 
     PipelineEventGroup pipelineEventGroup(std::make_shared<SourceBuffer>());
     pipelineEventGroup.SetTagNoCopy(LOG_RESERVED_KEY_SOURCE, LoongCollectorMonitor::mIpAddr);
@@ -138,8 +141,8 @@ bool SelfMonitorServer::ProcessSelfMonitorMetricEvent(SelfMonitorMetricEvent& ev
     return true;
 }
 
-void SelfMonitorServer::PushSelfMonitorMetricEvents(std::vector<SelfMonitorMetricEvent>& events) {
-    for (auto event : events) {
+void SelfMonitorServer::PushSelfMonitorMetricEvents(std::vector<SelfMonitorMetricEvent>&& events) {
+    for (auto& event : events) {
         bool shouldSkip = false;
         if (event.mCategory == MetricCategory::METRIC_CATEGORY_AGENT) {
             LoongCollectorMonitor::GetInstance()->SetAgentMetric(event);
@@ -160,10 +163,9 @@ void SelfMonitorServer::PushSelfMonitorMetricEvents(std::vector<SelfMonitorMetri
             continue;
         }
 
-        if (mSelfMonitorMetricEventMap.find(event.mKey) != mSelfMonitorMetricEventMap.end()) {
-            mSelfMonitorMetricEventMap[event.mKey].Merge(event);
-        } else {
-            mSelfMonitorMetricEventMap.emplace(event.mKey, std::move(event));
+        auto [iter, inserted] = mSelfMonitorMetricEventMap.try_emplace(event.mKey, std::move(event));
+        if (!inserted) {
+            iter->second.Merge(event);
         }
     }
 }
@@ -207,17 +209,39 @@ void SelfMonitorServer::SendAlarms() {
     }
 #endif
     vector<PipelineEventGroup> pipelineEventGroupList;
-    AlarmManager::GetInstance()->FlushAllRegionAlarm(pipelineEventGroupList);
-
     ReadLock lock(mAlarmPipelineMux);
     if (mAlarmPipelineCtx == nullptr) {
         return;
     }
+    QueueKey key = mAlarmPipelineCtx->GetProcessQueueKey();
+    size_t inputIndex = mAlarmInputIndex;
+    lock.unlock();
+
+    // 如果 AlarmPipeline 刚就绪，先处理文件
+    if (!AlarmManager::GetInstance()->CheckAndSetAlarmPipelineReady()) {
+        map<string, string> regionToRawJson;
+        if (AlarmManager::GetInstance()->ReadAlarmsFromFile(pipelineEventGroupList, regionToRawJson)) {
+            for (auto& group : pipelineEventGroupList) {
+                if (group.GetEvents().size() > 0) {
+                    string region = group.GetMetadata(EventGroupMetaKey::INTERNAL_DATA_TARGET_REGION).to_string();
+                    if (!ProcessorRunner::GetInstance()->PushQueue(key, inputIndex, std::move(group))) {
+                        auto it = regionToRawJson.find(region);
+                        LOG_ERROR(sLogger,
+                                  ("send startup alarms from file", "failed")("region", region)(
+                                      "failed alarm json", it == regionToRawJson.end() ? "N/A" : it->second));
+                    }
+                }
+            }
+            AlarmManager::GetInstance()->DeleteAlarmFile();
+        }
+    }
+
+    // 正常流程：从内存 buffer 获取 alarm
+    AlarmManager::GetInstance()->FlushAllRegionAlarm(pipelineEventGroupList);
 
     for (auto& pipelineEventGroup : pipelineEventGroupList) {
         if (pipelineEventGroup.GetEvents().size() > 0) {
-            ProcessorRunner::GetInstance()->PushQueue(
-                mAlarmPipelineCtx->GetProcessQueueKey(), mAlarmInputIndex, std::move(pipelineEventGroup));
+            ProcessorRunner::GetInstance()->PushQueue(key, inputIndex, std::move(pipelineEventGroup));
         }
     }
 }
