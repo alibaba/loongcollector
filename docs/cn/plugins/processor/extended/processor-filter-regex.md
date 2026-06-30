@@ -4,6 +4,14 @@
 
 `processor_filter_regex` 插件可以实现对日志的过滤。**一条数据**只有完全匹配 Include 中的正则表达式，且不匹配 Exclude 中的正则表达式时才会被采集，否则直接丢弃。
 
+## 事件能力
+
+列含义见 [概览 · 事件能力列说明](../overview.md#事件能力列说明)。
+
+| v1 接口 | v2 接口 | Log | Metric | Span |
+| --- | --- | --- | --- | --- |
+| ✓ | — | v1 | 透传未知 | 透传未知 |
+
 ## 版本
 
 [Stable](../../stability-level.md)

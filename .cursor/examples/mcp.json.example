@@ -1,0 +1,33 @@
+{
+  "mcpServers": {
+    "shell": {
+      "command": "uvx",
+      "args": [
+        "mcp-shell-server"
+      ],
+      "env": {
+        "ALLOW_COMMANDS": "ls,cat,pwd,grep,wc,touch,find"
+      }
+    },
+    "context7": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@upstash/context7-mcp@latest"
+      ]
+    },
+    "mcp-feedback-enhanced": {
+      "command": "uvx",
+      "args": [
+        "mcp-feedback-enhanced@latest"
+      ],
+      "timeout": 600,
+      "autoApprove": [
+        "interactive_feedback"
+      ]
+    },
+    "deepwiki": {
+      "url": "https://mcp.deepwiki.com/sse"
+    }
+  }
+}

@@ -5,6 +5,14 @@
 `flusher_prometheus` `flusher`插件可以实现将采集到的数据，经过处理后，通过http格式发送到指定的 Prometheus RemoteWrite 地址。
 参数配置大部分继承`flusher_http`，详见[flusher_http](flusher-http.md)。
 
+## 事件能力
+
+列含义见 [概览 · 事件能力列说明](../overview.md#事件能力列说明)。
+
+| v1 接口 | v2 接口 | Log | Metric | Span |
+| --- | --- | --- | --- | --- |
+| — | ✓ | — | v2 | — |
+
 ## 版本
 
 [Alpha](../../stability-level.md)

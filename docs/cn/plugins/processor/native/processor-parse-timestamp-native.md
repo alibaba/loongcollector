@@ -4,6 +4,15 @@
 
 `processor_parse_timestamp_native`插件解析事件中记录时间的字段，并将结果置为事件的__time__字段。
 
+
+## 事件能力
+
+列含义见 [概览 · 事件能力列说明](../overview.md#事件能力列说明)。
+
+| Log | Metric | Span |
+| --- | --- | --- |
+| ✓ | — | — |
+
 ## 版本
 
 [Stable](../../stability-level.md)

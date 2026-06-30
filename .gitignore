@@ -111,9 +111,5 @@ license_coverage.txt
 
 ### IDE configs
 /core/.clangd
-/.cursor/
 /.claude/settings.local.json
-/.claude/
-/.gemini/
-.omc/
 /code-review/

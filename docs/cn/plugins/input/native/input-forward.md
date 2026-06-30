@@ -4,6 +4,14 @@
 
 `input_forward` 插件用于接收来自其他系统的数据转发请求，目前支持LoongSuite协议。该插件可以作为数据转发的接收端，通过配置的匹配规则来处理接收到的数据。[源代码](https://github.com/alibaba/loongcollector/blob/main/core/plugin/input/InputForward.h)
 
+## 事件能力
+
+列含义见 [概览 · 事件能力列说明](../../overview.md#事件能力列说明)。
+
+| Log | Metric | Span |
+| --- | --- | --- |
+| ✓ | ✓ | ✓ |
+
 ## 版本
 
 [Stable](../../stability-level.md)

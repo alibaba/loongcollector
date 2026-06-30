@@ -4,6 +4,14 @@
 
 `input_cpu_profiling`插件可以实现利用ebpf探针采集进程CPU性能剖析数据。
 
+## 事件能力
+
+列含义见 [概览 · 事件能力列说明](../../overview.md#事件能力列说明)。
+
+| Log | Metric | Span |
+| --- | --- | --- |
+| ✓ | — | — |
+
 ## 版本
 
 [Beta](../../stability-level.md)

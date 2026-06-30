@@ -4,6 +4,14 @@
 
 `input_network_security`插件可以实现利用ebpf探针采集网络安全相关动作。
 
+## 事件能力
+
+列含义见 [概览 · 事件能力列说明](../../overview.md#事件能力列说明)。
+
+| Log | Metric | Span |
+| --- | --- | --- |
+| ✓ | — | — |
+
 ## 版本
 
 [Dev](../../stability-level.md)

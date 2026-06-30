@@ -6,6 +6,15 @@
 
 注意：如需使用该插件，LoongCollector 进程需以 **root** 用户运行。配置的脚本内容请自行评估风险。
 
+
+## 事件能力
+
+列含义见 [概览 · 事件能力列说明](../../overview.md#事件能力列说明)。
+
+| Log | Metric | Span |
+| --- | --- | --- |
+| ✓ | — | — |
+
 ## 版本
 
 [Alpha](../../stability-level.md)
