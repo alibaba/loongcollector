@@ -38,7 +38,7 @@ func (c *mockCollector) CollectList(groupEventsList ...*models.PipelineGroupEven
 	c.collected = append(c.collected, groupEventsList...)
 }
 
-func (c *mockCollector) ToArray() []*models.PipelineGroupEvents { return c.collected }
+func (c *mockCollector) ToArray() []*models.PipelineGroupEvents    { return c.collected }
 func (c *mockCollector) Observe() chan *models.PipelineGroupEvents { return nil }
 func (c *mockCollector) Close()                                    {}
 
