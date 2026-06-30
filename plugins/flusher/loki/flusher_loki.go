@@ -26,6 +26,7 @@ import (
 	"github.com/prometheus/common/model"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	converter "github.com/alibaba/ilogtail/pkg/protocol/converter"
@@ -164,6 +165,24 @@ func (f *FlusherLoki) Flush(projectName string, logstoreName string, configName 
 			// Append a log to the next batch, the sending is async
 			err = f.lokiClient.Handle(labels, time.Unix(int64(logGroup.Logs[i].Time), 0), string(log))
 			if err != nil {
+				logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "flush loki convert log fail, error", err)
+			}
+		}
+	}
+	return nil
+}
+
+func (f *FlusherLoki) Export(groups []*models.PipelineGroupEvents, _ pipeline.PipelineContext) error {
+	for _, groupEvents := range groups {
+		serializedLogs, values, err := f.converter.ToByteStreamWithSelectedFieldsV2(groupEvents, f.DynamicLabels)
+		if err != nil {
+			logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "flush loki convert log fail, error", err)
+			continue
+		}
+		for i, log := range serializedLogs.([][]byte) {
+			labels := f.buildLokiLabels(values[i])
+			ts := time.Unix(0, int64(groupEvents.Events[i].GetTimestamp()))
+			if err := f.lokiClient.Handle(labels, ts, string(log)); err != nil {
 				logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "flush loki convert log fail, error", err)
 			}
 		}

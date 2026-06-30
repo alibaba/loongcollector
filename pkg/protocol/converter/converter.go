@@ -198,6 +198,12 @@ func (c *Converter) ToByteStreamWithSelectedFields(logGroup *protocol.LogGroup, 
 
 func (c *Converter) ToByteStreamWithSelectedFieldsV2(groupEvents *models.PipelineGroupEvents, targetFields []string) (stream interface{}, values []map[string]string, err error) {
 	switch c.Protocol {
+	case ProtocolCustomSingle:
+		return c.ConvertToSingleProtocolStreamV2(groupEvents, targetFields)
+	case ProtocolCustomSingleFlatten:
+		return c.ConvertToSingleProtocolStreamFlattenV2(groupEvents, targetFields)
+	case ProtocolJsonline:
+		return c.ConvertToJsonlineProtocolStreamV2(groupEvents)
 	case ProtocolRaw:
 		return c.ConvertToRawStream(groupEvents, targetFields)
 	case ProtocolInfluxdb:
@@ -205,6 +211,11 @@ func (c *Converter) ToByteStreamWithSelectedFieldsV2(groupEvents *models.Pipelin
 	default:
 		return nil, nil, fmt.Errorf("unsupported protocol: %s", c.Protocol)
 	}
+}
+
+func (c *Converter) ToByteStreamV2(groupEvents *models.PipelineGroupEvents) (stream interface{}, err error) {
+	stream, _, err = c.ToByteStreamWithSelectedFieldsV2(groupEvents, nil)
+	return
 }
 
 func GetPooledByteBuf() *[]byte {

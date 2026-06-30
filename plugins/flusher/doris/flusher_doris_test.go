@@ -16,13 +16,23 @@ package doris
 
 import (
 	"bytes"
+	"encoding/json"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"sort"
 	"strconv"
+	"strings"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/alibaba/ilogtail/pkg/config"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/protocol"
+	converter "github.com/alibaba/ilogtail/pkg/protocol/converter"
 	"github.com/alibaba/ilogtail/plugins/test"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
 )
@@ -225,7 +235,8 @@ func makeTestLogGroupList() *protocol.LogGroupList {
 
 	for i := 1; i <= 10; i++ {
 		lg := &protocol.LogGroup{
-			Logs: make([]*protocol.Log, 0, 10),
+			Logs:   make([]*protocol.Log, 0, 10),
+			Source: "",
 		}
 		for j := 1; j <= 10; j++ {
 			fields["group"] = strconv.Itoa(i)
@@ -237,6 +248,134 @@ func makeTestLogGroupList() *protocol.LogGroupList {
 		lgl.LogGroupList = append(lgl.LogGroupList, lg)
 	}
 	return lgl
+}
+
+func makeParityLogGroups() ([]*protocol.LogGroup, []*models.PipelineGroupEvents) {
+	v1Groups := makeTestLogGroupList().GetLogGroupList()[:1]
+	return v1Groups, makePipelineGroupEventsFromLogGroups(v1Groups)
+}
+
+func makePipelineGroupEventsFromLogGroups(v1Groups []*protocol.LogGroup) []*models.PipelineGroupEvents {
+	v2Groups := make([]*models.PipelineGroupEvents, 0, len(v1Groups))
+	for _, lg := range v1Groups {
+		groupTags := models.NewTags()
+		groupTags.Add("host.ip", lg.Source)
+		for _, tag := range lg.LogTags {
+			groupTags.Add(tag.Key, tag.Value)
+		}
+		group := models.NewGroup(models.NewMetadata(), groupTags)
+		events := make([]models.PipelineEvent, 0, len(lg.Logs))
+		for _, log := range lg.Logs {
+			ts := uint64(log.GetTime()) * 1e9
+			if log.TimeNs != nil {
+				ts += uint64(*log.TimeNs)
+			}
+			v2Log := models.NewLog("", nil, "", "", "", models.NewTags(), ts)
+			for _, c := range log.Contents {
+				v2Log.GetIndices().Add(c.Key, c.Value)
+			}
+			events = append(events, v2Log)
+		}
+		v2Groups = append(v2Groups, &models.PipelineGroupEvents{Group: group, Events: events})
+	}
+	return v2Groups
+}
+
+func newCustomSingleConverter(t *testing.T) *converter.Converter {
+	t.Helper()
+	cvt, err := converter.NewConverter(
+		converter.ProtocolCustomSingle,
+		converter.EncodingJSON,
+		nil,
+		nil,
+		&config.GlobalConfig{},
+	)
+	require.NoError(t, err)
+	return cvt
+}
+
+func normalizeJSONLines(lines [][]byte) []string {
+	out := make([]string, 0, len(lines))
+	for _, line := range lines {
+		var obj map[string]interface{}
+		if err := json.Unmarshal(line, &obj); err != nil {
+			out = append(out, string(line))
+			continue
+		}
+		normalized, err := json.Marshal(obj)
+		if err != nil {
+			out = append(out, string(line))
+			continue
+		}
+		out = append(out, string(normalized))
+	}
+	sort.Strings(out)
+	return out
+}
+
+type dorisLoadCapture struct {
+	mu      sync.Mutex
+	payload string
+}
+
+func (c *dorisLoadCapture) handler(w http.ResponseWriter, r *http.Request) {
+	body, _ := io.ReadAll(r.Body)
+	c.mu.Lock()
+	c.payload = string(body)
+	c.mu.Unlock()
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte(`{"Status":"Success","NumberTotalRows":1,"NumberLoadedRows":1,"NumberFilteredRows":0,"NumberUnselectedRows":0,"LoadBytes":1,"LoadTimeMs":1,"Label":"test"}`))
+}
+
+func (c *dorisLoadCapture) snapshot() string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.payload
+}
+
+func newDorisParityFlusher(t *testing.T, server *httptest.Server) *FlusherDoris {
+	t.Helper()
+	f := NewFlusherDoris()
+	f.context = mock.NewEmptyContext("p", "l", "c")
+	f.converter = newCustomSingleConverter(t)
+	f.Addresses = []string{server.URL}
+	f.Database = "test_db"
+	f.Table = "test_table"
+	f.Concurrency = 1
+	f.GroupCommit = "off"
+	f.Authentication.PlainText = &PlainTextConfig{Username: "root", Password: ""}
+	require.NoError(t, f.initDorisClient())
+	return f
+}
+
+func normalizeDorisPayload(payload string) []string {
+	lines := strings.Split(strings.TrimSpace(payload), "\n")
+	out := make([][]byte, 0, len(lines))
+	for _, line := range lines {
+		if line != "" {
+			out = append(out, []byte(line))
+		}
+	}
+	return normalizeJSONLines(out)
+}
+
+func TestFlusherDoris_FlushExportParity(t *testing.T) {
+	v1Groups, v2Groups := makeParityLogGroups()
+
+	flushCapture := &dorisLoadCapture{}
+	flushServer := httptest.NewServer(http.HandlerFunc(flushCapture.handler))
+	defer flushServer.Close()
+	flushFlusher := newDorisParityFlusher(t, flushServer)
+	require.NoError(t, flushFlusher.Flush("", "", "", v1Groups))
+
+	exportCapture := &dorisLoadCapture{}
+	exportServer := httptest.NewServer(http.HandlerFunc(exportCapture.handler))
+	defer exportServer.Close()
+	exportFlusher := newDorisParityFlusher(t, exportServer)
+	require.NoError(t, exportFlusher.Export(v2Groups, nil))
+
+	require.Equal(t, normalizeDorisPayload(flushCapture.snapshot()), normalizeDorisPayload(exportCapture.snapshot()))
 }
 
 // InvalidTestConnectAndWrite is an integration test (disabled by default)

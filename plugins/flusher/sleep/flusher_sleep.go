@@ -15,10 +15,12 @@
 package sleep
 
 import (
+	"time"
+
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
-
-	"time"
+	converter "github.com/alibaba/ilogtail/pkg/protocol/converter"
 )
 
 type FlusherSleep struct {
@@ -37,6 +39,22 @@ func (*FlusherSleep) Description() string {
 
 func (p *FlusherSleep) Flush(projectName string, logstoreName string, configName string, logGroupList []*protocol.LogGroup) error {
 	time.Sleep(time.Duration(p.SleepMS) * time.Millisecond)
+	return nil
+}
+
+func (p *FlusherSleep) Export(groups []*models.PipelineGroupEvents, _ pipeline.PipelineContext) error {
+	for _, groupEvents := range groups {
+		logGroup, err := converter.PipelineGroupEventsToLogGroup(groupEvents)
+		if err != nil {
+			return err
+		}
+		if logGroup == nil || len(logGroup.Logs) == 0 {
+			continue
+		}
+		if err := p.Flush("", "", "", []*protocol.LogGroup{logGroup}); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

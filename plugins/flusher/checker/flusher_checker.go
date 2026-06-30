@@ -21,8 +21,10 @@ import (
 	"sync"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
+	converter "github.com/alibaba/ilogtail/pkg/protocol/converter"
 )
 
 type FlusherChecker struct {
@@ -134,6 +136,22 @@ func (p *FlusherChecker) Flush(projectName string, logstoreName string, configNa
 			newLog := log
 			// ilogtail.CopySLSLog(log)
 			p.LogGroup.Logs = append(p.LogGroup.Logs, newLog)
+		}
+	}
+	return nil
+}
+
+func (p *FlusherChecker) Export(groups []*models.PipelineGroupEvents, _ pipeline.PipelineContext) error {
+	for _, groupEvents := range groups {
+		logGroup, err := converter.PipelineGroupEventsToLogGroup(groupEvents)
+		if err != nil {
+			return err
+		}
+		if logGroup == nil || len(logGroup.Logs) == 0 {
+			continue
+		}
+		if err := p.Flush("", "", "", []*protocol.LogGroup{logGroup}); err != nil {
+			return err
 		}
 	}
 	return nil

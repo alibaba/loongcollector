@@ -1,4 +1,4 @@
-// Copyright 2021 iLogtail Authors
+// Copyright 2026 iLogtail Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,17 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package clickhouse
+package pulsar
 
 import (
 	"context"
 	"encoding/json"
 	"sort"
 	"strconv"
-	"strings"
 	"testing"
 
-	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
+	"github.com/apache/pulsar-client-go/pulsar"
 	"github.com/stretchr/testify/require"
 
 	"github.com/alibaba/ilogtail/pkg/config"
@@ -33,34 +32,8 @@ import (
 	"github.com/alibaba/ilogtail/plugins/test/mock"
 )
 
-// Invalid Test
-func InvalidTestConnectAndWrite(t *testing.T) {
-	if testing.Short() {
-		t.Skip("Skipping integration test in short mode")
-	}
-
-	f := NewFlusherClickHouse()
-	f.Addresses = []string{"127.0.0.1:9000"}
-	f.Authentication.PlainText.Username = ""
-	f.Authentication.PlainText.Password = ""
-	f.Authentication.PlainText.Database = "default"
-	f.Cluster = ""
-	f.Table = "demo"
-	f.flusher = f.BufferFlush
-	// Verify that we can connect to the ClickHouse
-	lctx := mock.NewEmptyContext("p", "l", "c")
-	err := f.Init(lctx)
-	require.NoError(t, err)
-
-	// Verify that we can successfully write data to the ClickHouse buffer engine table
-	lgl := makeTestLogGroupList()
-	err = f.Flush("projectName", "logstoreName", "configName", lgl.GetLogGroupList())
-	require.NoError(t, err)
-	_ = f.Stop()
-}
-
 func makeTestLogGroupList() *protocol.LogGroupList {
-	f := map[string]string{}
+	fields := map[string]string{}
 	lgl := &protocol.LogGroupList{
 		LogGroupList: make([]*protocol.LogGroup, 0, 10),
 	}
@@ -70,9 +43,9 @@ func makeTestLogGroupList() *protocol.LogGroupList {
 			Source: "",
 		}
 		for j := 1; j <= 10; j++ {
-			f["group"] = strconv.Itoa(i)
-			f["message"] = "The message: " + strconv.Itoa(j)
-			l := test.CreateLogByFields(f)
+			fields["group"] = strconv.Itoa(i)
+			fields["message"] = "The message: " + strconv.Itoa(j)
+			l := test.CreateLogByFields(fields)
 			lg.Logs = append(lg.Logs, l)
 		}
 		lgl.LogGroupList = append(lgl.LogGroupList, lg)
@@ -143,75 +116,82 @@ func normalizeJSONLines(lines [][]byte) []string {
 	return out
 }
 
-type captureClickHouseConn struct {
-	logs [][]byte
+type capturePulsarProducer struct {
+	payloads [][]byte
 }
 
-func (c *captureClickHouseConn) Contributors() []string { return nil }
+func (p *capturePulsarProducer) Topic() string { return "parity-topic" }
 
-func (c *captureClickHouseConn) ServerVersion() (*driver.ServerVersion, error) { return nil, nil }
+func (p *capturePulsarProducer) Name() string { return "capture-producer" }
 
-func (c *captureClickHouseConn) Select(_ context.Context, _ interface{}, _ string, _ ...interface{}) error {
-	return nil
-}
-
-func (c *captureClickHouseConn) Query(_ context.Context, _ string, _ ...interface{}) (driver.Rows, error) {
+func (p *capturePulsarProducer) Send(_ context.Context, msg *pulsar.ProducerMessage) (pulsar.MessageID, error) {
+	p.payloads = append(p.payloads, append([]byte(nil), msg.Payload...))
 	return nil, nil
 }
 
-func (c *captureClickHouseConn) QueryRow(_ context.Context, _ string, _ ...interface{}) driver.Row {
-	return nil
+func (p *capturePulsarProducer) SendAsync(_ context.Context, msg *pulsar.ProducerMessage, callback func(pulsar.MessageID, *pulsar.ProducerMessage, error)) {
+	p.payloads = append(p.payloads, append([]byte(nil), msg.Payload...))
+	if callback != nil {
+		callback(nil, msg, nil)
+	}
 }
 
-func (c *captureClickHouseConn) PrepareBatch(_ context.Context, _ string) (driver.Batch, error) {
+func (p *capturePulsarProducer) LastSequenceID() int64 { return 0 }
+
+func (p *capturePulsarProducer) Flush() error { return nil }
+
+func (p *capturePulsarProducer) FlushWithContext(_ context.Context) error { return nil }
+
+func (p *capturePulsarProducer) Close() {}
+
+type capturePulsarClient struct {
+	producer pulsar.Producer
+}
+
+func (c *capturePulsarClient) Topic() string { return "" }
+
+func (c *capturePulsarClient) CreateProducer(_ pulsar.ProducerOptions) (pulsar.Producer, error) {
+	return c.producer, nil
+}
+
+func (c *capturePulsarClient) Subscribe(_ pulsar.ConsumerOptions) (pulsar.Consumer, error) {
 	return nil, nil
 }
 
-func (c *captureClickHouseConn) Exec(_ context.Context, _ string, _ ...interface{}) error { return nil }
-
-func (c *captureClickHouseConn) AsyncInsert(_ context.Context, query string, _ bool) error {
-	const marker = ", '"
-	idx := strings.Index(query, marker)
-	if idx < 0 {
-		return nil
-	}
-	start := idx + len(marker)
-	end := strings.LastIndex(query, "')")
-	if end <= start {
-		return nil
-	}
-	c.logs = append(c.logs, []byte(query[start:end]))
-	return nil
+func (c *capturePulsarClient) CreateReader(_ pulsar.ReaderOptions) (pulsar.Reader, error) {
+	return nil, nil
 }
 
-func (c *captureClickHouseConn) Ping(_ context.Context) error { return nil }
+func (c *capturePulsarClient) TopicPartitions(_ string) ([]string, error) { return nil, nil }
 
-func (c *captureClickHouseConn) Stats() driver.Stats { return driver.Stats{} }
+func (c *capturePulsarClient) CreateTableView(_ pulsar.TableViewOptions) (pulsar.TableView, error) {
+	return nil, nil
+}
 
-func (c *captureClickHouseConn) Close() error { return nil }
+func (c *capturePulsarClient) Close() {}
 
-func newClickHouseParityFlusher(t *testing.T, conn *captureClickHouseConn) *FlusherClickHouse {
+func newPulsarParityFlusher(t *testing.T, producer *capturePulsarProducer) *FlusherPulsar {
 	t.Helper()
-	f := NewFlusherClickHouse()
-	f.context = mock.NewEmptyContext("p", "l", "c")
+	f := &FlusherPulsar{
+		Topic:   "parity-topic",
+		context: mock.NewEmptyContext("p", "l", "c"),
+	}
 	f.converter = newCustomSingleConverter(t)
-	f.conn = conn
-	f.Table = "demo"
-	f.Authentication.PlainText.Database = "default"
-	f.flusher = f.BufferFlush
+	f.pulsarClient = &capturePulsarClient{producer: producer}
+	f.producers = NewProducers(f.context.GetRuntimeContext(), 1)
 	return f
 }
 
-func TestFlusherClickHouse_FlushExportParity(t *testing.T) {
+func TestFlusherPulsar_FlushExportParity(t *testing.T) {
 	v1Groups, v2Groups := makeParityLogGroups()
 
-	flushConn := &captureClickHouseConn{}
-	flushFlusher := newClickHouseParityFlusher(t, flushConn)
+	flushProducer := &capturePulsarProducer{}
+	flushFlusher := newPulsarParityFlusher(t, flushProducer)
 	require.NoError(t, flushFlusher.Flush("", "", "", v1Groups))
 
-	exportConn := &captureClickHouseConn{}
-	exportFlusher := newClickHouseParityFlusher(t, exportConn)
+	exportProducer := &capturePulsarProducer{}
+	exportFlusher := newPulsarParityFlusher(t, exportProducer)
 	require.NoError(t, exportFlusher.Export(v2Groups, nil))
 
-	require.Equal(t, normalizeJSONLines(flushConn.logs), normalizeJSONLines(exportConn.logs))
+	require.Equal(t, normalizeJSONLines(flushProducer.payloads), normalizeJSONLines(exportProducer.payloads))
 }
