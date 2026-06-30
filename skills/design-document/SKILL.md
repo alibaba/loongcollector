@@ -94,5 +94,5 @@ description: Design document writing conventions. Use when writing or reviewing 
 ## Notes
 
 - **Do not** include project management info (estimates, schedules, milestones, Gantt charts)
-- Code examples must follow team C++ coding standards (see `.skill/skills/project-knowledge/`)
+- Code examples must follow team C++ coding standards (see `skills/project-knowledge/`)
 - Test case naming: `<Module>_<Function>_<Number>` for CI coverage tracking

@@ -3,4 +3,4 @@ description: Code Review Rule. Use this rule when you need expert code review fo
 globs: 
 alwaysApply: false
 ---
-@.skill/rules/review-standards/code-review.md
+@.cursor/rules/review-standards/code-review.md

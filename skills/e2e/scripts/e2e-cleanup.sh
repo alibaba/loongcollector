@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Optional manual E2E cleanup (not invoked by ./scripts/e2e.sh).
-# Usage: bash .skill/skills/e2e/scripts/e2e-cleanup.sh [case_name]
+# Usage: bash skills/e2e/scripts/e2e-cleanup.sh [case_name]
 set -euo pipefail
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"

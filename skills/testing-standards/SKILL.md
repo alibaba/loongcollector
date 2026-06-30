@@ -15,7 +15,7 @@ description: Testing standards for LoongCollector: unit tests, e2e tests, benchm
 - Test naming: accurately describe behavior being tested
 - Each `core/unittest/*/` directory produces one executable
 - Build and run tests from inside `build/` to ensure relative paths and temp files work correctly
-- See `.skill/skills/compile/SKILL.md` for build & run instructions
+- See `skills/compile/SKILL.md` for build & run instructions
 
 ### 2. Unit Tests (Go)
 - Use standard `testing` package
@@ -25,7 +25,7 @@ description: Testing standards for LoongCollector: unit tests, e2e tests, benchm
 ### 3. E2E Tests
 - BDD Godog framework
 - Configuration-driven via `.feature` files
-- See `.skill/skills/e2e/SKILL.md` for complete guide (design → write → run → debug)
+- See `skills/e2e/SKILL.md` for complete guide (design → write → run → debug)
 
 ### 4. Benchmarks
 - Required for performance-sensitive code paths

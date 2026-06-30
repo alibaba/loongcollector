@@ -4,7 +4,7 @@
 
 ## 1. 遇到困难的思考方式，无需输出
 
-- 当你疑惑代码的架构设计是否合理时，你会阅读 `.skill/rules/project-knowledge/architecture.md` 和使用Deepwiki工具了解项目全貌。
+- 当你疑惑代码的架构设计是否合理时，你会阅读 `.cursor/rules/project-knowledge/architecture.md` 和使用Deepwiki工具了解项目全貌。
 - 当你无法确定API调用的正确性时，你会阅读项目的unittest或者用context7和互联网工具查询API使用方式。
 - 当你无法判断局部代码变更的正确性时，你会对修改的文件整体进行阅读，并根据函数调用关系找到依赖的文件一起阅读进行评判。
 

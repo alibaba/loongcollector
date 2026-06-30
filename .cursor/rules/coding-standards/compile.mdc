@@ -5,7 +5,7 @@ alwaysApply: false
 ---
 ## 编译（LoongCollector）
 
-**与 CI 对齐**：`make core PATH_IN_DOCKER=$(pwd)` + `./scripts/run_core_ut.sh`。本机 CMake 见 `.skill/skills/compile/SKILL.md`。
+**与 CI 对齐**：`make core PATH_IN_DOCKER=$(pwd)` + `./scripts/run_core_ut.sh`。本机 CMake 见 `skills/compile/SKILL.md`。
 
 ```bash
 make core PATH_IN_DOCKER=$(pwd)

@@ -177,8 +177,8 @@ go test -v -timeout 90m -run '^TestE2EOnDockerCompose$' github.com/alibaba/ilogt
 - 异常退出或端口占用：可执行 skill 附带脚本（**不会**删除宿主机上无关容器）：
 
 ```bash
-bash .skill/skills/e2e/scripts/e2e-cleanup.sh
-bash .skill/skills/e2e/scripts/e2e-cleanup.sh input_static_file
+bash skills/e2e/scripts/e2e-cleanup.sh
+bash skills/e2e/scripts/e2e-cleanup.sh input_static_file
 ```
 
 勿将 `test/e2e/test_cases/**/a.log`、`reader_log_rotate/volume/simple.log` 等**跑测产物**提交进仓库。
@@ -216,7 +216,7 @@ docker exec <id> ls /usr/local/loongcollector/conf/continuous_pipeline_config/lo
 
 ### 6.1 ExcutionTimeout
 
-**不要**在 `input_file`、`input_forward` 等持续插件配置里写 `global.ExcutionTimeout`，否则被当作 onetime 配置，易出现 `unsupported input plugin`。详见 `.skill/rules/project-knowledge/config-pitfalls.mdc`。
+**不要**在 `input_file`、`input_forward` 等持续插件配置里写 `global.ExcutionTimeout`，否则被当作 onetime 配置，易出现 `unsupported input plugin`。详见 `.cursor/rules/project-knowledge/config-pitfalls.mdc`。
 
 ### 6.2 default_flusher.json
 

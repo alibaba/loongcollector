@@ -108,32 +108,32 @@ metadata:
 
 模板与脚本目录（必须使用）：
 
-- JSON 模板：`/.skill/skills/code-review/references/`
-- 流程脚本：`/.skill/skills/code-review/scripts/`
+- JSON 模板：`/skills/code-review/references/`
+- 流程脚本：`/skills/code-review/scripts/`
 
 执行步骤（必须按顺序）：
 
 1. 初始化评审目录与基础文件：
-   - PR：`python3 .skill/skills/code-review/scripts/init_review_workspace.py --repo-root <repo> --target-type pr --target-id <pr> --base-ref <baseRef> --head-ref <headRef> --base-sha <baseSha> --head-sha <headSha>`
-   - 分支：`python3 .skill/skills/code-review/scripts/init_review_workspace.py --repo-root <repo> --target-type branch --target-id <branchName> --base-ref <baseRef> --head-ref <headRef> --base-sha <baseSha> --head-sha <headSha>`
+   - PR：`python3 skills/code-review/scripts/init_review_workspace.py --repo-root <repo> --target-type pr --target-id <pr> --base-ref <baseRef> --head-ref <headRef> --base-sha <baseSha> --head-sha <headSha>`
+   - 分支：`python3 skills/code-review/scripts/init_review_workspace.py --repo-root <repo> --target-type branch --target-id <branchName> --base-ref <baseRef> --head-ref <headRef> --base-sha <baseSha> --head-sha <headSha>`
 2. 生成/更新 `review-plan.md`（可基于 `references/review-plan.template.md` 骨架，但必须补齐本轮大项/子项），并将当前阶段标记为 `Phase 1 in_progress`。
 3. 拉取 review comments 到 `comments/review-comments.json`：
-   - PR 评审：必须运行 `python3 .skill/skills/code-review/scripts/fetch_review_comments.py --repo-root <repo> --target-type pr --target-id <pr>`，仅 `PR review comments`
+   - PR 评审：必须运行 `python3 skills/code-review/scripts/fetch_review_comments.py --repo-root <repo> --target-type pr --target-id <pr>`，仅 `PR review comments`
    - 分支评审：可为空，或导入分支评审评论快照
    - `review-comments.json` 必须是标准对象结构（根对象含 `comments` 数组，元素含 `comment_id/path/line/side/body`）；若不满足，视为上游脚本错误，必须先修正上游脚本。
    - 评论项必须包含 `thread_resolved` 布尔字段；流程状态仅由该字段决定（`true -> resolved`，`false -> open`）。
    - `snapshot/` 必须保留源码相对路径层级，禁止平铺文件名。示例：`snapshot/round-2/files/core/ebpf/protocol/redis/RedisParser.cpp`。若出现平铺结果，视为快照脚本错误或中途中断，必须重跑修正。
 4. 生成/更新评论状态文件：
-   - PR：`python3 .skill/skills/code-review/scripts/update_comment_status.py --repo-root <repo> --target-type pr --target-id <pr>`
-   - 分支：`python3 .skill/skills/code-review/scripts/update_comment_status.py --repo-root <repo> --target-type branch --target-id <branchName>`
+   - PR：`python3 skills/code-review/scripts/update_comment_status.py --repo-root <repo> --target-type pr --target-id <pr>`
+   - 分支：`python3 skills/code-review/scripts/update_comment_status.py --repo-root <repo> --target-type branch --target-id <branchName>`
    - 说明：这一步只同步结构与流程状态（`status_flow`）并保留历史 `status_tech`，不会自动做代码复核判定。
 5. 生成双维状态 Markdown 报告（表格）：
-   - PR：`python3 .skill/skills/code-review/scripts/generate_comment_status_report.py --repo-root <repo> --target-type pr --target-id <pr>`
-   - 分支：`python3 .skill/skills/code-review/scripts/generate_comment_status_report.py --repo-root <repo> --target-type branch --target-id <branchName>`
+   - PR：`python3 skills/code-review/scripts/generate_comment_status_report.py --repo-root <repo> --target-type pr --target-id <pr>`
+   - 分支：`python3 skills/code-review/scripts/generate_comment_status_report.py --repo-root <repo> --target-type branch --target-id <branchName>`
    - 输出文件固定为：`comments/comment-status.md`（列：评论时间、文件、行号、作者、评论、流程状态、技术状态）
 6. 计算增量映射与回退建议（`--base` 与 `--head` 必须传 commit SHA）：
-   - PR：`python3 .skill/skills/code-review/scripts/incremental_review_mapper.py --repo-root <repo> --target-type pr --target-id <pr> --base <baseSha> --head <headSha> --review-round <n>`
-   - 分支：`python3 .skill/skills/code-review/scripts/incremental_review_mapper.py --repo-root <repo> --target-type branch --target-id <branchName> --base <baseSha> --head <headSha> --review-round <n>`
+   - PR：`python3 skills/code-review/scripts/incremental_review_mapper.py --repo-root <repo> --target-type pr --target-id <pr> --base <baseSha> --head <headSha> --review-round <n>`
+   - 分支：`python3 skills/code-review/scripts/incremental_review_mapper.py --repo-root <repo> --target-type branch --target-id <branchName> --base <baseSha> --head <headSha> --review-round <n>`
    - 当 `snapshot/latest.json` 存在时，映射脚本会计算 `snapshot_match_rate`，用于 rebase 冲突调整或 squash 合并后的增量决策辅助。
 7. 根据脚本输出中的 `recommendation` 执行：
    - `incremental`：只评审 `need_review_commits`
@@ -166,8 +166,8 @@ metadata:
      - 更新后的 `comments/comment-status.json`
      - 重新生成 `comments/comment-status.md`
 9. 本轮评审收尾后，必须生成 snapshot 供下一轮增量决策使用：
-   - PR：`python3 .skill/skills/code-review/scripts/build_snapshot.py --repo-root <repo> --target-type pr --target-id <pr> --base <baseSha> --head <headSha> --review-round <n>`
-   - 分支：`python3 .skill/skills/code-review/scripts/build_snapshot.py --repo-root <repo> --target-type branch --target-id <branchName> --base <baseSha> --head <headSha> --review-round <n>`
+   - PR：`python3 skills/code-review/scripts/build_snapshot.py --repo-root <repo> --target-type pr --target-id <pr> --base <baseSha> --head <headSha> --review-round <n>`
+   - 分支：`python3 skills/code-review/scripts/build_snapshot.py --repo-root <repo> --target-type branch --target-id <branchName> --base <baseSha> --head <headSha> --review-round <n>`
    - 产物：`snapshot/round-<n>/files/*`、`snapshot/round-<n>/manifest.json`、`snapshot/latest.json`
 
 状态文件字段约束（必须遵守）：
@@ -217,16 +217,16 @@ snapshot 在增量决策中的职责（必须遵守）：
 
 开始评审前，必须先完成以下步骤：
 
-1. 读取 `.skill/skills/project-knowledge/SKILL.md`，建立系统架构、术语与代码库地图认知。
-2. 补充阅读 `.skill/rules/project-knowledge/architecture.md` 与 `codebase-map.md`，优先吸收：
+1. 读取 `skills/project-knowledge/SKILL.md`，建立系统架构、术语与代码库地图认知。
+2. 补充阅读 `.cursor/rules/project-knowledge/architecture.md` 与 `codebase-map.md`，优先吸收：
    - 公共能力入口（必须复用的 common/helper）
    - 生命周期与资源释放不变量
    - 配置/环境变量约定（兼容大小写、默认值、废弃参数映射）
    - 历史 review 高频问题（作为优先检查清单）
 3. 读取并参考以下规范（按变更涉及范围选择）：
-   - `/.skill/skills/selfmonitor/SKILL.md`（自监控与告警相关改动必读）
-   - `/.skill/skills/security-check/SKILL.md`（安全与合规相关改动必读）
-   - `/.skill/skills/compile/SKILL.md`（涉及构建/编译链路时必读）
+   - `/skills/selfmonitor/SKILL.md`（自监控与告警相关改动必读）
+   - `/skills/security-check/SKILL.md`（安全与合规相关改动必读）
+   - `/skills/compile/SKILL.md`（涉及构建/编译链路时必读）
 4. 基于 PR/分支变更列表，读取受影响文件的完整上下文（至少覆盖变更函数、调用方、定义处）。
 5. 若改动涉及 pipeline/runner/配置系统，必须先阅读以下代码再下结论：
    - `core/application/Application.cpp`（主循环、配置扫描、退出顺序）
@@ -292,7 +292,7 @@ snapshot 在增量决策中的职责（必须遵守）：
 
 - 图必须与当前变更强相关，禁止画与本次 PR 无关的“百科全图”。
 - 图中节点命名使用代码中的真实组件/类型名称，避免抽象空词。
-- Mermaid 语法请遵循 `/.skill/skills/mermaid/SKILL.md`。
+- Mermaid 语法请遵循 `/skills/mermaid/SKILL.md`。
 
 ## 牢记评估标准（无需输出）
 
