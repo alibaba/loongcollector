@@ -112,6 +112,7 @@ public:
     int64_t GetLastContainerUpdateTime() const { return mLastContainerUpdateTime; }
     void SetLastContainerUpdateTime(int64_t time) { mLastContainerUpdateTime = time; }
 
+    bool IsNas() const { return mIsNas; }
 
     std::vector<std::string> mFilePaths;
     int32_t mMaxDirSearchDepth = 0;
@@ -121,6 +122,7 @@ public:
     std::vector<std::string> mExcludeDirs;
     bool mAllowingCollectingFilesInRootDir = false;
     bool mAllowingIncludedByMultiConfigs = false;
+    bool mIsNas = false;
 
 private:
     void ParseWildcardPath(BasePathInfo& pathInfo);
