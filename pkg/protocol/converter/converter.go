@@ -117,6 +117,7 @@ var supportedEncodingMap = map[string]map[string]bool{
 	},
 	ProtocolRaw: {
 		EncodingCustom: true,
+		EncodingJSON:   true,
 	},
 }
 
