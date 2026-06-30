@@ -4,6 +4,14 @@
 
 `processor_cloud_meta`插件可以添加为日志增加云平台元数据信息。
 
+## 事件能力
+
+列含义见 [概览 · 事件能力列说明](../overview.md#事件能力列说明)。
+
+| v1 接口 | v2 接口 | Log | Metric | Span |
+| --- | --- | --- | --- | --- |
+| ✓ | — | v1 | 透传未知 | 透传未知 |
+
 ## 版本
 
 [Alpha](../../stability-level.md)

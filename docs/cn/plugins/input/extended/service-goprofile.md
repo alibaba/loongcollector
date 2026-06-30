@@ -4,6 +4,15 @@
 
 `service_go_profile` `input`插件可以采集Golang pprof 性能数据。
 
+
+## 事件能力
+
+列含义见 [概览 · 事件能力列说明](../../overview.md#事件能力列说明)。
+
+| Log | Metric | Span |
+| --- | --- | --- |
+| ✓ | — | — |
+
 ## 版本说明
 
 * 推荐版本：iLogtail v1.7.1 及以上

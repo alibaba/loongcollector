@@ -34,6 +34,7 @@
 #include "common/TimeKeeper.h"
 #include "common/TimeUtil.h"
 #include "common/UUIDUtil.h"
+#include "common/http/Curl.h"
 #include "common/version.h"
 #include "config/ConfigDiff.h"
 #include "config/InstanceConfigManager.h"
@@ -93,6 +94,9 @@ Application::Application() : mStartTime(time(nullptr)) {
 }
 
 void Application::Init() {
+    // Install OpenSSL thread-safety callbacks before any thread performs SSL
+    // operations. Required for OpenSSL < 1.1.0; a no-op for newer versions.
+    SetupOpenSSLThreadSupport();
     TimeKeeper::GetInstance();
     // change working dir to ./${ILOGTAIL_VERSION}/
     string processExecutionDir = GetProcessExecutionDir();

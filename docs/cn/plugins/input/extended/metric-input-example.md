@@ -4,6 +4,15 @@
 
 `metric_input_example` 可作为编写`MetricInput`类插件的参考示例样例，该插件会定时生成模拟的指标数据。[源代码](https://github.com/alibaba/loongcollector/blob/main/plugins/input/example/metric_example.go)
 
+
+## 事件能力
+
+列含义见 [概览 · 事件能力列说明](../../overview.md#事件能力列说明)。
+
+| Log | Metric | Span |
+| --- | --- | --- |
+| — | ✓ | — |
+
 ## 版本
 
 [Stable](../../stability-level.md)

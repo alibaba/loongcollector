@@ -6,6 +6,15 @@
 
 运行本插件需要本地已运行 snmp 程序，开放`snmpget`需要的端口，且可正常执行`snmptranslate`命令和`snmptable`命令。
 
+
+## 事件能力
+
+列含义见 [概览 · 事件能力列说明](../../overview.md#事件能力列说明)。
+
+| Log | Metric | Span |
+| --- | --- | --- |
+| ✓ | — | — |
+
 ## 版本
 
 [Stable](../../stability-level.md)

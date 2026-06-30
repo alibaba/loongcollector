@@ -4,6 +4,15 @@
 
 `service_syslog` 插件在指定 **地址与端口** 上监听；LoongCollector 根据采集配置拉起该插件后，即可接收经 rsyslog 转发的系统日志、Nginx 转发的访问/错误日志，以及 syslog 客户端上报的日志。[源代码](https://github.com/alibaba/loongcollector/blob/main/plugins/input/syslog/syslog.go)
 
+
+## 事件能力
+
+列含义见 [概览 · 事件能力列说明](../../overview.md#事件能力列说明)。
+
+| Log | Metric | Span |
+| --- | --- | --- |
+| ✓ | — | — |
+
 ## 版本
 
 [Beta](../../stability-level.md)

@@ -4,6 +4,15 @@
 
 [ext_default_decoder](https://github.com/alibaba/loongcollector/blob/main/plugins/extension/default_decoder/default_decoder.go) 扩展，实现了 [Decoder](https://github.com/alibaba/loongcollector/blob/main/pkg/pipeline/extensions/decoder.go) 接口，可以用在 `service_http_server`、`udp_server` 等插件中用于解析不同的协议数据。
 
+
+## 事件能力
+
+列含义见 [概览 · 事件能力列说明](../overview.md#事件能力列说明)。
+
+| v1 接口 | v2 接口 | Log | Metric | Span |
+| --- | --- | --- | --- | --- |
+| — | — | 透传未知 | 透传未知 | 透传未知 |
+
 ## 版本
 
 [Alpha](../stability-level.md)

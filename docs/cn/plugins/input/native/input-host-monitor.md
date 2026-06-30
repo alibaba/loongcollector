@@ -6,6 +6,14 @@
 
 源代码：[InputHostMonitor.cpp](https://github.com/alibaba/loongcollector/blob/main/core/plugin/input/InputHostMonitor.cpp)
 
+## 事件能力
+
+列含义见 [概览 · 事件能力列说明](../../overview.md#事件能力列说明)。
+
+| Log | Metric | Span |
+| --- | --- | --- |
+| — | ✓ | — |
+
 ## 版本
 
 [Beta](../../stability-level.md)

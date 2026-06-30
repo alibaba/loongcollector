@@ -4,6 +4,15 @@
 
 `flusher_file` `flusher`插件将采集到的数据写入本地文件中。flusher\_file插件使用[spdlog](https://github.com/gabime/spdlog)库实现，所以写入的文件具有部分日志文件的特征，例如存在大小限制、会自动轮转。
 
+
+## 事件能力
+
+列含义见 [概览 · 事件能力列说明](../overview.md#事件能力列说明)。
+
+| Log | Metric | Span |
+| --- | --- | --- |
+| ✓ | ✓ | ✓ |
+
 ## 版本
 
 [Alpha](../../stability-level.md)

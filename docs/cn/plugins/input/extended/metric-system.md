@@ -4,6 +4,15 @@
 
 `metric_system_v2` `input`插件用于采集主机的监控数据（例如CPU、内存、负载、磁盘、网络等）。
 
+
+## 事件能力
+
+列含义见 [概览 · 事件能力列说明](../../overview.md#事件能力列说明)。
+
+| Log | Metric | Span |
+| --- | --- | --- |
+| — | ✓ | — |
+
 ## 版本
 
 [Stable](../../stability-level.md)

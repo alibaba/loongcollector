@@ -4,6 +4,15 @@
 
 `service_kubernetes_meta` 定时采集 Kubernetes 元数据，包括 Pod、Deployment 等内置资源及其关系；可通过 **`CustomResources`** 扩展采集第三方 CR（如 Argo Workflow），并生成对应实体与链路日志。提供 HTTP 查询接口，支持通过 Pod IP、Host IP 等索引快速查询元数据。
 
+
+## 事件能力
+
+列含义见 [概览 · 事件能力列说明](../../overview.md#事件能力列说明)。
+
+| Log | Metric | Span |
+| --- | --- | --- |
+| ✓ | — | — |
+
 ## 版本
 
 [Beta](../../stability-level.md)

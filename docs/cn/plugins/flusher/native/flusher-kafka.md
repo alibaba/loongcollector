@@ -6,6 +6,15 @@
 
 源代码：[FlusherKafka.cpp](https://github.com/alibaba/loongcollector/blob/main/core/plugin/flusher/kafka/FlusherKafka.cpp)
 
+
+## 事件能力
+
+列含义见 [概览 · 事件能力列说明](../overview.md#事件能力列说明)。
+
+| Log | Metric | Span |
+| --- | --- | --- |
+| ✓ | — | — |
+
 ## 版本
 
 [Alpha](../../stability-level.md)
