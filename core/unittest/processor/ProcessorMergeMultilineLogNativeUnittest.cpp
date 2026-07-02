@@ -36,11 +36,15 @@ public:
     void SetUp() override { mContext.SetConfigName("project##config_0"); }
     void TestInit();
     void TestProcess();
+    void TestMergeFlagOversized();
+    void TestMergeRegexOversized();
     CollectionPipelineContext mContext;
 };
 
 UNIT_TEST_CASE(ProcessorMergeMultilineLogNativeUnittest, TestInit);
 UNIT_TEST_CASE(ProcessorMergeMultilineLogNativeUnittest, TestProcess);
+UNIT_TEST_CASE(ProcessorMergeMultilineLogNativeUnittest, TestMergeFlagOversized);
+UNIT_TEST_CASE(ProcessorMergeMultilineLogNativeUnittest, TestMergeRegexOversized);
 
 void ProcessorMergeMultilineLogNativeUnittest::TestInit() {
     // 测试合法的正则配置
@@ -4816,7 +4820,7 @@ void ProcessorMergeMultilineLogJsonUnittest::TestMergeJsonOversized() {
     processor.CreateMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
     APSARA_TEST_TRUE_FATAL(processor.Init(config));
     processor.CommitMetricsRecordRef();
-    processor.mMaxJsonBlockSize = 20;
+    processor.mMaxMergeBlockSize = 20;
 
     auto sourceBuffer = std::make_shared<SourceBuffer>();
     PipelineEventGroup eventGroup(sourceBuffer);
@@ -5110,6 +5114,88 @@ void ProcessorMergeMultilineLogJsonUnittest::TestMergeJsonSingleCharEvents() {
                 "timestampNanosecond": 0,
                 "type": 1
             }
+        ]
+    })";
+    std::string outJson = eventGroup.ToJsonString();
+    APSARA_TEST_STREQ(CompactJson(expectJson.str()).c_str(), CompactJson(outJson).c_str());
+}
+
+// flag 合并:单个拆片块累积超过 mMaxMergeBlockSize 时强制切分,数据不丢(拆片间无分隔符,拼接后还原原始行)。
+void ProcessorMergeMultilineLogNativeUnittest::TestMergeFlagOversized() {
+    Json::Value config;
+    config["MergeType"] = "flag";
+    ProcessorMergeMultilineLogNative processor;
+    processor.SetContext(mContext);
+    processor.CreateMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
+    APSARA_TEST_TRUE_FATAL(processor.Init(config));
+    processor.CommitMetricsRecordRef();
+    processor.mMaxMergeBlockSize = 10;
+
+    // 一条被拆成 P(aaaaa) P(bbbbb) P(ccccc) F(ddd) 的物理行。
+    // 阈值 10:累积到 ccccc(=15)时超限,强制切分为 "aaaaabbbbbccccc";F 段 "ddd" 作为新块独立输出。
+    auto sourceBuffer = std::make_shared<SourceBuffer>();
+    PipelineEventGroup eventGroup(sourceBuffer);
+    std::string inJson = R"({
+        "events": [
+            {"contents": {"P": "", "content": "aaaaa"}, "timestamp": 12345678901, "timestampNanosecond": 0, "type": 1},
+            {"contents": {"P": "", "content": "bbbbb"}, "timestamp": 12345678901, "timestampNanosecond": 0, "type": 1},
+            {"contents": {"P": "", "content": "ccccc"}, "timestamp": 12345678901, "timestampNanosecond": 0, "type": 1},
+            {"contents": {"content": "ddd"}, "timestamp": 12345678901, "timestampNanosecond": 0, "type": 1}
+        ],
+        "metadata": {
+            "has.part.log": "P"
+        }
+    })";
+    eventGroup.FromJsonString(inJson);
+
+    processor.Process(eventGroup);
+
+    APSARA_TEST_EQUAL(2UL, eventGroup.GetEvents().size());
+    std::stringstream expectJson;
+    expectJson << R"({
+        "events": [
+            {"contents": {"content": "aaaaabbbbbccccc"}, "timestamp": 12345678901, "timestampNanosecond": 0, "type": 1},
+            {"contents": {"content": "ddd"}, "timestamp": 12345678901, "timestampNanosecond": 0, "type": 1}
+        ]
+    })";
+    std::string outJson = eventGroup.ToJsonString();
+    APSARA_TEST_STREQ(CompactJson(expectJson.str()).c_str(), CompactJson(outJson).c_str());
+}
+
+// regex 合并(start 模式):逻辑块累积超过 mMaxMergeBlockSize 时强制切分(cut and continue),数据不丢。
+void ProcessorMergeMultilineLogNativeUnittest::TestMergeRegexOversized() {
+    Json::Value config;
+    config["MergeType"] = "regex";
+    config["StartPattern"] = "START.*";
+    ProcessorMergeMultilineLogNative processor;
+    processor.SetContext(mContext);
+    processor.CreateMetricsRecordRef(ProcessorMergeMultilineLogNative::sName, "1");
+    APSARA_TEST_TRUE_FATAL(processor.Init(config));
+    processor.CommitMetricsRecordRef();
+    processor.mMaxMergeBlockSize = 10;
+
+    // START 开启一个块,后续三行为其延续。阈值 10:累积到 yyyyy(=15)时超限,强制切出
+    // "START\nxxxxx\nyyyyy";剩余 "zzz" 作为同块延续在 EOF 处输出。合并用 \n 连接。
+    auto sourceBuffer = std::make_shared<SourceBuffer>();
+    PipelineEventGroup eventGroup(sourceBuffer);
+    std::string inJson = R"({
+        "events": [
+            {"contents": {"content": "START"}, "timestamp": 12345678901, "timestampNanosecond": 0, "type": 1},
+            {"contents": {"content": "xxxxx"}, "timestamp": 12345678901, "timestampNanosecond": 0, "type": 1},
+            {"contents": {"content": "yyyyy"}, "timestamp": 12345678901, "timestampNanosecond": 0, "type": 1},
+            {"contents": {"content": "zzz"}, "timestamp": 12345678901, "timestampNanosecond": 0, "type": 1}
+        ]
+    })";
+    eventGroup.FromJsonString(inJson);
+
+    processor.Process(eventGroup);
+
+    APSARA_TEST_EQUAL(2UL, eventGroup.GetEvents().size());
+    std::stringstream expectJson;
+    expectJson << R"({
+        "events": [
+            {"contents": {"content": "START\nxxxxx\nyyyyy"}, "timestamp": 12345678901, "timestampNanosecond": 0, "type": 1},
+            {"contents": {"content": "zzz"}, "timestamp": 12345678901, "timestampNanosecond": 0, "type": 1}
         ]
     })";
     std::string outJson = eventGroup.ToJsonString();
