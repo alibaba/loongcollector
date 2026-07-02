@@ -349,13 +349,12 @@ bool InputContainerStdio::CreateInnerProcessors() {
         }
         mInnerProcessors.emplace_back(std::move(processor));
     }
-    if (mMultiline.IsMultiline()) {
+    if (mMultiline.IsMultiline() && mMultiline.mMode != MultilineOptions::Mode::WHOLE_FILE) {
         Json::Value detail;
         if (mContext->IsFirstProcessorJson() || mMultiline.mMode == MultilineOptions::Mode::JSON) {
-            mContext->SetRequiringJsonReaderFlag(true);
             processor = PluginRegistry::GetInstance()->CreateProcessor(
-                ProcessorSplitLogStringNative::sName, mContext->GetPipeline().GenNextPluginMeta(false));
-            detail["SplitChar"] = Json::Value('\0');
+                ProcessorMergeMultilineLogNative::sName, mContext->GetPipeline().GenNextPluginMeta(false));
+            detail["MergeType"] = Json::Value("json");
         } else if (mMultiline.mMode == MultilineOptions::Mode::CUSTOM) {
             processor = PluginRegistry::GetInstance()->CreateProcessor(
                 ProcessorMergeMultilineLogNative::sName, mContext->GetPipeline().GenNextPluginMeta(false));
@@ -371,6 +370,15 @@ bool InputContainerStdio::CreateInnerProcessors() {
                        == MultilineOptions::UnmatchedContentTreatment::SINGLE_LINE) {
                 detail["UnmatchedContentTreatment"] = Json::Value("single_line");
             }
+        } else {
+            PARAM_ERROR_RETURN(mContext->GetLogger(),
+                               mContext->GetAlarm(),
+                               "unsupported Multiline.Mode for container stdio",
+                               sName,
+                               mContext->GetConfigName(),
+                               mContext->GetProjectName(),
+                               mContext->GetLogstoreName(),
+                               mContext->GetRegion());
         }
         if (!processor->Init(detail, *mContext)) {
             return false;
