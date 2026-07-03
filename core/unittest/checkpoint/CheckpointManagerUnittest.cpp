@@ -35,9 +35,40 @@ public:
     static void TearDownTestCase() { bfs::remove_all(kTestRootDir); }
 
     void TestSearchFilePathByDevInodeInDirectory();
+    void TestAddCheckPointSameInodeDifferentCreateTime();
+    void TestSameNameRebuildNoOverwrite();
+    void TestGetDeleteCheckPointWithCreateTime();
+    void TestCreateTimeZeroBackwardCompatible();
+
+protected:
+    void SetUp() override { CheckPointManager::Instance()->RemoveAllCheckPoint(); }
+    void TearDown() override { CheckPointManager::Instance()->RemoveAllCheckPoint(); }
+
+    static CheckPoint* MakeCheckPoint(const std::string& fileName,
+                                      const DevInode& devInode,
+                                      const std::string& configName,
+                                      int64_t createTime) {
+        return new CheckPoint(fileName,
+                              "", // resolvedFileName
+                              0, // offset
+                              0, // signatureSize
+                              0, // signatureHash
+                              devInode,
+                              configName,
+                              "", // realFileName
+                              false, // fileOpenFlag
+                              false, // containerStopped
+                              "", // containerID
+                              false, // lastForceRead
+                              createTime);
+    }
 };
 
 UNIT_TEST_CASE(CheckpointManagerUnittest, TestSearchFilePathByDevInodeInDirectory);
+UNIT_TEST_CASE(CheckpointManagerUnittest, TestAddCheckPointSameInodeDifferentCreateTime);
+UNIT_TEST_CASE(CheckpointManagerUnittest, TestSameNameRebuildNoOverwrite);
+UNIT_TEST_CASE(CheckpointManagerUnittest, TestGetDeleteCheckPointWithCreateTime);
+UNIT_TEST_CASE(CheckpointManagerUnittest, TestCreateTimeZeroBackwardCompatible);
 
 void CheckpointManagerUnittest::TestSearchFilePathByDevInodeInDirectory() {
     const std::string kRotateFileName = "test.log.5";
@@ -94,6 +125,101 @@ void CheckpointManagerUnittest::TestSearchFilePathByDevInodeInDirectory() {
         EXPECT_TRUE(filePath);
         EXPECT_EQ(filePath.value(), kSubDirFilePath);
     }
+}
+
+// Two checkpoints with the same config and the same (dev, inode) but different
+// createTime must both be kept in memory instead of overwriting each other.
+void CheckpointManagerUnittest::TestAddCheckPointSameInodeDifferentCreateTime() {
+    auto* mgr = CheckPointManager::Instance();
+    const DevInode devInode(1, 100);
+    const std::string configName = "config-a";
+
+    mgr->AddCheckPoint(MakeCheckPoint("/var/log/app.log", devInode, configName, 1000));
+    mgr->AddCheckPoint(MakeCheckPoint("/var/log/app.log", devInode, configName, 2000));
+
+    APSARA_TEST_EQUAL(mgr->GetAllFileCheckPoint().size(), 2UL);
+
+    CheckPointPtr cp;
+    APSARA_TEST_TRUE(mgr->GetCheckPoint(devInode, configName, cp, 1000));
+    APSARA_TEST_EQUAL(cp->mCreateTime, 1000);
+    APSARA_TEST_TRUE(mgr->GetCheckPoint(devInode, configName, cp, 2000));
+    APSARA_TEST_EQUAL(cp->mCreateTime, 2000);
+}
+
+// Same-name rebuild scenario (Discussion #2628): a file is deleted and recreated
+// with the same name and the OS reuses the same inode. The new physical file has
+// a different createTime, so its checkpoint must not clobber the old one.
+void CheckpointManagerUnittest::TestSameNameRebuildNoOverwrite() {
+    auto* mgr = CheckPointManager::Instance();
+    const std::string fileName = "/var/log/rebuilt.log";
+    const DevInode devInode(2, 200); // same dev + inode for both generations
+    const std::string configName = "config-b";
+
+    // Old generation: offset already advanced.
+    auto* oldCp = MakeCheckPoint(fileName, devInode, configName, 1111);
+    oldCp->mOffset = 4096;
+    mgr->AddCheckPoint(oldCp);
+
+    // New generation: same name + same inode, different createTime, fresh offset.
+    auto* newCp = MakeCheckPoint(fileName, devInode, configName, 2222);
+    newCp->mOffset = 0;
+    mgr->AddCheckPoint(newCp);
+
+    APSARA_TEST_EQUAL(mgr->GetAllFileCheckPoint().size(), 2UL);
+
+    CheckPointPtr cp;
+    APSARA_TEST_TRUE(mgr->GetCheckPoint(devInode, configName, cp, 1111));
+    APSARA_TEST_EQUAL(cp->mOffset, 4096);
+    APSARA_TEST_TRUE(mgr->GetCheckPoint(devInode, configName, cp, 2222));
+    APSARA_TEST_EQUAL(cp->mOffset, 0);
+}
+
+// Get/Delete must hit exactly the entry matching (devInode, configName, createTime).
+void CheckpointManagerUnittest::TestGetDeleteCheckPointWithCreateTime() {
+    auto* mgr = CheckPointManager::Instance();
+    const DevInode devInode(3, 300);
+    const std::string configName = "config-c";
+
+    mgr->AddCheckPoint(MakeCheckPoint("/var/log/c.log", devInode, configName, 1000));
+    mgr->AddCheckPoint(MakeCheckPoint("/var/log/c.log", devInode, configName, 2000));
+    APSARA_TEST_EQUAL(mgr->GetAllFileCheckPoint().size(), 2UL);
+
+    // Delete only the createTime=1000 entry.
+    mgr->DeleteCheckPoint(devInode, configName, 1000);
+    APSARA_TEST_EQUAL(mgr->GetAllFileCheckPoint().size(), 1UL);
+
+    CheckPointPtr cp;
+    APSARA_TEST_FALSE(mgr->GetCheckPoint(devInode, configName, cp, 1000));
+    APSARA_TEST_TRUE(mgr->GetCheckPoint(devInode, configName, cp, 2000));
+    APSARA_TEST_EQUAL(cp->mCreateTime, 2000);
+}
+
+// With createTime defaulting to 0, the API behaves exactly like the legacy
+// (dev, inode, configName) keying: default-createTime Get/Delete still work, and
+// two different configs on the same inode remain distinct entries.
+void CheckpointManagerUnittest::TestCreateTimeZeroBackwardCompatible() {
+    auto* mgr = CheckPointManager::Instance();
+    const DevInode devInode(4, 400);
+
+    // Constructed via the legacy 12-arg constructor: createTime defaults to 0.
+    auto* legacyCp
+        = new CheckPoint("/var/log/legacy.log", "", 0, 0, 0, devInode, "config-d", "", false, false, "", false);
+    APSARA_TEST_EQUAL(legacyCp->mCreateTime, 0);
+    mgr->AddCheckPoint(legacyCp);
+
+    // Default-createTime Get/Delete hit the legacy entry.
+    CheckPointPtr cp;
+    APSARA_TEST_TRUE(mgr->GetCheckPoint(devInode, "config-d", cp));
+    APSARA_TEST_EQUAL(cp->mCreateTime, 0);
+
+    // Different config on the same inode stays a separate entry (unchanged behavior).
+    mgr->AddCheckPoint(MakeCheckPoint("/var/log/legacy.log", devInode, "config-e", 0));
+    APSARA_TEST_EQUAL(mgr->GetAllFileCheckPoint().size(), 2UL);
+
+    mgr->DeleteCheckPoint(devInode, "config-d");
+    APSARA_TEST_EQUAL(mgr->GetAllFileCheckPoint().size(), 1UL);
+    APSARA_TEST_FALSE(mgr->GetCheckPoint(devInode, "config-d", cp));
+    APSARA_TEST_TRUE(mgr->GetCheckPoint(devInode, "config-e", cp));
 }
 
 } // namespace logtail

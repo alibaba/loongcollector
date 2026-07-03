@@ -48,22 +48,29 @@ bool CheckPointManager::CheckVersion() {
 }
 
 void CheckPointManager::AddCheckPoint(CheckPoint* checkPointPtr) {
+    // createTime is taken from the CheckPoint itself so that checkpoints sharing
+    // the same (dev, inode, configName) but pointing at different physical files
+    // no longer overwrite each other.
+    CheckPointKey key(checkPointPtr->mDevInode, checkPointPtr->mConfigName, checkPointPtr->mCreateTime);
+    DevInodeCheckPointHashMap::iterator it = mDevInodeCheckPointPtrMap.find(key);
+    if (it != mDevInodeCheckPointPtrMap.end())
+        mDevInodeCheckPointPtrMap.erase(it);
+    mDevInodeCheckPointPtrMap.insert(std::make_pair(key, CheckPointPtr(checkPointPtr)));
+}
+
+void CheckPointManager::DeleteCheckPoint(DevInode devInode, const std::string& configName, int64_t createTime) {
     DevInodeCheckPointHashMap::iterator it
-        = mDevInodeCheckPointPtrMap.find(CheckPointKey(checkPointPtr->mDevInode, checkPointPtr->mConfigName));
-    if (it != mDevInodeCheckPointPtrMap.end())
-        mDevInodeCheckPointPtrMap.erase(it);
-    mDevInodeCheckPointPtrMap.insert(std::make_pair<CheckPointKey, CheckPointPtr>(
-        CheckPointKey(checkPointPtr->mDevInode, checkPointPtr->mConfigName), CheckPointPtr(checkPointPtr)));
-}
-
-void CheckPointManager::DeleteCheckPoint(DevInode devInode, const std::string& configName) {
-    DevInodeCheckPointHashMap::iterator it = mDevInodeCheckPointPtrMap.find(CheckPointKey(devInode, configName));
+        = mDevInodeCheckPointPtrMap.find(CheckPointKey(devInode, configName, createTime));
     if (it != mDevInodeCheckPointPtrMap.end())
         mDevInodeCheckPointPtrMap.erase(it);
 }
 
-bool CheckPointManager::GetCheckPoint(DevInode devInode, const std::string& configName, CheckPointPtr& checkPointPtr) {
-    DevInodeCheckPointHashMap::iterator it = mDevInodeCheckPointPtrMap.find(CheckPointKey(devInode, configName));
+bool CheckPointManager::GetCheckPoint(DevInode devInode,
+                                      const std::string& configName,
+                                      CheckPointPtr& checkPointPtr,
+                                      int64_t createTime) {
+    DevInodeCheckPointHashMap::iterator it
+        = mDevInodeCheckPointPtrMap.find(CheckPointKey(devInode, configName, createTime));
     if (it != mDevInodeCheckPointPtrMap.end()) {
         checkPointPtr = it->second;
         return true;

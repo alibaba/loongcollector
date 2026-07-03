@@ -40,6 +40,10 @@ namespace logtail {
 class CheckPoint {
 public:
     DevInode mDevInode;
+    // Physical-file discriminator: distinguishes different physical files that
+    // reuse the same (dev, inode), e.g. a same-name rebuild. 0 means unset, which
+    // keeps behavior identical to checkpoints that carry no create time.
+    int64_t mCreateTime = 0;
     int64_t mOffset = 0;
     uint64_t mSignatureHash = 0;
     uint32_t mSignatureSize = 0;
@@ -68,8 +72,10 @@ public:
                bool fileOpenFlag,
                bool containerStopped,
                std::string containerID,
-               bool lastForceRead)
+               bool lastForceRead,
+               int64_t createTime = 0)
         : mDevInode(devInode),
+          mCreateTime(createTime),
           mOffset(offset),
           mSignatureHash(signatureHash),
           mSignatureSize(signatureSize),
@@ -100,19 +106,26 @@ class CheckPointManager {
 public:
     struct CheckPointKey {
         CheckPointKey() {}
-        CheckPointKey(const DevInode& devInode, const std::string& configName)
-            : mDevInode(devInode), mConfigName(configName) {}
+        CheckPointKey(const DevInode& devInode, const std::string& configName, int64_t createTime = 0)
+            : mDevInode(devInode), mConfigName(configName), mCreateTime(createTime) {}
         DevInode mDevInode;
         std::string mConfigName;
+        // Physical-file discriminator, see CheckPoint::mCreateTime. 0 means unset,
+        // which preserves the original (dev, inode, configName) keying behavior.
+        int64_t mCreateTime = 0;
 
+        // Comparison order: dev -> inode -> createTime -> configName.
         bool operator<(const CheckPointKey& o) const {
             if (mDevInode < o.mDevInode) {
                 return true;
             }
-            if (mDevInode == o.mDevInode) {
-                return mConfigName < o.mConfigName;
+            if (!(mDevInode == o.mDevInode)) {
+                return false;
             }
-            return false;
+            if (mCreateTime != o.mCreateTime) {
+                return mCreateTime < o.mCreateTime;
+            }
+            return mConfigName < o.mConfigName;
         }
     };
 
@@ -132,14 +145,17 @@ public:
     bool CheckVersion();
     void AddCheckPoint(CheckPoint* checkPointPtr);
     void AddDirCheckPoint(const std::string& dirname);
-    void DeleteCheckPoint(DevInode devInode, const std::string& configName);
+    void DeleteCheckPoint(DevInode devInode, const std::string& configName, int64_t createTime = 0);
     void DeleteDirCheckPoint(const std::string& dirname);
     void LoadCheckPoint();
     void LoadDirCheckPoint(const Json::Value& root);
     void LoadFileCheckPoint(const Json::Value& root);
     bool DumpCheckPointToLocal();
     int32_t GetReaderCount();
-    bool GetCheckPoint(DevInode devInode, const std::string& configName, CheckPointPtr& checkPointPtr);
+    bool GetCheckPoint(DevInode devInode,
+                       const std::string& configName,
+                       CheckPointPtr& checkPointPtr,
+                       int64_t createTime = 0);
     bool GetDirCheckPoint(const std::string& filename, DirCheckPointPtr& checkPointPtr);
     void RemoveAllCheckPoint();
     void CheckTimeoutCheckPoint();
