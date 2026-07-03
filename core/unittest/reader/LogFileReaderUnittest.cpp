@@ -24,6 +24,8 @@
 #include "file_server/checkpoint/CheckPointManager.h"
 #include "file_server/reader/JsonLogFileReader.h"
 #include "file_server/reader/LogFileReader.h"
+#include "monitor/metric_constants/MetricConstants.h"
+#include "monitor/metric_models/ReentrantMetricsRecord.h"
 #include "unittest/Unittest.h"
 
 DECLARE_FLAG_INT32(force_release_deleted_file_fd_timeout);
@@ -72,6 +74,7 @@ public:
     void TestReadGBK();
     void TestReadUTF8();
     void TestSetExpectedFileSize();
+    void TestReloadMetricsGaugeNoZeroDrop();
 
     std::unique_ptr<char[]> expectedContent;
     static std::string logPathDir;
@@ -88,6 +91,7 @@ protected:
 UNIT_TEST_CASE(LogFileReaderUnittest, TestReadGBK);
 UNIT_TEST_CASE(LogFileReaderUnittest, TestReadUTF8);
 UNIT_TEST_CASE(LogFileReaderUnittest, TestSetExpectedFileSize);
+UNIT_TEST_CASE(LogFileReaderUnittest, TestReloadMetricsGaugeNoZeroDrop);
 
 std::string LogFileReaderUnittest::logPathDir;
 std::string LogFileReaderUnittest::gbkFile;
@@ -727,6 +731,83 @@ void LogFileReaderUnittest::TestSetExpectedFileSize() {
         // Should read normally without size limit
         APSARA_TEST_LE_FATAL(reader.mLastFilePos, actualFileSize);
     }
+}
+
+// Regression test for #2632: config reload must not expose a transient 0 on the
+// source_size_bytes / read_offset_bytes gauges. On reload a new reader is created for
+// the same file, sharing the reentrant metrics record keyed by config name + file
+// labels. If the old reader is destroyed before the new one is built, the shared
+// record is released and recreated with gauges defaulting to 0. Without seeding, the
+// gauge series shows a spurious drop to 0 until the new reader's first ReportMetrics.
+void LogFileReaderUnittest::TestReloadMetricsGaugeNoZeroDrop() {
+    const std::string configName = "reload_metrics_config_2632";
+    MetricLabelsPtr defaultLabels = std::make_shared<MetricLabels>();
+    defaultLabels->emplace_back(METRIC_LABEL_KEY_PROJECT, "test_project");
+    defaultLabels->emplace_back(METRIC_LABEL_KEY_PIPELINE_NAME, configName);
+    std::unordered_map<std::string, MetricType> metricKeys = {
+        {METRIC_PLUGIN_OUT_EVENTS_TOTAL, MetricType::METRIC_TYPE_COUNTER},
+        {METRIC_PLUGIN_OUT_EVENT_GROUPS_TOTAL, MetricType::METRIC_TYPE_COUNTER},
+        {METRIC_PLUGIN_OUT_SIZE_BYTES, MetricType::METRIC_TYPE_COUNTER},
+        {METRIC_PLUGIN_SOURCE_SIZE_BYTES, MetricType::METRIC_TYPE_INT_GAUGE},
+        {METRIC_PLUGIN_SOURCE_READ_OFFSET_BYTES, MetricType::METRIC_TYPE_INT_GAUGE},
+    };
+    auto pluginMetricManager = std::make_shared<PluginMetricManager>(
+        defaultLabels, metricKeys, MetricCategory::METRIC_CATEGORY_PLUGIN_SOURCE);
+    FileServer::GetInstance()->AddPluginMetricManager(configName, pluginMetricManager);
+
+    CollectionPipelineContext reloadCtx;
+    reloadCtx.SetConfigName(configName);
+    MultilineOptions multilineOpts;
+    FileReaderOptions reloadReaderOpts;
+    reloadReaderOpts.mInputType = FileReaderOptions::InputType::InputFile;
+    // Same dev/inode across readers so both map to the same reentrant metrics record.
+    DevInode devInode(1234, 5678);
+    // Offset restored from checkpoint; kept within the real file size so source_size
+    // (from the actual on-disk file) stays >= read_offset, mirroring a normal reload.
+    const int64_t consumedOffset = 128;
+
+    // --- Old reader before reload: gauges hold a real, non-zero read offset. ---
+    uint64_t offsetBeforeReload = 0;
+    {
+        LogFileReader oldReader(logPathDir,
+                                utf8File,
+                                devInode,
+                                std::make_pair(&reloadReaderOpts, &reloadCtx),
+                                std::make_pair(&multilineOpts, &reloadCtx),
+                                std::make_pair(&fileTagOpts, &reloadCtx));
+        oldReader.SetMetrics();
+        APSARA_TEST_TRUE_FATAL(oldReader.mSourceReadOffsetBytes != nullptr);
+        oldReader.mLastFilePos = consumedOffset;
+        oldReader.ReportMetrics(0);
+        offsetBeforeReload = oldReader.mSourceReadOffsetBytes->GetValue();
+        APSARA_TEST_EQUAL_FATAL(offsetBeforeReload, (uint64_t)consumedOffset);
+    }
+    // oldReader destroyed -> ReleaseReentrantMetricsRecordRef erases the shared record.
+
+    // --- New reader after reload: fresh record, gauge starts at 0 (the reload bug). ---
+    LogFileReader newReader(logPathDir,
+                            utf8File,
+                            devInode,
+                            std::make_pair(&reloadReaderOpts, &reloadCtx),
+                            std::make_pair(&multilineOpts, &reloadCtx),
+                            std::make_pair(&fileTagOpts, &reloadCtx));
+    newReader.SetMetrics();
+    APSARA_TEST_TRUE_FATAL(newReader.mSourceReadOffsetBytes != nullptr);
+    // Reproduce the bug window: the freshly recreated record reads 0 before seeding.
+    APSARA_TEST_EQUAL_FATAL(newReader.mSourceReadOffsetBytes->GetValue(), 0UL);
+
+    // Simulate the checkpoint offset restore performed by InitReader on reload.
+    newReader.mLastFilePos = consumedOffset;
+
+    // Fix under test: seed gauges right after the reader is (re)created.
+    newReader.InitMetricGauges();
+
+    // No 0 gap: read offset is restored, and source size is the real (non-zero) file size.
+    APSARA_TEST_EQUAL_FATAL(newReader.mSourceReadOffsetBytes->GetValue(), (uint64_t)consumedOffset);
+    APSARA_TEST_GT_FATAL(newReader.mSourceSizeBytes->GetValue(), 0UL);
+    APSARA_TEST_GE_FATAL(newReader.mSourceSizeBytes->GetValue(), newReader.mSourceReadOffsetBytes->GetValue());
+
+    FileServer::GetInstance()->RemovePluginMetricManager(configName);
 }
 
 class LogMultiBytesUnittest : public ::testing::Test {

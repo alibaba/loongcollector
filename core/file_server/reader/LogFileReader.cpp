@@ -204,6 +204,9 @@ LogFileReader* LogFileReader::CreateLogFileReader(const string& hostLogPathDir,
 
         reader->InitReader(
             readerConfig.first->mTailingAllMatchedFiles, LogFileReader::BACKWARD_TO_FIXED_POS, exactlyonceConcurrency);
+        // Seed gauges after the checkpoint offset is restored so a config reload does not
+        // expose a transient 0 on the shared reentrant metrics record. See #2632.
+        reader->InitMetricGauges();
     }
     return reader;
 }
@@ -2335,6 +2338,26 @@ void LogFileReader::ReportMetrics(uint64_t readSize) {
     ADD_COUNTER(mOutSizeBytes, readSize);
     SET_GAUGE(mSourceReadOffsetBytes, GetLastFilePos());
     SET_GAUGE(mSourceSizeBytes, GetFileSize());
+}
+
+void LogFileReader::InitMetricGauges() {
+    // On config reload a new reader is created for the same file, sharing the same
+    // reentrant metrics record (keyed by config name + file labels). When the old
+    // reader is destroyed before the new one is built, the record is released and
+    // recreated with gauges defaulting to 0, so the source_size_bytes / read_offset_bytes
+    // series show a spurious drop to 0 until the new reader's first ReportMetrics call.
+    // Seed the gauges here with the reader's restored state to close that 0 window.
+    int64_t readOffset = GetLastFilePos();
+    // Best-effort current file size; the gauge is refreshed with the exact value on the
+    // first read. Fall back to readOffset (source_size >= read_offset always) so the size
+    // gauge never reads 0 either.
+    int64_t fileSize = readOffset;
+    fsutil::PathStat ps;
+    if (fsutil::PathStat::stat(mHostLogPath, ps)) {
+        fileSize = ps.GetFileSize();
+    }
+    SET_GAUGE(mSourceReadOffsetBytes, readOffset);
+    SET_GAUGE(mSourceSizeBytes, fileSize);
 }
 
 
