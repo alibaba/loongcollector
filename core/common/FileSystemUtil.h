@@ -285,6 +285,17 @@ public:
     time_t GetMtime() const;
     int64_t GetFileSize() const;
 
+    // GetCreateTime returns the file creation time (birth time) in seconds since the
+    // epoch, or 0 when it is unavailable. Being 0 lets the caller fall back to other
+    // file identity signatures.
+    // - Linux: queries statx(STATX_BTIME) on the recorded path. Returns 0 on old
+    //   kernels (< 4.11), filesystems without birth time (overlayfs, some tmpfs), or
+    //   when the path is unknown (e.g. after fstat, which does not record a path).
+    // - Windows: reads the file creation time.
+    // NOTE: This is a read-only addition; it does not change any existing PathStat
+    // behavior, and it needs an extra system call (like GetLastWriteTime on Windows).
+    int64_t GetCreateTime() const;
+
     // GetMode returns st_mode.
     int GetMode() const { return static_cast<int>(mRawStat.st_mode); }
 };

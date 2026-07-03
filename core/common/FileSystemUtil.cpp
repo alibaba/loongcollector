@@ -22,8 +22,11 @@
 #include <direct.h>
 #include <fcntl.h>
 #elif defined(__linux__)
+#include <fcntl.h>
 #include <fnmatch.h>
 #include <sys/statvfs.h>
+#include <sys/syscall.h>
+#include <unistd.h>
 #endif
 #include <fstream>
 
@@ -809,6 +812,103 @@ DevInode PathStat::GetDevInode() const {
 
 int64_t PathStat::GetFileSize() const {
     return mRawStat.st_size;
+}
+
+#if defined(__linux__)
+// statx syscall number. Prefer what the headers expose; fall back to the fixed,
+// stable per-arch numbers because the build toolchain's headers (glibc 2.17, kernel
+// 3.10 era) predate statx and define neither SYS_statx nor __NR_statx. Architectures
+// without a known number (e.g. sw64) leave it undefined and GetCreateTime returns 0.
+#if defined(SYS_statx)
+#define LOONG_SYS_STATX SYS_statx
+#elif defined(__NR_statx)
+#define LOONG_SYS_STATX __NR_statx
+#elif defined(__x86_64__)
+#define LOONG_SYS_STATX 332
+#elif defined(__aarch64__)
+#define LOONG_SYS_STATX 291
+#endif
+
+namespace {
+// statx(STATX_BTIME) gives the file birth time. It exists since Linux 4.11, but the
+// glibc wrapper needs glibc >= 2.28 and the kernel UAPI struct is absent from the
+// build toolchain's headers. So mirror the stable ABI here and call the raw syscall.
+// Layout must match include/uapi/linux/stat.h exactly.
+struct LoongStatxTimestamp {
+    int64_t tv_sec;
+    uint32_t tv_nsec;
+    int32_t __reserved;
+};
+struct LoongStatx {
+    uint32_t stx_mask;
+    uint32_t stx_blksize;
+    uint64_t stx_attributes;
+    uint32_t stx_nlink;
+    uint32_t stx_uid;
+    uint32_t stx_gid;
+    uint16_t stx_mode;
+    uint16_t __spare0[1];
+    uint64_t stx_ino;
+    uint64_t stx_size;
+    uint64_t stx_blocks;
+    uint64_t stx_attributes_mask;
+    LoongStatxTimestamp stx_atime;
+    LoongStatxTimestamp stx_btime;
+    LoongStatxTimestamp stx_ctime;
+    LoongStatxTimestamp stx_mtime;
+    uint32_t stx_rdev_major;
+    uint32_t stx_rdev_minor;
+    uint32_t stx_dev_major;
+    uint32_t stx_dev_minor;
+    uint64_t __spare2[14];
+};
+constexpr uint32_t kStatxBtime = 0x00000800U; // STATX_BTIME
+constexpr int kAtStatxSyncAsStat = 0x0000; // AT_STATX_SYNC_AS_STAT: behave like stat()
+
+static_assert(sizeof(LoongStatxTimestamp) == 16, "statx_timestamp ABI mismatch");
+static_assert(sizeof(LoongStatx) == 256, "statx ABI mismatch (must be 0x100 bytes)");
+static_assert(offsetof(LoongStatx, stx_mask) == 0, "stx_mask offset mismatch");
+static_assert(offsetof(LoongStatx, stx_btime) == 0x50, "stx_btime offset mismatch");
+} // namespace
+#endif
+
+int64_t PathStat::GetCreateTime() const {
+#if defined(__linux__)
+#if defined(LOONG_SYS_STATX)
+    // fstat does not record a path on Linux, so birth time cannot be queried.
+    if (mPath.empty()) {
+        return 0;
+    }
+    LoongStatx stx;
+    long ret = ::syscall(LOONG_SYS_STATX, AT_FDCWD, mPath.c_str(), kAtStatxSyncAsStat, kStatxBtime, &stx);
+    // Old kernels return ENOSYS; overlayfs and filesystems without birth time return
+    // success but leave STATX_BTIME unset. Both fall back to 0.
+    if (ret != 0 || (stx.stx_mask & kStatxBtime) == 0) {
+        return 0;
+    }
+    return static_cast<int64_t>(stx.stx_btime.tv_sec);
+#else
+    return 0;
+#endif
+#elif defined(_MSC_VER)
+    HANDLE hFile = CreateFile(mPath.c_str(),
+                              GENERIC_READ,
+                              FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                              NULL,
+                              OPEN_EXISTING,
+                              FILE_FLAG_BACKUP_SEMANTICS,
+                              NULL);
+    if (INVALID_HANDLE_VALUE == hFile) {
+        return 0;
+    }
+    FILETIME creationTime;
+    auto ok = GetFileTime(hFile, &creationTime, NULL, NULL);
+    CloseHandle(hFile);
+    if (!ok) {
+        return 0;
+    }
+    return FILETIME2Time(creationTime);
+#endif
 }
 
 } // namespace fsutil

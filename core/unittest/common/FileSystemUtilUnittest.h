@@ -16,6 +16,7 @@
 
 #include <fstream>
 #include <string>
+#include <type_traits>
 
 #include "boost/format.hpp"
 
@@ -286,6 +287,42 @@ TEST_F(FileSystemUtilUnittest, TestPathStat_GetLastWriteTime) {
         dirStat.GetLastWriteTime(sec, nsec);
         EXPECT_GE(sec, 0);
         EXPECT_GE(nsec, 0);
+    }
+}
+
+TEST_F(FileSystemUtilUnittest, TestPathStat_GetCreateTime) {
+    // -1 tolerates coarse clock granularity between here and the file creation.
+    auto beforeCreate = static_cast<int64_t>(time(nullptr)) - 1;
+    auto filePath = ((mTestRoot / "file").string());
+    { std::ofstream(filePath).write("xxx", 3); }
+
+    fsutil::PathStat fileStat;
+    EXPECT_TRUE(fsutil::PathStat::stat(filePath, fileStat));
+
+    // The return value must be an int64 timestamp.
+    static_assert(std::is_same<decltype(fileStat.GetCreateTime()), int64_t>::value,
+                  "GetCreateTime must return int64_t");
+
+    int64_t createTime = fileStat.GetCreateTime();
+    // 0 means birth time is unavailable on this platform/FS (old kernel, overlayfs,
+    // unsupported FS). Otherwise it must be a sane timestamp around the creation time.
+    EXPECT_GE(createTime, 0);
+    if (createTime > 0) {
+        EXPECT_GE(createTime, beforeCreate);
+        EXPECT_LE(createTime, static_cast<int64_t>(time(nullptr)) + 1);
+    }
+
+    // Unknown path (default-constructed / empty mPath): must report 0, never crash.
+    {
+        fsutil::PathStat emptyStat;
+        EXPECT_EQ(emptyStat.GetCreateTime(), 0);
+    }
+
+    // Non-existent path: stat fails and birth time query must report 0.
+    {
+        fsutil::PathStat missingStat;
+        EXPECT_FALSE(fsutil::PathStat::stat((mTestRoot / "not_exist").string(), missingStat));
+        EXPECT_EQ(missingStat.GetCreateTime(), 0);
     }
 }
 
