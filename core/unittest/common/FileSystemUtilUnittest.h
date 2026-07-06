@@ -304,13 +304,23 @@ TEST_F(FileSystemUtilUnittest, TestPathStat_GetCreateTime) {
                   "GetCreateTime must return int64_t");
 
     int64_t createTime = fileStat.GetCreateTime();
-    // 0 means birth time is unavailable on this platform/FS (old kernel, overlayfs,
-    // unsupported FS). Otherwise it must be a sane timestamp around the creation time.
     EXPECT_GE(createTime, 0);
+#if defined(_MSC_VER)
+    // Windows/NTFS always records birth time, so a just-created file must report a
+    // non-zero timestamp around the creation time. This asserts the Windows code path
+    // (CreateFile + GetFileTime) rather than tolerating an unavailable birth time.
+    EXPECT_GT(createTime, 0);
+    EXPECT_GE(createTime, beforeCreate);
+    EXPECT_LE(createTime, static_cast<int64_t>(time(nullptr)) + 1);
+#else
+    // Linux: 0 means birth time is unavailable on this kernel/FS (old kernel,
+    // overlayfs, unsupported FS). Otherwise it must be a sane timestamp around
+    // the creation time.
     if (createTime > 0) {
         EXPECT_GE(createTime, beforeCreate);
         EXPECT_LE(createTime, static_cast<int64_t>(time(nullptr)) + 1);
     }
+#endif
 
     // Unknown path (default-constructed / empty mPath): must report 0, never crash.
     {
