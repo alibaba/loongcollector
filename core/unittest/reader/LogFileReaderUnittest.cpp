@@ -75,6 +75,7 @@ public:
     void TestReadUTF8();
     void TestSetExpectedFileSize();
     void TestReloadMetricsGaugeNoZeroDrop();
+    void TestReloadMetricsGaugeTruncatedFile();
 
     std::unique_ptr<char[]> expectedContent;
     static std::string logPathDir;
@@ -92,6 +93,7 @@ UNIT_TEST_CASE(LogFileReaderUnittest, TestReadGBK);
 UNIT_TEST_CASE(LogFileReaderUnittest, TestReadUTF8);
 UNIT_TEST_CASE(LogFileReaderUnittest, TestSetExpectedFileSize);
 UNIT_TEST_CASE(LogFileReaderUnittest, TestReloadMetricsGaugeNoZeroDrop);
+UNIT_TEST_CASE(LogFileReaderUnittest, TestReloadMetricsGaugeTruncatedFile);
 
 std::string LogFileReaderUnittest::logPathDir;
 std::string LogFileReaderUnittest::gbkFile;
@@ -812,6 +814,62 @@ void LogFileReaderUnittest::TestReloadMetricsGaugeNoZeroDrop() {
     APSARA_TEST_EQUAL_FATAL(newReader.mSourceReadOffsetBytes->GetValue(), (uint64_t)consumedOffset);
     APSARA_TEST_GT_FATAL(newReader.mSourceSizeBytes->GetValue(), 0UL);
     APSARA_TEST_GE_FATAL(newReader.mSourceSizeBytes->GetValue(), newReader.mSourceReadOffsetBytes->GetValue());
+    // managerGuard removes the PluginMetricManager on scope exit.
+}
+
+// Regression test for #2632 maintainer feedback: when the file is truncated across a
+// reload (stat succeeds but reports a size smaller than the checkpoint-restored offset),
+// InitMetricGauges must clamp source_size_bytes up to read_offset_bytes so the
+// source_size >= read_offset invariant holds and the size gauge does not regress below
+// the offset.
+void LogFileReaderUnittest::TestReloadMetricsGaugeTruncatedFile() {
+    const std::string configName = "reload_metrics_config_2632_truncated";
+    MetricLabelsPtr defaultLabels = std::make_shared<MetricLabels>();
+    defaultLabels->emplace_back(METRIC_LABEL_KEY_PROJECT, "test_project");
+    defaultLabels->emplace_back(METRIC_LABEL_KEY_PIPELINE_NAME, configName);
+    std::unordered_map<std::string, MetricType> metricKeys = {
+        {METRIC_PLUGIN_OUT_EVENTS_TOTAL, MetricType::METRIC_TYPE_COUNTER},
+        {METRIC_PLUGIN_OUT_EVENT_GROUPS_TOTAL, MetricType::METRIC_TYPE_COUNTER},
+        {METRIC_PLUGIN_OUT_SIZE_BYTES, MetricType::METRIC_TYPE_COUNTER},
+        {METRIC_PLUGIN_SOURCE_SIZE_BYTES, MetricType::METRIC_TYPE_INT_GAUGE},
+        {METRIC_PLUGIN_SOURCE_READ_OFFSET_BYTES, MetricType::METRIC_TYPE_INT_GAUGE},
+    };
+    auto pluginMetricManager = std::make_shared<PluginMetricManager>(
+        defaultLabels, metricKeys, MetricCategory::METRIC_CATEGORY_PLUGIN_SOURCE);
+    FileServer::GetInstance()->AddPluginMetricManager(configName, pluginMetricManager);
+    std::shared_ptr<void> managerGuard(nullptr, [&configName](void*) {
+        FileServer::GetInstance()->RemovePluginMetricManager(configName);
+    });
+
+    CollectionPipelineContext reloadCtx;
+    reloadCtx.SetConfigName(configName);
+    MultilineOptions multilineOpts;
+    FileReaderOptions reloadReaderOpts;
+    reloadReaderOpts.mInputType = FileReaderOptions::InputType::InputFile;
+    DevInode devInode(4321, 8765);
+
+    LogFileReader reader(logPathDir,
+                         utf8File,
+                         devInode,
+                         std::make_pair(&reloadReaderOpts, &reloadCtx),
+                         std::make_pair(&multilineOpts, &reloadCtx),
+                         std::make_pair(&fileTagOpts, &reloadCtx));
+    reader.SetMetrics();
+    APSARA_TEST_TRUE_FATAL(reader.mSourceReadOffsetBytes != nullptr);
+    APSARA_TEST_TRUE_FATAL(reader.mSourceSizeBytes != nullptr);
+
+    // Restore an offset far beyond the real on-disk file size, simulating a file that
+    // was truncated between the two readers while the checkpoint still holds the old,
+    // larger offset. stat() succeeds here but returns a size smaller than the offset.
+    const int64_t truncatedOffset = 1LL << 30; // 1 GiB, well above the small test file.
+    reader.mLastFilePos = truncatedOffset;
+
+    reader.InitMetricGauges();
+
+    // Clamp under test: size gauge is raised to the offset, never below it.
+    APSARA_TEST_EQUAL_FATAL(reader.mSourceReadOffsetBytes->GetValue(), (uint64_t)truncatedOffset);
+    APSARA_TEST_EQUAL_FATAL(reader.mSourceSizeBytes->GetValue(), (uint64_t)truncatedOffset);
+    APSARA_TEST_GE_FATAL(reader.mSourceSizeBytes->GetValue(), reader.mSourceReadOffsetBytes->GetValue());
     // managerGuard removes the PluginMetricManager on scope exit.
 }
 

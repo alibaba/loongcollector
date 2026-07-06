@@ -2356,6 +2356,11 @@ void LogFileReader::InitMetricGauges() {
     if (fsutil::PathStat::stat(mHostLogPath, ps)) {
         fileSize = ps.GetFileSize();
     }
+    // Clamp to the read offset to preserve the source_size >= read_offset invariant even
+    // when the file was truncated across the reload (stat succeeds but reports a size
+    // smaller than the checkpoint-restored offset), avoiding an unexpected size gauge
+    // regression. The exact size is restored on the first ReportMetrics call.
+    fileSize = std::max(fileSize, readOffset);
     SET_GAUGE(mSourceReadOffsetBytes, readOffset);
     SET_GAUGE(mSourceSizeBytes, fileSize);
 }
