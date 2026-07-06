@@ -539,7 +539,7 @@ void AgentsightManagerUnittest::TestBuiltinCmdlineRulesInjectedWhenCmdlineOmitte
     ctx.SetConfigName("p1");
     ctx.SetProcessQueueKey(1);
     APSARA_TEST_EQUAL(0, mgr->AddOrUpdateConfig(&ctx, 0, nullptr, asVariant()));
-    APSARA_TEST_EQUAL(9, g_ut_cmdline_allow_calls);
+    APSARA_TEST_EQUAL(11, g_ut_cmdline_allow_calls);
     APSARA_TEST_EQUAL(0, g_ut_cmdline_deny_calls);
     APSARA_TEST_EQUAL(4, g_ut_https_calls);
     APSARA_TEST_EQUAL(0, g_ut_http_calls);
