@@ -759,9 +759,8 @@ void LogFileReaderUnittest::TestReloadMetricsGaugeNoZeroDrop() {
     // RAII guard: remove the manager from the global FileServer singleton on scope exit,
     // including an early return triggered by a *_FATAL (gtest ASSERT_*) assertion, so a
     // mid-test failure cannot leak a stale manager into subsequent test cases.
-    std::shared_ptr<void> managerGuard(nullptr, [&configName](void*) {
-        FileServer::GetInstance()->RemovePluginMetricManager(configName);
-    });
+    std::shared_ptr<void> managerGuard(
+        nullptr, [&configName](void*) { FileServer::GetInstance()->RemovePluginMetricManager(configName); });
 
     CollectionPipelineContext reloadCtx;
     reloadCtx.SetConfigName(configName);
@@ -837,9 +836,8 @@ void LogFileReaderUnittest::TestReloadMetricsGaugeTruncatedFile() {
     auto pluginMetricManager = std::make_shared<PluginMetricManager>(
         defaultLabels, metricKeys, MetricCategory::METRIC_CATEGORY_PLUGIN_SOURCE);
     FileServer::GetInstance()->AddPluginMetricManager(configName, pluginMetricManager);
-    std::shared_ptr<void> managerGuard(nullptr, [&configName](void*) {
-        FileServer::GetInstance()->RemovePluginMetricManager(configName);
-    });
+    std::shared_ptr<void> managerGuard(
+        nullptr, [&configName](void*) { FileServer::GetInstance()->RemovePluginMetricManager(configName); });
 
     CollectionPipelineContext reloadCtx;
     reloadCtx.SetConfigName(configName);
