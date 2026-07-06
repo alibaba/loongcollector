@@ -864,6 +864,7 @@ struct LoongStatx {
 };
 constexpr uint32_t kStatxBtime = 0x00000800U; // STATX_BTIME
 constexpr int kAtStatxSyncAsStat = 0x0000; // AT_STATX_SYNC_AS_STAT: behave like stat()
+constexpr int kAtSymlinkNofollow = 0x0100; // AT_SYMLINK_NOFOLLOW: do not follow symlinks
 
 static_assert(sizeof(LoongStatxTimestamp) == 16, "statx_timestamp ABI mismatch");
 static_assert(sizeof(LoongStatx) == 256, "statx ABI mismatch (must be 0x100 bytes)");
@@ -879,8 +880,15 @@ int64_t PathStat::GetCreateTime() const {
     if (mPath.empty()) {
         return 0;
     }
+    // mRawStat may come from ::lstat. When it describes a symlink, IsLink()/mRawStat
+    // refer to the link itself, so query the link's own birth time (AT_SYMLINK_NOFOLLOW)
+    // to stay consistent. Otherwise follow the link like stat() does.
+    int flags = kAtStatxSyncAsStat;
+    if (S_ISLNK(mRawStat.st_mode)) {
+        flags |= kAtSymlinkNofollow;
+    }
     LoongStatx stx;
-    long ret = ::syscall(LOONG_SYS_STATX, AT_FDCWD, mPath.c_str(), kAtStatxSyncAsStat, kStatxBtime, &stx);
+    long ret = ::syscall(LOONG_SYS_STATX, AT_FDCWD, mPath.c_str(), flags, kStatxBtime, &stx);
     // Old kernels return ENOSYS; overlayfs and filesystems without birth time return
     // success but leave STATX_BTIME unset. Both fall back to 0.
     if (ret != 0 || (stx.stx_mask & kStatxBtime) == 0) {

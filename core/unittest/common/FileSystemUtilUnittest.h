@@ -334,6 +334,25 @@ TEST_F(FileSystemUtilUnittest, TestPathStat_GetCreateTime) {
         EXPECT_FALSE(fsutil::PathStat::stat((mTestRoot / "not_exist").string(), missingStat));
         EXPECT_EQ(missingStat.GetCreateTime(), 0);
     }
+
+#if defined(__linux__)
+    // Symlink consistency: after lstat(), mRawStat/IsLink() describe the link itself,
+    // so GetCreateTime() must query the link's own birth time (AT_SYMLINK_NOFOLLOW)
+    // rather than following it to the target. Regression guard for the symlink flag.
+    {
+        auto linkPath = (mTestRoot / "the_link").string();
+        // A dangling link (missing target) is the sharp case: following the link would
+        // hit ENOENT and yield 0, while querying the link node itself succeeds. On a
+        // birth-time-capable FS this proves no-follow; on others it still must be a
+        // sane, non-negative value and never crash.
+        bfs::create_symlink((mTestRoot / "no_such_target"), bfs::path(linkPath));
+
+        fsutil::PathStat linkStat;
+        EXPECT_TRUE(fsutil::PathStat::lstat(linkPath, linkStat));
+        EXPECT_TRUE(linkStat.IsLink());
+        EXPECT_GE(linkStat.GetCreateTime(), 0);
+    }
+#endif
 }
 
 TEST_F(FileSystemUtilUnittest, TestFileReadOnlyOpen) {
