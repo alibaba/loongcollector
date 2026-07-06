@@ -50,6 +50,7 @@ CREATE TABLE IF NOT EXISTS test_table (
     time BIGINT,
     content STRING,
     value STRING,
+    __pipeline_passthrough__ STRING,
     __tag__hostip STRING,
     __tag__hostname STRING
 ) DUPLICATE KEY(time)

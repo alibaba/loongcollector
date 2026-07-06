@@ -107,8 +107,9 @@ func (i *ElasticSearchSubscriber) queryRecords() (logGroup *protocol.LogGroup, e
 
 	type logContent struct {
 		Contents struct {
-			Index   string `json:"Index"`
-			Content string `json:"Content"`
+			Index       string `json:"Index"`
+			Content     string `json:"Content"`
+			Passthrough string `json:"__pipeline_passthrough__"`
 		} `json:"contents"`
 		Tags struct {
 			HostIP   string `json:"host.ip"`
@@ -135,6 +136,12 @@ func (i *ElasticSearchSubscriber) queryRecords() (logGroup *protocol.LogGroup, e
 				{Key: "index", Value: lc.Contents.Index},
 				{Key: "content", Value: lc.Contents.Content},
 			},
+		}
+		if lc.Contents.Passthrough != "" {
+			log.Contents = append(log.Contents, &protocol.Log_Content{
+				Key:   "__pipeline_passthrough__",
+				Value: lc.Contents.Passthrough,
+			})
 		}
 		logGroup.Logs = append(logGroup.Logs, log)
 	}

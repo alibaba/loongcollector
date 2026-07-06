@@ -33,7 +33,7 @@ import (
 )
 
 const dorisName = "doris"
-const dorisQuerySQL = "select time, content, value from `%s`.`%s` where time > %v order by time limit 100"
+const dorisQuerySQL = "select time, content, value, __pipeline_passthrough__ from `%s`.`%s` where time > %v order by time limit 100"
 
 type DorisSubscriber struct {
 	Address     string `mapstructure:"address" comment:"the doris FE address (format: http://host:port)"`
@@ -136,11 +136,12 @@ func (d *DorisSubscriber) queryRecords() (logGroup *protocol.LogGroup, err error
 
 	for rows.Next() {
 		var (
-			timestamp int64
-			content   sql.NullString
-			value     sql.NullString
+			timestamp   int64
+			content     sql.NullString
+			value       sql.NullString
+			passthrough sql.NullString
 		)
-		if err = rows.Scan(&timestamp, &content, &value); err != nil {
+		if err = rows.Scan(&timestamp, &content, &value, &passthrough); err != nil {
 			logger.Warningf(context.Background(), selfmonitor.DorisSubscriberAlarm, "failed to scan row, err: %s", err)
 			return
 		}
@@ -162,6 +163,14 @@ func (d *DorisSubscriber) queryRecords() (logGroup *protocol.LogGroup, err error
 			log.Contents = append(log.Contents, &protocol.Log_Content{
 				Key:   "value",
 				Value: value.String,
+			})
+		}
+
+		// Add passthrough field (v2 Metric/Span events are serialized here)
+		if passthrough.Valid && passthrough.String != "" {
+			log.Contents = append(log.Contents, &protocol.Log_Content{
+				Key:   "__pipeline_passthrough__",
+				Value: passthrough.String,
 			})
 		}
 

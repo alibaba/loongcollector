@@ -43,8 +43,9 @@ type LokiSubscriber struct {
 
 type logContent struct {
 	Contents struct {
-		Index string `json:"Index"`
-		Value string `json:"value"`
+		Index       string `json:"Index"`
+		Value       string `json:"value"`
+		Passthrough string `json:"__pipeline_passthrough__"`
 	} `json:"contents"`
 	Tags struct {
 		HostIP   string `json:"host.ip"`
@@ -149,6 +150,12 @@ func (l *LokiSubscriber) queryRecords() (logGroup *protocol.LogGroup, maxTimesta
 				Key:   "value",
 				Value: lc.Contents.Value,
 			})
+			if lc.Contents.Passthrough != "" {
+				log.Contents = append(log.Contents, &protocol.Log_Content{
+					Key:   "__pipeline_passthrough__",
+					Value: lc.Contents.Passthrough,
+				})
+			}
 			logGroup.Logs = append(logGroup.Logs, log)
 		}
 	}

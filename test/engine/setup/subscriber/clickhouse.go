@@ -123,9 +123,10 @@ func (i *ClickHouseSubscriber) queryRecords() (logGroup *protocol.LogGroup, err 
 
 	type logContent struct {
 		Contents struct {
-			Index string `json:"Index"`
-			Name  string `json:"_name"`
-			Value string `json:"_value"`
+			Index       string `json:"Index"`
+			Name        string `json:"_name"`
+			Value       string `json:"_value"`
+			Passthrough string `json:"__pipeline_passthrough__"`
 		} `json:"contents"`
 		Tags struct {
 			HostIP   string `json:"host.ip"`
@@ -158,6 +159,12 @@ func (i *ClickHouseSubscriber) queryRecords() (logGroup *protocol.LogGroup, err 
 			Key:   "_value",
 			Value: lc.Contents.Value,
 		})
+		if lc.Contents.Passthrough != "" {
+			log.Contents = append(log.Contents, &protocol.Log_Content{
+				Key:   "__pipeline_passthrough__",
+				Value: lc.Contents.Passthrough,
+			})
+		}
 		logGroup.Logs = append(logGroup.Logs, log)
 	}
 	return

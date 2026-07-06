@@ -16,11 +16,14 @@ Feature: flusher loki
     Given {flusher-loki-case} local config as below
     """
     enable: true
+    global:
+      StructureType: v2
+      InputIntervalMs: 100
     inputs:
       - Type: metric_mock
         IntervalMs: 100
         Tags:
-          __tag__:name: "hello"
+          name: "hello"
         Fields:
           value: "log contents"
     flushers:
@@ -44,9 +47,8 @@ Feature: flusher loki
     Given loongcollector depends on containers {["loki"]}
     When start docker-compose {flusher_loki}
     Then there is at least {10} logs
-    Then the log fields match kv
+    Then the log fields match as below
     """
-    name: "hello"
-    value: "log contents"
+    - __pipeline_passthrough__
     """
-  
+

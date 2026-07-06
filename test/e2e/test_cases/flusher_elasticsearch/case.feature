@@ -15,6 +15,9 @@ Feature: flusher elasticsearch
     Given {flusher-elasticsearch-case} local config as below
     """
     enable: true
+    global:
+      StructureType: v2
+      InputIntervalMs: 100
     inputs:
       - Type: metric_mock
         IntervalMs: 100
@@ -33,9 +36,8 @@ Feature: flusher elasticsearch
     Given loongcollector depends on containers {["elasticsearch"]}
     When start docker-compose {flusher_elasticsearch}
     Then there is at least {10} logs
-    Then the log fields match kv
+    Then the log fields match as below
     """
-    index: "default"
-    content: "hello"
+    - __pipeline_passthrough__
     """
-  
+
