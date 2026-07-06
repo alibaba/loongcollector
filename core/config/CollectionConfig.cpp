@@ -116,8 +116,16 @@ static const unordered_set<string>& GetNativeInputBlacklistWhenUsingGoPlugin() {
 }
 
 static bool IsNativeInputBlockedWhenUsingGoPlugin(const string& pluginType) {
-    // Blacklist is platform-agnostic: Linux-only native inputs are not registered on Windows,
-    // but configs referencing them must still be rejected when paired with Go plugins.
+    // This blacklist is intentionally NOT a subset of PluginRegistry::IsValidNativeInputPlugin.
+    // IsValidNativeInputPlugin reflects what is actually *registered*, which is conditional on
+    // platform (#if defined(__linux__)) and eBPF gflags (e.g. input_cpu_profiling is only
+    // registered when enable_ebpf_cpu_profiling is on, which defaults to false). The blacklist,
+    // by contrast, is unconditional. This gap matters because IsValidGoPlugin treats any name
+    // that is not a registered native plugin as a Go plugin: a blacklisted native input that
+    // happens to be unregistered (Linux-only input on Windows, or eBPF input with its gflag off)
+    // would otherwise be misclassified as a Go input and slip through the gate. Checking the
+    // blacklist first keeps such inputs classified as native and rejected when paired with Go
+    // plugins, regardless of build target or gflags.
     return GetNativeInputBlacklistWhenUsingGoPlugin().count(pluginType) > 0;
 }
 
