@@ -754,6 +754,12 @@ void LogFileReaderUnittest::TestReloadMetricsGaugeNoZeroDrop() {
     auto pluginMetricManager = std::make_shared<PluginMetricManager>(
         defaultLabels, metricKeys, MetricCategory::METRIC_CATEGORY_PLUGIN_SOURCE);
     FileServer::GetInstance()->AddPluginMetricManager(configName, pluginMetricManager);
+    // RAII guard: remove the manager from the global FileServer singleton on scope exit,
+    // including an early return triggered by a *_FATAL (gtest ASSERT_*) assertion, so a
+    // mid-test failure cannot leak a stale manager into subsequent test cases.
+    std::shared_ptr<void> managerGuard(nullptr, [&configName](void*) {
+        FileServer::GetInstance()->RemovePluginMetricManager(configName);
+    });
 
     CollectionPipelineContext reloadCtx;
     reloadCtx.SetConfigName(configName);
@@ -806,8 +812,7 @@ void LogFileReaderUnittest::TestReloadMetricsGaugeNoZeroDrop() {
     APSARA_TEST_EQUAL_FATAL(newReader.mSourceReadOffsetBytes->GetValue(), (uint64_t)consumedOffset);
     APSARA_TEST_GT_FATAL(newReader.mSourceSizeBytes->GetValue(), 0UL);
     APSARA_TEST_GE_FATAL(newReader.mSourceSizeBytes->GetValue(), newReader.mSourceReadOffsetBytes->GetValue());
-
-    FileServer::GetInstance()->RemovePluginMetricManager(configName);
+    // managerGuard removes the PluginMetricManager on scope exit.
 }
 
 class LogMultiBytesUnittest : public ::testing::Test {
