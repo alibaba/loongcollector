@@ -16,10 +16,14 @@
 
 #include <set>
 
+#include "json/json.h"
+
 #include "Monitor.h"
 #include "app_config/AppConfig.h"
 #include "go_pipeline/LogtailPlugin.h"
 #include "logger/Logger.h"
+#include "protobuf/models/ProtocolConversion.h"
+#include "protobuf/models/pipeline_event_group.pb.h"
 #include "provider/Provider.h"
 
 
@@ -229,6 +233,61 @@ void ReadMetrics::UpdateGoCppProvidedMetrics(vector<map<string, string>>& metric
             }
         }
     }
+}
+
+bool ReadMetrics::ParseGoMetricsPB(const std::string& pbData,
+                                   std::vector<std::map<std::string, std::string>>& metricsList) {
+    if (pbData.empty()) {
+        return true;
+    }
+    models::PipelineEventGroup pbGroup;
+    if (!pbGroup.ParseFromString(pbData)) {
+        LOG_WARNING(sLogger, ("receive go metrics pb", "failed to parse protobuf")("size", pbData.size()));
+        return false;
+    }
+    PipelineEventGroup eventGroup(std::make_shared<SourceBuffer>());
+    std::string errMsg;
+    if (!TransferPBToPipelineEventGroup(pbGroup, eventGroup, errMsg)) {
+        LOG_WARNING(sLogger, ("receive go metrics pb", "failed to transfer pb")("err", errMsg));
+        return false;
+    }
+
+    Json::StreamWriterBuilder writerBuilder;
+    writerBuilder["indentation"] = "";
+    for (auto& eventPtr : eventGroup.GetEvents()) {
+        if (!eventPtr.Is<MetricEvent>()) {
+            continue;
+        }
+        const MetricEvent& metricEvent = eventPtr.Cast<MetricEvent>();
+        // category is carried in MetricEvent.Name; reinsert it as the metric_category
+        // label so the record matches the GetGoMetrics map form expected by
+        // SelfMonitorMetricEvent(const std::map&).
+        Json::Value labels(Json::objectValue);
+        labels["metric_category"] = metricEvent.GetName().to_string();
+        for (auto tag = metricEvent.TagsBegin(); tag != metricEvent.TagsEnd(); ++tag) {
+            labels[tag->first.to_string()] = tag->second.to_string();
+        }
+        Json::Value counters(Json::objectValue);
+        Json::Value gauges(Json::objectValue);
+        const auto* multiValues = metricEvent.GetValue<UntypedMultiDoubleValues>();
+        if (multiValues != nullptr) {
+            for (auto it = multiValues->ValuesBegin(); it != multiValues->ValuesEnd(); ++it) {
+                const std::string name = it->first.to_string();
+                const UntypedMultiDoubleValue& value = it->second;
+                if (value.MetricType == UntypedValueMetricType::MetricTypeCounter) {
+                    counters[name] = std::to_string(static_cast<uint64_t>(value.Value));
+                } else {
+                    gauges[name] = std::to_string(value.Value);
+                }
+            }
+        }
+        std::map<std::string, std::string> record;
+        record["labels"] = Json::writeString(writerBuilder, labels);
+        record["counters"] = Json::writeString(writerBuilder, counters);
+        record["gauges"] = Json::writeString(writerBuilder, gauges);
+        metricsList.emplace_back(std::move(record));
+    }
+    return true;
 }
 
 } // namespace logtail

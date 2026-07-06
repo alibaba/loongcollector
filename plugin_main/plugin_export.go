@@ -26,6 +26,7 @@ import (
 
 	"github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/flags"
+	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/helper/containercenter"
 	"github.com/alibaba/ilogtail/pkg/helper/k8smeta"
 	"github.com/alibaba/ilogtail/pkg/logger"
@@ -89,6 +90,14 @@ typedef struct {
     InnerGoAlarm** alarms;
     int count;
 } InnerGoAlarms;
+
+// PBBuffer carries a serialized PipelineEventGroup protobuf pushed from Go to C++.
+// The caller (C++) owns data and must free() it. size is the byte length; data is
+// NULL and size is 0 when there is nothing to push or on marshal failure.
+typedef struct {
+    char* data;
+    int size;
+} PBBuffer;
 
 static KeyValue** makeKeyValueArray(int size) {
     return malloc(sizeof(KeyValue*) * size);
@@ -378,6 +387,61 @@ func GetGoAlarms() *C.InnerGoAlarms {
 		runtime.KeepAlive(cAlarm)
 	}
 	return cAlarms
+}
+
+// marshalAlarmsPB collects Go self-monitor alarms into a PipelineEventGroup PB
+// (one LogEvent per alarm) using the D2 contract helper and returns the serialized
+// bytes. Factored out of the CGO export so it can be unit-tested without cgo types.
+func marshalAlarmsPB(alarms []selfmonitor.AlarmExportMessage, now time.Time) ([]byte, error) {
+	group, err := helper.TransferAlarmsToPipelineEventGroup(alarms, now)
+	if err != nil {
+		return nil, err
+	}
+	return group.Marshal()
+}
+
+// marshalMetricsPB collects Go self-monitor metrics of the given export type into a
+// PipelineEventGroup PB (one MetricEvent per record) using the D2 contract helper
+// and returns the serialized bytes.
+func marshalMetricsPB(rawMetrics []map[string]string, now time.Time) ([]byte, error) {
+	group := helper.TransferRawMetricsToPipelineEventGroup(rawMetrics, now)
+	return group.Marshal()
+}
+
+// toPBBuffer copies data into a C-owned buffer. The C++ caller must free() data.
+// An empty or failed marshal yields a nil buffer, which the receiver treats as no-op.
+func toPBBuffer(data []byte, err error) C.PBBuffer {
+	var buf C.PBBuffer
+	if err != nil {
+		logger.Error(context.Background(), selfmonitor.PluginAlarm, "marshal self-monitor PB error", err)
+		return buf
+	}
+	if len(data) == 0 {
+		return buf
+	}
+	buf.data = (*C.char)(C.CBytes(data))
+	buf.size = C.int(len(data))
+	return buf
+}
+
+// GetGoSelfMonitorAlarmsPB pushes Go self-monitor alarms to C++ as a serialized
+// PipelineEventGroup protobuf. This is the D3 push path; it coexists with the legacy
+// GetGoAlarms CGO struct path (removed in D5).
+//
+//export GetGoSelfMonitorAlarmsPB
+func GetGoSelfMonitorAlarmsPB() C.PBBuffer {
+	data, err := marshalAlarmsPB(pluginmanager.GetAlarmMessages(), time.Now())
+	return toPBBuffer(data, err)
+}
+
+// GetGoSelfMonitorMetricsPB pushes Go self-monitor metrics of the given export type
+// to C++ as a serialized PipelineEventGroup protobuf. This is the D3 push path; it
+// coexists with the legacy GetGoMetrics CGO struct path (removed in D5).
+//
+//export GetGoSelfMonitorMetricsPB
+func GetGoSelfMonitorMetricsPB(metricType string) C.PBBuffer {
+	data, err := marshalMetricsPB(pluginmanager.GetMetrics(metricType), time.Now())
+	return toPBBuffer(data, err)
 }
 
 func initPluginBase(cfgStr string) int {

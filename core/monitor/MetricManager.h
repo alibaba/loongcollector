@@ -81,6 +81,15 @@ public:
     void ReadAsSelfMonitorMetricEvents(std::vector<SelfMonitorMetricEvent>& metricEventList) const;
     void UpdateMetrics();
 
+    // Parse self-monitor metrics pushed from Go as a serialized PipelineEventGroup
+    // protobuf (one MetricEvent per record) into the same map<string,string> form
+    // ("labels"/"counters"/"gauges" JSON) produced by the legacy GetGoMetrics path,
+    // so the pushed metrics can be consumed identically. This is the D3 receive path;
+    // it coexists with the legacy pull-based path (removed in D5). Returns false on a
+    // protobuf parse/transfer error.
+    static bool ParseGoMetricsPB(const std::string& pbData,
+                                 std::vector<std::map<std::string, std::string>>& metricsList);
+
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class MetricManagerUnittest;
 #endif
