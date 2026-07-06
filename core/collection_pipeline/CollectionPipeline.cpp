@@ -120,13 +120,14 @@ bool CollectionPipeline::Init(CollectionConfig&& config) {
             if (!optionalGoPipeline.isNull()) {
                 MergeGoPipeline(optionalGoPipeline, mGoPipelineWithInput);
             }
-            // for special treatment below
+            // for special treatment below; use the input just added (mInputs.back()) rather than
+            // mInputs[0], since multiple inputs may now coexist and a file input need not be first.
             if (pluginType == InputFile::sName) {
-                inputFile = static_cast<const InputFile*>(mInputs[0]->GetPlugin());
+                inputFile = static_cast<const InputFile*>(mInputs.back()->GetPlugin());
             } else if (pluginType == InputContainerStdio::sName) {
-                inputContainerStdio = static_cast<const InputContainerStdio*>(mInputs[0]->GetPlugin());
+                inputContainerStdio = static_cast<const InputContainerStdio*>(mInputs.back()->GetPlugin());
             } else if (pluginType == InputStaticFile::sName) {
-                inputStaticFile = static_cast<const InputStaticFile*>(mInputs[0]->GetPlugin());
+                inputStaticFile = static_cast<const InputStaticFile*>(mInputs.back()->GetPlugin());
             }
         } else {
             AddPluginToGoPipeline(pluginType, detail, "inputs", mGoPipelineWithInput);
