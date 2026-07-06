@@ -92,8 +92,10 @@ typedef struct {
 } InnerGoAlarms;
 
 // PBBuffer carries a serialized PipelineEventGroup protobuf pushed from Go to C++.
-// The caller (C++) owns data and must free() it. size is the byte length; data is
-// NULL and size is 0 when there is nothing to push or on marshal failure.
+// data is allocated inside libGoPluginBase.so; the C++ caller must release it via
+// FreeSelfMonitorPB (never free() directly) so that allocation and release stay in
+// the same module. size is the byte length; data is NULL and size is 0 when there
+// is nothing to push or on marshal failure.
 typedef struct {
     char* data;
     int size;
@@ -408,8 +410,10 @@ func marshalMetricsPB(rawMetrics []map[string]string, now time.Time) ([]byte, er
 	return group.Marshal()
 }
 
-// toPBBuffer copies data into a C-owned buffer. The C++ caller must free() data.
-// An empty or failed marshal yields a nil buffer, which the receiver treats as no-op.
+// toPBBuffer copies data into a buffer allocated inside libGoPluginBase.so. The C++
+// caller must release it via FreeSelfMonitorPB (not free()), keeping allocation and
+// release in the same module. An empty or failed marshal yields a nil buffer, which
+// the receiver treats as no-op.
 func toPBBuffer(data []byte, err error) C.PBBuffer {
 	var buf C.PBBuffer
 	if err != nil {
@@ -442,6 +446,21 @@ func GetGoSelfMonitorAlarmsPB() C.PBBuffer {
 func GetGoSelfMonitorMetricsPB(metricType string) C.PBBuffer {
 	data, err := marshalMetricsPB(pluginmanager.GetMetrics(metricType), time.Now())
 	return toPBBuffer(data, err)
+}
+
+// FreeSelfMonitorPB releases a PBBuffer.data block previously returned by
+// GetGoSelfMonitorAlarmsPB / GetGoSelfMonitorMetricsPB. Both the allocation
+// (C.CBytes in toPBBuffer) and this release run inside libGoPluginBase.so, so the
+// buffer is never freed across the module boundary — this satisfies the dynamic
+// library rule that memory must be allocated and freed within the same module and
+// avoids relying on a shared CRT heap under static-CRT linking. A nil pointer is a
+// no-op, so callers may invoke it unconditionally.
+//
+//export FreeSelfMonitorPB
+func FreeSelfMonitorPB(data *C.char) {
+	if data != nil {
+		C.free(unsafe.Pointer(data))
+	}
 }
 
 func initPluginBase(cfgStr string) int {
