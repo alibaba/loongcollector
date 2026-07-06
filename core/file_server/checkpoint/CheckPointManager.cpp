@@ -52,10 +52,9 @@ void CheckPointManager::AddCheckPoint(CheckPoint* checkPointPtr) {
     // the same (dev, inode, configName) but pointing at different physical files
     // no longer overwrite each other.
     CheckPointKey key(checkPointPtr->mDevInode, checkPointPtr->mConfigName, checkPointPtr->mCreateTime);
-    DevInodeCheckPointHashMap::iterator it = mDevInodeCheckPointPtrMap.find(key);
-    if (it != mDevInodeCheckPointPtrMap.end())
-        mDevInodeCheckPointPtrMap.erase(it);
-    mDevInodeCheckPointPtrMap.insert(std::make_pair(key, CheckPointPtr(checkPointPtr)));
+    // Re-adding the same key replaces the existing entry; insert_or_assign does this in a
+    // single tree lookup and drops the previous CheckPointPtr (freeing the old CheckPoint).
+    mDevInodeCheckPointPtrMap.insert_or_assign(key, CheckPointPtr(checkPointPtr));
 }
 
 void CheckPointManager::DeleteCheckPoint(DevInode devInode, const std::string& configName, int64_t createTime) {

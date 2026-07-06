@@ -37,13 +37,22 @@
 namespace logtail {
 
 #define NO_CHECKPOINT_VERSION 0
+
+// kUnsetCreateTime is the canonical "createTime not assigned" value. It is a real
+// key component, not a wildcard: checkpoints created before createTime is wired in,
+// and lookups that omit createTime, all share this value, which reproduces the legacy
+// (dev, inode, configName) keying exactly. Get/Delete always do an exact match on the
+// full key, so once real createTimes are populated a caller must pass the matching
+// createTime to hit the intended entry.
+constexpr int64_t kUnsetCreateTime = 0;
+
 class CheckPoint {
 public:
     DevInode mDevInode;
     // Physical-file discriminator: distinguishes different physical files that
-    // reuse the same (dev, inode), e.g. a same-name rebuild. 0 means unset, which
-    // keeps behavior identical to checkpoints that carry no create time.
-    int64_t mCreateTime = 0;
+    // reuse the same (dev, inode), e.g. a same-name rebuild. kUnsetCreateTime means
+    // unset, which keeps behavior identical to checkpoints that carry no create time.
+    int64_t mCreateTime = kUnsetCreateTime;
     int64_t mOffset = 0;
     uint64_t mSignatureHash = 0;
     uint32_t mSignatureSize = 0;
@@ -73,7 +82,7 @@ public:
                bool containerStopped,
                std::string containerID,
                bool lastForceRead,
-               int64_t createTime = 0)
+               int64_t createTime = kUnsetCreateTime)
         : mDevInode(devInode),
           mCreateTime(createTime),
           mOffset(offset),
@@ -106,13 +115,13 @@ class CheckPointManager {
 public:
     struct CheckPointKey {
         CheckPointKey() {}
-        CheckPointKey(const DevInode& devInode, const std::string& configName, int64_t createTime = 0)
+        CheckPointKey(const DevInode& devInode, const std::string& configName, int64_t createTime = kUnsetCreateTime)
             : mDevInode(devInode), mConfigName(configName), mCreateTime(createTime) {}
         DevInode mDevInode;
         std::string mConfigName;
-        // Physical-file discriminator, see CheckPoint::mCreateTime. 0 means unset,
-        // which preserves the original (dev, inode, configName) keying behavior.
-        int64_t mCreateTime = 0;
+        // Physical-file discriminator, see CheckPoint::mCreateTime. kUnsetCreateTime
+        // means unset, preserving the original (dev, inode, configName) keying behavior.
+        int64_t mCreateTime = kUnsetCreateTime;
 
         // Comparison order: dev -> inode -> createTime -> configName.
         bool operator<(const CheckPointKey& o) const {
@@ -145,7 +154,7 @@ public:
     bool CheckVersion();
     void AddCheckPoint(CheckPoint* checkPointPtr);
     void AddDirCheckPoint(const std::string& dirname);
-    void DeleteCheckPoint(DevInode devInode, const std::string& configName, int64_t createTime = 0);
+    void DeleteCheckPoint(DevInode devInode, const std::string& configName, int64_t createTime = kUnsetCreateTime);
     void DeleteDirCheckPoint(const std::string& dirname);
     void LoadCheckPoint();
     void LoadDirCheckPoint(const Json::Value& root);
@@ -155,7 +164,7 @@ public:
     bool GetCheckPoint(DevInode devInode,
                        const std::string& configName,
                        CheckPointPtr& checkPointPtr,
-                       int64_t createTime = 0);
+                       int64_t createTime = kUnsetCreateTime);
     bool GetDirCheckPoint(const std::string& filename, DirCheckPointPtr& checkPointPtr);
     void RemoveAllCheckPoint();
     void CheckTimeoutCheckPoint();
