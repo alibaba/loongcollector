@@ -40,8 +40,12 @@ PLATFORMS := linux darwin windows
 
 ifeq ($(shell uname -m),x86_64)
     ARCH := amd64
-else
+else ifneq (,$(filter $(shell uname -m),aarch64 arm64))
     ARCH := arm64
+else ifneq (,$(filter $(shell uname -m),riscv64 riscv64gc))
+    ARCH := riscv64
+else
+    ARCH := sw64
 endif
 
 ifndef DOCKER_BUILD_USE_BUILDKIT

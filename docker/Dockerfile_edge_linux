@@ -88,6 +88,7 @@ RUN set -eux; \
     case "${TARGETARCH}" in \
         amd64) LIB_DIR="/usr/lib/x86_64-linux-gnu" ;; \
         arm64) LIB_DIR="/usr/lib/aarch64-linux-gnu" ;; \
+        riscv64) LIB_DIR="/usr/lib/riscv64-linux-gnu" ;; \
         *) echo "Unsupported TARGETARCH: ${TARGETARCH}" >&2; exit 1 ;; \
     esac; \
     mkdir -p "${LIB_DIR}"; \
