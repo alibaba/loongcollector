@@ -328,7 +328,7 @@ bool CollectionConfig::Parse() {
             } else {
                 if (isCurrentPluginNative) {
                     if (PluginRegistry::GetInstance()->IsValidGoPlugin(pluginType)) {
-                        // A3: any registered native input may coexist with Go processors; the
+                        // Any registered native input may coexist with Go processors; the
                         // former input-type whitelist/blacklist gate has been removed.
                         isCurrentPluginNative = false;
                         mHasGoProcessor = true;
@@ -447,7 +447,7 @@ bool CollectionConfig::Parse() {
         }
         const string pluginType = it->asString();
         if (PluginRegistry::GetInstance()->IsValidGoPlugin(pluginType)) {
-            // A3: any registered native input may coexist with Go flushers; the former
+            // Any registered native input may coexist with Go flushers; the former
             // input-type whitelist/blacklist gate has been removed.
             mHasGoFlusher = true;
         } else if (PluginRegistry::GetInstance()->IsValidNativeFlusherPlugin(pluginType)) {
@@ -468,7 +468,7 @@ bool CollectionConfig::Parse() {
     // (see ShouldNativeFlusherConnectedByGoPipeline), and flusher_sls is currently the only native
     // flusher able to consume that output. Therefore at most one native flusher may coexist with Go
     // flushers, and it must be flusher_sls. This rule is lifted once extended flushers implement
-    // FlusherV2.Export end to end (Epic #2595 B-line: #2623 / #2603).
+    // FlusherV2.Export end to end.
     if (mHasGoFlusher && nativeFlusherCnt > 1) {
         PARAM_ERROR_RETURN(sLogger,
                            alarm,

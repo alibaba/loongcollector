@@ -2424,9 +2424,9 @@ void CollectionConfigUnittest::NativeInputWithGoPlugin() const {
     unique_ptr<CollectionConfig> config;
     string errorMsg;
 
-    // A3 (#2600): the input-type whitelist/blacklist gate is removed. Any registered native input
+    // The input-type whitelist/blacklist gate is removed. Any registered native input
     // may now coexist with Go processors and/or Go flushers, so these configs must Parse.
-    // (These inputs were rejected by the A1 legacy-parity blacklist.)
+    // (These inputs were previously rejected by the legacy-parity blacklist.)
     const vector<string> nativeInputs = {
         "input_agentsight",
         "input_cpu_profiling",
@@ -2492,7 +2492,7 @@ void CollectionConfigUnittest::MultiInputAndFlusherCoexistence() const {
     unique_ptr<CollectionConfig> config;
     string errorMsg;
 
-    // A3 (#2600): multiple native file inputs may coexist (single-input transitional
+    // Multiple native file inputs may coexist (single-input transitional
     // constraint removed).
     string configStr = R"(
         {
@@ -2516,7 +2516,7 @@ void CollectionConfigUnittest::MultiInputAndFlusherCoexistence() const {
     config.reset(new CollectionConfig(configName, std::move(configJson), filepath));
     APSARA_TEST_TRUE(config->Parse());
 
-    // native input coexists with Go flusher (multi-Input path exercised by A4 E2E).
+    // native input coexists with Go flusher (multi-input path).
     configStr = R"(
         {
             "inputs": [
