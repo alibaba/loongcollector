@@ -15,8 +15,6 @@
 package checker
 
 import (
-	"encoding/json"
-	"sort"
 	"strconv"
 	"testing"
 	"time"
@@ -88,40 +86,38 @@ func makePipelineGroupEventsFromLogGroups(v1Groups []*protocol.LogGroup) []*mode
 	return v2Groups
 }
 
-func logsToNormalizedJSON(logs []*protocol.Log) ([]string, error) {
-	out := make([]string, 0, len(logs))
-	for _, log := range logs {
-		fields := make(map[string]string, len(log.Contents))
-		for _, c := range log.Contents {
-			fields[c.Key] = c.Value
-		}
-		payload, err := json.Marshal(map[string]interface{}{
-			"time":   log.GetTime(),
-			"fields": fields,
-		})
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, string(payload))
+// TestFlusherChecker_ExportRecordsEventsNatively verifies that the v2 Export
+// path records PipelineGroupEvents natively, without populating the v1 LogGroup
+// or otherwise routing through the v1 pipeline data structures.
+func TestFlusherChecker_ExportRecordsEventsNatively(t *testing.T) {
+	_, v2Groups := makeParityLogGroups()
+
+	checker := &FlusherChecker{}
+	require.NoError(t, checker.Init(mock.NewEmptyContext("p", "l", "c")))
+	require.NoError(t, checker.Export(v2Groups, nil))
+
+	// Export must not touch the v1 LogGroup.
+	require.Empty(t, checker.LogGroup.Logs)
+
+	// Events are recorded as native PipelineGroupEvents and counted.
+	expected := 0
+	for _, g := range v2Groups {
+		expected += len(g.Events)
 	}
-	sort.Strings(out)
-	return out, nil
-}
+	require.Equal(t, len(v2Groups), len(checker.GroupEvents))
+	require.Equal(t, expected, checker.GetLogCount())
 
-func TestFlusherChecker_FlushExportParity(t *testing.T) {
-	v1Groups, v2Groups := makeParityLogGroups()
-
-	flushChecker := &FlusherChecker{}
-	require.NoError(t, flushChecker.Init(mock.NewEmptyContext("p", "l", "c")))
-	require.NoError(t, flushChecker.Flush("", "", "", v1Groups))
-
-	exportChecker := &FlusherChecker{}
-	require.NoError(t, exportChecker.Init(mock.NewEmptyContext("p", "l", "c")))
-	require.NoError(t, exportChecker.Export(v2Groups, nil))
-
-	v1JSON, err := logsToNormalizedJSON(flushChecker.LogGroup.Logs)
-	require.NoError(t, err)
-	v2JSON, err := logsToNormalizedJSON(exportChecker.LogGroup.Logs)
-	require.NoError(t, err)
-	require.Equal(t, v1JSON, v2JSON)
+	// Field values survive the v2 path unchanged.
+	seen := map[string]interface{}{}
+	for _, g := range checker.GroupEvents {
+		for _, e := range g.Events {
+			log, ok := e.(*models.Log)
+			require.True(t, ok)
+			for k, v := range log.GetIndices().Iterator() {
+				seen[k] = v
+			}
+		}
+	}
+	require.Equal(t, "The message: 10", seen["message"])
+	require.Equal(t, "1", seen["group"])
 }

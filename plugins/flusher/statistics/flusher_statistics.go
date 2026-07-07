@@ -22,7 +22,6 @@ import (
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
-	converter "github.com/alibaba/ilogtail/pkg/protocol/converter"
 
 	"github.com/paulbellamy/ratecounter"
 )
@@ -65,13 +64,6 @@ func (*FlusherStatistics) SetUrgent(flag bool) {
 // Flush flushes @logGroupList but it only do statistics.
 // It returns any error it encountered.
 func (p *FlusherStatistics) Flush(projectName string, logstoreName string, configName string, logGroupList []*protocol.LogGroup) error {
-	return p.flushLogGroups(logGroupList)
-}
-
-// flushLogGroups accumulates statistics for the log groups. It is shared by the
-// v1 Flush entry point and the v2 Export so that Export does not depend on
-// Flush, which is planned for removal.
-func (p *FlusherStatistics) flushLogGroups(logGroupList []*protocol.LogGroup) error {
 	for _, logGroup := range logGroupList {
 		p.loggroupRateCounter.Incr(1)
 		p.logRateCounter.Incr((int64)(len(logGroup.Logs)))
@@ -84,29 +76,36 @@ func (p *FlusherStatistics) flushLogGroups(logGroupList []*protocol.LogGroup) er
 		}
 		time.Sleep(time.Millisecond * time.Duration(p.SleepMsPerLogGroup))
 	}
+	p.reportRates()
+	return nil
+}
 
+// Export is the v2 pipeline entry point. It accumulates statistics directly from
+// PipelineGroupEvents without converting to protocol.LogGroup or going through
+// Flush, both of which belong to the v1 pipeline and are planned for removal.
+func (p *FlusherStatistics) Export(groups []*models.PipelineGroupEvents, _ pipeline.PipelineContext) error {
+	for _, groupEvents := range groups {
+		if groupEvents == nil {
+			continue
+		}
+		p.loggroupRateCounter.Incr(1)
+		p.logRateCounter.Incr((int64)(len(groupEvents.Events)))
+		if p.GeneratePB {
+			p.byteRateCount.Incr(groupEvents.GetSize())
+		}
+		time.Sleep(time.Millisecond * time.Duration(p.SleepMsPerLogGroup))
+	}
+	p.reportRates()
+	return nil
+}
+
+// reportRates periodically logs the accumulated rates. Shared by Flush and Export.
+func (p *FlusherStatistics) reportRates() {
 	nowTime := time.Now()
 	if nowTime.Sub(p.lastOutputTime) >= (time.Duration)(p.RateIntervalMs)*time.Millisecond {
 		logger.Info(p.context.GetRuntimeContext(), "current rate(MB)", float32(p.byteRateCount.Rate())/1024.0/1024.0, "log tps", p.logRateCounter.Rate(), "loggroup tps", p.loggroupRateCounter.Rate())
 		p.lastOutputTime = nowTime
 	}
-	return nil
-}
-
-func (p *FlusherStatistics) Export(groups []*models.PipelineGroupEvents, _ pipeline.PipelineContext) error {
-	for _, groupEvents := range groups {
-		logGroup, err := converter.PipelineGroupEventsToLogGroup(groupEvents)
-		if err != nil {
-			return err
-		}
-		if logGroup == nil || len(logGroup.Logs) == 0 {
-			continue
-		}
-		if err := p.flushLogGroups([]*protocol.LogGroup{logGroup}); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 // IsReady is ready to flush

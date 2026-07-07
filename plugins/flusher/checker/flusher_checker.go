@@ -24,14 +24,17 @@ import (
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
-	converter "github.com/alibaba/ilogtail/pkg/protocol/converter"
 )
 
 type FlusherChecker struct {
-	context  pipeline.Context
+	context pipeline.Context
+	// LogGroup records data received via the v1 Flush entry point.
 	LogGroup protocol.LogGroup
-	Lock     sync.RWMutex
-	Ready    bool
+	// GroupEvents records data received via the v2 Export entry point. It is kept
+	// as native PipelineGroupEvents rather than being converted to a v1 LogGroup.
+	GroupEvents []*models.PipelineGroupEvents
+	Lock        sync.RWMutex
+	Ready       bool
 }
 
 func (p *FlusherChecker) Init(context pipeline.Context) error {
@@ -47,7 +50,11 @@ func (*FlusherChecker) Description() string {
 func (p *FlusherChecker) GetLogCount() int {
 	p.Lock.Lock()
 	defer p.Lock.Unlock()
-	return len(p.LogGroup.Logs)
+	count := len(p.LogGroup.Logs)
+	for _, groupEvents := range p.GroupEvents {
+		count += len(groupEvents.Events)
+	}
+	return count
 }
 
 func (p *FlusherChecker) SetUrgent(flag bool) {
@@ -125,13 +132,6 @@ func (p *FlusherChecker) CheckEveryKeyValue(checker func(string, string) error) 
 }
 
 func (p *FlusherChecker) Flush(projectName string, logstoreName string, configName string, logGroupList []*protocol.LogGroup) error {
-	return p.flushLogGroups(logGroupList)
-}
-
-// flushLogGroups records the log groups. It is shared by the v1 Flush entry
-// point and the v2 Export so that Export does not depend on Flush, which is
-// planned for removal.
-func (p *FlusherChecker) flushLogGroups(logGroupList []*protocol.LogGroup) error {
 	p.Lock.Lock()
 	defer p.Lock.Unlock()
 	for _, logGroup := range logGroupList {
@@ -148,18 +148,17 @@ func (p *FlusherChecker) flushLogGroups(logGroupList []*protocol.LogGroup) error
 	return nil
 }
 
+// Export is the v2 pipeline entry point. It records PipelineGroupEvents directly
+// for later assertion, without converting to protocol.LogGroup or going through
+// Flush, both of which belong to the v1 pipeline and are planned for removal.
 func (p *FlusherChecker) Export(groups []*models.PipelineGroupEvents, _ pipeline.PipelineContext) error {
+	p.Lock.Lock()
+	defer p.Lock.Unlock()
 	for _, groupEvents := range groups {
-		logGroup, err := converter.PipelineGroupEventsToLogGroup(groupEvents)
-		if err != nil {
-			return err
-		}
-		if logGroup == nil || len(logGroup.Logs) == 0 {
+		if groupEvents == nil || len(groupEvents.Events) == 0 {
 			continue
 		}
-		if err := p.flushLogGroups([]*protocol.LogGroup{logGroup}); err != nil {
-			return err
-		}
+		p.GroupEvents = append(p.GroupEvents, groupEvents)
 	}
 	return nil
 }

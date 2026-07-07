@@ -20,7 +20,6 @@ import (
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
-	converter "github.com/alibaba/ilogtail/pkg/protocol/converter"
 )
 
 type FlusherSleep struct {
@@ -38,29 +37,19 @@ func (*FlusherSleep) Description() string {
 }
 
 func (p *FlusherSleep) Flush(projectName string, logstoreName string, configName string, logGroupList []*protocol.LogGroup) error {
-	return p.flushLogGroups()
-}
-
-// flushLogGroups performs the configured sleep. It is shared by the v1 Flush
-// entry point and the v2 Export so that Export does not depend on Flush, which
-// is planned for removal.
-func (p *FlusherSleep) flushLogGroups() error {
 	time.Sleep(time.Duration(p.SleepMS) * time.Millisecond)
 	return nil
 }
 
+// Export is the v2 pipeline entry point. It consumes PipelineGroupEvents
+// directly and does not route through Flush or protocol.LogGroup, both of which
+// belong to the v1 pipeline and are planned for removal.
 func (p *FlusherSleep) Export(groups []*models.PipelineGroupEvents, _ pipeline.PipelineContext) error {
 	for _, groupEvents := range groups {
-		logGroup, err := converter.PipelineGroupEventsToLogGroup(groupEvents)
-		if err != nil {
-			return err
-		}
-		if logGroup == nil || len(logGroup.Logs) == 0 {
+		if groupEvents == nil || len(groupEvents.Events) == 0 {
 			continue
 		}
-		if err := p.flushLogGroups(); err != nil {
-			return err
-		}
+		time.Sleep(time.Duration(p.SleepMS) * time.Millisecond)
 	}
 	return nil
 }

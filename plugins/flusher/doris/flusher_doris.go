@@ -266,13 +266,6 @@ func (f *FlusherDoris) Validate() error {
 }
 
 func (f *FlusherDoris) Flush(projectName string, logstoreName string, configName string, logGroupList []*protocol.LogGroup) error {
-	return f.flushLogGroups(logGroupList)
-}
-
-// flushLogGroups dispatches log groups to the doris client (async or sync). It
-// is shared by the v1 Flush entry point and the v2 Export so that Export does
-// not depend on Flush, which is planned for removal.
-func (f *FlusherDoris) flushLogGroups(logGroupList []*protocol.LogGroup) error {
 	if f.dorisClient == nil {
 		return fmt.Errorf("doris client not initialized")
 	}
@@ -290,20 +283,42 @@ func (f *FlusherDoris) flushLogGroups(logGroupList []*protocol.LogGroup) error {
 	return f.flushSync(logGroupList)
 }
 
+// Export is the v2 pipeline entry point. It serializes PipelineGroupEvents with
+// the v2 converter and streams the resulting bytes to Doris directly, without
+// converting to protocol.LogGroup or going through Flush, both of which belong
+// to the v1 pipeline and are planned for removal.
 func (f *FlusherDoris) Export(groups []*models.PipelineGroupEvents, _ pipeline.PipelineContext) error {
-	for _, groupEvents := range groups {
-		logGroup, err := converter.PipelineGroupEventsToLogGroup(groupEvents)
-		if err != nil {
-			return err
+	if f.dorisClient == nil {
+		return fmt.Errorf("doris client not initialized")
+	}
+
+	buffer := f.bufferPool.Get().(*bytes.Buffer)
+	buffer.Reset()
+	defer func() {
+		if buffer.Cap() > 10*1024*1024 {
+			buffer = nil
 		}
-		if logGroup == nil || len(logGroup.Logs) == 0 {
+		if buffer != nil {
+			f.bufferPool.Put(buffer)
+		}
+	}()
+
+	for _, groupEvents := range groups {
+		if groupEvents == nil || len(groupEvents.Events) == 0 {
 			continue
 		}
-		if err := f.flushLogGroups([]*protocol.LogGroup{logGroup}); err != nil {
-			return err
+		serializedLogs, err := f.converter.ToByteStreamV2(groupEvents)
+		if err != nil {
+			logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "flush doris convert log fail, error", err)
+			continue
+		}
+		for _, log := range serializedLogs.([][]byte) {
+			buffer.Write(log)
+			buffer.WriteByte('\n') // JSON object line format
 		}
 	}
-	return nil
+
+	return f.loadBuffer(buffer)
 }
 
 // addTask adds a flush task to the queue for async processing
@@ -380,6 +395,14 @@ func (f *FlusherDoris) flushSync(logGroupList []*protocol.LogGroup) error {
 		}
 	}
 
+	return f.loadBuffer(buffer)
+}
+
+// loadBuffer streams the accumulated byte buffer to Doris via Stream Load and
+// handles the response and statistics. It is shared by the v1 flushSync and the
+// v2 Export paths; it operates purely on bytes and never touches
+// protocol.LogGroup.
+func (f *FlusherDoris) loadBuffer(buffer *bytes.Buffer) error {
 	if buffer.Len() == 0 {
 		logger.Debug(f.context.GetRuntimeContext(), "No logs to flush")
 		return nil
