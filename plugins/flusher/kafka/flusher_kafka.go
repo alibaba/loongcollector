@@ -23,10 +23,8 @@ import (
 	"github.com/IBM/sarama"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
-	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
-	converter "github.com/alibaba/ilogtail/pkg/protocol/converter"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
@@ -179,24 +177,6 @@ func (k *FlusherKafka) hashPartitionKey(log *protocol.Log, defaultKey string) sa
 	}
 	logger.Debug(k.context.GetRuntimeContext(), "partition key", hashData, " hashKeyMap", k.hashKeyMap)
 	return sarama.StringEncoder(strings.Join(hashData, "###"))
-}
-
-func (k *FlusherKafka) Export(groups []*models.PipelineGroupEvents, _ pipeline.PipelineContext) error {
-	for _, groupEvents := range groups {
-		logGroup, err := converter.PipelineGroupEventsToLogGroup(groupEvents)
-		if err != nil {
-			return err
-		}
-		if logGroup == nil || len(logGroup.Logs) == 0 {
-			continue
-		}
-		// Do not go through Flush: the v1 Flush entry point is planned for removal.
-		// Reuse the underlying flusher func (NormalFlush/HashFlush) directly.
-		if err := k.flusher("", "", "", []*protocol.LogGroup{logGroup}); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 func (*FlusherKafka) SetUrgent(flag bool) {

@@ -15,17 +15,14 @@
 package kafka
 
 import (
-	"encoding/json"
-	"sort"
+	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/plugins/test"
+	"github.com/alibaba/ilogtail/plugins/test/mock"
+
 	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/require"
-
-	"github.com/alibaba/ilogtail/pkg/models"
-	"github.com/alibaba/ilogtail/pkg/protocol"
-	"github.com/alibaba/ilogtail/plugins/test"
-	"github.com/alibaba/ilogtail/plugins/test/mock"
 )
 
 // Invalid Test
@@ -61,8 +58,7 @@ func makeTestLogGroupList() *protocol.LogGroupList {
 	}
 	for i := 1; i <= 10; i++ {
 		lg := &protocol.LogGroup{
-			Logs:   make([]*protocol.Log, 0, 10),
-			Source: "",
+			Logs: make([]*protocol.Log, 0, 10),
 		}
 		for j := 1; j <= 10; j++ {
 			f["group"] = strconv.Itoa(i)
@@ -73,67 +69,4 @@ func makeTestLogGroupList() *protocol.LogGroupList {
 		lgl.LogGroupList = append(lgl.LogGroupList, lg)
 	}
 	return lgl
-}
-
-func makeParityLogGroups() ([]*protocol.LogGroup, []*models.PipelineGroupEvents) {
-	v1Groups := makeTestLogGroupList().GetLogGroupList()[:1]
-	return v1Groups, makePipelineGroupEventsFromLogGroups(v1Groups)
-}
-
-func makePipelineGroupEventsFromLogGroups(v1Groups []*protocol.LogGroup) []*models.PipelineGroupEvents {
-	v2Groups := make([]*models.PipelineGroupEvents, 0, len(v1Groups))
-	for _, lg := range v1Groups {
-		groupTags := models.NewTags()
-		groupTags.Add("host.ip", lg.Source)
-		for _, tag := range lg.LogTags {
-			groupTags.Add(tag.Key, tag.Value)
-		}
-		group := models.NewGroup(models.NewMetadata(), groupTags)
-		events := make([]models.PipelineEvent, 0, len(lg.Logs))
-		for _, log := range lg.Logs {
-			ts := uint64(log.GetTime()) * 1e9
-			if log.TimeNs != nil {
-				ts += uint64(*log.TimeNs)
-			}
-			v2Log := models.NewLog("", nil, "", "", "", models.NewTags(), ts)
-			for _, c := range log.Contents {
-				v2Log.GetIndices().Add(c.Key, c.Value)
-			}
-			events = append(events, v2Log)
-		}
-		v2Groups = append(v2Groups, &models.PipelineGroupEvents{Group: group, Events: events})
-	}
-	return v2Groups
-}
-
-func TestFlusherKafka_FlushExportParity(t *testing.T) {
-	v1Groups, v2Groups := makeParityLogGroups()
-
-	var flushPayloads, exportPayloads []string
-	newCapture := func(dst *[]string) FlusherFunc {
-		return func(_ string, _ string, _ string, logGroupList []*protocol.LogGroup) error {
-			for _, lg := range logGroupList {
-				for _, log := range lg.Logs {
-					sort.Slice(log.Contents, func(i, j int) bool {
-						return log.Contents[i].Key < log.Contents[j].Key
-					})
-					buf, err := json.Marshal(log)
-					require.NoError(t, err)
-					*dst = append(*dst, string(buf))
-				}
-			}
-			return nil
-		}
-	}
-
-	flushFlusher := &FlusherKafka{flusher: newCapture(&flushPayloads)}
-	require.NoError(t, flushFlusher.Flush("", "", "", v1Groups))
-
-	exportFlusher := &FlusherKafka{flusher: newCapture(&exportPayloads)}
-	require.NoError(t, exportFlusher.Export(v2Groups, nil))
-
-	require.Equal(t, len(flushPayloads), len(exportPayloads))
-	for i := range flushPayloads {
-		require.JSONEq(t, flushPayloads[i], exportPayloads[i])
-	}
 }

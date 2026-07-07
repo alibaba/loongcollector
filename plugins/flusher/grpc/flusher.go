@@ -122,6 +122,13 @@ func (f *Flusher) flushLogGroups(logGroupList []*protocol.LogGroup) error {
 	return nil
 }
 
+// Export sends v2 PipelineGroupEvents over the gRPC stream. Unlike other
+// flushers, protocol.LogGroup is retained here on purpose: it is the on-wire
+// message type of the LogReportService.Collect RPC
+// (pkg/protocol/proto/sls_logs_transfer.proto, stream.Send(*protocol.LogGroup)).
+// There is no v2 report proto, so LogGroup is the serialization format of this
+// channel rather than a v1 pipeline leftover; converting away from it would
+// require a new gRPC service, which is out of the flusher Export scope.
 func (f *Flusher) Export(groups []*models.PipelineGroupEvents, _ pipeline.PipelineContext) error {
 	for _, groupEvents := range groups {
 		logGroup, err := converter.PipelineGroupEventsToLogGroup(groupEvents)
