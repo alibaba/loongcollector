@@ -21,6 +21,7 @@ import (
 
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/models"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
@@ -34,8 +35,9 @@ func (c *Converter) ConvertToSingleProtocolStreamV2(groupEvents *models.Pipeline
 	marshaledLogs := make([][]byte, 0, len(groupEvents.Events))
 	desiredValues := make([]map[string]string, 0, len(groupEvents.Events))
 	for _, event := range groupEvents.Events {
-		switch event.GetType() {
-		case models.EventTypeLogging:
+		// Classify events via B1's shared pass-through contract (pkg/pipeline):
+		// Log-only handlers process Log events; all other kinds pass through.
+		if pipeline.LogOnlyEventKinds.Supports(event.GetType()) {
 			log, ok := event.(*models.Log)
 			if !ok {
 				return nil, nil, fmt.Errorf("expected log event, got %T", event)
@@ -50,26 +52,23 @@ func (c *Converter) ConvertToSingleProtocolStreamV2(groupEvents *models.Pipeline
 			}
 			marshaledLogs = append(marshaledLogs, b)
 			desiredValues = append(desiredValues, desiredValue)
-		case models.EventTypeMetric, models.EventTypeSpan, models.EventTypeByteArray:
-			entry, desiredValue, err := c.convertPassthroughToSingleProtocol(event, groupEvents.Group, targetFields)
-			if err != nil {
-				if c.IgnoreUnExpectedData {
-					continue
-				}
-				return nil, nil, err
-			}
-			b, err := marshalSingleProtocolEntry(entry)
-			if err != nil {
-				return nil, nil, err
-			}
-			marshaledLogs = append(marshaledLogs, b)
-			desiredValues = append(desiredValues, desiredValue)
-		default:
+			continue
+		}
+		// Metric/Span/ByteArray are serialized into __pipeline_passthrough__ so they
+		// are never silently dropped; serialization rejects genuinely unknown kinds.
+		entry, desiredValue, err := c.convertPassthroughToSingleProtocol(event, groupEvents.Group, targetFields)
+		if err != nil {
 			if c.IgnoreUnExpectedData {
 				continue
 			}
-			return nil, nil, fmt.Errorf("unsupported event type: %v", event.GetType())
+			return nil, nil, err
 		}
+		b, err := marshalSingleProtocolEntry(entry)
+		if err != nil {
+			return nil, nil, err
+		}
+		marshaledLogs = append(marshaledLogs, b)
+		desiredValues = append(desiredValues, desiredValue)
 	}
 	return marshaledLogs, desiredValues, nil
 }
@@ -82,8 +81,9 @@ func (c *Converter) ConvertToSingleProtocolStreamFlattenV2(groupEvents *models.P
 	marshaledLogs := make([][]byte, 0, len(groupEvents.Events))
 	desiredValues := make([]map[string]string, 0, len(groupEvents.Events))
 	for _, event := range groupEvents.Events {
-		switch event.GetType() {
-		case models.EventTypeLogging:
+		// Classify events via B1's shared pass-through contract (pkg/pipeline):
+		// Log-only handlers process Log events; all other kinds pass through.
+		if pipeline.LogOnlyEventKinds.Supports(event.GetType()) {
 			log, ok := event.(*models.Log)
 			if !ok {
 				return nil, nil, fmt.Errorf("expected log event, got %T", event)
@@ -98,26 +98,23 @@ func (c *Converter) ConvertToSingleProtocolStreamFlattenV2(groupEvents *models.P
 			}
 			marshaledLogs = append(marshaledLogs, b)
 			desiredValues = append(desiredValues, desiredValue)
-		case models.EventTypeMetric, models.EventTypeSpan, models.EventTypeByteArray:
-			entry, desiredValue, err := c.convertPassthroughToSingleProtocolFlatten(event, groupEvents.Group, targetFields)
-			if err != nil {
-				if c.IgnoreUnExpectedData {
-					continue
-				}
-				return nil, nil, err
-			}
-			b, err := marshalSingleProtocolEntry(entry)
-			if err != nil {
-				return nil, nil, err
-			}
-			marshaledLogs = append(marshaledLogs, b)
-			desiredValues = append(desiredValues, desiredValue)
-		default:
+			continue
+		}
+		// Metric/Span/ByteArray are serialized into __pipeline_passthrough__ so they
+		// are never silently dropped; serialization rejects genuinely unknown kinds.
+		entry, desiredValue, err := c.convertPassthroughToSingleProtocolFlatten(event, groupEvents.Group, targetFields)
+		if err != nil {
 			if c.IgnoreUnExpectedData {
 				continue
 			}
-			return nil, nil, fmt.Errorf("unsupported event type: %v", event.GetType())
+			return nil, nil, err
 		}
+		b, err := marshalSingleProtocolEntry(entry)
+		if err != nil {
+			return nil, nil, err
+		}
+		marshaledLogs = append(marshaledLogs, b)
+		desiredValues = append(desiredValues, desiredValue)
 	}
 	return marshaledLogs, desiredValues, nil
 }
@@ -322,8 +319,9 @@ func PipelineGroupEventsToLogGroup(groupEvents *models.PipelineGroupEvents) (*pr
 	}
 
 	for _, event := range groupEvents.Events {
-		switch event.GetType() {
-		case models.EventTypeLogging:
+		// Classify events via B1's shared pass-through contract (pkg/pipeline):
+		// Log-only handlers process Log events; all other kinds pass through.
+		if pipeline.LogOnlyEventKinds.Supports(event.GetType()) {
 			log, ok := event.(*models.Log)
 			if !ok {
 				return nil, fmt.Errorf("expected log event, got %T", event)
@@ -337,22 +335,22 @@ func PipelineGroupEventsToLogGroup(groupEvents *models.PipelineGroupEvents) (*pr
 				return nil, err
 			}
 			logGroup.Logs = append(logGroup.Logs, legacyLog)
-		case models.EventTypeMetric, models.EventTypeSpan, models.EventTypeByteArray:
-			payload, err := serializePassthroughEvent(event)
-			if err != nil {
-				return nil, err
-			}
-			ts := event.GetTimestamp()
-			logGroup.Logs = append(logGroup.Logs, &protocol.Log{
-				Time: uint32(ts / 1e9),
-				Contents: []*protocol.Log_Content{{
-					Key:   passthroughLogKey,
-					Value: string(payload),
-				}},
-			})
-		default:
-			return nil, fmt.Errorf("unsupported event type: %v", event.GetType())
+			continue
 		}
+		// Metric/Span/ByteArray are serialized into __pipeline_passthrough__ so they
+		// are never silently dropped; serialization rejects genuinely unknown kinds.
+		payload, err := serializePassthroughEvent(event)
+		if err != nil {
+			return nil, err
+		}
+		ts := event.GetTimestamp()
+		logGroup.Logs = append(logGroup.Logs, &protocol.Log{
+			Time: uint32(ts / 1e9),
+			Contents: []*protocol.Log_Content{{
+				Key:   passthroughLogKey,
+				Value: string(payload),
+			}},
+		})
 	}
 	return logGroup, nil
 }
