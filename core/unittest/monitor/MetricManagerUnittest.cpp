@@ -342,7 +342,7 @@ void MetricManagerUnittest::TestCreateAndDeleteMetric() {
 }
 
 // Build a serialized PipelineEventGroup PB carrying one MetricEvent, mirroring the
-// D3 Go push payload, and verify ParseGoMetricsPB reconstructs the GetGoMetrics map
+// D3 Go pull payload, and verify ParseGoMetricsPB reconstructs the GetGoMetrics map
 // form that SelfMonitorMetricEvent(const std::map&) consumes.
 void MetricManagerUnittest::TestParseGoMetricsPB() {
     PipelineEventGroup group(std::make_shared<SourceBuffer>());

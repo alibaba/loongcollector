@@ -26,8 +26,9 @@ import (
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
-// TestMarshalAlarmsPBRoundTrip verifies that alarms marshaled by the D3 push path
-// deserialize back to the same AlarmExportMessage set via the D2 contract helper.
+// TestMarshalAlarmsPBRoundTrip verifies that alarms marshaled on the Go side for the
+// D3 pull path deserialize back to the same AlarmExportMessage set via the D2 contract
+// helper.
 func TestMarshalAlarmsPBRoundTrip(t *testing.T) {
 	now := time.Unix(1700000000, 0)
 	alarms := []selfmonitor.AlarmExportMessage{
@@ -79,8 +80,8 @@ func TestMarshalAlarmsPBEmpty(t *testing.T) {
 	assert.Empty(t, helper.TransferPipelineEventGroupToAlarms(group))
 }
 
-// TestMarshalMetricsPBRoundTrip verifies that raw metric records marshaled by the D3
-// push path deserialize back to the expected MetricExportRecord set.
+// TestMarshalMetricsPBRoundTrip verifies that raw metric records marshaled on the Go
+// side for the D3 pull path deserialize back to the expected MetricExportRecord set.
 func TestMarshalMetricsPBRoundTrip(t *testing.T) {
 	now := time.Unix(1700000000, 0)
 	raw := []map[string]string{

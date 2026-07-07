@@ -29,7 +29,7 @@ public:
 
 private:
     // Serialize a PipelineEventGroup of alarm LogEvents into PB bytes, mirroring the
-    // D3 Go push payload produced by helper.TransferAlarmsToPipelineEventGroup.
+    // D3 Go pull payload produced by helper.TransferAlarmsToPipelineEventGroup.
     static std::string BuildAlarmsPB(const std::vector<std::map<std::string, std::string>>& alarms) {
         PipelineEventGroup group(std::make_shared<SourceBuffer>());
         for (const auto& alarm : alarms) {
