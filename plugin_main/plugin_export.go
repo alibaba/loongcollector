@@ -96,11 +96,13 @@ typedef struct {
 // libGoPluginBase.so; after the C++ caller copies the bytes on receive it must
 // release the buffer via FreeSelfMonitorPB (never free() directly) so that allocation
 // and release stay in the same module and no memory crosses the module boundary. size
-// is the byte length; data is NULL and size is 0 when there is nothing to pull or on
-// marshal failure.
+// is the byte length; it is size_t (unsigned, pointer-sized) rather than int so the
+// cross-language length matches the C++ std::string consumer and cannot overflow or go
+// negative on the ABI boundary. data is NULL and size is 0 when there is nothing to
+// pull or on marshal failure.
 typedef struct {
     char* data;
-    int size;
+    size_t size;
 } PBBuffer;
 
 static KeyValue** makeKeyValueArray(int size) {
@@ -429,7 +431,7 @@ func toPBBuffer(data []byte, err error) C.PBBuffer {
 		return buf
 	}
 	buf.data = (*C.char)(C.CBytes(data))
-	buf.size = C.int(len(data))
+	buf.size = C.size_t(len(data))
 	return buf
 }
 
