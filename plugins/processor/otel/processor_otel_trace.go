@@ -132,7 +132,8 @@ func (p *ProcessorOtelTraceParser) processProtoJSONTraceData(val string) ([]*pro
 	resourceSpans := &v1.ResourceSpans{}
 	var err error
 
-	if err = protojson.Unmarshal([]byte(val), resourceSpans); err != nil {
+	opt := protojson.UnmarshalOptions{DiscardUnknown: true}
+	if err = opt.Unmarshal([]byte(val), resourceSpans); err != nil {
 		return nil, err
 	}
 
