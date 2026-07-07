@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"strings"
 	"time"
 
 	"github.com/ClickHouse/clickhouse-go/v2"
@@ -192,7 +193,7 @@ func (f *FlusherClickHouse) Export(groups []*models.PipelineGroupEvents, _ pipel
 			continue
 		}
 		for _, log := range serializedLogs.([][]byte) {
-			sql := fmt.Sprintf("INSERT INTO %s.ilogtail_%s_buffer (_timestamp, _log) VALUES (%d, '%s')", f.Authentication.PlainText.Database, f.Table, time.Now().Unix(), string(log))
+			sql := fmt.Sprintf("INSERT INTO %s.ilogtail_%s_buffer (_timestamp, _log) VALUES (%d, '%s')", f.Authentication.PlainText.Database, f.Table, time.Now().Unix(), escapeClickHouseStringLiteral(string(log)))
 			if err := f.conn.AsyncInsert(ctx, sql, false); err != nil {
 				logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "flush clickhouse AsyncInsert fail, error", err)
 			}
@@ -211,7 +212,7 @@ func (f *FlusherClickHouse) BufferFlush(projectName string, logstoreName string,
 			logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "flush clickhouse convert log fail, error", err)
 		}
 		for _, log := range serializedLogs.([][]byte) {
-			sql := fmt.Sprintf("INSERT INTO %s.ilogtail_%s_buffer (_timestamp, _log) VALUES (%d, '%s')", f.Authentication.PlainText.Database, f.Table, time.Now().Unix(), string(log))
+			sql := fmt.Sprintf("INSERT INTO %s.ilogtail_%s_buffer (_timestamp, _log) VALUES (%d, '%s')", f.Authentication.PlainText.Database, f.Table, time.Now().Unix(), escapeClickHouseStringLiteral(string(log)))
 			err = f.conn.AsyncInsert(ctx, sql, false)
 			if err != nil {
 				logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "flush clickhouse AsyncInsert fail, error", err)
@@ -310,6 +311,18 @@ func createNullBufferTable(f *FlusherClickHouse) error {
 		return err
 	}
 	return nil
+}
+
+// escapeClickHouseStringLiteral escapes a string so it can be safely embedded
+// inside a single-quoted ClickHouse SQL string literal. ClickHouse consumes
+// backslash escape sequences (e.g. \" -> ") while parsing literals, so a JSON
+// payload containing escaped quotes would be corrupted on read-back. Escaping
+// the backslashes and single quotes here keeps the stored value byte-identical
+// to the serialized bytes. Backslash must be escaped before the single quote.
+func escapeClickHouseStringLiteral(s string) string {
+	s = strings.ReplaceAll(s, `\`, `\\`)
+	s = strings.ReplaceAll(s, `'`, `\'`)
+	return s
 }
 
 func compressionMethod(compression string) (clickhouse.CompressionMethod, error) {

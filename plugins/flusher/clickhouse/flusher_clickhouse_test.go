@@ -202,6 +202,55 @@ func newClickHouseParityFlusher(t *testing.T, conn *captureClickHouseConn) *Flus
 	return f
 }
 
+// clickHouseUnescapeStringLiteral mimics how ClickHouse's single-quoted string
+// literal parser consumes backslash escape sequences, so the test can assert
+// that the stored bytes are valid JSON after the server unescapes them.
+func clickHouseUnescapeStringLiteral(s string) string {
+	var b strings.Builder
+	for i := 0; i < len(s); i++ {
+		if s[i] == '\\' && i+1 < len(s) {
+			i++
+			b.WriteByte(s[i])
+			continue
+		}
+		b.WriteByte(s[i])
+	}
+	return b.String()
+}
+
+// TestFlusherClickHouse_ExportMetricPassthroughValidJSON reproduces the v2 e2e
+// scenario (metric_mock -> Export): a Metric event is passthrough-serialized as
+// nested JSON, whose escaped quotes must survive the ClickHouse string literal
+// so the stored _log round-trips as valid JSON instead of being silently
+// dropped or corrupted.
+func TestFlusherClickHouse_ExportMetricPassthroughValidJSON(t *testing.T) {
+	group := models.NewGroup(models.NewMetadata(), models.NewTags())
+	// A single-quote in a tag value also stresses the SQL literal escaping.
+	metric := models.NewSingleValueMetric("hello", models.MetricTypeGauge,
+		models.NewTagsWithKeyValues("region", "cn-'hangzhou'"), 1700000000*1e9, 3.14)
+	groups := []*models.PipelineGroupEvents{{Group: group, Events: []models.PipelineEvent{metric}}}
+
+	conn := &captureClickHouseConn{}
+	f := newClickHouseParityFlusher(t, conn)
+	require.NoError(t, f.Export(groups, nil))
+	require.NotEmpty(t, conn.logs, "metric event must not be silently dropped")
+
+	for _, raw := range conn.logs {
+		stored := clickHouseUnescapeStringLiteral(string(raw))
+		var obj map[string]interface{}
+		require.NoErrorf(t, json.Unmarshal([]byte(stored), &obj),
+			"stored _log must be valid JSON after ClickHouse unescapes the literal: %s", stored)
+		contents, ok := obj["contents"].(map[string]interface{})
+		require.True(t, ok, "entry must contain contents")
+		passthrough, ok := contents["__pipeline_passthrough__"].(string)
+		require.True(t, ok, "metric event must be passthrough-serialized")
+		var payload map[string]interface{}
+		require.NoError(t, json.Unmarshal([]byte(passthrough), &payload),
+			"passthrough payload must itself be valid JSON")
+		require.Equal(t, "metric", payload["eventType"])
+	}
+}
+
 func TestFlusherClickHouse_FlushExportParity(t *testing.T) {
 	v1Groups, v2Groups := makeParityLogGroups()
 
