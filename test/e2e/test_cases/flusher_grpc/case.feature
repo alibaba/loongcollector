@@ -44,15 +44,20 @@ Feature: flusher grpc
     """
     When start docker-compose {flusher_grpc}
     Then there is at least {10} logs
-    # Verify keys AND values on the structured metric-log entries produced by the v2 input:
-    # every streamed entry is a canonical metric log whose __name__ equals one of the two
-    # metric identities metric_mock emits, whose __value__ is non-empty, and whose
-    # __labels__ carries the configured tags (tag1=aaaa, tag2=bbb) that ride on both Metric
-    # events. This asserts the Metric events reached the target as first-class metric fields
-    # with their key/value dimensions intact.
-    Then the log fields match kv
+    # Verify the exact key-value entries produced by the v2 input, not a loose regex.
+    # metric_mock emits two Metric identities per cycle; Export turns them into canonical
+    # metric-log entries keyed by __name__/__value__, each carrying the configured tags as
+    # a sorted __labels__ string "tag1#$#aaaa|tag2#$#bbb":
+    #   - single_metrics_mock               (single-value counter; __value__ is a monotonic
+    #                                         counter, so only its identity + labels are pinned)
+    #   - multi_values_metrics_mock_content -> "xxxxxx" (typed string field content)
+    # Asserting the concrete (__name__, __value__, __labels__) triples proves the Metric
+    # fields and their tag dimensions reached the target intact.
+    Then the log fields have exact kv
     """
-    __name__: '^(single_metrics_mock|multi_values_metrics_mock)'
-    __value__: '.+'
-    __labels__: 'tag1#\$#aaaa.*tag2#\$#bbb'
+    - __name__: single_metrics_mock
+      __labels__: tag1#$#aaaa|tag2#$#bbb
+    - __name__: multi_values_metrics_mock_content
+      __value__: xxxxxx
+      __labels__: tag1#$#aaaa|tag2#$#bbb
     """

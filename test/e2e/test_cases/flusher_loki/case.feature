@@ -66,15 +66,20 @@ Feature: flusher loki
     Given loongcollector depends on containers {["loki"]}
     When start docker-compose {flusher_loki}
     Then there is at least {10} logs
-    # Verify keys AND values on the structured metric-log lines produced by the v2 input:
-    # every flushed line is a canonical metric log whose __name__ equals one of the two
-    # metric identities metric_mock emits, whose __value__ is non-empty, and whose
-    # __labels__ carries the configured tag (name=hello) that rides on both Metric events.
-    # This asserts the Metric events reached the target as first-class metric fields with
-    # their key/value dimensions intact.
-    Then the log fields match kv
+    # Verify the exact key-value lines produced by the v2 input, not a loose regex.
+    # metric_mock emits two Metric identities per cycle; the converter turns them into
+    # canonical metric-log lines keyed by __name__/__value__, each carrying the configured
+    # tag as __labels__ "name#$#hello":
+    #   - single_metrics_mock             (single-value counter; __value__ is a monotonic
+    #                                       counter, so only its identity + labels are pinned)
+    #   - multi_values_metrics_mock_value -> "log contents" (typed string field value)
+    # Asserting the concrete (__name__, __value__, __labels__) triples proves the Metric
+    # fields and their tag dimension reached the target intact.
+    Then the log fields have exact kv
     """
-    __name__: '^(single_metrics_mock|multi_values_metrics_mock)'
-    __value__: '.+'
-    __labels__: 'name#\$#hello'
+    - __name__: single_metrics_mock
+      __labels__: name#$#hello
+    - __name__: multi_values_metrics_mock_value
+      __value__: log contents
+      __labels__: name#$#hello
     """

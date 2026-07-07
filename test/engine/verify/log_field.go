@@ -133,3 +133,83 @@ func LogFieldKV(ctx context.Context, expectKeyValuesStr string) (context.Context
 	}
 	return ctx, nil
 }
+
+// LogFieldExactKV verifies that every expected record is located, by exact
+// key-value equality, in at least one flushed log. Unlike LogFieldKV, values
+// are matched literally (no regex) so tests pin down the concrete key-value
+// pairs a flusher emits instead of a loose pattern. The expected input is a
+// YAML list of records; each record is a set of key-value pairs that must all
+// coexist in a single log line. This lets a test assert distinct rows, e.g. a
+// structured metric log whose __name__ and __value__ have specific values.
+func LogFieldExactKV(ctx context.Context, expectRecordsStr string) (context.Context, error) {
+	var from int32
+	value := ctx.Value(config.StartTimeContextKey)
+	if value != nil {
+		from = value.(int32)
+	} else {
+		return ctx, fmt.Errorf("no start time")
+	}
+
+	// Get logs
+	timeoutCtx, cancel := context.WithTimeout(context.TODO(), config.TestConfig.RetryTimeout)
+	defer cancel()
+	var err error
+	var groups []*protocol.LogGroup
+	err = retry.Do(
+		func() error {
+			groups, err = subscriber.TestSubscriber.GetData(control.GetQuery(ctx), from)
+			return err
+		},
+		retry.Context(timeoutCtx),
+		retry.Delay(5*time.Second),
+		retry.DelayType(retry.FixedDelay),
+	)
+	if err != nil {
+		return ctx, err
+	}
+
+	expectRecords := make([]map[string]string, 0)
+	if err = yaml.Unmarshal([]byte(expectRecordsStr), &expectRecords); err != nil {
+		return ctx, err
+	}
+
+	for _, expect := range expectRecords {
+		matched := false
+		for _, group := range groups {
+			for _, log := range group.Logs {
+				if logContainsExactKV(log, expect) {
+					matched = true
+					break
+				}
+			}
+			if matched {
+				break
+			}
+		}
+		if !matched {
+			return ctx, fmt.Errorf("want a log with exact KV %v, but not found", expect)
+		}
+	}
+	return ctx, nil
+}
+
+// logContainsExactKV reports whether the log contains every expected key with
+// exactly the expected value.
+func logContainsExactKV(log *protocol.Log, expect map[string]string) bool {
+	for k, v := range expect {
+		found := false
+		for _, content := range log.Contents {
+			if content.Key == k {
+				if content.Value != v {
+					return false
+				}
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	return true
+}

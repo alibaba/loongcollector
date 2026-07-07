@@ -51,13 +51,20 @@ Feature: flusher elasticsearch
     Given loongcollector depends on containers {["elasticsearch"]}
     When start docker-compose {flusher_elasticsearch}
     Then there is at least {10} logs
-    # Verify keys AND values on the structured metric-log docs produced by the v2 input:
-    # every flushed doc is a canonical metric log whose __name__ equals one of the two
-    # metric identities metric_mock emits and whose __value__ is non-empty. This asserts
-    # the Metric events reached the target as first-class metric fields (key + value),
-    # not merely that a field exists.
-    Then the log fields match kv
+    # Verify the exact key-value docs produced by the v2 input, not a loose regex.
+    # metric_mock emits two Metric identities per cycle; the converter turns them into
+    # canonical metric-log docs keyed by __name__/__value__:
+    #   - single_metrics_mock              (single-value counter; __value__ is a monotonic
+    #                                        counter, so only its identity is pinned)
+    #   - multi_values_metrics_mock_Content -> "hello"   (typed string field Content)
+    #   - multi_values_metrics_mock_Index   -> "default" (typed string field Index)
+    # Asserting the concrete (__name__, __value__) pairs proves the Metric fields reached
+    # the target intact rather than merely that some field exists.
+    Then the log fields have exact kv
     """
-    __name__: '^(single_metrics_mock|multi_values_metrics_mock)'
-    __value__: '.+'
+    - __name__: single_metrics_mock
+    - __name__: multi_values_metrics_mock_Content
+      __value__: hello
+    - __name__: multi_values_metrics_mock_Index
+      __value__: default
     """

@@ -58,13 +58,20 @@ Feature: flusher clickhouse
     Given loongcollector depends on containers {["clickhouse"]}
     When start docker-compose {flusher_clickhouse}
     Then there is at least {10} logs
-    # Verify keys AND values on the structured metric-log rows produced by the v2 input:
-    # every flushed row is a canonical metric log whose __name__ equals one of the two
-    # metric identities metric_mock emits and whose __value__ is non-empty. This asserts
-    # the Metric events reached the target as first-class metric fields (key + value),
-    # not merely that a column exists.
-    Then the log fields match kv
+    # Verify the exact key-value rows produced by the v2 input, not a loose regex.
+    # metric_mock emits two Metric identities per cycle; the converter turns them into
+    # canonical metric-log rows keyed by __name__/__value__:
+    #   - single_metrics_mock            (single-value counter; __value__ is a monotonic
+    #                                      counter, so only its identity is pinned)
+    #   - multi_values_metrics_mock__name  -> "hello"        (typed string field _name)
+    #   - multi_values_metrics_mock__value -> "log contents" (typed string field _value)
+    # Asserting the concrete (__name__, __value__) pairs proves the Metric fields reached
+    # the target intact rather than merely that some column exists.
+    Then the log fields have exact kv
     """
-    __name__: '^(single_metrics_mock|multi_values_metrics_mock)'
-    __value__: '.+'
+    - __name__: single_metrics_mock
+    - __name__: multi_values_metrics_mock__name
+      __value__: hello
+    - __name__: multi_values_metrics_mock__value
+      __value__: log contents
     """
