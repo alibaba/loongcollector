@@ -33,7 +33,7 @@ import (
 )
 
 const dorisName = "doris"
-const dorisQuerySQL = "select time, content, value, __pipeline_passthrough__ from `%s`.`%s` where time > %v order by time limit 100"
+const dorisQuerySQL = "select time, `__name__`, `__value__`, `__labels__` from `%s`.`%s` where time > %v order by time limit 100"
 
 type DorisSubscriber struct {
 	Address     string `mapstructure:"address" comment:"the doris FE address (format: http://host:port)"`
@@ -136,12 +136,12 @@ func (d *DorisSubscriber) queryRecords() (logGroup *protocol.LogGroup, err error
 
 	for rows.Next() {
 		var (
-			timestamp   int64
-			content     sql.NullString
-			value       sql.NullString
-			passthrough sql.NullString
+			timestamp int64
+			name      sql.NullString
+			value     sql.NullString
+			labels    sql.NullString
 		)
-		if err = rows.Scan(&timestamp, &content, &value, &passthrough); err != nil {
+		if err = rows.Scan(&timestamp, &name, &value, &labels); err != nil {
 			logger.Warningf(context.Background(), selfmonitor.DorisSubscriberAlarm, "failed to scan row, err: %s", err)
 			return
 		}
@@ -150,27 +150,24 @@ func (d *DorisSubscriber) queryRecords() (logGroup *protocol.LogGroup, err error
 			Time: uint32(timestamp),
 		}
 
-		// Add content field
-		if content.Valid {
+		// v2 Metric events are flushed structurally as canonical metric-log
+		// fields (__name__/__labels__/__value__), never a pass-through blob.
+		if name.Valid {
 			log.Contents = append(log.Contents, &protocol.Log_Content{
-				Key:   "content",
-				Value: content.String,
+				Key:   "__name__",
+				Value: name.String,
 			})
 		}
-
-		// Add value field
 		if value.Valid {
 			log.Contents = append(log.Contents, &protocol.Log_Content{
-				Key:   "value",
+				Key:   "__value__",
 				Value: value.String,
 			})
 		}
-
-		// Add passthrough field (v2 Metric/Span events are serialized here)
-		if passthrough.Valid && passthrough.String != "" {
+		if labels.Valid {
 			log.Contents = append(log.Contents, &protocol.Log_Content{
-				Key:   "__pipeline_passthrough__",
-				Value: passthrough.String,
+				Key:   "__labels__",
+				Value: labels.String,
 			})
 		}
 

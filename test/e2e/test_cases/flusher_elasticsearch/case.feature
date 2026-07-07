@@ -38,6 +38,8 @@ Feature: flusher elasticsearch
     Then there is at least {10} logs
     Then the log fields match as below
     """
-    - __pipeline_passthrough__
+    - __name__
+    - __value__
+    - __labels__
     """
 

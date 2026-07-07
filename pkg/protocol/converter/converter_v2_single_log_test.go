@@ -39,13 +39,19 @@ func TestConvertToSingleProtocolStreamV2MixedEvents(t *testing.T) {
 	stream, _, err := c.ConvertToSingleProtocolStreamV2(groupEvents, nil)
 	require.NoError(t, err)
 	assert.Len(t, stream, 3)
-	assert.Contains(t, string(stream[1]), passthroughLogKey)
-	assert.Contains(t, string(stream[1]), `\"eventType\":\"metric\"`)
-	assert.Contains(t, string(stream[2]), passthroughLogKey)
-	assert.Contains(t, string(stream[2]), `\"eventType\":\"span\"`)
+	// Metric is converted structurally into a canonical metric log, never a
+	// pass-through blob.
+	assert.NotContains(t, string(stream[1]), "__pipeline_passthrough__")
+	assert.Contains(t, string(stream[1]), metricNameKey)
+	assert.Contains(t, string(stream[1]), `cpu`)
+	assert.Contains(t, string(stream[1]), metricValueKey)
+	// Span is converted structurally with its own fields.
+	assert.NotContains(t, string(stream[2]), "__pipeline_passthrough__")
+	assert.Contains(t, string(stream[2]), "traceID")
+	assert.Contains(t, string(stream[2]), "trace-id")
 }
 
-func TestPipelineGroupEventsToLogGroupPreservesPassthrough(t *testing.T) {
+func TestPipelineGroupEventsToLogGroupConvertsMetricStructurally(t *testing.T) {
 	log := models.NewLog("", []byte("hello"), "info", "", "", models.NewTags(), 1)
 	metric := models.NewSingleValueMetric("m", models.MetricTypeGauge, models.NewTags(), 2, 1.0)
 	groupEvents := &models.PipelineGroupEvents{
@@ -56,5 +62,12 @@ func TestPipelineGroupEventsToLogGroupPreservesPassthrough(t *testing.T) {
 	logGroup, err := PipelineGroupEventsToLogGroup(groupEvents)
 	require.NoError(t, err)
 	require.Len(t, logGroup.Logs, 2)
-	assert.Equal(t, passthroughLogKey, logGroup.Logs[1].Contents[0].Key)
+
+	metricContents := make(map[string]string, len(logGroup.Logs[1].Contents))
+	for _, content := range logGroup.Logs[1].Contents {
+		metricContents[content.GetKey()] = content.GetValue()
+	}
+	assert.Equal(t, "m", metricContents[metricNameKey])
+	assert.Equal(t, "1", metricContents[metricValueKey])
+	assert.NotContains(t, metricContents, "__pipeline_passthrough__")
 }
