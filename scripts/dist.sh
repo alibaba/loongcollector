@@ -22,6 +22,8 @@ function arch() {
     echo amd64
   elif uname -m | grep -E "aarch64|arm64" &>/dev/null; then
     echo arm64
+  elif uname -m | grep -E "riscv64|riscv64gc" &>/dev/null; then
+    echo riscv64
   else
     echo sw64
   fi

@@ -16,6 +16,7 @@ package selfmonitor
 
 import (
 	"encoding/json"
+	"strconv"
 	"sync"
 )
 
@@ -23,6 +24,70 @@ const SelfMetricNameKey = "__name__"
 const MetricLabelPrefix = "labels"
 const MetricCounterPrefix = "counters"
 const MetricGaugePrefix = "gauges"
+
+// MetricExportRecord is the structured representation of a single self-monitor
+// metric record for PB transport. Analogous to AlarmExportMessage for alarms.
+// Fields align with C++ SelfMonitorMetricEvent (core/monitor/metric_models/SelfMonitorMetricEvent.h).
+type MetricExportRecord struct {
+	Category string
+	Labels   map[string]string
+	Counters map[string]uint64
+	Gauges   map[string]float64
+}
+
+// ParseMetricExportRecord converts the existing map[string]string export format
+// (with JSON-encoded "labels", "counters", "gauges" values) to a structured
+// MetricExportRecord. This bridges the current ExportMetricRecords() output to
+// the PB contract.
+func ParseMetricExportRecord(raw map[string]string) (MetricExportRecord, error) {
+	record := MetricExportRecord{
+		Labels:   make(map[string]string),
+		Counters: make(map[string]uint64),
+		Gauges:   make(map[string]float64),
+	}
+
+	if labelsStr, ok := raw[MetricLabelPrefix]; ok && labelsStr != "" {
+		var labels map[string]string
+		if err := json.Unmarshal([]byte(labelsStr), &labels); err != nil {
+			return record, err
+		}
+		if cat, ok := labels[MetricLabelKeyMetricCategory]; ok {
+			record.Category = cat
+			delete(labels, MetricLabelKeyMetricCategory)
+		}
+		record.Labels = labels
+	}
+
+	if countersStr, ok := raw[MetricCounterPrefix]; ok && countersStr != "" {
+		var counters map[string]string
+		if err := json.Unmarshal([]byte(countersStr), &counters); err != nil {
+			return record, err
+		}
+		for k, v := range counters {
+			parsed, err := strconv.ParseFloat(v, 64)
+			if err != nil {
+				parsed = 0
+			}
+			record.Counters[k] = uint64(parsed)
+		}
+	}
+
+	if gaugesStr, ok := raw[MetricGaugePrefix]; ok && gaugesStr != "" {
+		var gauges map[string]string
+		if err := json.Unmarshal([]byte(gaugesStr), &gauges); err != nil {
+			return record, err
+		}
+		for k, v := range gauges {
+			parsed, err := strconv.ParseFloat(v, 64)
+			if err != nil {
+				parsed = 0
+			}
+			record.Gauges[k] = parsed
+		}
+	}
+
+	return record, nil
+}
 
 type MetricsRecord struct {
 	Labels []LabelPair
