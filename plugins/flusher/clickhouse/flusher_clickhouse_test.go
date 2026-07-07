@@ -218,14 +218,13 @@ func clickHouseUnescapeStringLiteral(s string) string {
 	return b.String()
 }
 
-// TestFlusherClickHouse_ExportMetricPassthroughValidJSON reproduces the v2 e2e
-// scenario (metric_mock -> Export): a Metric event is passthrough-serialized as
-// nested JSON, whose escaped quotes must survive the ClickHouse string literal
-// so the stored _log round-trips as valid JSON instead of being silently
-// dropped or corrupted.
-func TestFlusherClickHouse_ExportMetricPassthroughValidJSON(t *testing.T) {
+// TestFlusherClickHouse_ExportMetricStructural reproduces the v2 e2e scenario
+// (metric_mock -> Export): a Metric event is converted structurally into a
+// canonical metric log (__name__/__labels__/__value__), never wrapped in a
+// pass-through blob. The single-quote in the label value also stresses the
+// ClickHouse SQL literal escaping so the stored _log round-trips as valid JSON.
+func TestFlusherClickHouse_ExportMetricStructural(t *testing.T) {
 	group := models.NewGroup(models.NewMetadata(), models.NewTags())
-	// A single-quote in a tag value also stresses the SQL literal escaping.
 	metric := models.NewSingleValueMetric("hello", models.MetricTypeGauge,
 		models.NewTagsWithKeyValues("region", "cn-'hangzhou'"), 1700000000*1e9, 3.14)
 	groups := []*models.PipelineGroupEvents{{Group: group, Events: []models.PipelineEvent{metric}}}
@@ -242,12 +241,11 @@ func TestFlusherClickHouse_ExportMetricPassthroughValidJSON(t *testing.T) {
 			"stored _log must be valid JSON after ClickHouse unescapes the literal: %s", stored)
 		contents, ok := obj["contents"].(map[string]interface{})
 		require.True(t, ok, "entry must contain contents")
-		passthrough, ok := contents["__pipeline_passthrough__"].(string)
-		require.True(t, ok, "metric event must be passthrough-serialized")
-		var payload map[string]interface{}
-		require.NoError(t, json.Unmarshal([]byte(passthrough), &payload),
-			"passthrough payload must itself be valid JSON")
-		require.Equal(t, "metric", payload["eventType"])
+		require.NotContains(t, contents, "__pipeline_passthrough__",
+			"metric event must not be pass-through serialized")
+		require.Equal(t, "hello", contents["__name__"], "metric name must be preserved structurally")
+		require.Equal(t, "3.14", contents["__value__"], "metric value must be preserved structurally")
+		require.Contains(t, contents["__labels__"], "cn-'hangzhou'", "metric labels must survive SQL escaping")
 	}
 }
 

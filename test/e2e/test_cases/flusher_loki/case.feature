@@ -25,10 +25,13 @@ Feature: flusher loki
     #       2 Metric events/cycle: single_metrics_mock (counter, single value) and
     #       multi_values_metrics_mock (untyped; values{Index} + typedValues{value}),
     #       both tagged {name=hello}.
-    #     - output of flusher: converter.ToByteStreamWithSelectedFieldsV2 -> loki push
-    #       stream; each Metric becomes one log line whose body is the
-    #       __pipeline_passthrough__ blob (eventType/name/tags/value(s)/typedValues),
-    #       never silently dropped.
+    #     - output of flusher: converter.ToByteStreamWithSelectedFieldsV2 converts each
+    #       Metric structurally into canonical metric-log lines
+    #       {__name__, __labels__, __value__, __time_nano__} (one line per value /
+    #       typed-value), never an opaque pass-through blob and never silently dropped. The
+    #       metric tag becomes __labels__=name#$#hello on every line. single_metrics_mock
+    #       -> __name__=single_metrics_mock; multi_values_metrics_mock ->
+    #       __name__=multi_values_metrics_mock_{Index,value}.
     Given {flusher-loki-case} local config as below
     """
     enable: true
@@ -63,12 +66,15 @@ Feature: flusher loki
     Given loongcollector depends on containers {["loki"]}
     When start docker-compose {flusher_loki}
     Then there is at least {10} logs
-    # Verify keys AND values: every flushed row carries a __pipeline_passthrough__
-    # blob whose value contains the real metric identity emitted by metric_mock
-    # (eventType + one of the two metric names), proving the Metric events reached
-    # the target intact rather than only that a column exists.
+    # Verify keys AND values on the structured metric-log lines produced by the v2 input:
+    # every flushed line is a canonical metric log whose __name__ equals one of the two
+    # metric identities metric_mock emits, whose __value__ is non-empty, and whose
+    # __labels__ carries the configured tag (name=hello) that rides on both Metric events.
+    # This asserts the Metric events reached the target as first-class metric fields with
+    # their key/value dimensions intact.
     Then the log fields match kv
     """
-    __pipeline_passthrough__: '"eventType":"metric".*"name":"(single_metrics_mock|multi_values_metrics_mock)"'
+    __name__: '^(single_metrics_mock|multi_values_metrics_mock)'
+    __value__: '.+'
+    __labels__: 'name#\$#hello'
     """
-

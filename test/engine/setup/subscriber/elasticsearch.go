@@ -105,17 +105,13 @@ func (i *ElasticSearchSubscriber) queryRecords() (logGroup *protocol.LogGroup, e
 		log.Fatalf("Error parsing the response body: %s", err)
 	}
 
+	// contents is parsed generically so structurally-converted events (e.g. a
+	// Metric flushed as __name__/__labels__/__value__/__time_nano__) surface all
+	// their fields for verification without hard-coding a fixed field set.
 	type logContent struct {
-		Contents struct {
-			Index       string `json:"Index"`
-			Content     string `json:"Content"`
-			Passthrough string `json:"__pipeline_passthrough__"`
-		} `json:"contents"`
-		Tags struct {
-			HostIP   string `json:"host.ip"`
-			HostName string `json:"host.name"`
-		} `json:"tags"`
-		Time int `json:"time"`
+		Contents map[string]string `json:"contents"`
+		Tags     map[string]string `json:"tags"`
+		Time     int               `json:"time"`
 	}
 	if _, ok := r["hits"]; !ok {
 		return nil, fmt.Errorf("no hits found in response")
@@ -131,17 +127,9 @@ func (i *ElasticSearchSubscriber) queryRecords() (logGroup *protocol.LogGroup, e
 			logger.Warning(context.Background(), selfmonitor.ElasticsearchSubscriberAlarm, "err", err)
 		}
 
-		log := &protocol.Log{
-			Contents: []*protocol.Log_Content{
-				{Key: "index", Value: lc.Contents.Index},
-				{Key: "content", Value: lc.Contents.Content},
-			},
-		}
-		if lc.Contents.Passthrough != "" {
-			log.Contents = append(log.Contents, &protocol.Log_Content{
-				Key:   "__pipeline_passthrough__",
-				Value: lc.Contents.Passthrough,
-			})
+		log := &protocol.Log{}
+		for k, v := range lc.Contents {
+			log.Contents = append(log.Contents, &protocol.Log_Content{Key: k, Value: v})
 		}
 		logGroup.Logs = append(logGroup.Logs, log)
 	}

@@ -22,9 +22,11 @@ Feature: flusher clickhouse
     #     - input  to flusher: []*models.PipelineGroupEvents. metric_mock.Read() emits
     #       2 Metric events/cycle: single_metrics_mock (counter, single value) and
     #       multi_values_metrics_mock (untyped; values{Index} + typedValues{_name,_value}).
-    #     - output of flusher: converter.ToByteStreamV2 -> 1 clickhouse row per Metric,
-    #       each serialized into the __pipeline_passthrough__ blob
-    #       (eventType/name/tags/value(s)/typedValues), never silently dropped.
+    #     - output of flusher: converter.ToByteStreamV2 converts each Metric structurally
+    #       into canonical metric-log rows {__name__, __labels__, __value__, __time_nano__}
+    #       (one row per value / typed-value), never an opaque pass-through blob and never
+    #       silently dropped. single_metrics_mock -> __name__=single_metrics_mock;
+    #       multi_values_metrics_mock -> __name__=multi_values_metrics_mock_{Index,_name,_value}.
     Given {flusher-clickhouse-case} local config as below
     """
     enable: true
@@ -56,12 +58,13 @@ Feature: flusher clickhouse
     Given loongcollector depends on containers {["clickhouse"]}
     When start docker-compose {flusher_clickhouse}
     Then there is at least {10} logs
-    # Verify keys AND values: every flushed row carries a __pipeline_passthrough__
-    # blob whose value contains the real metric identity emitted by metric_mock
-    # (eventType + one of the two metric names), proving the Metric events reached
-    # the target intact rather than only that a column exists.
+    # Verify keys AND values on the structured metric-log rows produced by the v2 input:
+    # every flushed row is a canonical metric log whose __name__ equals one of the two
+    # metric identities metric_mock emits and whose __value__ is non-empty. This asserts
+    # the Metric events reached the target as first-class metric fields (key + value),
+    # not merely that a column exists.
     Then the log fields match kv
     """
-    __pipeline_passthrough__: '"eventType":"metric".*"name":"(single_metrics_mock|multi_values_metrics_mock)"'
+    __name__: '^(single_metrics_mock|multi_values_metrics_mock)'
+    __value__: '.+'
     """
-

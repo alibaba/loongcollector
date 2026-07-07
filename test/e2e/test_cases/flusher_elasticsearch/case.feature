@@ -21,10 +21,12 @@ Feature: flusher elasticsearch
     #   v2 pipeline (StructureType=v2, this case):
     #     - input  to flusher: []*models.PipelineGroupEvents. metric_mock.Read() emits
     #       2 Metric events/cycle: single_metrics_mock (counter, single value) and
-    #       multi_values_metrics_mock (untyped; values{Index} + typedValues{Content}).
-    #     - output of flusher: converter.ToByteStreamV2 -> 1 ES doc per Metric, each
-    #       serialized into the __pipeline_passthrough__ blob
-    #       (eventType/name/tags/value(s)/typedValues), never silently dropped.
+    #       multi_values_metrics_mock (untyped; values{Index} + typedValues{Index,Content}).
+    #     - output of flusher: converter.ToByteStreamV2 converts each Metric structurally
+    #       into canonical metric-log docs {__name__, __labels__, __value__, __time_nano__}
+    #       (one doc per value / typed-value), never an opaque pass-through blob and never
+    #       silently dropped. single_metrics_mock -> __name__=single_metrics_mock;
+    #       multi_values_metrics_mock -> __name__=multi_values_metrics_mock_{Index,Content}.
     Given {flusher-elasticsearch-case} local config as below
     """
     enable: true
@@ -49,12 +51,13 @@ Feature: flusher elasticsearch
     Given loongcollector depends on containers {["elasticsearch"]}
     When start docker-compose {flusher_elasticsearch}
     Then there is at least {10} logs
-    # Verify keys AND values: every flushed row carries a __pipeline_passthrough__
-    # blob whose value contains the real metric identity emitted by metric_mock
-    # (eventType + one of the two metric names), proving the Metric events reached
-    # the target intact rather than only that a column exists.
+    # Verify keys AND values on the structured metric-log docs produced by the v2 input:
+    # every flushed doc is a canonical metric log whose __name__ equals one of the two
+    # metric identities metric_mock emits and whose __value__ is non-empty. This asserts
+    # the Metric events reached the target as first-class metric fields (key + value),
+    # not merely that a field exists.
     Then the log fields match kv
     """
-    __pipeline_passthrough__: '"eventType":"metric".*"name":"(single_metrics_mock|multi_values_metrics_mock)"'
+    __name__: '^(single_metrics_mock|multi_values_metrics_mock)'
+    __value__: '.+'
     """
-

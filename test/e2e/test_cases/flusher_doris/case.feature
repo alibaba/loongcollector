@@ -24,9 +24,12 @@ Feature: flusher doris
     #     - input  to flusher: []*models.PipelineGroupEvents. metric_mock.Read() emits
     #       2 Metric events/cycle: single_metrics_mock (counter, single value) and
     #       multi_values_metrics_mock (untyped; values{Index} + typedValues{content,value}).
-    #     - output of flusher: converter.ToByteStreamV2 (custom_single_flatten) -> 1 doris
-    #       row per Metric, each serialized into the flattened __pipeline_passthrough__
-    #       column (eventType/name/tags/value(s)/typedValues), never silently dropped.
+    #     - output of flusher: converter.ToByteStreamV2 (custom_single_flatten) converts each
+    #       Metric structurally into flattened canonical metric-log columns
+    #       {__name__, __labels__, __value__, __time_nano__} (one row per value / typed-value),
+    #       never an opaque pass-through blob and never silently dropped. single_metrics_mock
+    #       -> __name__=single_metrics_mock; multi_values_metrics_mock ->
+    #       __name__=multi_values_metrics_mock_{Index,content,value}.
     Given {flusher-doris-case} local config as below
     """
     enable: true
@@ -55,13 +58,13 @@ Feature: flusher doris
     Given loongcollector depends on containers {["doris", "init-test-env"]}
     When start docker-compose {flusher_doris}
     Then there is at least {10} logs
-    # Verify keys AND values: every flushed row carries a __pipeline_passthrough__
-    # blob whose value contains the real metric identity emitted by metric_mock
-    # (eventType + one of the two metric names), proving the Metric events reached
-    # the target intact rather than only that a column exists.
+    # Verify keys AND values on the structured metric-log rows produced by the v2 input:
+    # every flushed row is a canonical metric log whose __name__ equals one of the two
+    # metric identities metric_mock emits and whose __value__ is non-empty. This asserts
+    # the Metric events reached the target as first-class metric fields (key + value),
+    # not merely that a column exists.
     Then the log fields match kv
     """
-    __pipeline_passthrough__: '"eventType":"metric".*"name":"(single_metrics_mock|multi_values_metrics_mock)"'
+    __name__: '^(single_metrics_mock|multi_values_metrics_mock)'
+    __value__: '.+'
     """
-
-
