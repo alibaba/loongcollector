@@ -97,6 +97,13 @@ func (f *Flusher) IsReady(projectName string, logstoreName string, logstoreKey i
 }
 
 func (f *Flusher) Flush(projectName string, logstoreName string, configName string, logGroupList []*protocol.LogGroup) error {
+	return f.flushLogGroups(logGroupList)
+}
+
+// flushLogGroups sends log groups over the gRPC stream. It is shared by the v1
+// Flush entry point and the v2 Export so that Export does not depend on Flush,
+// which is planned for removal.
+func (f *Flusher) flushLogGroups(logGroupList []*protocol.LogGroup) error {
 	stream, err := f.client.Collect(context.Background())
 	defer f.closeStream(stream)
 	if err != nil {
@@ -124,7 +131,7 @@ func (f *Flusher) Export(groups []*models.PipelineGroupEvents, _ pipeline.Pipeli
 		if logGroup == nil || len(logGroup.Logs) == 0 {
 			continue
 		}
-		if err := f.Flush("", "", "", []*protocol.LogGroup{logGroup}); err != nil {
+		if err := f.flushLogGroups([]*protocol.LogGroup{logGroup}); err != nil {
 			return err
 		}
 	}

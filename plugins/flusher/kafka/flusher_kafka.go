@@ -190,7 +190,9 @@ func (k *FlusherKafka) Export(groups []*models.PipelineGroupEvents, _ pipeline.P
 		if logGroup == nil || len(logGroup.Logs) == 0 {
 			continue
 		}
-		if err := k.Flush("", "", "", []*protocol.LogGroup{logGroup}); err != nil {
+		// Do not go through Flush: the v1 Flush entry point is planned for removal.
+		// Reuse the underlying flusher func (NormalFlush/HashFlush) directly.
+		if err := k.flusher("", "", "", []*protocol.LogGroup{logGroup}); err != nil {
 			return err
 		}
 	}

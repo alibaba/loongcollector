@@ -125,6 +125,13 @@ func (p *FlusherChecker) CheckEveryKeyValue(checker func(string, string) error) 
 }
 
 func (p *FlusherChecker) Flush(projectName string, logstoreName string, configName string, logGroupList []*protocol.LogGroup) error {
+	return p.flushLogGroups(logGroupList)
+}
+
+// flushLogGroups records the log groups. It is shared by the v1 Flush entry
+// point and the v2 Export so that Export does not depend on Flush, which is
+// planned for removal.
+func (p *FlusherChecker) flushLogGroups(logGroupList []*protocol.LogGroup) error {
 	p.Lock.Lock()
 	defer p.Lock.Unlock()
 	for _, logGroup := range logGroupList {
@@ -150,7 +157,7 @@ func (p *FlusherChecker) Export(groups []*models.PipelineGroupEvents, _ pipeline
 		if logGroup == nil || len(logGroup.Logs) == 0 {
 			continue
 		}
-		if err := p.Flush("", "", "", []*protocol.LogGroup{logGroup}); err != nil {
+		if err := p.flushLogGroups([]*protocol.LogGroup{logGroup}); err != nil {
 			return err
 		}
 	}

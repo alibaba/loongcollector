@@ -38,6 +38,13 @@ func (*FlusherSleep) Description() string {
 }
 
 func (p *FlusherSleep) Flush(projectName string, logstoreName string, configName string, logGroupList []*protocol.LogGroup) error {
+	return p.flushLogGroups()
+}
+
+// flushLogGroups performs the configured sleep. It is shared by the v1 Flush
+// entry point and the v2 Export so that Export does not depend on Flush, which
+// is planned for removal.
+func (p *FlusherSleep) flushLogGroups() error {
 	time.Sleep(time.Duration(p.SleepMS) * time.Millisecond)
 	return nil
 }
@@ -51,7 +58,7 @@ func (p *FlusherSleep) Export(groups []*models.PipelineGroupEvents, _ pipeline.P
 		if logGroup == nil || len(logGroup.Logs) == 0 {
 			continue
 		}
-		if err := p.Flush("", "", "", []*protocol.LogGroup{logGroup}); err != nil {
+		if err := p.flushLogGroups(); err != nil {
 			return err
 		}
 	}

@@ -65,6 +65,13 @@ func (*FlusherStatistics) SetUrgent(flag bool) {
 // Flush flushes @logGroupList but it only do statistics.
 // It returns any error it encountered.
 func (p *FlusherStatistics) Flush(projectName string, logstoreName string, configName string, logGroupList []*protocol.LogGroup) error {
+	return p.flushLogGroups(logGroupList)
+}
+
+// flushLogGroups accumulates statistics for the log groups. It is shared by the
+// v1 Flush entry point and the v2 Export so that Export does not depend on
+// Flush, which is planned for removal.
+func (p *FlusherStatistics) flushLogGroups(logGroupList []*protocol.LogGroup) error {
 	for _, logGroup := range logGroupList {
 		p.loggroupRateCounter.Incr(1)
 		p.logRateCounter.Incr((int64)(len(logGroup.Logs)))
@@ -95,7 +102,7 @@ func (p *FlusherStatistics) Export(groups []*models.PipelineGroupEvents, _ pipel
 		if logGroup == nil || len(logGroup.Logs) == 0 {
 			continue
 		}
-		if err := p.Flush("", "", "", []*protocol.LogGroup{logGroup}); err != nil {
+		if err := p.flushLogGroups([]*protocol.LogGroup{logGroup}); err != nil {
 			return err
 		}
 	}

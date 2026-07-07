@@ -266,6 +266,13 @@ func (f *FlusherDoris) Validate() error {
 }
 
 func (f *FlusherDoris) Flush(projectName string, logstoreName string, configName string, logGroupList []*protocol.LogGroup) error {
+	return f.flushLogGroups(logGroupList)
+}
+
+// flushLogGroups dispatches log groups to the doris client (async or sync). It
+// is shared by the v1 Flush entry point and the v2 Export so that Export does
+// not depend on Flush, which is planned for removal.
+func (f *FlusherDoris) flushLogGroups(logGroupList []*protocol.LogGroup) error {
 	if f.dorisClient == nil {
 		return fmt.Errorf("doris client not initialized")
 	}
@@ -292,7 +299,7 @@ func (f *FlusherDoris) Export(groups []*models.PipelineGroupEvents, _ pipeline.P
 		if logGroup == nil || len(logGroup.Logs) == 0 {
 			continue
 		}
-		if err := f.Flush("", "", "", []*protocol.LogGroup{logGroup}); err != nil {
+		if err := f.flushLogGroups([]*protocol.LogGroup{logGroup}); err != nil {
 			return err
 		}
 	}
