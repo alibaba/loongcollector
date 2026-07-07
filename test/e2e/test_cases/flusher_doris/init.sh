@@ -45,15 +45,12 @@ CREATE DATABASE IF NOT EXISTS test_db;
 -- Use test database
 USE test_db;
 
--- Create test table with custom_single_flatten protocol structure.
--- v2 Metric events are flushed structurally as canonical metric-log fields
--- (__name__/__labels__/__value__/__time_nano__), never a pass-through blob.
+-- Create test table with custom_single_flatten protocol structure
 CREATE TABLE IF NOT EXISTS test_table (
     time BIGINT,
-    `__name__` STRING,
-    `__value__` STRING,
-    `__labels__` STRING,
-    `__time_nano__` STRING,
+    content STRING,
+    value STRING,
+    __pipeline_passthrough__ STRING,
     __tag__hostip STRING,
     __tag__hostname STRING
 ) DUPLICATE KEY(time)

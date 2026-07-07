@@ -15,9 +15,9 @@
 package protocol
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
-	"sort"
-	"strconv"
 
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/models"
@@ -25,18 +25,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
-// byteArrayContentKey carries the raw ByteArray payload, which has no
-// structured fields of its own, so it is never silently dropped.
-const byteArrayContentKey = "content"
-
-// protocolRecord is one flushable record extracted from a pipeline event. A Log
-// maps to a single record; a Metric may expand into several records (one per
-// value/typed-value) so every value is flushed as a first-class field.
-type protocolRecord struct {
-	contents map[string]string
-	tags     map[string]string
-	timeSec  uint32
-}
+const passthroughLogKey = "__pipeline_passthrough__"
 
 func (c *Converter) ConvertToSingleProtocolStreamV2(groupEvents *models.PipelineGroupEvents, targetFields []string) ([][]byte, []map[string]string, error) {
 	if groupEvents == nil || len(groupEvents.Events) == 0 {
@@ -46,25 +35,40 @@ func (c *Converter) ConvertToSingleProtocolStreamV2(groupEvents *models.Pipeline
 	marshaledLogs := make([][]byte, 0, len(groupEvents.Events))
 	desiredValues := make([]map[string]string, 0, len(groupEvents.Events))
 	for _, event := range groupEvents.Events {
-		records, err := c.pipelineEventToRecords(event, groupEvents.Group)
+		// Classify events via B1's shared pass-through contract (pkg/pipeline):
+		// Log-only handlers process Log events; all other kinds pass through.
+		if pipeline.LogOnlyEventKinds.Supports(event.GetType()) {
+			log, ok := event.(*models.Log)
+			if !ok {
+				return nil, nil, fmt.Errorf("expected log event, got %T", event)
+			}
+			entry, desiredValue, err := c.convertPipelineLogToSingleProtocol(log, groupEvents.Group, targetFields)
+			if err != nil {
+				return nil, nil, err
+			}
+			b, err := marshalSingleProtocolEntry(entry)
+			if err != nil {
+				return nil, nil, err
+			}
+			marshaledLogs = append(marshaledLogs, b)
+			desiredValues = append(desiredValues, desiredValue)
+			continue
+		}
+		// Metric/Span/ByteArray are serialized into __pipeline_passthrough__ so they
+		// are never silently dropped; serialization rejects genuinely unknown kinds.
+		entry, desiredValue, err := c.convertPassthroughToSingleProtocol(event, groupEvents.Group, targetFields)
 		if err != nil {
 			if c.IgnoreUnExpectedData {
 				continue
 			}
 			return nil, nil, err
 		}
-		for _, record := range records {
-			desiredValue, err := findTargetValues(targetFields, record.contents, record.tags, c.TagKeyRenameMap)
-			if err != nil {
-				return nil, nil, err
-			}
-			b, err := marshalSingleProtocolEntry(c.buildSingleProtocolEntry(record))
-			if err != nil {
-				return nil, nil, err
-			}
-			marshaledLogs = append(marshaledLogs, b)
-			desiredValues = append(desiredValues, desiredValue)
+		b, err := marshalSingleProtocolEntry(entry)
+		if err != nil {
+			return nil, nil, err
 		}
+		marshaledLogs = append(marshaledLogs, b)
+		desiredValues = append(desiredValues, desiredValue)
 	}
 	return marshaledLogs, desiredValues, nil
 }
@@ -77,25 +81,40 @@ func (c *Converter) ConvertToSingleProtocolStreamFlattenV2(groupEvents *models.P
 	marshaledLogs := make([][]byte, 0, len(groupEvents.Events))
 	desiredValues := make([]map[string]string, 0, len(groupEvents.Events))
 	for _, event := range groupEvents.Events {
-		records, err := c.pipelineEventToRecords(event, groupEvents.Group)
+		// Classify events via B1's shared pass-through contract (pkg/pipeline):
+		// Log-only handlers process Log events; all other kinds pass through.
+		if pipeline.LogOnlyEventKinds.Supports(event.GetType()) {
+			log, ok := event.(*models.Log)
+			if !ok {
+				return nil, nil, fmt.Errorf("expected log event, got %T", event)
+			}
+			entry, desiredValue, err := c.convertPipelineLogToSingleProtocolFlatten(log, groupEvents.Group, targetFields)
+			if err != nil {
+				return nil, nil, err
+			}
+			b, err := marshalSingleProtocolEntry(entry)
+			if err != nil {
+				return nil, nil, err
+			}
+			marshaledLogs = append(marshaledLogs, b)
+			desiredValues = append(desiredValues, desiredValue)
+			continue
+		}
+		// Metric/Span/ByteArray are serialized into __pipeline_passthrough__ so they
+		// are never silently dropped; serialization rejects genuinely unknown kinds.
+		entry, desiredValue, err := c.convertPassthroughToSingleProtocolFlatten(event, groupEvents.Group, targetFields)
 		if err != nil {
 			if c.IgnoreUnExpectedData {
 				continue
 			}
 			return nil, nil, err
 		}
-		for _, record := range records {
-			desiredValue, err := findTargetValues(targetFields, record.contents, record.tags, c.TagKeyRenameMap)
-			if err != nil {
-				return nil, nil, err
-			}
-			b, err := marshalSingleProtocolEntry(c.buildFlattenProtocolEntry(record))
-			if err != nil {
-				return nil, nil, err
-			}
-			marshaledLogs = append(marshaledLogs, b)
-			desiredValues = append(desiredValues, desiredValue)
+		b, err := marshalSingleProtocolEntry(entry)
+		if err != nil {
+			return nil, nil, err
 		}
+		marshaledLogs = append(marshaledLogs, b)
+		desiredValues = append(desiredValues, desiredValue)
 	}
 	return marshaledLogs, desiredValues, nil
 }
@@ -119,79 +138,126 @@ func (c *Converter) ConvertToJsonlineProtocolStreamV2(groupEvents *models.Pipeli
 	return joinedStream, nil, nil
 }
 
-// pipelineEventToRecords converts one pipeline event into flushable records.
-// Log events keep their structured fields; Metric/Span/ByteArray events are
-// converted into structured logs (mirroring v1's representation) instead of
-// being wrapped in an opaque pass-through blob.
-func (c *Converter) pipelineEventToRecords(event models.PipelineEvent, group *models.GroupInfo) ([]protocolRecord, error) {
-	if pipeline.LogOnlyEventKinds.Supports(event.GetType()) {
-		log, ok := event.(*models.Log)
-		if !ok {
-			return nil, fmt.Errorf("expected log event, got %T", event)
-		}
-		contents, tags := convertPipelineLogToMap(log, group, c.TagKeyRenameMap)
-		return []protocolRecord{{
-			contents: contents,
-			tags:     tags,
-			timeSec:  uint32(log.GetTimestamp() / 1e9),
-		}}, nil
-	}
-
-	logs, err := convertNonLogEventToLogs(event)
+func (c *Converter) convertPipelineLogToSingleProtocol(log *models.Log, group *models.GroupInfo, targetFields []string) (map[string]interface{}, map[string]string, error) {
+	contents, tags := convertPipelineLogToMap(log, group, c.TagKeyRenameMap)
+	desiredValue, err := findTargetValues(targetFields, contents, tags, c.TagKeyRenameMap)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	// Non-log events carry their own dimensions inside the converted contents
-	// (metric labels in __labels__, span/byteArray fields inline); only the
-	// group tags are attached separately, matching how a Log record is built.
-	groupTags := collectGroupTags(group, c.TagKeyRenameMap)
-	records := make([]protocolRecord, 0, len(logs))
-	for _, log := range logs {
-		records = append(records, protocolRecord{
-			contents: logContentsToMap(log),
-			tags:     groupTags,
-			timeSec:  log.GetTime(),
-		})
-	}
-	return records, nil
-}
 
-func (c *Converter) buildSingleProtocolEntry(record protocolRecord) map[string]interface{} {
 	entry := make(map[string]interface{}, numProtocolKeys)
+	timeSec := uint32(log.GetTimestamp() / 1e9)
 	if newKey, ok := c.ProtocolKeyRenameMap[protocolKeyTime]; ok {
-		entry[newKey] = record.timeSec
+		entry[newKey] = timeSec
 	} else {
-		entry[protocolKeyTime] = record.timeSec
+		entry[protocolKeyTime] = timeSec
 	}
 	if newKey, ok := c.ProtocolKeyRenameMap[protocolKeyContent]; ok {
-		entry[newKey] = record.contents
+		entry[newKey] = contents
 	} else {
-		entry[protocolKeyContent] = record.contents
+		entry[protocolKeyContent] = contents
 	}
 	if newKey, ok := c.ProtocolKeyRenameMap[protocolKeyTag]; ok {
-		entry[newKey] = record.tags
+		entry[newKey] = tags
 	} else {
-		entry[protocolKeyTag] = record.tags
+		entry[protocolKeyTag] = tags
 	}
-	return entry
+	return entry, desiredValue, nil
 }
 
-func (c *Converter) buildFlattenProtocolEntry(record protocolRecord) map[string]interface{} {
-	entry := make(map[string]interface{}, 1+len(record.contents)+len(record.tags))
-	for k, v := range record.contents {
+func (c *Converter) convertPipelineLogToSingleProtocolFlatten(log *models.Log, group *models.GroupInfo, targetFields []string) (map[string]interface{}, map[string]string, error) {
+	contents, tags := convertPipelineLogToMap(log, group, c.TagKeyRenameMap)
+	desiredValue, err := findTargetValues(targetFields, contents, tags, c.TagKeyRenameMap)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	logLength := 1 + len(contents)
+	if !c.OnlyContents {
+		logLength += len(tags)
+	}
+	entry := make(map[string]interface{}, logLength)
+	for k, v := range contents {
 		entry[k] = v
 	}
 	if !c.OnlyContents {
-		for k, v := range record.tags {
+		for k, v := range tags {
 			entry[k] = v
 		}
 	}
+	timeSec := uint32(log.GetTimestamp() / 1e9)
 	if newKey, ok := c.ProtocolKeyRenameMap[protocolKeyTime]; ok {
-		entry[newKey] = record.timeSec
+		entry[newKey] = timeSec
 	} else {
-		entry[protocolKeyTime] = record.timeSec
+		entry[protocolKeyTime] = timeSec
 	}
-	return entry
+	return entry, desiredValue, nil
+}
+
+func (c *Converter) convertPassthroughToSingleProtocol(event models.PipelineEvent, group *models.GroupInfo, targetFields []string) (map[string]interface{}, map[string]string, error) {
+	payload, err := serializePassthroughEvent(event)
+	if err != nil {
+		return nil, nil, err
+	}
+	contents := map[string]string{passthroughLogKey: string(payload)}
+	tags := collectGroupTags(group, c.TagKeyRenameMap)
+	for k, v := range event.GetTags().Iterator() {
+		addTagIfRequired(tags, c.TagKeyRenameMap, k, v)
+	}
+	desiredValue, err := findTargetValues(targetFields, contents, tags, c.TagKeyRenameMap)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	entry := make(map[string]interface{}, numProtocolKeys)
+	timeSec := uint32(event.GetTimestamp() / 1e9)
+	if newKey, ok := c.ProtocolKeyRenameMap[protocolKeyTime]; ok {
+		entry[newKey] = timeSec
+	} else {
+		entry[protocolKeyTime] = timeSec
+	}
+	if newKey, ok := c.ProtocolKeyRenameMap[protocolKeyContent]; ok {
+		entry[newKey] = contents
+	} else {
+		entry[protocolKeyContent] = contents
+	}
+	if newKey, ok := c.ProtocolKeyRenameMap[protocolKeyTag]; ok {
+		entry[newKey] = tags
+	} else {
+		entry[protocolKeyTag] = tags
+	}
+	return entry, desiredValue, nil
+}
+
+func (c *Converter) convertPassthroughToSingleProtocolFlatten(event models.PipelineEvent, group *models.GroupInfo, targetFields []string) (map[string]interface{}, map[string]string, error) {
+	payload, err := serializePassthroughEvent(event)
+	if err != nil {
+		return nil, nil, err
+	}
+	contents := map[string]string{passthroughLogKey: string(payload)}
+	tags := collectGroupTags(group, c.TagKeyRenameMap)
+	for k, v := range event.GetTags().Iterator() {
+		addTagIfRequired(tags, c.TagKeyRenameMap, k, v)
+	}
+	desiredValue, err := findTargetValues(targetFields, contents, tags, c.TagKeyRenameMap)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	entry := make(map[string]interface{}, 1+len(contents)+len(tags))
+	entry[passthroughLogKey] = string(payload)
+	if !c.OnlyContents {
+		for k, v := range tags {
+			entry[k] = v
+		}
+	}
+	timeSec := uint32(event.GetTimestamp() / 1e9)
+	if newKey, ok := c.ProtocolKeyRenameMap[protocolKeyTime]; ok {
+		entry[newKey] = timeSec
+	} else {
+		entry[protocolKeyTime] = timeSec
+	}
+	return entry, desiredValue, nil
 }
 
 func convertPipelineLogToMap(log *models.Log, group *models.GroupInfo, tagKeyRenameMap map[string]string) (map[string]string, map[string]string) {
@@ -219,14 +285,6 @@ func collectGroupTags(group *models.GroupInfo, tagKeyRenameMap map[string]string
 		addTagIfRequired(tags, tagKeyRenameMap, k, v)
 	}
 	return tags
-}
-
-func logContentsToMap(log *protocol.Log) map[string]string {
-	contents := make(map[string]string, len(log.Contents))
-	for _, content := range log.Contents {
-		contents[content.GetKey()] = content.GetValue()
-	}
-	return contents
 }
 
 func interfaceToString(v interface{}) string {
@@ -261,6 +319,8 @@ func PipelineGroupEventsToLogGroup(groupEvents *models.PipelineGroupEvents) (*pr
 	}
 
 	for _, event := range groupEvents.Events {
+		// Classify events via B1's shared pass-through contract (pkg/pipeline):
+		// Log-only handlers process Log events; all other kinds pass through.
 		if pipeline.LogOnlyEventKinds.Supports(event.GetType()) {
 			log, ok := event.(*models.Log)
 			if !ok {
@@ -277,143 +337,94 @@ func PipelineGroupEventsToLogGroup(groupEvents *models.PipelineGroupEvents) (*pr
 			logGroup.Logs = append(logGroup.Logs, legacyLog)
 			continue
 		}
-		// Metric/Span/ByteArray are converted structurally so they are flushed
-		// as first-class fields and never silently dropped.
-		logs, err := convertNonLogEventToLogs(event)
+		// Metric/Span/ByteArray are serialized into __pipeline_passthrough__ so they
+		// are never silently dropped; serialization rejects genuinely unknown kinds.
+		payload, err := serializePassthroughEvent(event)
 		if err != nil {
 			return nil, err
 		}
-		logGroup.Logs = append(logGroup.Logs, logs...)
+		ts := event.GetTimestamp()
+		logGroup.Logs = append(logGroup.Logs, &protocol.Log{
+			Time: uint32(ts / 1e9),
+			Contents: []*protocol.Log_Content{{
+				Key:   passthroughLogKey,
+				Value: string(payload),
+			}},
+		})
 	}
 	return logGroup, nil
 }
 
-// convertNonLogEventToLogs converts a non-Log pipeline event (Metric/Span/
-// ByteArray) into one or more structured protocol logs. Metric events reuse
-// v1's canonical metric-log format (__name__/__labels__/__value__/__time_nano__)
-// via helper.NewMetricLog so that v2 supports Metric the same way v1 does.
-func convertNonLogEventToLogs(event models.PipelineEvent) ([]*protocol.Log, error) {
+func serializePassthroughEvent(event models.PipelineEvent) ([]byte, error) {
+	payload, err := passthroughPayload(event)
+	if err != nil {
+		return nil, err
+	}
+	var buf bytes.Buffer
+	encoder := json.NewEncoder(&buf)
+	encoder.SetEscapeHTML(false)
+	if err := encoder.Encode(payload); err != nil {
+		return nil, err
+	}
+	return bytes.TrimSpace(buf.Bytes()), nil
+}
+
+func passthroughPayload(event models.PipelineEvent) (map[string]interface{}, error) {
+	payload := map[string]interface{}{
+		"name":              event.GetName(),
+		"timestamp":         event.GetTimestamp(),
+		"observedTimestamp": event.GetObservedTimestamp(),
+	}
+	tags := make(map[string]string, event.GetTags().Len())
+	for k, v := range event.GetTags().Iterator() {
+		tags[k] = v
+	}
+	if len(tags) > 0 {
+		payload["tags"] = tags
+	}
+
 	switch event.GetType() {
 	case models.EventTypeMetric:
+		payload["eventType"] = "metric"
 		metric, ok := event.(*models.Metric)
 		if !ok {
 			return nil, fmt.Errorf("expected metric event, got %T", event)
 		}
-		return convertPipelineMetricToLogs(metric), nil
+		payload["metricType"] = models.MetricTypeTexts[metric.GetMetricType()]
+		if metric.GetValue().IsSingleValue() {
+			payload["value"] = metric.GetValue().GetSingleValue()
+		} else if metric.GetValue().IsMultiValues() {
+			values := make(map[string]float64, metric.GetValue().GetMultiValues().Len())
+			for k, v := range metric.GetValue().GetMultiValues().Iterator() {
+				values[k] = v
+			}
+			payload["values"] = values
+		}
+		if metric.GetTypedValue().Len() > 0 {
+			typedValues := make(map[string]interface{}, metric.GetTypedValue().Len())
+			for k, v := range metric.GetTypedValue().Iterator() {
+				typedValues[k] = v.Value
+			}
+			payload["typedValues"] = typedValues
+		}
 	case models.EventTypeSpan:
+		payload["eventType"] = "span"
 		span, ok := event.(*models.Span)
 		if !ok {
 			return nil, fmt.Errorf("expected span event, got %T", event)
 		}
-		return []*protocol.Log{convertPipelineSpanToLog(span)}, nil
+		payload["traceID"] = span.GetTraceID()
+		payload["spanID"] = span.GetSpanID()
+		payload["parentSpanID"] = span.GetParentSpanID()
+		payload["kind"] = spanKindText(span.GetKind())
+		payload["statusCode"] = span.GetStatus()
 	case models.EventTypeByteArray:
-		return []*protocol.Log{convertPipelineByteArrayToLog(event)}, nil
+		payload["eventType"] = "byteArray"
+		payload["body"] = string(event.(models.ByteArray))
 	default:
-		return nil, fmt.Errorf("unsupported event type: %v", event.GetType())
+		return nil, fmt.Errorf("unsupported passthrough event type: %v", event.GetType())
 	}
-}
-
-func convertPipelineMetricToLogs(metric *models.Metric) []*protocol.Log {
-	labels := &helper.MetricLabels{}
-	for k, v := range metric.GetTags().Iterator() {
-		labels.Append(k, v)
-	}
-
-	name := metric.GetName()
-	t := int64(metric.GetTimestamp())
-	logs := make([]*protocol.Log, 0, 1)
-
-	if value := metric.GetValue(); value != nil {
-		if value.IsSingleValue() {
-			logs = append(logs, helper.NewMetricLog(name, t, value.GetSingleValue(), labels))
-		} else if value.IsMultiValues() {
-			multiValues := value.GetMultiValues().Iterator()
-			for _, field := range sortedFloatKeys(multiValues) {
-				logs = append(logs, helper.NewMetricLog(name+"_"+field, t, multiValues[field], labels))
-			}
-		}
-	}
-
-	if typedValues := metric.GetTypedValue(); typedValues.Len() > 0 {
-		iter := typedValues.Iterator()
-		for _, field := range sortedTypedKeys(iter) {
-			logs = append(logs, helper.NewMetricLogStringVal(name+"_"+field, t, typedValueToString(iter[field]), labels))
-		}
-	}
-
-	// A metric with neither value nor typed value still emits its name so it is
-	// never silently dropped.
-	if len(logs) == 0 {
-		logs = append(logs, helper.NewMetricLogStringVal(name, t, "", labels))
-	}
-	return logs
-}
-
-func convertPipelineSpanToLog(span *models.Span) *protocol.Log {
-	log := &protocol.Log{
-		Time: uint32(span.GetTimestamp() / 1e9),
-		Contents: []*protocol.Log_Content{
-			{Key: "traceID", Value: span.GetTraceID()},
-			{Key: "spanID", Value: span.GetSpanID()},
-			{Key: "parentSpanID", Value: span.GetParentSpanID()},
-			{Key: "name", Value: span.GetName()},
-			{Key: "kind", Value: spanKindText(span.GetKind())},
-			{Key: "startTime", Value: strconv.FormatUint(span.GetStartTime(), 10)},
-			{Key: "endTime", Value: strconv.FormatUint(span.GetEndTime(), 10)},
-			{Key: "statusCode", Value: strconv.FormatInt(int64(span.GetStatus()), 10)},
-		},
-	}
-	for _, k := range sortedStringKeys(span.GetTags().Iterator()) {
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: k, Value: span.GetTags().Iterator()[k]})
-	}
-	return log
-}
-
-func convertPipelineByteArrayToLog(event models.PipelineEvent) *protocol.Log {
-	log := &protocol.Log{
-		Time: uint32(event.GetTimestamp() / 1e9),
-		Contents: []*protocol.Log_Content{
-			{Key: byteArrayContentKey, Value: string(event.(models.ByteArray))},
-		},
-	}
-	for _, k := range sortedStringKeys(event.GetTags().Iterator()) {
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: k, Value: event.GetTags().Iterator()[k]})
-	}
-	return log
-}
-
-func typedValueToString(tv *models.TypedValue) string {
-	if tv == nil {
-		return ""
-	}
-	return fmt.Sprint(tv.Value)
-}
-
-func sortedStringKeys(m map[string]string) []string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	return keys
-}
-
-func sortedFloatKeys(m map[string]float64) []string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	return keys
-}
-
-func sortedTypedKeys(m map[string]*models.TypedValue) []string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	return keys
+	return payload, nil
 }
 
 func spanKindText(kind models.SpanKind) string {

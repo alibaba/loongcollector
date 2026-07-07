@@ -121,13 +121,18 @@ func (i *ClickHouseSubscriber) queryRecords() (logGroup *protocol.LogGroup, err 
 	}
 	logger.Debug(context.Background(), "sql", s)
 
-	// contents is parsed generically so structurally-converted events (e.g. a
-	// Metric flushed as __name__/__labels__/__value__/__time_nano__) surface all
-	// their fields for verification without hard-coding a fixed field set.
 	type logContent struct {
-		Contents map[string]string `json:"contents"`
-		Tags     map[string]string `json:"tags"`
-		Time     int               `json:"time"`
+		Contents struct {
+			Index       string `json:"Index"`
+			Name        string `json:"_name"`
+			Value       string `json:"_value"`
+			Passthrough string `json:"__pipeline_passthrough__"`
+		} `json:"contents"`
+		Tags struct {
+			HostIP   string `json:"host.ip"`
+			HostName string `json:"host.name"`
+		} `json:"tags"`
+		Time int `json:"time"`
 	}
 
 	defer func() { _ = rows.Close() }()
@@ -146,8 +151,19 @@ func (i *ClickHouseSubscriber) queryRecords() (logGroup *protocol.LogGroup, err 
 			logger.Warning(context.Background(), selfmonitor.ClickhouseSubscriberAlarm, "failed to unmarshal data, err", err)
 			return
 		}
-		for k, v := range lc.Contents {
-			log.Contents = append(log.Contents, &protocol.Log_Content{Key: k, Value: v})
+		log.Contents = append(log.Contents, &protocol.Log_Content{
+			Key:   "_name",
+			Value: lc.Contents.Name,
+		})
+		log.Contents = append(log.Contents, &protocol.Log_Content{
+			Key:   "_value",
+			Value: lc.Contents.Value,
+		})
+		if lc.Contents.Passthrough != "" {
+			log.Contents = append(log.Contents, &protocol.Log_Content{
+				Key:   "__pipeline_passthrough__",
+				Value: lc.Contents.Passthrough,
+			})
 		}
 		logGroup.Logs = append(logGroup.Logs, log)
 	}
