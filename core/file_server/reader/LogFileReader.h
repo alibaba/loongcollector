@@ -466,6 +466,9 @@ public:
     void SetEventGroupMetaAndTag(PipelineEventGroup& group);
 
     void SetMetrics();
+    // Seed source_size/read_offset gauges right after the reader is (re)created so a
+    // config reload does not briefly expose 0 on the shared reentrant metrics record.
+    void InitMetricGauges();
     void ReportMetrics(uint64_t readSize);
 
 protected:

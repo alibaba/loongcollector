@@ -15,6 +15,7 @@
 #include "config/CollectionConfig.h"
 
 #include <string>
+#include <unordered_set>
 
 #include "boost/regex.hpp"
 
@@ -95,6 +96,39 @@ static void ReplaceEnvVarRef(Json::Value& value, bool& res) {
     }
 }
 
+static const unordered_set<string>& GetNativeInputBlacklistWhenUsingGoPlugin() {
+    // A1: explicit blacklist framework; populated to match pre-A1 legacy whitelist parity
+    // (does NOT expand Parse allow surface). Allowed native inputs:
+    //   input_file, input_container_stdio, input_static_file_onetime,
+    //   input_*_security, input_internal_metrics, input_internal_alarms.
+    // Remove one blacklist entry after B-line matrix/E2E proves end-to-end reachability.
+    static const unordered_set<string> kBlacklist = {
+        "input_agentsight",
+        "input_cpu_profiling",
+        "input_forward",
+        "input_host_meta",
+        "input_host_monitor",
+        "input_internal_config_container_info",
+        "input_network_observer",
+        "input_prometheus",
+    };
+    return kBlacklist;
+}
+
+static bool IsNativeInputBlockedWhenUsingGoPlugin(const string& pluginType) {
+    // This blacklist is intentionally NOT a subset of PluginRegistry::IsValidNativeInputPlugin.
+    // IsValidNativeInputPlugin reflects what is actually *registered*, which is conditional on
+    // platform (#if defined(__linux__)) and eBPF gflags (e.g. input_cpu_profiling is only
+    // registered when enable_ebpf_cpu_profiling is on, which defaults to false). The blacklist,
+    // by contrast, is unconditional. This gap matters because IsValidGoPlugin treats any name
+    // that is not a registered native plugin as a Go plugin: a blacklisted native input that
+    // happens to be unregistered (Linux-only input on Windows, or eBPF input with its gflag off)
+    // would otherwise be misclassified as a Go input and slip through the gate. Checking the
+    // blacklist first keeps such inputs classified as native and rejected when paired with Go
+    // plugins, regardless of build target or gflags.
+    return GetNativeInputBlacklistWhenUsingGoPlugin().count(pluginType) > 0;
+}
+
 bool CollectionConfig::Parse() {
     if (BOOL_FLAG(enable_env_ref_in_config)) {
         if (ReplaceEnvVar()) {
@@ -143,8 +177,7 @@ bool CollectionConfig::Parse() {
     // inputs, processors and flushers module must be parsed first and parsed by order, since aggregators and
     // extensions module parsing will rely on their results.
     bool hasFileInput = false;
-    bool hasSecurityInput = false;
-    bool hasSelfMonitorInput = false;
+    bool hasNativeInputBlockedWhenUsingGoPlugin = false;
     key = "inputs";
     itr = mDetail->find(key.c_str(), key.c_str() + key.size());
     if (!itr) {
@@ -215,7 +248,9 @@ bool CollectionConfig::Parse() {
             }
         }
         if (i == 0) {
-            if (PluginRegistry::GetInstance()->IsValidGoPlugin(pluginType)) {
+            if (IsNativeInputBlockedWhenUsingGoPlugin(pluginType)) {
+                mHasNativeInput = true;
+            } else if (PluginRegistry::GetInstance()->IsValidGoPlugin(pluginType)) {
                 mHasGoInput = true;
             } else if (PluginRegistry::GetInstance()->IsValidNativeInputPlugin(pluginType, IsOnetime())) {
                 mHasNativeInput = true;
@@ -268,11 +303,8 @@ bool CollectionConfig::Parse() {
             hasFileInput = true;
         }
 #endif
-        if (pluginType.find("_security") != string::npos) {
-            hasSecurityInput = true;
-        }
-        if (pluginType == "input_internal_metrics" || pluginType == "input_internal_alarms") {
-            hasSelfMonitorInput = true;
+        if (IsNativeInputBlockedWhenUsingGoPlugin(pluginType)) {
+            hasNativeInputBlockedWhenUsingGoPlugin = true;
         }
     }
     // TODO: remove these special restrictions
@@ -362,12 +394,11 @@ bool CollectionConfig::Parse() {
                 if (isCurrentPluginNative) {
                     if (PluginRegistry::GetInstance()->IsValidGoPlugin(pluginType)) {
                         // TODO: remove these special restrictions
-                        if (!hasFileInput && !hasSecurityInput && !hasSelfMonitorInput) {
+                        if (hasNativeInputBlockedWhenUsingGoPlugin) {
                             PARAM_ERROR_RETURN(sLogger,
                                                alarm,
-                                               "extended processor plugins coexist with native input plugins other "
-                                               "than input_file or input_container_stdio or input_*_security "
-                                               "or input_internal_*",
+                                               "extended processor plugins coexist with native input plugins in "
+                                               "blacklist",
                                                noModule,
                                                mName,
                                                mProject,
@@ -492,12 +523,10 @@ bool CollectionConfig::Parse() {
         const string pluginType = it->asString();
         if (PluginRegistry::GetInstance()->IsValidGoPlugin(pluginType)) {
             // TODO: remove these special restrictions
-            if (mHasNativeInput && !hasFileInput && !hasSecurityInput && !hasSelfMonitorInput) {
+            if (mHasNativeInput && hasNativeInputBlockedWhenUsingGoPlugin) {
                 PARAM_ERROR_RETURN(sLogger,
                                    alarm,
-                                   "extended flusher plugins coexist with native input plugins other than "
-                                   "input_file or input_container_stdio or input_*_security "
-                                   "or input_internal_*",
+                                   "extended flusher plugins coexist with native input plugins in blacklist",
                                    noModule,
                                    mName,
                                    mProject,
