@@ -271,6 +271,7 @@ bool CollectionConfig::Parse() {
         }
 #endif
     }
+    // TODO: remove this restriction once FileServer keys registrations by (config, input index) (tracked in #2644).
     // A native file input registers in FileServer keyed by config name only, so it cannot coexist with any
     // other input in the same pipeline without overwriting registrations. Keep it as the sole input for now.
     if (hasFileInput && (*mDetail)["inputs"].size() > 1) {
@@ -494,6 +495,7 @@ bool CollectionConfig::Parse() {
         }
         mFlushers.push_back(&plugin);
     }
+    // TODO: remove this restriction once extended flushers implement FlusherV2.Export end to end.
     // Native + Go flusher coexistence rule (intentional, not part of the removed input whitelist):
     // when a Go (extended) flusher is present the native flushers are fed by the Go pipeline
     // (see ShouldNativeFlusherConnectedByGoPipeline), and flusher_sls is currently the only native
