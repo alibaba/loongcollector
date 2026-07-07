@@ -142,6 +142,13 @@ bool CollectionConfig::Parse() {
 
     // inputs, processors and flushers module must be parsed first and parsed by order, since aggregators and
     // extensions module parsing will rely on their results.
+    // Native file inputs (input_file / input_container_stdio / input_static_file_onetime) register their
+    // per-input state in FileServer keyed by the config (pipeline) name, not by input index (see
+    // FileServer::AddFileDiscoveryConfig / AddPluginMetricManager). Two such inputs in one pipeline would
+    // therefore overwrite each other's registration and silently lose data. Until FileServer keys these by
+    // (config, index), a file input must remain the sole input of its pipeline. See issue tracking multi
+    // native file input support.
+    bool hasFileInput = false;
     key = "inputs";
     itr = mDetail->find(key.c_str(), key.c_str() + key.size());
     if (!itr) {
@@ -252,6 +259,30 @@ bool CollectionConfig::Parse() {
             }
         }
         mInputs.push_back(&plugin);
+#ifndef APSARA_UNIT_TEST_MAIN
+        if (pluginType == "input_file" || pluginType == "input_container_stdio"
+            || pluginType == "input_static_file_onetime") {
+            hasFileInput = true;
+        }
+#else
+        if (pluginType.find("input_file") != string::npos || pluginType.find("input_container_stdio") != string::npos
+            || pluginType.find("input_static_file_onetime") != string::npos) {
+            hasFileInput = true;
+        }
+#endif
+    }
+    // A native file input registers in FileServer keyed by config name only, so it cannot coexist with any
+    // other input in the same pipeline without overwriting registrations. Keep it as the sole input for now.
+    if (hasFileInput && (*mDetail)["inputs"].size() > 1) {
+        PARAM_ERROR_RETURN(sLogger,
+                           alarm,
+                           "input_file, input_container_stdio or input_static_file_onetime cannot coexist "
+                           "with other inputs in the same pipeline",
+                           noModule,
+                           mName,
+                           mProject,
+                           mLogstore,
+                           mRegion);
     }
 
     key = "processors";

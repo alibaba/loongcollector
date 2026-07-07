@@ -118,9 +118,10 @@ bool CollectionPipeline::Init(CollectionConfig&& config) {
             }
             // Keep a raw pointer to the input just created in this iteration for the special
             // treatment below. Ownership moves into mInputs, but the pointee address is unchanged,
-            // so currentInput stays valid. We must bind to *this* input (the one matching
-            // pluginType), not mInputs[0]: now that the input whitelist is removed, multiple inputs
-            // may coexist and a native file input need not be the first element of mInputs.
+            // so currentInput stays valid. Bind to *this* input (the one matching pluginType) rather
+            // than mInputs[0]. CollectionConfig::Parse currently constrains a native file input to be
+            // the sole input of its pipeline, so mInputs[0] would also work today; binding to the
+            // matching input keeps this correct regardless of position and future-proof.
             InputInstance* currentInput = input.get();
             mInputs.emplace_back(std::move(input));
             if (!optionalGoPipeline.isNull()) {

@@ -2492,8 +2492,9 @@ void CollectionConfigUnittest::MultiInputAndFlusherCoexistence() const {
     unique_ptr<CollectionConfig> config;
     string errorMsg;
 
-    // Multiple native file inputs may coexist (single-input transitional
-    // constraint removed).
+    // A native file input registers in FileServer keyed by config name only, so multiple native file
+    // inputs in one pipeline would overwrite each other's registration and silently lose data. Parse
+    // must reject a file input coexisting with any other input.
     string configStr = R"(
         {
             "inputs": [
@@ -2514,7 +2515,7 @@ void CollectionConfigUnittest::MultiInputAndFlusherCoexistence() const {
     configJson.reset(new Json::Value());
     APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
     config.reset(new CollectionConfig(configName, std::move(configJson), filepath));
-    APSARA_TEST_TRUE(config->Parse());
+    APSARA_TEST_FALSE(config->Parse());
 
     // native input coexists with Go flusher (multi-input path).
     configStr = R"(
