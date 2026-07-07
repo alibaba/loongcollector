@@ -116,18 +116,22 @@ bool CollectionPipeline::Init(CollectionConfig&& config) {
             if (!input->Init(detail, mContext, i, optionalGoPipeline)) {
                 return false;
             }
+            // Keep a raw pointer to the input just created in this iteration for the special
+            // treatment below. Ownership moves into mInputs, but the pointee address is unchanged,
+            // so currentInput stays valid. We must bind to *this* input (the one matching
+            // pluginType), not mInputs[0]: now that the input whitelist is removed, multiple inputs
+            // may coexist and a native file input need not be the first element of mInputs.
+            InputInstance* currentInput = input.get();
             mInputs.emplace_back(std::move(input));
             if (!optionalGoPipeline.isNull()) {
                 MergeGoPipeline(optionalGoPipeline, mGoPipelineWithInput);
             }
-            // for special treatment below; use the input just added (mInputs.back()) rather than
-            // mInputs[0], since multiple inputs may now coexist and a file input need not be first.
             if (pluginType == InputFile::sName) {
-                inputFile = static_cast<const InputFile*>(mInputs.back()->GetPlugin());
+                inputFile = static_cast<const InputFile*>(currentInput->GetPlugin());
             } else if (pluginType == InputContainerStdio::sName) {
-                inputContainerStdio = static_cast<const InputContainerStdio*>(mInputs.back()->GetPlugin());
+                inputContainerStdio = static_cast<const InputContainerStdio*>(currentInput->GetPlugin());
             } else if (pluginType == InputStaticFile::sName) {
-                inputStaticFile = static_cast<const InputStaticFile*>(mInputs.back()->GetPlugin());
+                inputStaticFile = static_cast<const InputStaticFile*>(currentInput->GetPlugin());
             }
         } else {
             AddPluginToGoPipeline(pluginType, detail, "inputs", mGoPipelineWithInput);
