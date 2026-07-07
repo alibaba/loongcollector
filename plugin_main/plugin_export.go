@@ -93,13 +93,11 @@ typedef struct {
 
 // PBBuffer carries a serialized PipelineEventGroup protobuf that the C++ self-monitor
 // timer pulls from Go via GetGoSelfMonitor*PB. data is allocated inside
-// libGoPluginBase.so and stays owned by it: the C++ caller only copies the bytes out
-// on receive and never frees anything. Because pulls are synchronous and serialized
-// (the single self-monitor timer copies the bytes before issuing the next pull), Go
-// reclaims each buffer on the following pull. Keeping both allocation and release
-// inside this module means no memory crosses the module boundary and there is no free
-// export for C++ to call. size is the byte length; data is NULL and size is 0 when
-// there is nothing to pull or on marshal failure.
+// libGoPluginBase.so; after the C++ caller copies the bytes on receive it must
+// release the buffer via FreeSelfMonitorPB (never free() directly) so that allocation
+// and release stay in the same module and no memory crosses the module boundary. size
+// is the byte length; data is NULL and size is 0 when there is nothing to pull or on
+// marshal failure.
 typedef struct {
     char* data;
     int size;
@@ -416,30 +414,12 @@ func marshalMetricsPB(rawMetrics []map[string]string, now time.Time) ([]byte, er
 	return group.Marshal()
 }
 
-// selfMonitorAlarmsPBBuf / selfMonitorMetricsPBBuf hold the C buffer returned by the
-// most recent GetGoSelfMonitor*PB pull so it can be released on the *next* pull. The
-// C++ self-monitor timer pulls synchronously — it copies the bytes into a std::string
-// before issuing the next pull — so the previous buffer is always fully consumed by
-// the time we free it here. Freeing inside libGoPluginBase.so (where C.CBytes
-// allocated it) keeps allocation and release in the same module, so no memory crosses
-// the boundary and the C++ side never has to call a free export. Only the single
-// self-monitor pull thread touches these; alarms and metrics keep separate slots so
-// their pulls never race each other.
-var (
-	selfMonitorAlarmsPBBuf  unsafe.Pointer
-	selfMonitorMetricsPBBuf unsafe.Pointer
-)
-
-// toPBBuffer releases whatever the previous pull left in *slot, then copies data into
-// a fresh buffer allocated inside libGoPluginBase.so and records it in *slot. The C++
-// caller only copies the bytes out on receive; the buffer is reclaimed on the
-// following pull. An empty or failed marshal releases the prior buffer and yields a
-// nil buffer, which the receiver treats as no-op.
-func toPBBuffer(slot *unsafe.Pointer, data []byte, err error) C.PBBuffer {
-	if *slot != nil {
-		C.free(*slot)
-		*slot = nil
-	}
+// toPBBuffer copies data into a buffer allocated inside libGoPluginBase.so. The C++
+// caller copies the bytes on receive and then releases the buffer via
+// FreeSelfMonitorPB (not free()), keeping allocation and release in the same module
+// so no memory crosses the boundary. An empty or failed marshal yields a nil buffer,
+// which the receiver treats as no-op.
+func toPBBuffer(data []byte, err error) C.PBBuffer {
 	var buf C.PBBuffer
 	if err != nil {
 		logger.Error(context.Background(), selfmonitor.PluginAlarm, "marshal self-monitor PB error", err)
@@ -450,36 +430,50 @@ func toPBBuffer(slot *unsafe.Pointer, data []byte, err error) C.PBBuffer {
 	}
 	buf.data = (*C.char)(C.CBytes(data))
 	buf.size = C.int(len(data))
-	*slot = unsafe.Pointer(buf.data)
 	return buf
 }
 
 // GetGoSelfMonitorAlarmsPB lets the C++ self-monitor timer pull Go self-monitor
 // alarms as a serialized PipelineEventGroup protobuf. C++ copies the bytes into a
-// std::string and feeds them to SelfMonitorServer::ReceiveGoAlarmsPB; Go owns the
-// buffer and reclaims it on the next pull, so C++ never frees it. This is the D3 pull
-// path (C++ drives collection, mirroring the legacy getter structure); it coexists
-// with the legacy GetGoAlarms CGO struct path (removed in D5). Runtime wiring
-// (LoadMethod + the timer call) lands in D4, matching this PR's deferred-wiring stance
-// on the receive side.
+// std::string, feeds them to SelfMonitorServer::ReceiveGoAlarmsPB, then releases the
+// buffer via FreeSelfMonitorPB. This is the D3 pull path (C++ drives collection,
+// mirroring the legacy getter structure); it coexists with the legacy GetGoAlarms CGO
+// struct path (removed in D5). Runtime wiring (LoadMethod + the timer call) lands in
+// D4, matching this PR's deferred-wiring stance on the receive side.
 //
 //export GetGoSelfMonitorAlarmsPB
 func GetGoSelfMonitorAlarmsPB() C.PBBuffer {
 	data, err := marshalAlarmsPB(pluginmanager.GetAlarmMessages(), time.Now())
-	return toPBBuffer(&selfMonitorAlarmsPBBuf, data, err)
+	return toPBBuffer(data, err)
 }
 
 // GetGoSelfMonitorMetricsPB lets the C++ self-monitor timer pull Go self-monitor
 // metrics of the given export type as a serialized PipelineEventGroup protobuf. C++
-// copies the bytes into a std::string and feeds them to ReadMetrics::ParseGoMetricsPB;
-// Go owns the buffer and reclaims it on the next pull, so C++ never frees it. This is
-// the D3 pull path; it coexists with the legacy GetGoMetrics CGO struct path (removed
-// in D5). Runtime wiring lands in D4.
+// copies the bytes into a std::string, feeds them to ReadMetrics::ParseGoMetricsPB,
+// then releases the buffer via FreeSelfMonitorPB. This is the D3 pull path; it
+// coexists with the legacy GetGoMetrics CGO struct path (removed in D5). Runtime
+// wiring lands in D4.
 //
 //export GetGoSelfMonitorMetricsPB
 func GetGoSelfMonitorMetricsPB(metricType string) C.PBBuffer {
 	data, err := marshalMetricsPB(pluginmanager.GetMetrics(metricType), time.Now())
-	return toPBBuffer(&selfMonitorMetricsPBBuf, data, err)
+	return toPBBuffer(data, err)
+}
+
+// FreeSelfMonitorPB releases a PBBuffer.data block previously returned by
+// GetGoSelfMonitorAlarmsPB / GetGoSelfMonitorMetricsPB. Both the allocation
+// (C.CBytes in toPBBuffer) and this release run inside libGoPluginBase.so, so the
+// buffer is never freed across the module boundary — this satisfies the dynamic
+// library rule that memory must be allocated and freed within the same module and
+// avoids relying on a shared CRT heap under static-CRT linking (the cross-boundary
+// free pattern tracked as the Windows crash risk in #2645). A nil pointer is a no-op,
+// so callers may invoke it unconditionally.
+//
+//export FreeSelfMonitorPB
+func FreeSelfMonitorPB(data *C.char) {
+	if data != nil {
+		C.free(unsafe.Pointer(data))
+	}
 }
 
 func initPluginBase(cfgStr string) int {
