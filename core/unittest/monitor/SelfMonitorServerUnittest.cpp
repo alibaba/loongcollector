@@ -45,7 +45,14 @@ private:
             return "";
         }
         std::string bytes;
-        pb.SerializeToString(&bytes);
+        bool serialized = pb.SerializeToString(&bytes);
+        // Guard the boolean: on failure `bytes` may be empty/partial, which would make
+        // downstream assertions misleading. Fail loudly with context and return "" so the
+        // callers' APSARA_TEST_FALSE(bytes.empty()) check stops the test deterministically.
+        EXPECT_TRUE(serialized) << "SerializeToString failed, ByteSizeLong=" << pb.ByteSizeLong();
+        if (!serialized) {
+            return "";
+        }
         return bytes;
     }
 };
