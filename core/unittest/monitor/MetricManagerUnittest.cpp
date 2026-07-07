@@ -356,6 +356,8 @@ void MetricManagerUnittest::TestParseGoMetricsPB() {
                           UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeCounter, 100.0});
     multiValues->SetValue(std::string("cache_size"),
                           UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, 12.0});
+    multiValues->SetValue(std::string("avg_delay_ms"),
+                          UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, 50.5});
 
     models::PipelineEventGroup pb;
     std::string errMsg;
@@ -367,12 +369,20 @@ void MetricManagerUnittest::TestParseGoMetricsPB() {
     APSARA_TEST_TRUE(ReadMetrics::ParseGoMetricsPB(bytes, metricsList));
     APSARA_TEST_EQUAL(metricsList.size(), 1UL);
 
+    // The reconstructed string form must match the legacy GetGoMetrics map shape:
+    // counters are integral strings, gauges use fixed 4-fractional-digit notation
+    // (Go: strconv.FormatFloat(v, 'f', 4, 64)), not std::to_string's 6 digits.
+    APSARA_TEST_EQUAL(metricsList[0]["counters"], std::string(R"({"proc_in_records_total":"100"})"));
+    APSARA_TEST_EQUAL(metricsList[0]["gauges"],
+                      std::string(R"({"avg_delay_ms":"50.5000","cache_size":"12.0000"})"));
+
     // feed through the same ctor GetGoMetrics uses, verifying end-to-end coexistence
     SelfMonitorMetricEvent event(metricsList[0]);
     APSARA_TEST_EQUAL(event.mCategory, std::string("plugin"));
     APSARA_TEST_EQUAL(event.GetLabel("plugin_type"), std::string("flusher_stdout"));
     APSARA_TEST_EQUAL(event.GetCounter("proc_in_records_total"), 100UL);
     APSARA_TEST_EQUAL(event.GetGauge("cache_size"), 12.0);
+    APSARA_TEST_EQUAL(event.GetGauge("avg_delay_ms"), 50.5);
 }
 
 // Empty input is a no-op success; malformed protobuf returns false without touching

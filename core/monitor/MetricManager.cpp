@@ -14,7 +14,9 @@
 
 #include "MetricManager.h"
 
+#include <iomanip>
 #include <set>
+#include <sstream>
 
 #include "json/json.h"
 
@@ -34,6 +36,19 @@ namespace logtail {
 
 const string METRIC_EXPORT_TYPE_GO = "direct";
 const string METRIC_EXPORT_TYPE_CPP = "cpp_provided";
+
+namespace {
+// Format a gauge value to match the legacy GetGoMetrics map form byte-for-byte.
+// The Go side serializes gauges via strconv.FormatFloat(v, 'f', 4, 64) (see
+// pkg/selfmonitor/metrics_imp_v2.go), i.e. fixed notation with 4 fractional
+// digits. std::to_string(double) instead emits 6 digits ("12" -> "12.000000"),
+// which diverges from the legacy string shape downstream parsers expect.
+std::string FormatGoMetricGauge(double value) {
+    std::ostringstream oss;
+    oss << std::fixed << std::setprecision(4) << value;
+    return oss.str();
+}
+} // namespace
 
 WriteMetrics::~WriteMetrics() {
     Clear();
@@ -277,7 +292,7 @@ bool ReadMetrics::ParseGoMetricsPB(const std::string& pbData,
                 if (value.MetricType == UntypedValueMetricType::MetricTypeCounter) {
                     counters[name] = std::to_string(static_cast<uint64_t>(value.Value));
                 } else {
-                    gauges[name] = std::to_string(value.Value);
+                    gauges[name] = FormatGoMetricGauge(value.Value);
                 }
             }
         }
