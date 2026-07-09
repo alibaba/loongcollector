@@ -373,8 +373,7 @@ void MetricManagerUnittest::TestParseGoMetricsPB() {
     // counters are integral strings, gauges use fixed 4-fractional-digit notation
     // (Go: strconv.FormatFloat(v, 'f', 4, 64)), not std::to_string's 6 digits.
     APSARA_TEST_EQUAL(metricsList[0]["counters"], std::string(R"({"proc_in_records_total":"100"})"));
-    APSARA_TEST_EQUAL(metricsList[0]["gauges"],
-                      std::string(R"({"avg_delay_ms":"50.5000","cache_size":"12.0000"})"));
+    APSARA_TEST_EQUAL(metricsList[0]["gauges"], std::string(R"({"avg_delay_ms":"50.5000","cache_size":"12.0000"})"));
 
     // feed through the same ctor GetGoMetrics uses, verifying end-to-end coexistence
     SelfMonitorMetricEvent event(metricsList[0]);
