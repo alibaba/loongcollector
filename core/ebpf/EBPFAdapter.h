@@ -39,9 +39,6 @@ struct AgentSightSymbolTable {
     void (*config_add_cmdline_rule)(AgentsightConfigHandle*, const char* const*, const char*, int) = nullptr;
     void (*config_add_https)(AgentsightConfigHandle*, const char*) = nullptr;
     int (*config_add_http)(AgentsightConfigHandle*, const char*) = nullptr;
-    // Optional: apply a JSON config blob (merges into existing rules; sets traceEnabled/encryption).
-    // May be null when linked against an older libagentsight.so.
-    int (*config_load_config)(AgentsightConfigHandle*, const char*) = nullptr;
     AgentsightHandle* (*handle_new)(AgentsightConfigHandle*) = nullptr;
     void (*handle_free)(AgentsightHandle*) = nullptr;
     int (*handle_start)(AgentsightHandle*) = nullptr;

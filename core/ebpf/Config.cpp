@@ -690,7 +690,6 @@ bool SecurityOptions::Init(SecurityProbeType probeType,
         mAgentsightHttp.clear();
         mAgentsightEventStreamFormat = true;
         mAgentsightMessageDeltaOnly = true;
-        mAgentsightTraceEnabled = false;
     }
 
     SecurityOption thisSecurityOption;
@@ -744,11 +743,6 @@ bool SecurityOptions::Init(SecurityProbeType probeType,
                 if (innerConfig.isMember("EventStreamFormat")) {
                     if (!GetOptionalBoolParam(
                             innerConfig, "EventStreamFormat", mAgentsightEventStreamFormat, errorMsg)) {
-                        warnOptionalParse();
-                    }
-                }
-                if (innerConfig.isMember("TraceEnabled")) {
-                    if (!GetOptionalBoolParam(innerConfig, "TraceEnabled", mAgentsightTraceEnabled, errorMsg)) {
                         warnOptionalParse();
                     }
                 }

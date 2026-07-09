@@ -510,20 +510,6 @@ bool AgentsightManager::RestartAgentSightLocked(const SecurityOptions& opts) {
 
     ApplyAgentsightRulesToConfig(cfg, sym, opts);
 
-    // Opt-in conversation content upload. load_from_json merges (does not replace) the rules
-    // already applied above, so an empty-rules JSON only flips the traceEnabled flag.
-    if (opts.mAgentsightTraceEnabled) {
-        if (sym->config_load_config) {
-            if (sym->config_load_config(cfg, "{\"traceEnabled\":true}") != 0) {
-                LogAgentSightError("config_load_config(traceEnabled) failed");
-            }
-        } else {
-            LOG_WARNING(sLogger,
-                        ("AgentSight", "TraceEnabled requested but libagentsight.so lacks "
-                                       "agentsight_config_load_config; conversation content will not upload"));
-        }
-    }
-
     mHandle = sym->handle_new(cfg);
     if (sym->config_free) {
         sym->config_free(cfg);

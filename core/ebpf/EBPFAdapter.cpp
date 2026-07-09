@@ -263,9 +263,6 @@ bool EBPFAdapter::tryLoadAgentSightDylib() {
         = reinterpret_cast<decltype(sym.config_add_https)>(tmpLib->LoadMethod("agentsight_config_add_https", symErr));
     sym.config_add_http
         = reinterpret_cast<decltype(sym.config_add_http)>(tmpLib->LoadMethod("agentsight_config_add_http", symErr));
-    // Optional symbol: absent in older libagentsight.so, so it is NOT part of the `ok` gate below.
-    sym.config_load_config = reinterpret_cast<decltype(sym.config_load_config)>(
-        tmpLib->LoadMethod("agentsight_config_load_config", symErr));
     sym.handle_new = reinterpret_cast<decltype(sym.handle_new)>(tmpLib->LoadMethod("agentsight_new", symErr));
     sym.handle_free = reinterpret_cast<decltype(sym.handle_free)>(tmpLib->LoadMethod("agentsight_free", symErr));
     sym.handle_start = reinterpret_cast<decltype(sym.handle_start)>(tmpLib->LoadMethod("agentsight_start", symErr));
