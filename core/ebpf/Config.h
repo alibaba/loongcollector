@@ -71,6 +71,9 @@ public:
     bool mAgentsightEventStreamFormat = true;
     /// When true, omit system instructions, tool definitions, and full input messages (per dedup).
     bool mAgentsightMessageDeltaOnly = true;
+    /// When true, upload conversation content fields (system_instructions, input.messages,
+    /// output.messages). Default false keeps only metadata (model, token counts) private-safe.
+    bool mAgentsightTraceEnabled = false;
 };
 
 /////////////////////  /////////////////////
