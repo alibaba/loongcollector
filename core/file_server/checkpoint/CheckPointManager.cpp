@@ -82,7 +82,9 @@ void CheckPointManager::AddCheckPoint(CheckPoint* checkPointPtr) {
                     "stale file", newCheckPoint->mFileName)("active file", oldCheckPoint->mFileName));
             return;
         }
-        mDevInodeCheckPointPtrMap.erase(it);
+        // Same key: replace in place (last-writer-wins) to avoid erase+reinsert hash churn.
+        it->second = newCheckPoint;
+        return;
     }
     mDevInodeCheckPointPtrMap.insert(std::make_pair(key, newCheckPoint));
 }

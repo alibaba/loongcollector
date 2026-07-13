@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <memory>
+
 #include "common/FileSystemUtil.h"
 #include "common/Flags.h"
 #include "file_server/checkpoint/CheckPointManager.h"
@@ -41,23 +43,25 @@ public:
     void TestAddCheckPointNeitherExistLastWriterWins();
 
 private:
-    static CheckPoint* MakeCheckPoint(const std::string& fileName,
-                                      const DevInode& devInode,
-                                      int64_t offset,
-                                      const std::string& configName,
-                                      const std::string& realFileName = "") {
-        return new CheckPoint(fileName,
-                              "" /* resolvedFileName */,
-                              offset,
-                              0 /* signatureSize */,
-                              0 /* signatureHash */,
-                              devInode,
-                              configName,
-                              realFileName,
-                              false /* fileOpenFlag */,
-                              false /* containerStopped */,
-                              "" /* containerID */,
-                              false /* lastForceRead */);
+    // Ownership is transferred to AddCheckPoint via release(); unique_ptr keeps construction
+    // exception-safe until that hand-off.
+    static std::unique_ptr<CheckPoint> MakeCheckPoint(const std::string& fileName,
+                                                      const DevInode& devInode,
+                                                      int64_t offset,
+                                                      const std::string& configName,
+                                                      const std::string& realFileName = "") {
+        return std::unique_ptr<CheckPoint>(new CheckPoint(fileName,
+                                                          "" /* resolvedFileName */,
+                                                          offset,
+                                                          0 /* signatureSize */,
+                                                          0 /* signatureHash */,
+                                                          devInode,
+                                                          configName,
+                                                          realFileName,
+                                                          false /* fileOpenFlag */,
+                                                          false /* containerStopped */,
+                                                          "" /* containerID */,
+                                                          false /* lastForceRead */));
     }
 };
 
@@ -140,8 +144,10 @@ void CheckpointManagerUnittest::TestAddCheckPointStaleFileNotOverwriteActive() {
     const DevInode reusedDevInode = ps.GetDevInode();
 
     // Active reader dumps first, then the stale reader of the deleted file (same inode).
-    CheckPointManager::Instance()->AddCheckPoint(MakeCheckPoint(activeFile, reusedDevInode, 1000, configName));
-    CheckPointManager::Instance()->AddCheckPoint(MakeCheckPoint(deletedFile, reusedDevInode, 0, configName));
+    CheckPointManager::Instance()->AddCheckPoint(
+        MakeCheckPoint(activeFile, reusedDevInode, 1000, configName).release());
+    CheckPointManager::Instance()->AddCheckPoint(
+        MakeCheckPoint(deletedFile, reusedDevInode, 0, configName).release());
 
     CheckPointPtr cpt;
     EXPECT_TRUE(CheckPointManager::Instance()->GetCheckPoint(reusedDevInode, configName, cpt));
@@ -166,8 +172,10 @@ void CheckpointManagerUnittest::TestAddCheckPointActiveOverwriteStale() {
     EXPECT_TRUE(fsutil::PathStat::stat(activeFile, ps));
     const DevInode reusedDevInode = ps.GetDevInode();
 
-    CheckPointManager::Instance()->AddCheckPoint(MakeCheckPoint(deletedFile, reusedDevInode, 0, configName));
-    CheckPointManager::Instance()->AddCheckPoint(MakeCheckPoint(activeFile, reusedDevInode, 2000, configName));
+    CheckPointManager::Instance()->AddCheckPoint(
+        MakeCheckPoint(deletedFile, reusedDevInode, 0, configName).release());
+    CheckPointManager::Instance()->AddCheckPoint(
+        MakeCheckPoint(activeFile, reusedDevInode, 2000, configName).release());
 
     CheckPointPtr cpt;
     EXPECT_TRUE(CheckPointManager::Instance()->GetCheckPoint(reusedDevInode, configName, cpt));
@@ -186,14 +194,18 @@ void CheckpointManagerUnittest::TestAddCheckPointBothExistLastWriterWins() {
     const std::string file1 = (bfs::path(kTestRootDir) / "link1.log").string();
     const std::string file2 = (bfs::path(kTestRootDir) / "link2.log").string();
     std::ofstream(file1) << "data";
-    bfs::create_hard_link(file1, file2);
+    try {
+        bfs::create_hard_link(file1, file2);
+    } catch (const bfs::filesystem_error& e) {
+        GTEST_SKIP() << "hard link not supported in this environment: " << e.what();
+    }
 
     fsutil::PathStat ps;
     EXPECT_TRUE(fsutil::PathStat::stat(file1, ps));
     const DevInode devInode = ps.GetDevInode();
 
-    CheckPointManager::Instance()->AddCheckPoint(MakeCheckPoint(file1, devInode, 100, configName));
-    CheckPointManager::Instance()->AddCheckPoint(MakeCheckPoint(file2, devInode, 200, configName));
+    CheckPointManager::Instance()->AddCheckPoint(MakeCheckPoint(file1, devInode, 100, configName).release());
+    CheckPointManager::Instance()->AddCheckPoint(MakeCheckPoint(file2, devInode, 200, configName).release());
 
     CheckPointPtr cpt;
     EXPECT_TRUE(CheckPointManager::Instance()->GetCheckPoint(devInode, configName, cpt));
@@ -213,8 +225,8 @@ void CheckpointManagerUnittest::TestAddCheckPointNeitherExistLastWriterWins() {
     const std::string gone2 = (bfs::path(kTestRootDir) / "gone2.log").string();
     const DevInode devInode(12345, 67890); // does not match any real file
 
-    CheckPointManager::Instance()->AddCheckPoint(MakeCheckPoint(gone1, devInode, 100, configName));
-    CheckPointManager::Instance()->AddCheckPoint(MakeCheckPoint(gone2, devInode, 200, configName));
+    CheckPointManager::Instance()->AddCheckPoint(MakeCheckPoint(gone1, devInode, 100, configName).release());
+    CheckPointManager::Instance()->AddCheckPoint(MakeCheckPoint(gone2, devInode, 200, configName).release());
 
     CheckPointPtr cpt;
     EXPECT_TRUE(CheckPointManager::Instance()->GetCheckPoint(devInode, configName, cpt));
