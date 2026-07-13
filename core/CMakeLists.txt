@@ -156,13 +156,13 @@ set(SUB_DIRECTORIES_LIST
         protobuf/sls protobuf/models protobuf/forward
         file_server file_server/event file_server/event_handler file_server/event_listener file_server/reader file_server/polling file_server/checkpoint
         parser
+        prometheus prometheus/labels prometheus/schedulers prometheus/async prometheus/component
         )
 if (LINUX)
     if (ENABLE_ENTERPRISE)
         set(SUB_DIRECTORIES_LIST ${SUB_DIRECTORIES_LIST} shennong shennong/sdk apm/forward)
     endif()
     set(SUB_DIRECTORIES_LIST ${SUB_DIRECTORIES_LIST} ebpf ebpf/type ebpf/type/table ebpf/util ebpf/util/sampler ebpf/protocol/http ebpf/protocol/mysql ebpf/protocol/redis ebpf/protocol ebpf/plugin/file_security ebpf/plugin/network_observer ebpf/plugin/process_security ebpf/plugin/network_security ebpf/plugin/agentsight ebpf/plugin/cpu_profiling ebpf/plugin ebpf/observer ebpf/security
-        prometheus prometheus/labels prometheus/schedulers prometheus/async prometheus/component
         host_monitor host_monitor/collector host_monitor/common forward forward/loongsuite
         )
 elseif(MSVC)
