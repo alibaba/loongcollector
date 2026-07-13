@@ -174,16 +174,26 @@ func (f *FlusherLoki) Flush(projectName string, logstoreName string, configName 
 
 func (f *FlusherLoki) Export(groups []*models.PipelineGroupEvents, _ pipeline.PipelineContext) error {
 	for _, groupEvents := range groups {
-		serializedLogs, values, err := f.converter.ToByteStreamWithSelectedFieldsV2(groupEvents, f.DynamicLabels)
-		if err != nil {
-			logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "flush loki convert log fail, error", err)
+		if groupEvents == nil {
 			continue
 		}
-		for i, log := range serializedLogs.([][]byte) {
-			labels := f.buildLokiLabels(values[i])
-			ts := time.Unix(0, int64(groupEvents.Events[i].GetTimestamp()))
-			if err := f.lokiClient.Handle(labels, ts, string(log)); err != nil {
+		// Convert one event at a time: a single event (e.g. a multi-value Metric)
+		// expands into several serialized log lines, so the line index cannot be
+		// used to index back into Events. Per-event conversion keeps every line
+		// aligned with its own timestamp and keeps serializedLogs/values in lockstep.
+		for _, event := range groupEvents.Events {
+			single := &models.PipelineGroupEvents{Group: groupEvents.Group, Events: []models.PipelineEvent{event}}
+			serializedLogs, values, err := f.converter.ToByteStreamWithSelectedFieldsV2(single, f.DynamicLabels)
+			if err != nil {
 				logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "flush loki convert log fail, error", err)
+				continue
+			}
+			ts := time.Unix(0, int64(event.GetTimestamp()))
+			for i, log := range serializedLogs.([][]byte) {
+				labels := f.buildLokiLabels(values[i])
+				if err := f.lokiClient.Handle(labels, ts, string(log)); err != nil {
+					logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "flush loki convert log fail, error", err)
+				}
 			}
 		}
 	}

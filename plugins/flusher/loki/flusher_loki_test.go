@@ -25,6 +25,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang/snappy"
+	"github.com/grafana/loki-client-go/pkg/logproto"
 	"github.com/prometheus/common/model"
 	"github.com/stretchr/testify/require"
 
@@ -121,6 +123,85 @@ func TestFlusherLoki_FlushExportParity(t *testing.T) {
 	})
 
 	require.Equal(t, flushLines, exportLines)
+}
+
+func TestFlusherLoki_ExportMetricExpansion(t *testing.T) {
+	// A single Metric event expands into several serialized log lines (its single
+	// value plus each multi/typed value). Regression guard: the Export loop must
+	// not index groupEvents.Events by the serialized-line index, otherwise the
+	// multi-value metric drives the index out of range, panics, and nothing
+	// reaches loki (the failure seen in the flusher_loki e2e case).
+	tags := models.NewTagsWithMap(map[string]string{"name": "hello"})
+	ts := int64(1691646109945000000)
+	single := models.NewSingleValueMetric("single_metrics_mock", models.MetricTypeCounter, tags, ts, 1)
+	values := models.NewMetricMultiValue()
+	values.Add("Index", float64(1))
+	typedValues := models.NewMetricTypedValues()
+	typedValues.Add("value", &models.TypedValue{Type: models.ValueTypeString, Value: "log contents"})
+	multi := models.NewMetric("multi_values_metrics_mock", models.MetricTypeUntyped, tags, ts, values, typedValues)
+
+	groups := []*models.PipelineGroupEvents{{
+		Group:  models.NewGroup(models.NewMetadata(), models.NewTags()),
+		Events: []models.PipelineEvent{single, multi},
+	}}
+
+	lines := captureLokiEntries(t, func(f *FlusherLoki) error {
+		return f.Export(groups, nil)
+	})
+
+	// single_metrics_mock -> 1 line; multi_values_metrics_mock -> Index + value -> 2 lines.
+	require.Len(t, lines, 3)
+	got := map[string]string{}
+	for _, line := range lines {
+		var obj struct {
+			Contents map[string]string `json:"contents"`
+		}
+		require.NoError(t, json.Unmarshal([]byte(line), &obj))
+		got[obj.Contents["__name__"]] = obj.Contents["__value__"]
+		require.Contains(t, obj.Contents["__labels__"], "name#$#hello")
+	}
+	require.Contains(t, got, "single_metrics_mock")
+	require.Contains(t, got, "multi_values_metrics_mock_Index")
+	require.Equal(t, "log contents", got["multi_values_metrics_mock_value"])
+}
+
+// captureLokiEntries runs the flush and decodes the loki push wire format
+// (snappy-compressed logproto.PushRequest), returning every log line delivered
+// across all batches. Unlike captureLokiPayloads it recovers all lines batched
+// into a single request, which is required to verify metric expansion.
+func captureLokiEntries(t *testing.T, run func(*FlusherLoki) error) []string {
+	t.Helper()
+	var bodies [][]byte
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		bodies = append(bodies, body)
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer server.Close()
+
+	f := NewFlusherLoki()
+	f.URL = server.URL + "/loki/api/v1/push"
+	f.StaticLabels = model.LabelSet{"app": "expansion-test"}
+	f.DynamicLabels = []string{}
+	f.MaxMessageWait = 10 * time.Millisecond
+	require.NoError(t, f.Init(mock.NewEmptyContext("p", "l", "c")))
+	require.NoError(t, run(f))
+	require.NoError(t, f.Stop())
+	time.Sleep(20 * time.Millisecond)
+
+	var lines []string
+	for _, body := range bodies {
+		decoded, err := snappy.Decode(nil, body)
+		require.NoError(t, err)
+		var req logproto.PushRequest
+		require.NoError(t, req.Unmarshal(decoded))
+		for _, stream := range req.Streams {
+			for _, entry := range stream.Entries {
+				lines = append(lines, entry.Line)
+			}
+		}
+	}
+	return lines
 }
 
 func captureLokiPayloads(t *testing.T, run func(*FlusherLoki) error) []string {
