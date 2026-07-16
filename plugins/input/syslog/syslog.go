@@ -301,6 +301,12 @@ func parseTargetPort(host string) (target, port string, err error) {
 	if err != nil {
 		return "", "", fmt.Errorf("split host port from %s: %w", host, err)
 	}
+	switch target {
+	case "", "0.0.0.0":
+		target = "127.0.0.1"
+	case "::":
+		target = "::1"
+	}
 	return target, port, nil
 }
 
