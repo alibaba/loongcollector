@@ -165,6 +165,101 @@ func TestFlusherLoki_ExportMetricExpansion(t *testing.T) {
 	require.Equal(t, "log contents", got["multi_values_metrics_mock_value"])
 }
 
+func TestFlusherLoki_ExportMetricDynamicLabels(t *testing.T) {
+	// Regression guard for the flusher_loki e2e "got 0 logs" failure: a metric
+	// dimension selected as a DynamicLabel (with a tag rename) must become a loki
+	// stream label. The metric's tag lives in __labels__ contents, so unless the
+	// converter also surfaces it as a record tag, DynamicLabels resolves to an
+	// empty value, the stream is labeled loki_name="" and the subscriber query
+	// {loki_name="hello"} matches nothing.
+	tags := models.NewTagsWithMap(map[string]string{"name": "hello"})
+	ts := int64(1691646109945000000)
+	single := models.NewSingleValueMetric("single_metrics_mock", models.MetricTypeCounter, tags, ts, 1)
+	values := models.NewMetricMultiValue()
+	values.Add("Index", float64(1))
+	typedValues := models.NewMetricTypedValues()
+	typedValues.Add("value", &models.TypedValue{Type: models.ValueTypeString, Value: "log contents"})
+	multi := models.NewMetric("multi_values_metrics_mock", models.MetricTypeUntyped, tags, ts, values, typedValues)
+
+	groups := []*models.PipelineGroupEvents{{
+		Group:  models.NewGroup(models.NewMetadata(), models.NewTags()),
+		Events: []models.PipelineEvent{single, multi},
+	}}
+
+	labelSets := captureLokiStreamLabels(t, func(f *FlusherLoki) error {
+		return f.Export(groups, nil)
+	})
+
+	require.NotEmpty(t, labelSets)
+	for _, ls := range labelSets {
+		// source from StaticLabels, loki_name from DynamicLabels(tag.loki_name)
+		// resolved via TagFieldsRename{loki_name: name} to the metric dimension.
+		require.Equal(t, "loongcollector", ls["source"], "static label missing")
+		require.Equal(t, "hello", ls["loki_name"], "metric dimension not promoted to loki stream label")
+	}
+}
+
+// captureLokiStreamLabels runs the flush against the e2e loki config (dynamic +
+// static labels) and returns the parsed label set of every pushed stream.
+func captureLokiStreamLabels(t *testing.T, run func(*FlusherLoki) error) []map[string]string {
+	t.Helper()
+	var bodies [][]byte
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		bodies = append(bodies, body)
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer server.Close()
+
+	f := NewFlusherLoki()
+	f.URL = server.URL + "/loki/api/v1/push"
+	f.StaticLabels = model.LabelSet{"source": "loongcollector"}
+	f.DynamicLabels = []string{"tag.loki_name"}
+	f.Convert.TagFieldsRename = map[string]string{"loki_name": "name"}
+	f.MaxMessageWait = 10 * time.Millisecond
+	require.NoError(t, f.Init(mock.NewEmptyContext("p", "l", "c")))
+	require.NoError(t, run(f))
+	require.NoError(t, f.Stop())
+	time.Sleep(20 * time.Millisecond)
+
+	var labelSets []map[string]string
+	for _, body := range bodies {
+		decoded, err := snappy.Decode(nil, body)
+		require.NoError(t, err)
+		var req logproto.PushRequest
+		require.NoError(t, req.Unmarshal(decoded))
+		for _, stream := range req.Streams {
+			labelSets = append(labelSets, parseLokiLabels(stream.Labels))
+		}
+	}
+	return labelSets
+}
+
+// parseLokiLabels parses a loki label string like `{a="1", b="2"}` into a map,
+// without pulling in a promql parser dependency.
+func parseLokiLabels(s string) map[string]string {
+	out := map[string]string{}
+	s = strings.TrimSpace(s)
+	s = strings.TrimPrefix(s, "{")
+	s = strings.TrimSuffix(s, "}")
+	if s == "" {
+		return out
+	}
+	for _, pair := range strings.Split(s, ",") {
+		kv := strings.SplitN(strings.TrimSpace(pair), "=", 2)
+		if len(kv) != 2 {
+			continue
+		}
+		key := strings.TrimSpace(kv[0])
+		val, err := strconv.Unquote(strings.TrimSpace(kv[1]))
+		if err != nil {
+			val = strings.Trim(strings.TrimSpace(kv[1]), `"`)
+		}
+		out[key] = val
+	}
+	return out
+}
+
 // captureLokiEntries runs the flush and decodes the loki push wire format
 // (snappy-compressed logproto.PushRequest), returning every log line delivered
 // across all batches. Unlike captureLokiPayloads it recovers all lines batched

@@ -142,14 +142,21 @@ func (c *Converter) pipelineEventToRecords(event models.PipelineEvent, group *mo
 		return nil, err
 	}
 	// Non-log events carry their own dimensions inside the converted contents
-	// (metric labels in __labels__, span/byteArray fields inline); only the
-	// group tags are attached separately, matching how a Log record is built.
-	groupTags := collectGroupTags(group, c.TagKeyRenameMap)
+	// (metric labels in __labels__, span/byteArray fields inline). Their
+	// event-level tags plus the group tags are also surfaced as record tags so
+	// that DynamicLabels selection (e.g. a loki stream label built from a metric
+	// dimension) resolves the same way it does for a v1 log tag. Without this,
+	// a metric dimension only lives in __labels__ and DynamicLabels resolves to
+	// an empty value, mislabeling the flushed loki stream so it is never queried.
+	tags := collectGroupTags(group, c.TagKeyRenameMap)
+	for k, v := range event.GetTags().Iterator() {
+		addTagIfRequired(tags, c.TagKeyRenameMap, k, v)
+	}
 	records := make([]protocolRecord, 0, len(logs))
 	for _, log := range logs {
 		records = append(records, protocolRecord{
 			contents: logContentsToMap(log),
-			tags:     groupTags,
+			tags:     tags,
 			timeSec:  log.GetTime(),
 		})
 	}
