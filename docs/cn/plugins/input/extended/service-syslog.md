@@ -34,6 +34,8 @@
 | ParseProtocol | string，`""` | 指定解析日志所使用的协议，默认为空，表示不解析。其中：`rfc3164`：指定使用RFC3164协议解析日志。`rfc5424`：指定使用RFC5424协议解析日志。`auto`：指定插件根据日志内容自动选择合适的解析协议。 |
 | IgnoreParseFailure | bool，`true` | 指定解析失败后的操作，不配置表示放弃解析，直接填充所返回的content字段。配置为`false` ，表示解析失败时丢弃日志。 |
 | AddHostname | bool，`false` | 当从/dev/log监听unixgram时，log中不包括hostname字段，所以使用rfc3164会导致解析错误，这时将AddHostname设置为`true`，就会给解析器当前主机的hostname，然后解析器就可以解析tag、program、content字段了。 |
+| AutoConfigRsyslog | bool，`false` | 是否自动配置 rsyslog 转发。开启后，LoongCollector 会自动在 `/etc/rsyslog.d/` 下生成转发配置并重启 rsyslogd。仅支持 TCP 和 UDP 协议，需要 root 权限。 |
+| RsyslogFilters | string 数组，不配置则默认转发所有日志（`*.*`） | 通过 rsyslog 过滤规则选择采集哪些日志。每个条目为 rsyslog 标准的 `facility.severity` 格式（如 "auth.warning"、"kern.err"）。仅在 AutoConfigRsyslog 为 true 时生效。 |
 
 ## 样例
 
@@ -82,3 +84,30 @@ flushers:
 | `_content_` | 日志内容, 如果解析失败的话, 此字段包含末解析日志的所有内容。 |
 | `_ip_` | 当前主机的IP地址。 |
 |`_client_ip_`|传输日志的客户端ip地址。|
+
+## 自动配置 rsyslog 转发
+
+开启 `AutoConfigRsyslog` 后，LoongCollector 会在 `/etc/rsyslog.d/` 目录下自动生成 rsyslog v8+ 转发配置文件（文件名格式为 `10-loongcollector-{configName}.conf`），并在配置内容变更时自动重启 rsyslogd。
+
+**前提条件**：
+- 需要 root 权限运行 LoongCollector
+- 仅支持 TCP 和 UDP 协议（不支持 unixgram）
+- 目标机器需安装 rsyslogd v8 及以上版本
+
+* 采集配置
+
+```yaml
+enable: true
+inputs:
+  - Type: service_syslog
+    Address: tcp://127.0.0.1:9000
+    AutoConfigRsyslog: true
+    RsyslogFilters:
+      - "auth.warning"
+      - "kern.err"
+flushers:
+  - Type: flusher_stdout
+    OnlyStdout: true
+```
+
+上述配置将自动在 `/etc/rsyslog.d/` 下生成仅转发 `auth.warning` 和 `kern.err` 级别日志的配置，并重启 rsyslogd 使其生效。若不配置 `RsyslogFilters`，则默认转发所有日志（`*.*`）。
