@@ -16,6 +16,7 @@
 #include <vector>
 
 #include "file_server/WatchManager.h"
+#include "file_server/event_listener/EventListener.h"
 #include "monitor/MetricManager.h"
 #include "monitor/metric_constants/MetricConstants.h"
 #include "unittest/Unittest.h"
@@ -83,6 +84,23 @@ public:
         APSARA_TEST_EQUAL_FATAL(wm.mAddedPaths[0], wm.mAddedPaths[1]);
     }
 
+    // WatchManager must forward watches to the very same EventListener that
+    // EventDispatcher reads and removes events through; otherwise a watch
+    // acquired via WatchManager would be invisible to the dispatcher's event
+    // loop. Both sides obtain the listener from EventListener::GetInstance() --
+    // a Meyers singleton (function-local static, private ctor) that yields one
+    // process-wide instance. Lock that invariant here so a future refactor
+    // giving WatchManager its own listener fails loudly instead of silently
+    // desyncing the two.
+    void TestSharedEventListenerInstance() {
+        WatchManager* wm = WatchManager::GetInstance();
+        // GetInstance() is stable across calls (same singleton every time)...
+        APSARA_TEST_EQUAL_FATAL(EventListener::GetInstance(), EventListener::GetInstance());
+        // ...and the runner stores exactly that canonical instance, which is the
+        // same one EventDispatcher's ctor captures via EventListener::GetInstance().
+        APSARA_TEST_EQUAL_FATAL(EventListener::GetInstance(), wm->mEventListener);
+    }
+
     // Constructing WatchManager registers a runner_name = "watch_manager"
     // MetricsRecordRef and commits it to WriteMetrics.
     void TestMetricsRecordRegistered() {
@@ -119,7 +137,8 @@ public:
 
 APSARA_UNIT_TEST_CASE(WatchManagerUnittest, TestAcquireReleasePassThrough, 0);
 APSARA_UNIT_TEST_CASE(WatchManagerUnittest, TestNoDedupAtWatchManager, 1);
-APSARA_UNIT_TEST_CASE(WatchManagerUnittest, TestMetricsRecordRegistered, 2);
+APSARA_UNIT_TEST_CASE(WatchManagerUnittest, TestSharedEventListenerInstance, 2);
+APSARA_UNIT_TEST_CASE(WatchManagerUnittest, TestMetricsRecordRegistered, 3);
 
 } // namespace logtail
 
