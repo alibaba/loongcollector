@@ -197,7 +197,17 @@ void CheckpointManagerUnittest::TestAddCheckPointBothExistLastWriterWins() {
     try {
         bfs::create_hard_link(file1, file2);
     } catch (const bfs::filesystem_error& e) {
+        // Some filesystems / container overlays / permission setups reject hard links. Skip
+        // rather than abort so CI without hard-link support stays green. The bundled gtest
+        // predates GTEST_SKIP, so fall back to a logged early return (see BPFWrapperUnittest).
+#if defined(GTEST_HAS_SKIP) && GTEST_HAS_SKIP
         GTEST_SKIP() << "hard link not supported in this environment: " << e.what();
+#else
+        GTEST_LOG_(INFO) << "Skipped: hard link not supported in this environment "
+                            "(no GTEST_SKIP in this gtest build): "
+                         << e.what();
+        return;
+#endif
     }
 
     fsutil::PathStat ps;
