@@ -90,12 +90,13 @@ public:
         APSARA_TEST_TRUE_FATAL(wm->GetMetricsRecordRef().HasLabel(
             METRIC_LABEL_KEY_RUNNER_NAME, METRIC_LABEL_VALUE_RUNNER_NAME_WATCH_MANAGER));
 
+        // GetHead() is private to WriteMetrics; iterate committed records via the
+        // public DoSnapshot() instead. It returns caller-owned copies of the
+        // undeleted records (deleted ones are already filtered out), so we free
+        // the returned list afterwards to avoid leaking.
         bool found = false;
-        for (MetricsRecord* record = WriteMetrics::GetInstance()->GetHead(); record != nullptr;
-             record = record->GetNext()) {
-            if (record->IsDeleted()) {
-                continue;
-            }
+        MetricsRecord* snapshot = WriteMetrics::GetInstance()->DoSnapshot();
+        for (MetricsRecord* record = snapshot; record != nullptr; record = record->GetNext()) {
             for (auto label = record->GetLabels()->begin(); label != record->GetLabels()->end(); ++label) {
                 if (label->first == METRIC_LABEL_KEY_RUNNER_NAME
                     && label->second == METRIC_LABEL_VALUE_RUNNER_NAME_WATCH_MANAGER) {
@@ -103,6 +104,14 @@ public:
                     break;
                 }
             }
+            if (found) {
+                break;
+            }
+        }
+        while (snapshot != nullptr) {
+            MetricsRecord* next = snapshot->GetNext();
+            delete snapshot;
+            snapshot = next;
         }
         APSARA_TEST_TRUE_FATAL(found);
     }
