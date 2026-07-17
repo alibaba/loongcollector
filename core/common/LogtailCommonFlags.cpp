@@ -35,6 +35,12 @@ DEFINE_FLAG_STRING(
     "JSON key ignored_interfaces in ilogtail_config.json; env ignored_interfaces or LOONG_IGNORED_INTERFACES.",
     "kube-ipvs0,nodelocaldns,docker0");
 
+// When non-empty, resolve host IP from this interface first (GetHostIpByInterface), then fall back to hostname.
+DEFINE_FLAG_STRING(working_interface,
+                   "Interface name used to resolve host IP first when non-empty (Linux); "
+                   "falls back to hostname resolution if the interface yields no valid IP.",
+                   "");
+
 // checkpoint
 DEFINE_FLAG_INT32(unused_checkpoints_clear_interval_sec, "", 600);
 
