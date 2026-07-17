@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 
@@ -75,13 +76,36 @@ func (p *FlusherStatistics) Flush(projectName string, logstoreName string, confi
 		}
 		time.Sleep(time.Millisecond * time.Duration(p.SleepMsPerLogGroup))
 	}
+	p.reportRates()
+	return nil
+}
 
+// Export is the v2 pipeline entry point. It accumulates statistics directly from
+// PipelineGroupEvents without converting to protocol.LogGroup or going through
+// Flush, both of which belong to the v1 pipeline and are planned for removal.
+func (p *FlusherStatistics) Export(groups []*models.PipelineGroupEvents, _ pipeline.PipelineContext) error {
+	for _, groupEvents := range groups {
+		if groupEvents == nil {
+			continue
+		}
+		p.loggroupRateCounter.Incr(1)
+		p.logRateCounter.Incr((int64)(len(groupEvents.Events)))
+		if p.GeneratePB {
+			p.byteRateCount.Incr(groupEvents.GetSize())
+		}
+		time.Sleep(time.Millisecond * time.Duration(p.SleepMsPerLogGroup))
+	}
+	p.reportRates()
+	return nil
+}
+
+// reportRates periodically logs the accumulated rates. Shared by Flush and Export.
+func (p *FlusherStatistics) reportRates() {
 	nowTime := time.Now()
 	if nowTime.Sub(p.lastOutputTime) >= (time.Duration)(p.RateIntervalMs)*time.Millisecond {
 		logger.Info(p.context.GetRuntimeContext(), "current rate(MB)", float32(p.byteRateCount.Rate())/1024.0/1024.0, "log tps", p.logRateCounter.Rate(), "loggroup tps", p.loggroupRateCounter.Rate())
 		p.lastOutputTime = nowTime
 	}
-	return nil
 }
 
 // IsReady is ready to flush

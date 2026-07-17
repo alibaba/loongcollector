@@ -26,6 +26,7 @@ import (
 	"github.com/prometheus/common/model"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	converter "github.com/alibaba/ilogtail/pkg/protocol/converter"
@@ -165,6 +166,34 @@ func (f *FlusherLoki) Flush(projectName string, logstoreName string, configName 
 			err = f.lokiClient.Handle(labels, time.Unix(int64(logGroup.Logs[i].Time), 0), string(log))
 			if err != nil {
 				logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "flush loki convert log fail, error", err)
+			}
+		}
+	}
+	return nil
+}
+
+func (f *FlusherLoki) Export(groups []*models.PipelineGroupEvents, _ pipeline.PipelineContext) error {
+	for _, groupEvents := range groups {
+		if groupEvents == nil {
+			continue
+		}
+		// Convert one event at a time: a single event (e.g. a multi-value Metric)
+		// expands into several serialized log lines, so the line index cannot be
+		// used to index back into Events. Per-event conversion keeps every line
+		// aligned with its own timestamp and keeps serializedLogs/values in lockstep.
+		for _, event := range groupEvents.Events {
+			single := &models.PipelineGroupEvents{Group: groupEvents.Group, Events: []models.PipelineEvent{event}}
+			serializedLogs, values, err := f.converter.ToByteStreamWithSelectedFieldsV2(single, f.DynamicLabels)
+			if err != nil {
+				logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "flush loki convert log fail, error", err)
+				continue
+			}
+			ts := time.Unix(0, int64(event.GetTimestamp()))
+			for i, log := range serializedLogs.([][]byte) {
+				labels := f.buildLokiLabels(values[i])
+				if err := f.lokiClient.Handle(labels, ts, string(log)); err != nil {
+					logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "flush loki convert log fail, error", err)
+				}
 			}
 		}
 	}

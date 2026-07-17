@@ -167,16 +167,16 @@
 
 | 名称 | 提供方 | v1 接口 | v2 接口 | Log | Metric | Span | 简介 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `flusher_clickhouse`<br>[ClickHouse](flusher/extended/flusher-clickhouse.md) | 社区<br>[kl7sn](https://github.com/kl7sn) | ✓ | — | v1 | 透传未知 | 透传未知 | 将采集到的数据输出到 ClickHouse。 |
-| `flusher_doris`<br>[Apache Doris](flusher/extended/flusher-doris.md) | 社区 | ✓ | — | v1 | 透传未知 | 透传未知 | 通过 Stream Load 将数据写入 Apache Doris。 |
-| `flusher_elasticsearch`<br>[ElasticSearch](flusher/extended/flusher-elasticsearch.md) | 社区<br>[joeCarf](https://github.com/joeCarf) | ✓ | — | v1 | 透传未知 | 透传未知 | 将采集到的数据输出到 ElasticSearch。 |
+| `flusher_clickhouse`<br>[ClickHouse](flusher/extended/flusher-clickhouse.md) | 社区<br>[kl7sn](https://github.com/kl7sn) | ✓ | ✓ | v1&v2 | 透传未知 | 透传未知 | 将采集到的数据输出到 ClickHouse。 |
+| `flusher_doris`<br>[Apache Doris](flusher/extended/flusher-doris.md) | 社区 | ✓ | ✓ | v1&v2 | 透传未知 | 透传未知 | 通过 Stream Load 将数据写入 Apache Doris。 |
+| `flusher_elasticsearch`<br>[ElasticSearch](flusher/extended/flusher-elasticsearch.md) | 社区<br>[joeCarf](https://github.com/joeCarf) | ✓ | ✓ | v1&v2 | 透传未知 | 透传未知 | 将采集到的数据输出到 ElasticSearch。 |
 | `flusher_http`<br>[HTTP](flusher/extended/flusher-http.md) | 社区<br>[snakorse](https://github.com/snakorse) | ✓ | ✓ | v1&v2 | 透传未知 | 透传未知 | 将采集到的数据以 http 方式输出到指定的后端。 |
-| `flusher_kafka`<br>[Kafka](flusher/extended/flusher-kafka.md) | 社区 | ✓ | — | v1 | 透传未知 | 透传未知 | 将采集到的数据输出到 Kafka。推荐使用下面的 flusher_kafka_v2 |
+| `flusher_kafka`<br>[Kafka](flusher/extended/flusher-kafka.md) | 社区 | — | — | — | — | — | Deprecated，代码已移除，请使用下面的 flusher_kafka_v2。 |
 | `flusher_kafka_v2`<br>[Kafka V2](flusher/extended/flusher-kafka-v2.md) | 社区<br>[shalousun](https://github.com/shalousun) | ✓ | ✓ | v1&v2 | 透传未知 | 透传未知 | 将采集到的数据输出到 Kafka。 |
-| `flusher_loki`<br>[Loki](flusher/extended/flusher-loki.md) | 社区<br>[abingcbc](https://github.com/abingcbc) | ✓ | — | v1 | 透传未知 | 透传未知 | 将采集到的数据输出到 Loki。 |
+| `flusher_loki`<br>[Loki](flusher/extended/flusher-loki.md) | 社区<br>[abingcbc](https://github.com/abingcbc) | ✓ | ✓ | v1&v2 | 透传未知 | 透传未知 | 将采集到的数据输出到 Loki。 |
 | `flusher_otlp_log`<br>[OTLP 日志](flusher/extended/flusher-otlp.md) | 社区<br>[liuhaoyang](https://github.com/liuhaoyang) | ✓ | ✓ | v1&v2 | 透传未知 | 透传未知 | 将采集到的数据支持`OpenTelemetry log protocol`的后端。 |
 | `flusher_prometheus`<br>[Prometheus](flusher/extended/flusher-prometheus.md) | 社区<br> | — | ✓ | — | v2 | — | 将采集到的数据，经过处理后，通过 http 格式发送到指定的 Prometheus RemoteWrite 地址。 |
-| `flusher_pulsar`<br>[Pulsar](flusher/extended/flusher-pulsar.md) | 社区<br>[shalousun](https://github.com/shalousun) | ✓ | — | v1 | 透传未知 | 透传未知 | 将采集到的数据输出到 Pulsar。 |
+| `flusher_pulsar`<br>[Pulsar](flusher/extended/flusher-pulsar.md) | 社区<br>[shalousun](https://github.com/shalousun) | ✓ | ✓ | v1&v2 | 透传未知 | 透传未知 | 将采集到的数据输出到 Pulsar。 |
 | `flusher_stdout`<br>[标准输出/文件](flusher/extended/flusher-stdout.md) | SLS 官方 | ✓ | ✓ | v1&v2 | v2 | v2 | 将采集到的数据输出到标准输出或文件。 |
 
 ## 扩展

@@ -37,7 +37,7 @@ data:
         ExpandDepth: 1
         ExpandConnector: ""
     flushers:
-      - Type: flusher_kafka
+      - Type: flusher_kafka_v2
         Brokers:
           - <kafka_host>:<kafka_port>
         Topic: access-log
