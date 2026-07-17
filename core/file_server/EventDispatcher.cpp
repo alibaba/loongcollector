@@ -43,6 +43,7 @@
 #include "file_server/checkpoint/CheckpointManagerV2.h"
 #include "file_server/event/Event.h"
 #include "file_server/event_handler/EventHandler.h"
+#include "file_server/WatchManager.h"
 #include "file_server/event_handler/LogInput.h"
 #include "file_server/polling/PollingDirFile.h"
 #include "file_server/polling/PollingModify.h"
@@ -239,7 +240,7 @@ bool EventDispatcher::RegisterEventHandler(const string& path,
     } else {
         // need check mEventListener valid
         if (mEventListener->IsInit() && !AppConfig::GetInstance()->IsInInotifyBlackList(path)) {
-            wd = mEventListener->AddWatch(path.c_str());
+            wd = WatchManager::GetInstance()->AcquireWatch(path);
             if (!EventListener::IsValidID(wd)) {
                 string str = ErrnoToString(GetErrno());
                 LOG_WARNING(sLogger, ("failed to register dir", path)("reason", str));
@@ -868,7 +869,7 @@ void EventDispatcher::UnregisterEventHandler(const string& path) {
     RemoveOneToOneMapEntry(wd);
     mWdUpdateTimeMap.erase(wd);
     if (EventListener::IsValidID(wd) && mEventListener->IsInit()) {
-        mEventListener->RemoveWatch(wd);
+        WatchManager::GetInstance()->ReleaseWatch(wd);
         mInotifyWatchNum--;
     }
     mWatchNum--;

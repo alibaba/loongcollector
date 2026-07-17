@@ -32,6 +32,7 @@ const string METRIC_LABEL_VALUE_RUNNER_NAME_PROMETHEUS = "prometheus_runner";
 const string METRIC_LABEL_VALUE_RUNNER_NAME_EBPF_SERVER = "ebpf_runner";
 const string METRIC_LABEL_VALUE_RUNNER_NAME_K8S_METADATA = "k8s_metadata_runner";
 const string METRIC_LABEL_VALUE_RUNNER_NAME_STATIC_FILE_SERVER = "static_file_server";
+const string METRIC_LABEL_VALUE_RUNNER_NAME_WATCH_MANAGER = "watch_manager";
 
 // metric keys
 const string& METRIC_RUNNER_IN_EVENTS_TOTAL = METRIC_IN_EVENTS_TOTAL;

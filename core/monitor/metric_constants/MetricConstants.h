@@ -300,6 +300,7 @@ extern const std::string METRIC_LABEL_VALUE_RUNNER_NAME_PROMETHEUS;
 extern const std::string METRIC_LABEL_VALUE_RUNNER_NAME_EBPF_SERVER;
 extern const std::string METRIC_LABEL_VALUE_RUNNER_NAME_K8S_METADATA;
 extern const std::string METRIC_LABEL_VALUE_RUNNER_NAME_STATIC_FILE_SERVER;
+extern const std::string METRIC_LABEL_VALUE_RUNNER_NAME_WATCH_MANAGER;
 
 // metric keys
 extern const std::string& METRIC_RUNNER_IN_EVENTS_TOTAL;
