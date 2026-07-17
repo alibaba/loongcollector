@@ -26,6 +26,7 @@ import (
 
 	"github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/flags"
+	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/helper/containercenter"
 	"github.com/alibaba/ilogtail/pkg/helper/k8smeta"
 	"github.com/alibaba/ilogtail/pkg/logger"
@@ -89,6 +90,20 @@ typedef struct {
     InnerGoAlarm** alarms;
     int count;
 } InnerGoAlarms;
+
+// PBBuffer carries a serialized PipelineEventGroup protobuf that the C++ self-monitor
+// timer pulls from Go via GetGoSelfMonitor*PB. data is allocated inside
+// libGoPluginBase.so; after the C++ caller copies the bytes on receive it must
+// release the buffer via FreeSelfMonitorPB (never free() directly) so that allocation
+// and release stay in the same module and no memory crosses the module boundary. size
+// is the byte length; it is size_t (unsigned, pointer-sized) rather than int so the
+// cross-language length matches the C++ std::string consumer and cannot overflow or go
+// negative on the ABI boundary. data is NULL and size is 0 when there is nothing to
+// pull or on marshal failure.
+typedef struct {
+    char* data;
+    size_t size;
+} PBBuffer;
 
 static KeyValue** makeKeyValueArray(int size) {
     return malloc(sizeof(KeyValue*) * size);
@@ -378,6 +393,89 @@ func GetGoAlarms() *C.InnerGoAlarms {
 		runtime.KeepAlive(cAlarm)
 	}
 	return cAlarms
+}
+
+// marshalAlarmsPB collects Go self-monitor alarms into a PipelineEventGroup PB
+// (one LogEvent per alarm) using the D2 contract helper and returns the serialized
+// bytes. These bytes are what GetGoSelfMonitorAlarmsPB hands to C++ when C++ pulls;
+// factored out of the CGO export so it can be unit-tested without cgo types.
+func marshalAlarmsPB(alarms []selfmonitor.AlarmExportMessage, now time.Time) ([]byte, error) {
+	group, err := helper.TransferAlarmsToPipelineEventGroup(alarms, now)
+	if err != nil {
+		return nil, err
+	}
+	return group.Marshal()
+}
+
+// marshalMetricsPB collects Go self-monitor metrics of the given export type into a
+// PipelineEventGroup PB (one MetricEvent per record) using the D2 contract helper
+// and returns the serialized bytes, the payload GetGoSelfMonitorMetricsPB hands to
+// C++ on pull and that ReadMetrics::ParseGoMetricsPB consumes.
+func marshalMetricsPB(rawMetrics []map[string]string, now time.Time) ([]byte, error) {
+	group := helper.TransferRawMetricsToPipelineEventGroup(rawMetrics, now)
+	return group.Marshal()
+}
+
+// toPBBuffer copies data into a buffer allocated inside libGoPluginBase.so. The C++
+// caller copies the bytes on receive and then releases the buffer via
+// FreeSelfMonitorPB (not free()), keeping allocation and release in the same module
+// so no memory crosses the boundary. An empty or failed marshal yields a nil buffer,
+// which the receiver treats as no-op.
+func toPBBuffer(data []byte, err error) C.PBBuffer {
+	var buf C.PBBuffer
+	if err != nil {
+		logger.Error(context.Background(), selfmonitor.PluginAlarm, "marshal self-monitor PB error", err)
+		return buf
+	}
+	if len(data) == 0 {
+		return buf
+	}
+	buf.data = (*C.char)(C.CBytes(data))
+	buf.size = C.size_t(len(data))
+	return buf
+}
+
+// GetGoSelfMonitorAlarmsPB lets the C++ self-monitor timer pull Go self-monitor
+// alarms as a serialized PipelineEventGroup protobuf. C++ copies the bytes into a
+// std::string, feeds them to SelfMonitorServer::ReceiveGoAlarmsPB, then releases the
+// buffer via FreeSelfMonitorPB. This is the D3 pull path (C++ drives collection,
+// mirroring the legacy getter structure); it coexists with the legacy GetGoAlarms CGO
+// struct path (removed in D5). Runtime wiring (LoadMethod + the timer call) lands in
+// D4, matching this PR's deferred-wiring stance on the receive side.
+//
+//export GetGoSelfMonitorAlarmsPB
+func GetGoSelfMonitorAlarmsPB() C.PBBuffer {
+	data, err := marshalAlarmsPB(pluginmanager.GetAlarmMessages(), time.Now())
+	return toPBBuffer(data, err)
+}
+
+// GetGoSelfMonitorMetricsPB lets the C++ self-monitor timer pull Go self-monitor
+// metrics of the given export type as a serialized PipelineEventGroup protobuf. C++
+// copies the bytes into a std::string, feeds them to ReadMetrics::ParseGoMetricsPB,
+// then releases the buffer via FreeSelfMonitorPB. This is the D3 pull path; it
+// coexists with the legacy GetGoMetrics CGO struct path (removed in D5). Runtime
+// wiring lands in D4.
+//
+//export GetGoSelfMonitorMetricsPB
+func GetGoSelfMonitorMetricsPB(metricType string) C.PBBuffer {
+	data, err := marshalMetricsPB(pluginmanager.GetMetrics(metricType), time.Now())
+	return toPBBuffer(data, err)
+}
+
+// FreeSelfMonitorPB releases a PBBuffer.data block previously returned by
+// GetGoSelfMonitorAlarmsPB / GetGoSelfMonitorMetricsPB. Both the allocation
+// (C.CBytes in toPBBuffer) and this release run inside libGoPluginBase.so, so the
+// buffer is never freed across the module boundary — this satisfies the dynamic
+// library rule that memory must be allocated and freed within the same module and
+// avoids relying on a shared CRT heap under static-CRT linking (the cross-boundary
+// free pattern tracked as the Windows crash risk in #2645). A nil pointer is a no-op,
+// so callers may invoke it unconditionally.
+//
+//export FreeSelfMonitorPB
+func FreeSelfMonitorPB(data *C.char) {
+	if data != nil {
+		C.free(unsafe.Pointer(data))
+	}
 }
 
 func initPluginBase(cfgStr string) int {

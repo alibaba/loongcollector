@@ -24,6 +24,7 @@ import (
 
 	"github.com/alibaba/ilogtail/pkg/fmtstr"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	converter "github.com/alibaba/ilogtail/pkg/protocol/converter"
@@ -230,6 +231,44 @@ func (f *FlusherPulsar) Description() string {
 }
 
 func (*FlusherPulsar) SetUrgent(flag bool) {
+}
+
+func (f *FlusherPulsar) Export(groups []*models.PipelineGroupEvents, _ pipeline.PipelineContext) error {
+	topic := f.Topic
+	for _, groupEvents := range groups {
+		logger.Debug(f.context.GetRuntimeContext(), "[GroupEvents] events count", len(groupEvents.Events),
+			"tags", groupEvents.Group.GetTags().Iterator())
+		logs, values, err := f.converter.ToByteStreamWithSelectedFieldsV2(groupEvents, f.selectFields)
+		if err != nil {
+			logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "flush pulsar convert log fail, error", err)
+		}
+		for index, log := range logs.([][]byte) {
+			valueMap := values[index]
+			if len(f.topicKeys) > 0 {
+				formattedTopic, err := fmtstr.FormatTopic(valueMap, f.Topic)
+				if err != nil {
+					logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "flush pulsar format topic fail, error", err)
+				} else {
+					topic = *formattedTopic
+				}
+			}
+			producer, err := f.producers.GetProducer(topic, f.pulsarClient, f.producerOptions)
+			if err != nil {
+				logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "load pulsar producer fail,topic", topic, "err", err)
+				return err
+			}
+			message := &pulsar.ProducerMessage{Payload: log}
+			if f.PartitionKeys != nil {
+				message.Key = f.hashPartitionKey(valueMap, "")
+			}
+			producer.SendAsync(f.context.GetRuntimeContext(), message, func(msgId pulsar.MessageID, prodMsg *pulsar.ProducerMessage, err error) {
+				if err != nil {
+					logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "send message to pulsar fail,error", err)
+				}
+			})
+		}
+	}
+	return nil
 }
 
 // IsReady is ready to flush

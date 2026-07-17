@@ -18,7 +18,12 @@
 
 #include "MetricConstants.h"
 #include "Monitor.h"
+#include "collection_pipeline/CollectionPipelineManager.h"
+#include "common/LogtailCommonFlags.h"
 #include "go_pipeline/LogtailPlugin.h"
+#include "monitor/AlarmManager.h"
+#include "protobuf/models/ProtocolConversion.h"
+#include "protobuf/models/pipeline_event_group.pb.h"
 #include "runner/ProcessorRunner.h"
 
 using namespace std;
@@ -220,6 +225,81 @@ void SelfMonitorServer::SendAlarms() {
                 mAlarmPipelineCtx->GetProcessQueueKey(), mAlarmInputIndex, std::move(pipelineEventGroup));
         }
     }
+}
+
+int32_t SelfMonitorServer::ReceiveGoAlarmsPB(const std::string& pbData) {
+    if (pbData.empty()) {
+        return 0;
+    }
+    models::PipelineEventGroup pbGroup;
+    if (!pbGroup.ParseFromString(pbData)) {
+        LOG_WARNING(sLogger, ("receive go alarms pb", "failed to parse protobuf")("size", pbData.size()));
+        return 0;
+    }
+    PipelineEventGroup eventGroup(std::make_shared<SourceBuffer>());
+    std::string errMsg;
+    if (!TransferPBToPipelineEventGroup(pbGroup, eventGroup, errMsg)) {
+        LOG_WARNING(sLogger, ("receive go alarms pb", "failed to transfer pb")("err", errMsg));
+        return 0;
+    }
+
+    int32_t syncedAlarmCount = 0;
+    for (auto& eventPtr : eventGroup.GetEvents()) {
+        if (!eventPtr.Is<LogEvent>()) {
+            continue;
+        }
+        const LogEvent& logEvent = eventPtr.Cast<LogEvent>();
+        std::string alarmType = logEvent.GetContent("alarm_type").to_string();
+        if (alarmType.empty()) {
+            continue;
+        }
+        std::string alarmLevel = logEvent.GetContent("alarm_level").to_string();
+        std::string alarmMessage = logEvent.GetContent("alarm_message").to_string();
+        std::string alarmCount = logEvent.GetContent("alarm_count").to_string();
+        std::string projectName = logEvent.GetContent("project_name").to_string();
+        std::string category = logEvent.GetContent("category").to_string();
+        std::string config = logEvent.GetContent("config").to_string();
+
+        AlarmLevel level = ALARM_LEVEL_WARNING;
+        if (alarmLevel == "2") {
+            level = ALARM_LEVEL_ERROR;
+        } else if (alarmLevel == "3") {
+            level = ALARM_LEVEL_CRITICAL;
+        }
+        int32_t count = 1;
+        if (!alarmCount.empty()) {
+            try {
+                count = std::stoi(alarmCount);
+            } catch (...) {
+                count = 1;
+            }
+        }
+        if (count <= 0) {
+            count = 1;
+        }
+        // strip the "/1" or "/2" pipeline version suffix, matching GetGoAlarms
+        std::string pipelineConfig = config;
+        if (pipelineConfig.size() > 2 && pipelineConfig[pipelineConfig.size() - 2] == '/'
+            && (pipelineConfig.back() == '1' || pipelineConfig.back() == '2')) {
+            pipelineConfig = pipelineConfig.substr(0, pipelineConfig.size() - 2);
+        }
+        std::string resolvedRegion = STRING_FLAG(default_region_name);
+        const std::shared_ptr<CollectionPipeline>& pipeline
+            = CollectionPipelineManager::GetInstance()->FindConfigByName(pipelineConfig);
+        if (pipeline) {
+            const std::string& region = pipeline->GetContext().GetRegion();
+            if (!region.empty()) {
+                resolvedRegion = region;
+            }
+        }
+        AlarmManager::GetInstance()->SendExternalAlarm(
+            alarmType, level, alarmMessage, count, resolvedRegion, projectName, pipelineConfig, category);
+        ++syncedAlarmCount;
+    }
+    if (syncedAlarmCount > 0) {
+        LOG_DEBUG(sLogger, ("receive go alarms pb", "finished")("synced", syncedAlarmCount));
+    }
+    return syncedAlarmCount;
 }
 
 void SelfMonitorServer::SendTaskStatus() {

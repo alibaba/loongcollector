@@ -38,6 +38,13 @@ public:
     void UpdateAlarmPipeline(CollectionPipelineContext* ctx, size_t inputIndex);
     void RemoveAlarmPipeline();
 
+    // Receive self-monitor alarms pulled from Go as a serialized PipelineEventGroup
+    // protobuf (one LogEvent per alarm) and forward each to AlarmManager. This is the
+    // D3 receive side of the C++-pull path; it coexists with the legacy
+    // LogtailPlugin::GetGoAlarms path (removed in D5). Returns the number of alarms
+    // merged.
+    int32_t ReceiveGoAlarmsPB(const std::string& pbData);
+
     void SendTaskStatus(); // use Alarm pipeline to send task status immediately in enterprise version
 
     // Task status management

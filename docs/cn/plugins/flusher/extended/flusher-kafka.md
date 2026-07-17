@@ -2,52 +2,14 @@
 
 ## 简介
 
-`flusher_kafka` `flusher`插件可以实现将采集到的数据，经过处理后，发送到Kafka。
-
-## 事件能力
-
-列含义见 [概览 · 事件能力列说明](../../overview.md#事件能力列说明)。
-
-| v1 接口 | v2 接口 | Log | Metric | Span |
-| --- | --- | --- | --- | --- |
-| ✓ | — | v1 | 透传未知 | 透传未知 |
+`flusher_kafka` 扩展插件用于将采集到的数据发送到 Kafka。
 
 ## 版本
 
-[Deprecated](../../stability-level.md)，请使用`flusher_kafka_v2`
+[Deprecated](../../stability-level.md)，插件代码已移除，请使用 [`flusher_kafka_v2`](flusher-kafka-v2.md)。
 
-## 版本说明
-
-* 推荐版本：无
-
-## 配置参数
-
-| 参数              | 类型       | 是否必选 | 说明                                                          |
-| --------------- | -------- | ---- | ----------------------------------------------------------- |
-| Type            | string   | 是    | 插件类型                                                        |
-| Brokers         | String数组 | 是    | Kafka Brokers                                               |
-| Topic           | string   | 是    | Kafka Topic                                                 |
-| SASLUsername    | string   | 否    | SASL用户名                                                     |
-| SASLPassword    | string   | 否    | SASL密码                                                      |
-| PartitionerType | string   | 否    | Partitioner类型。取值：`roundrobin`、`hash`、`random`。默认为：`random`。 |
-| HashKeys        | String数组 | 否    | PartitionerType为`hash`时，需指定HashKeys。                        |
-| HashOnce        | bool  | 否    |                                                             |
-| ClientID        | string   | 否    | 写入 Kafka 的 Client ID，默认取值：`LogtailPlugin`（LoongCollector Go 插件模块历史命名）。                     |
-
-## 样例
-
-采集`/home/test-log/`路径下的所有文件名匹配`*.log`规则的文件，并将采集结果发送到Kafka。
-
-```yaml
-enable: true
-inputs:
-  - Type: input_file
-    FilePaths: 
-      - /home/test-log/*.log
-flushers:
-  - Type: flusher_kafka
-    Brokers: 
-      - 192.XX.XX.1:9092
-      - 192.XX.XX.2:9092
-    Topic: KafkaTestTopic
-```
+> 按 [插件版本管理](../../stability-level.md) 约定，被标注为 Deprecated 的插件将在后续版本中移除。
+> `flusher_kafka` 长期仅支持 v1 接口且不支持 Metric/Span，已由功能更完整的
+> `flusher_kafka_v2`（支持 v1&v2 接口）取代，故本版本起移除其实现代码。
+> 存量配置请将 `Type: flusher_kafka` 迁移到 `Type: flusher_kafka_v2`，参数说明见
+> [`flusher_kafka_v2` 文档](flusher-kafka-v2.md)。
