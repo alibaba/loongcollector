@@ -25,7 +25,7 @@
 **扩展 Processor / 扩展 Flusher / Aggregator / Extension**
 
 - **v1 接口 / v2 接口**：是否实现 v1（`ProcessLogs` / `Flush(LogGroup)` / `Aggregator.Add`）或 v2（`Process(PipelineGroupEvents)` / `Export` / `FlushInterceptor.Intercept` 等）处理路径。
-- **Log / Metric / Span**：对该事件类型的支持；`v1`/`v1&v2`/`v2` 表示明确实现，`透传未知` 表示代码中无类型特化信号（可能随 Pipeline 透传）。
+- **Log / Metric / Span**：对该事件类型的支持；`v1`/`v1&v2`/`v2` 表示明确实现，`透传` 表示 v2 `Process` 明确保留该类型事件（不处理但不丢弃），`透传未知` 表示代码中无类型特化信号（可能随 Pipeline 透传）。
 
 ## 输入
 
@@ -110,13 +110,13 @@
 
 | 名称 | 提供方 | v1 接口 | v2 接口 | Log | Metric | Span | 简介 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `processor_add_fields`<br>[添加字段](processor/extended/processor-add-fields.md) | SLS 官方 | ✓ | — | v1 | 透传未知 | 透传未知 | 添加字段。 |
+| `processor_add_fields`<br>[添加字段](processor/extended/processor-add-fields.md) | SLS 官方 | ✓ | ✓ | v1&v2 | 透传 | 透传 | 添加字段。 |
 | `processor_appender`<br>[追加字段](processor/extended/processor-appender.md) | SLS 官方 | ✓ | — | v1 | 透传未知 | 透传未知 | 追加字段。 |
 | `processor_cloud_meta`<br>[添加云资产信息](processor/extended/processor-cloudmeta.md) | SLS 官方 | ✓ | — | v1 | 透传未知 | 透传未知 | 为日志增加云平台元数据信息。 |
 | `processor_default`<br>[原始数据](processor/extended/processor-default.md) | SLS 官方 | ✓ | ✓ | v1&v2 | 透传未知 | 透传未知 | 不对数据任何操作，只是简单的数据透传。 |
 | `processor_desensitize`<br>[数据脱敏](processor/extended/processor-desensitize.md) | SLS 官方<br>[Takuka0311](https://github.com/Takuka0311) | ✓ | — | v1 | 透传未知 | 透传未知 | 对敏感数据进行脱敏处理。 |
 | `processor_dict_map`<br>[字段值映射处理](processor/extended/processor-dict-map.md) | SLS 官方 | ✓ | — | v1 | 透传未知 | 透传未知 | 对指定字段的值查表映射. |
-| `processor_drop`<br>[丢弃字段](processor/extended/processor-drop.md) | SLS 官方 | ✓ | — | v1 | 透传未知 | 透传未知 | 丢弃字段。 |
+| `processor_drop`<br>[丢弃字段](processor/extended/processor-drop.md) | SLS 官方 | ✓ | ✓ | v1&v2 | 透传 | 透传 | 丢弃字段。 |
 | `processor_encrypt`<br>[字段加密](processor/extended/processor-encrypy.md) | SLS 官方 | ✓ | — | v1 | 透传未知 | 透传未知 | 加密字段 |
 | `processor_fields_with_conditions`<br>[条件字段处理](processor/extended/processor-fields-with-condition.md) | 社区<br>[pj1987111](https://github.com/pj1987111) | ✓ | — | v1 | 透传未知 | 透传未知 | 根据日志部分字段的取值，动态进行字段扩展或删除。 |
 | `processor_filter_regex`<br>[日志过滤](processor/extended/processor-filter-regex.md) | SLS 官方 | ✓ | — | v1 | 透传未知 | 透传未知 | 通过正则匹配过滤日志。 |
@@ -126,7 +126,7 @@
 | `processor_log_to_sls_metric`<br>[日志转 sls metric](processor/extended/processor-log-to-sls-metric.md) | SLS 官方 | ✓ | — | v1 | 透传未知 | 透传未知 | 将日志转 sls metric |
 | `processor_otel_metric`<br>[otel Metric格式转换](processor/extended/processor-otel-metric.md) | SLS 官方 | ✓ | — | v1 | 透传未知 | 透传未知 | OpenTelemetry Metric 数据格式转换。 |
 | `processor_otel_trace`<br>[otel Trace格式转换](processor/extended/processor-otel-trace.md) | SLS 官方 | ✓ | — | v1 | 透传未知 | 透传未知 | OpenTelemetry Trace 数据格式转换。 |
-| `processor_packjson`<br>[字段打包](processor/extended/processor-packjson.md) | SLS 官方 | ✓ | — | v1 | 透传未知 | 透传未知 | 可添加指定的字段（支持多个）以 JSON 格式打包成单个字段。 |
+| `processor_packjson`<br>[字段打包](processor/extended/processor-packjson.md) | SLS 官方 | ✓ | ✓ | v1&v2 | 透传 | 透传 | 可添加指定的字段（支持多个）以 JSON 格式打包成单个字段。 |
 | `processor_rate_limit`<br>[日志限速](processor/extended/processor-rate-limit.md) | SLS 官方 | ✓ | — | v1 | 透传未知 | 透传未知 | 用于对日志进行限速处理，确保在设定的时间窗口内，具有相同索引值的日志条目的数量不超过预定的速率限制。 |
 | `processor_regex`<br>[正则](processor/extended/processor-regex.md) | SLS 官方 | ✓ | — | v1 | 透传未知 | 透传未知 | 通过正则匹配的模式实现文本日志的字段提取。 |
 | `processor_rename`<br>[重命名字段](processor/extended/processor-rename.md) | SLS 官方 | ✓ | ✓ | v1&v2 | 透传未知 | 透传未知 | 重命名字段。 |
