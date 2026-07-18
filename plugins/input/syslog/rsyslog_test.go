@@ -129,11 +129,11 @@ func TestWriteRsyslogConfig_ChangeDetection(t *testing.T) {
 	const name = "testcfg"
 	path := rsyslogConfigFilePath(name)
 
-	// First write: changed, no previous content.
+	// First write: changed, no previous file (nil oldContent).
 	changed, oldContent, err := writeRsyslogConfig(name, "content-v1")
 	require.NoError(t, err)
 	assert.True(t, changed)
-	assert.Empty(t, oldContent)
+	assert.Nil(t, oldContent)
 	data, err := os.ReadFile(path)
 	require.NoError(t, err)
 	assert.Equal(t, "content-v1", string(data))
@@ -142,13 +142,15 @@ func TestWriteRsyslogConfig_ChangeDetection(t *testing.T) {
 	changed, oldContent, err = writeRsyslogConfig(name, "content-v1")
 	require.NoError(t, err)
 	assert.False(t, changed)
-	assert.Equal(t, "content-v1", oldContent)
+	require.NotNil(t, oldContent)
+	assert.Equal(t, "content-v1", *oldContent)
 
 	// Different content: changed, returns previous content.
 	changed, oldContent, err = writeRsyslogConfig(name, "content-v2")
 	require.NoError(t, err)
 	assert.True(t, changed)
-	assert.Equal(t, "content-v1", oldContent)
+	require.NotNil(t, oldContent)
+	assert.Equal(t, "content-v1", *oldContent)
 	data, err = os.ReadFile(path)
 	require.NoError(t, err)
 	assert.Equal(t, "content-v2", string(data))
@@ -170,7 +172,7 @@ func TestWriteRsyslogConfig_UnreadableExistingFile(t *testing.T) {
 	changed, oldContent, err := writeRsyslogConfig(name, "content-v1")
 	require.Error(t, err)
 	assert.False(t, changed)
-	assert.Empty(t, oldContent)
+	assert.Nil(t, oldContent)
 
 	// The existing path must be left untouched, not overwritten.
 	fi, statErr := os.Stat(path)
@@ -187,16 +189,26 @@ func TestRestoreRsyslogConfig(t *testing.T) {
 	const name = "restorecfg"
 	path := rsyslogConfigFilePath(name)
 
-	// Restore with empty oldContent removes the file.
+	// Restore with nil oldContent (file did not exist before) removes the file.
 	require.NoError(t, os.WriteFile(path, []byte("bad"), 0644))
-	require.NoError(t, restoreRsyslogConfig(name, ""))
+	require.NoError(t, restoreRsyslogConfig(name, nil))
 	_, err := os.Stat(path)
 	assert.True(t, os.IsNotExist(err))
 
+	// Restore with a non-nil empty oldContent (previously an empty file) keeps an
+	// empty file rather than deleting it.
+	require.NoError(t, os.WriteFile(path, []byte("new-bad"), 0644))
+	empty := ""
+	require.NoError(t, restoreRsyslogConfig(name, &empty))
+	data, err := os.ReadFile(path)
+	require.NoError(t, err)
+	assert.Empty(t, string(data))
+
 	// Restore with oldContent rewrites the previous content.
 	require.NoError(t, os.WriteFile(path, []byte("new-bad"), 0644))
-	require.NoError(t, restoreRsyslogConfig(name, "good-old"))
-	data, err := os.ReadFile(path)
+	good := "good-old"
+	require.NoError(t, restoreRsyslogConfig(name, &good))
+	data, err = os.ReadFile(path)
 	require.NoError(t, err)
 	assert.Equal(t, "good-old", string(data))
 }

@@ -139,25 +139,28 @@ func generateRsyslogConfig(cfg *SyslogForwardingConfig) string {
 }
 
 // writeRsyslogConfig writes the rsyslog config file if content has changed.
-// It returns whether the file was written (changed) and the previous content
-// (empty if the file did not exist), so the caller can roll back on validation failure.
-func writeRsyslogConfig(configName string, content string) (changed bool, oldContent string, err error) {
+// It returns whether the file was written (changed) and the previous content:
+// a nil oldContent means the file did not exist, while a non-nil pointer (even
+// to "") means it existed, so the caller can roll back correctly on validation
+// failure — distinguishing "delete the file" from "restore an empty file".
+func writeRsyslogConfig(configName string, content string) (changed bool, oldContent *string, err error) {
 	path := rsyslogConfigFilePath(configName)
 
 	// Read existing content (if any) so we can compare and roll back.
 	existing, readErr := os.ReadFile(path)
 	switch {
 	case readErr == nil:
-		oldContent = string(existing)
-		if oldContent == content {
+		prev := string(existing)
+		oldContent = &prev
+		if prev == content {
 			return false, oldContent, nil
 		}
 	case !os.IsNotExist(readErr):
 		// The file exists but cannot be read. Overwriting now would destroy the
-		// original, and on a later rollback an empty oldContent would be mistaken
+		// original, and on a later rollback a nil oldContent would be mistaken
 		// for "no previous file" and delete the config. Abort instead so existing
 		// rsyslog forwarding is never broken.
-		return false, "", fmt.Errorf("read existing rsyslog config %s: %w", path, readErr)
+		return false, nil, fmt.Errorf("read existing rsyslog config %s: %w", path, readErr)
 	}
 
 	if writeErr := os.WriteFile(path, []byte(content), 0644); writeErr != nil {
@@ -168,13 +171,14 @@ func writeRsyslogConfig(configName string, content string) (changed bool, oldCon
 }
 
 // restoreRsyslogConfig rolls back a config file to its previous state: it restores
-// oldContent if there was a previous version, otherwise removes the file.
-func restoreRsyslogConfig(configName string, oldContent string) error {
+// the previous content if the file existed (oldContent non-nil, including an empty
+// file), otherwise removes the file (oldContent nil).
+func restoreRsyslogConfig(configName string, oldContent *string) error {
 	path := rsyslogConfigFilePath(configName)
-	if oldContent == "" {
+	if oldContent == nil {
 		return removeRsyslogConfig(configName)
 	}
-	if err := os.WriteFile(path, []byte(oldContent), 0644); err != nil {
+	if err := os.WriteFile(path, []byte(*oldContent), 0644); err != nil {
 		return fmt.Errorf("restore rsyslog config %s: %w", path, err)
 	}
 	return nil
