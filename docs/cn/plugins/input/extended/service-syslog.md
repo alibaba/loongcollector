@@ -91,6 +91,8 @@ flushers:
 
 > **注意**：文件名中的 `{configName}` 会经过清洗——所有非 `[a-zA-Z0-9_-]` 的字符（如空格、`/`、`.`、`:`、中文等）都会被替换为 `_`。例如采集配置名为 `my config.a` 时，实际生成的文件为 `10-loongcollector-my_config_a.conf`。请按清洗后的名称查找文件；此外，若两个配置名清洗后相同，会指向同一个文件，需注意避免相互覆盖。
 
+> **副作用与清理**：由于 rsyslog v8+ 的 `reload`/`SIGHUP` 不会重载配置，应用新配置只能通过 **重启 rsyslogd**（`systemctl restart rsyslog` 或 `service rsyslog restart`）实现。这是 **宿主机全局操作**，会短暂影响该主机上所有基于 rsyslog 的日志链路，且仅在配置内容确有变化时触发。当采集配置被停止或删除时，LoongCollector 会自动删除对应的转发配置文件并重启一次 rsyslogd，以避免残留的转发规则持续向已停止的端口投递并堆积磁盘队列。
+
 **前提条件**：
 - 需要 root 权限运行 LoongCollector
 - 仅支持 TCP 和 UDP 协议（不支持 unixgram）

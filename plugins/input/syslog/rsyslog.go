@@ -22,10 +22,19 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
 )
+
+// rsyslogOpMu serializes the "write + validate + restart" critical section (and the
+// Stop-time cleanup) across pipelines. `rsyslogd -N1` validates the whole effective
+// config, so a concurrent half-written drop-in from another pipeline could otherwise
+// fail an unrelated pipeline's validation and trigger a spurious rollback; concurrent
+// restarts could also stomp on each other. All host-global rsyslog operations run
+// under this lock.
+var rsyslogOpMu sync.Mutex
 
 const (
 	rsyslogFilePrefix = "10-loongcollector"
@@ -80,6 +89,19 @@ func normalizeRsyslogProtocol(scheme string) string {
 // rsyslogConfigFilePath returns the full path for the rsyslog config file.
 func rsyslogConfigFilePath(configName string) string {
 	return fmt.Sprintf("%s/%s-%s.conf", rsyslogConfigDir, rsyslogFilePrefix, sanitizeConfigName(configName))
+}
+
+// validateRsyslogFilters rejects filter entries that contain a carriage return or
+// newline, which would break out of the selector line and inject extra rsyslog
+// directives. Other syntax errors are still caught by `rsyslogd -N1`, but newlines
+// are the structural hazard worth failing fast on with a clear alarm.
+func validateRsyslogFilters(filters []string) error {
+	for _, f := range filters {
+		if strings.ContainsAny(f, "\r\n") {
+			return fmt.Errorf("rsyslog filter %q contains a newline", f)
+		}
+	}
+	return nil
 }
 
 // sanitizeConfigName replaces any character that is NOT [a-zA-Z0-9_-] with '_'.
@@ -176,7 +198,8 @@ func writeRsyslogConfig(configName string, content string) (changed bool, oldCon
 func restoreRsyslogConfig(configName string, oldContent *string) error {
 	path := rsyslogConfigFilePath(configName)
 	if oldContent == nil {
-		return removeRsyslogConfig(configName)
+		_, err := removeRsyslogConfig(configName)
+		return err
 	}
 	if err := os.WriteFile(path, []byte(*oldContent), 0644); err != nil {
 		return fmt.Errorf("restore rsyslog config %s: %w", path, err)
@@ -185,15 +208,17 @@ func restoreRsyslogConfig(configName string, oldContent *string) error {
 }
 
 // removeRsyslogConfig removes the rsyslog config file for the given config name.
-func removeRsyslogConfig(configName string) error {
+// It returns removed=true only when a file actually existed and was deleted, so the
+// caller can decide whether a rsyslog restart is warranted. A missing file is a no-op.
+func removeRsyslogConfig(configName string) (removed bool, err error) {
 	path := rsyslogConfigFilePath(configName)
 	if err := os.Remove(path); err != nil {
 		if os.IsNotExist(err) {
-			return nil
+			return false, nil
 		}
-		return fmt.Errorf("remove rsyslog config %s: %w", path, err)
+		return false, fmt.Errorf("remove rsyslog config %s: %w", path, err)
 	}
-	return nil
+	return true, nil
 }
 
 // runCommand runs an external command bounded by timeout and returns its combined output.

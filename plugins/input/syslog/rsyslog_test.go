@@ -222,14 +222,29 @@ func TestRemoveRsyslogConfig(t *testing.T) {
 	const name = "removecfg"
 	path := rsyslogConfigFilePath(name)
 
-	// Removing a non-existent file is a no-op (no error).
-	require.NoError(t, removeRsyslogConfig(name))
+	// Removing a non-existent file is a no-op (no error, removed=false).
+	removed, err := removeRsyslogConfig(name)
+	require.NoError(t, err)
+	assert.False(t, removed)
 
-	// Removing an existing file deletes it.
+	// Removing an existing file deletes it and reports removed=true.
 	require.NoError(t, os.WriteFile(path, []byte("x"), 0644))
-	require.NoError(t, removeRsyslogConfig(name))
-	_, err := os.Stat(path)
-	assert.True(t, os.IsNotExist(err))
+	removed, err = removeRsyslogConfig(name)
+	require.NoError(t, err)
+	assert.True(t, removed)
+	_, statErr := os.Stat(path)
+	assert.True(t, os.IsNotExist(statErr))
+}
+
+func TestValidateRsyslogFilters(t *testing.T) {
+	// Valid: empty, nil, and normal facility.severity selectors.
+	require.NoError(t, validateRsyslogFilters(nil))
+	require.NoError(t, validateRsyslogFilters([]string{}))
+	require.NoError(t, validateRsyslogFilters([]string{"*.*", "auth.warning", "kern.err"}))
+
+	// Invalid: a newline would break out of the selector line.
+	require.Error(t, validateRsyslogFilters([]string{"auth.warning\n*.* action(type=\"omfwd\")"}))
+	require.Error(t, validateRsyslogFilters([]string{"ok.info", "bad\rentry"}))
 }
 
 func TestParseRsyslogMajorVersion(t *testing.T) {

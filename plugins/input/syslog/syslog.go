@@ -184,6 +184,12 @@ func (s *Syslog) Stop() error {
 	s.wg.Wait()
 	s.connectionsWg.Wait()
 
+	// Tear down auto-generated rsyslog forwarding so a removed pipeline does not leave
+	// rsyslog forwarding (and accumulating a disk queue) to a port no longer listened on.
+	if s.AutoConfigRsyslog {
+		s.cleanupRsyslogConfig()
+	}
+
 	// If scheme type is "unixgram", remove unix socket file after close.
 	if s.isUnix {
 		_, host, err := getAddressParts(s.Address)
@@ -225,6 +231,14 @@ func (s *Syslog) configureRsyslogIfNeeded(scheme, host string) {
 		return
 	}
 
+	// Reject filters that could break the generated config structure.
+	if filterErr := validateRsyslogFilters(s.RsyslogFilters); filterErr != nil {
+		logger.Warning(ctx, selfmonitor.ServiceSyslogRsyslogConfigAlarm,
+			"invalid RsyslogFilters, skipping rsyslog auto-configuration", filterErr,
+			"Address", s.Address)
+		return
+	}
+
 	// Check rsyslog version (needs v8+ for the action(type="omfwd" ...) syntax).
 	major, verErr := checkRsyslogVersion(ctx)
 	if verErr != nil {
@@ -258,6 +272,13 @@ func (s *Syslog) configureRsyslogIfNeeded(scheme, host string) {
 	}
 
 	content := generateRsyslogConfig(cfg)
+
+	// Serialize the host-global write+validate+restart against other pipelines and
+	// against Stop-time cleanup, so a concurrent drop-in cannot fail this pipeline's
+	// `rsyslogd -N1` and cause a spurious rollback.
+	rsyslogOpMu.Lock()
+	defer rsyslogOpMu.Unlock()
+
 	changed, oldContent, writeErr := writeRsyslogConfig(configName, content)
 	if writeErr != nil {
 		logger.Warning(ctx, selfmonitor.ServiceSyslogRsyslogConfigAlarm,
@@ -295,6 +316,44 @@ func (s *Syslog) configureRsyslogIfNeeded(scheme, host string) {
 	}
 }
 
+// cleanupRsyslogConfig removes the auto-generated rsyslog config on Stop and restarts
+// rsyslogd so the forwarding action (and its disk-assisted retry queue) is torn down
+// instead of lingering and endlessly retrying against a port nobody listens on. It only
+// restarts when a file was actually removed, and skips silently when not running as root.
+func (s *Syslog) cleanupRsyslogConfig() {
+	ctx := s.context.GetRuntimeContext()
+
+	if !isRoot() {
+		logger.Warning(ctx, selfmonitor.ServiceSyslogRsyslogConfigAlarm,
+			"AutoConfigRsyslog cleanup requires root privileges, skipping rsyslog config removal",
+			"Address", s.Address)
+		return
+	}
+
+	configName := s.context.GetConfigName()
+
+	rsyslogOpMu.Lock()
+	defer rsyslogOpMu.Unlock()
+
+	removed, err := removeRsyslogConfig(configName)
+	if err != nil {
+		logger.Warning(ctx, selfmonitor.ServiceSyslogRsyslogConfigAlarm,
+			"failed to remove rsyslog config on stop", err,
+			"configName", configName)
+		return
+	}
+	if !removed {
+		return
+	}
+
+	logger.Info(ctx, "rsyslog config removed on stop, restarting rsyslogd",
+		"configName", configName)
+	if restartErr := restartRsyslog(ctx); restartErr != nil {
+		logger.Warning(ctx, selfmonitor.ServiceSyslogRsyslogRestartAlarm,
+			"failed to restart rsyslogd after config cleanup", restartErr)
+	}
+}
+
 // parseTargetPort splits "host:port" into target and port strings.
 func parseTargetPort(host string) (target, port string, err error) {
 	target, port, err = net.SplitHostPort(host)
@@ -322,16 +381,13 @@ func getAddressParts(a string) (string, string, error) {
 		return parts[0], parts[1], nil
 	}
 
-	var host string
-	if u.Hostname() != "" {
-		host = u.Hostname()
+	port := u.Port()
+	if port == "" {
+		port = "6514"
 	}
-	host += ":"
-	if u.Port() == "" {
-		host += "6514"
-	} else {
-		host += u.Port()
-	}
+	// net.JoinHostPort brackets IPv6 hosts (e.g. "[::1]:6514") so both net.Listen
+	// and the downstream net.SplitHostPort in parseTargetPort accept the result.
+	host := net.JoinHostPort(u.Hostname(), port)
 
 	return u.Scheme, host, nil
 }
