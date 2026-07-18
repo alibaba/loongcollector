@@ -251,7 +251,7 @@ func (s *Syslog) configureRsyslogIfNeeded(scheme, host string) {
 
 	cfg := &SyslogForwardingConfig{
 		ConfigName: configName,
-		Protocol:   scheme,
+		Protocol:   normalizeRsyslogProtocol(scheme),
 		Target:     target,
 		Port:       port,
 		Filters:    s.RsyslogFilters,

@@ -62,6 +62,21 @@ type SyslogForwardingConfig struct {
 	Filters    []string // rsyslog filter rules like "auth.warning", default ["*.*"]
 }
 
+// normalizeRsyslogProtocol maps a Go network scheme to the value accepted by the
+// rsyslog omfwd "Protocol" parameter, which only understands "tcp" or "udp".
+// The IPv4/IPv6 variants allowed by net.Listen (tcp4/tcp6/udp4/udp6) would fail
+// `rsyslogd -N1` validation and trigger a rollback, so collapse them here.
+func normalizeRsyslogProtocol(scheme string) string {
+	switch scheme {
+	case "tcp4", "tcp6":
+		return "tcp"
+	case "udp4", "udp6":
+		return "udp"
+	default:
+		return scheme
+	}
+}
+
 // rsyslogConfigFilePath returns the full path for the rsyslog config file.
 func rsyslogConfigFilePath(configName string) string {
 	return fmt.Sprintf("%s/%s-%s.conf", rsyslogConfigDir, rsyslogFilePrefix, sanitizeConfigName(configName))

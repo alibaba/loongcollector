@@ -39,6 +39,23 @@ func TestSanitizeConfigName(t *testing.T) {
 	}
 }
 
+func TestNormalizeRsyslogProtocol(t *testing.T) {
+	cases := []struct {
+		in, want string
+	}{
+		{"tcp", "tcp"},
+		{"udp", "udp"},
+		{"tcp4", "tcp"},
+		{"tcp6", "tcp"},
+		{"udp4", "udp"},
+		{"udp6", "udp"},
+		{"unixgram", "unixgram"}, // untouched; unixgram never reaches config generation
+	}
+	for _, c := range cases {
+		assert.Equal(t, c.want, normalizeRsyslogProtocol(c.in), "input=%q", c.in)
+	}
+}
+
 func TestRsyslogConfigFilePath(t *testing.T) {
 	old := rsyslogConfigDir
 	rsyslogConfigDir = "/etc/rsyslog.d"
