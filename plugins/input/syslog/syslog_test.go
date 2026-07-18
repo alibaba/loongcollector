@@ -40,8 +40,8 @@ func TestGetAddressPartsHostFormat(t *testing.T) {
 	}{
 		{"tcp://127.0.0.1:9000", "tcp", "127.0.0.1:9000"},
 		{"udp://127.0.0.1", "udp", "127.0.0.1:6514"}, // default port
-		{"tcp6://[::1]:9000", "tcp6", "[::1]:9000"},   // IPv6 must stay bracketed
-		{"tcp6://[::1]", "tcp6", "[::1]:6514"},        // IPv6 + default port
+		{"tcp6://[::1]:9000", "tcp6", "[::1]:9000"},  // IPv6 must stay bracketed
+		{"tcp6://[::1]", "tcp6", "[::1]:6514"},       // IPv6 + default port
 	}
 	for _, c := range cases {
 		scheme, host, err := getAddressParts(c.address)

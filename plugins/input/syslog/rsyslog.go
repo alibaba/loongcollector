@@ -169,7 +169,8 @@ func writeRsyslogConfig(configName string, content string) (changed bool, oldCon
 	path := rsyslogConfigFilePath(configName)
 
 	// Read existing content (if any) so we can compare and roll back.
-	existing, readErr := os.ReadFile(path)
+	// path is derived from a sanitized config name under the fixed rsyslog dir.
+	existing, readErr := os.ReadFile(path) //nolint:gosec
 	switch {
 	case readErr == nil:
 		prev := string(existing)
