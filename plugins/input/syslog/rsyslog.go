@@ -111,7 +111,9 @@ func generateRsyslogConfig(cfg *SyslogForwardingConfig) string {
 
 	var b strings.Builder
 	b.WriteString("# LoongCollector auto-generated rsyslog forwarding configuration\n")
-	b.WriteString(fmt.Sprintf("# Config: %s\n", cfg.ConfigName))
+	// %q escapes newlines/control chars so a crafted ConfigName cannot break out
+	// of the comment and inject extra rsyslog directives.
+	b.WriteString(fmt.Sprintf("# Config: %q\n", cfg.ConfigName))
 	b.WriteString("# DO NOT EDIT - managed by LoongCollector service_syslog plugin\n")
 	b.WriteString("\n")
 	b.WriteString("template(name=\"LC_TraditionalForwardFormat\" type=\"string\"\n")

