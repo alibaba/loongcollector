@@ -288,6 +288,8 @@ void FillAgentsightCommonCorrelation(const AgentsightLlmRecord& rec,
         log->SetContent("pid", std::to_string(rec.mPid));
     }
     setStr(StringView("comm"), rec.mProcessName);
+    setStr(StringView("cmdline"), rec.mCmdline);
+    setStr(StringView("container.id"), rec.mContainerId);
     setStr(StringView("gen_ai.agent.type"), rec.mAgentType);
 }
 
