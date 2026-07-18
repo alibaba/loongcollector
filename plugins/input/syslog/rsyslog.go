@@ -143,11 +143,19 @@ func writeRsyslogConfig(configName string, content string) (changed bool, oldCon
 	path := rsyslogConfigFilePath(configName)
 
 	// Read existing content (if any) so we can compare and roll back.
-	if existing, readErr := os.ReadFile(path); readErr == nil {
+	existing, readErr := os.ReadFile(path)
+	switch {
+	case readErr == nil:
 		oldContent = string(existing)
 		if oldContent == content {
 			return false, oldContent, nil
 		}
+	case !os.IsNotExist(readErr):
+		// The file exists but cannot be read. Overwriting now would destroy the
+		// original, and on a later rollback an empty oldContent would be mistaken
+		// for "no previous file" and delete the config. Abort instead so existing
+		// rsyslog forwarding is never broken.
+		return false, "", fmt.Errorf("read existing rsyslog config %s: %w", path, readErr)
 	}
 
 	if writeErr := os.WriteFile(path, []byte(content), 0644); writeErr != nil {

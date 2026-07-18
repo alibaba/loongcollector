@@ -136,6 +136,30 @@ func TestWriteRsyslogConfig_ChangeDetection(t *testing.T) {
 	assert.Equal(t, "content-v2", string(data))
 }
 
+func TestWriteRsyslogConfig_UnreadableExistingFile(t *testing.T) {
+	dir := t.TempDir()
+	old := rsyslogConfigDir
+	rsyslogConfigDir = dir
+	defer func() { rsyslogConfigDir = old }()
+
+	const name = "unreadablecfg"
+	path := rsyslogConfigFilePath(name)
+
+	// Make the config path a directory so os.ReadFile fails with a non-NotExist
+	// error (EISDIR) regardless of the test user (root bypasses file perms).
+	require.NoError(t, os.Mkdir(path, 0755))
+
+	changed, oldContent, err := writeRsyslogConfig(name, "content-v1")
+	require.Error(t, err)
+	assert.False(t, changed)
+	assert.Empty(t, oldContent)
+
+	// The existing path must be left untouched, not overwritten.
+	fi, statErr := os.Stat(path)
+	require.NoError(t, statErr)
+	assert.True(t, fi.IsDir())
+}
+
 func TestRestoreRsyslogConfig(t *testing.T) {
 	dir := t.TempDir()
 	old := rsyslogConfigDir
