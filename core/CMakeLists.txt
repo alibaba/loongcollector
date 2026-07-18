@@ -156,8 +156,11 @@ set(SUB_DIRECTORIES_LIST
         protobuf/sls protobuf/models protobuf/forward
         file_server file_server/event file_server/event_handler file_server/event_listener file_server/reader file_server/polling file_server/checkpoint
         parser
-        prometheus prometheus/labels prometheus/schedulers prometheus/async prometheus/component
         )
+if (NOT ANDROID)
+    set(SUB_DIRECTORIES_LIST ${SUB_DIRECTORIES_LIST}
+        prometheus prometheus/labels prometheus/schedulers prometheus/async prometheus/component)
+endif()
 if (LINUX)
     if (ENABLE_ENTERPRISE)
         set(SUB_DIRECTORIES_LIST ${SUB_DIRECTORIES_LIST} shennong shennong/sdk apm/forward)
