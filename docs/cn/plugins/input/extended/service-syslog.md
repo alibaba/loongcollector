@@ -89,6 +89,8 @@ flushers:
 
 开启 `AutoConfigRsyslog` 后，LoongCollector 会在 `/etc/rsyslog.d/` 目录下自动生成 rsyslog v8+ 转发配置文件（文件名格式为 `10-loongcollector-{configName}.conf`），并在配置内容变更时自动重启 rsyslogd。
 
+> **注意**：文件名中的 `{configName}` 会经过清洗——所有非 `[a-zA-Z0-9_-]` 的字符（如空格、`/`、`.`、`:`、中文等）都会被替换为 `_`。例如采集配置名为 `my config.a` 时，实际生成的文件为 `10-loongcollector-my_config_a.conf`。请按清洗后的名称查找文件；此外，若两个配置名清洗后相同，会指向同一个文件，需注意避免相互覆盖。
+
 **前提条件**：
 - 需要 root 权限运行 LoongCollector
 - 仅支持 TCP 和 UDP 协议（不支持 unixgram）
