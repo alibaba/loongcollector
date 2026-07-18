@@ -184,12 +184,6 @@ func (s *Syslog) Stop() error {
 	s.wg.Wait()
 	s.connectionsWg.Wait()
 
-	// Tear down auto-generated rsyslog forwarding so a removed pipeline does not leave
-	// rsyslog forwarding (and accumulating a disk queue) to a port no longer listened on.
-	if s.AutoConfigRsyslog {
-		s.cleanupRsyslogConfig()
-	}
-
 	// If scheme type is "unixgram", remove unix socket file after close.
 	if s.isUnix {
 		_, host, err := getAddressParts(s.Address)
@@ -316,10 +310,23 @@ func (s *Syslog) configureRsyslogIfNeeded(scheme, host string) {
 	}
 }
 
-// cleanupRsyslogConfig removes the auto-generated rsyslog config on Stop and restarts
-// rsyslogd so the forwarding action (and its disk-assisted retry queue) is torn down
-// instead of lingering and endlessly retrying against a port nobody listens on. It only
-// restarts when a file was actually removed, and skips silently when not running as root.
+// OnPipelineRemoved implements pipeline.PipelineRemovedCleaner. It is invoked only when
+// this pipeline config is permanently removed (not on reload/restart, and not on process
+// shutdown), which is exactly when the generated rsyslog forwarding should be torn down.
+// Reloads are handled by Start's content comparison instead, so an unrelated edit to the
+// pipeline does not churn rsyslog; process shutdown deliberately leaves the config in
+// place so rsyslog keeps queuing until the agent returns.
+func (s *Syslog) OnPipelineRemoved() {
+	if !s.AutoConfigRsyslog {
+		return
+	}
+	s.cleanupRsyslogConfig()
+}
+
+// cleanupRsyslogConfig removes the auto-generated rsyslog config and restarts rsyslogd so
+// the forwarding action (and its disk-assisted retry queue) is torn down instead of
+// lingering and endlessly retrying against a port nobody listens on. It only restarts when
+// a file was actually removed, and skips silently when not running as root.
 func (s *Syslog) cleanupRsyslogConfig() {
 	ctx := s.context.GetRuntimeContext()
 

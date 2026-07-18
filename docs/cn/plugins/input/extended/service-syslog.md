@@ -91,17 +91,16 @@ flushers:
 
 > **注意**：文件名中的 `{configName}` 会经过清洗——所有非 `[a-zA-Z0-9_-]` 的字符（如空格、`/`、`.`、`:`、中文等）都会被替换为 `_`。例如采集配置名为 `my config.a` 时，实际生成的文件为 `10-loongcollector-my_config_a.conf`。请按清洗后的名称查找文件；此外，若两个配置名清洗后相同，会指向同一个文件，需注意避免相互覆盖。
 
-> **副作用与清理**：由于 rsyslog v8+ 的 `reload`/`SIGHUP` 不会重载配置，应用或撤销转发配置只能通过 **重启 rsyslogd**（`systemctl restart rsyslog` 或 `service rsyslog restart`）实现。这是 **宿主机全局操作**，会短暂影响该主机上所有基于 rsyslog 的日志链路。当采集配置被停止或删除时，LoongCollector 会自动删除对应的转发配置文件并重启 rsyslogd，以避免残留的转发规则持续向已停止的端口投递并堆积磁盘队列。
+> **副作用与清理**：由于 rsyslog v8+ 的 `reload`/`SIGHUP` 不会重载配置，应用或撤销转发配置只能通过 **重启 rsyslogd**（`systemctl restart rsyslog` 或 `service rsyslog restart`）实现。这是 **宿主机全局操作**，会短暂影响该主机上所有基于 rsyslog 的日志链路，因此仅在确有必要时触发。当采集配置被 **永久删除** 时，LoongCollector 会自动删除对应的转发配置文件并重启 rsyslogd，以避免残留的转发规则持续向已停止的端口投递并堆积磁盘队列。
 >
-> **重启次数**：LoongCollector 的配置热更新会将整条采集配置对应的 pipeline 先停止再启动。因此每次涉及该采集配置的变更所触发的 rsyslogd 重启次数如下：
+> **重启次数**：仅当生成的 rsyslog 转发配置**内容真正发生变化**时才会重启 rsyslogd。各场景如下：
 >
 > | 场景 | rsyslogd 重启次数 |
 > |------|------|
-> | 采集配置未发生变更 | 0（pipeline 不停不起） |
-> | 删除采集配置 | 1（停止时删除转发配置并重启） |
-> | 修改采集配置 | 2（停止旧 pipeline 删除并重启 + 启动新 pipeline 写入并重启） |
->
-> ⚠️ 注意：只要该采集配置的 **任意部分**发生改动（即使与 syslog/rsyslog 转发无关，例如调整某个 processor 或 flusher），都会触发整条 pipeline 的停止与启动，进而产生上表中「修改采集配置」的 2 次全局重启。若宿主机对 rsyslog 抖动敏感，请尽量减少对开启了 `AutoConfigRsyslog` 的采集配置的频繁热更新。
+> | 修改采集配置中与 syslog/rsyslog 转发**无关**的部分（如某个 processor/flusher） | 0（转发配置内容不变，重载时按内容比对跳过重启） |
+> | 修改会影响转发的部分（监听地址/端口、`RsyslogFilters` 等） | 1（内容变化，重写并重启） |
+> | 删除采集配置 | 1（删除转发配置并重启） |
+> | LoongCollector 进程退出 / 升级重启 | 0（保留转发配置，日志继续在 rsyslog 磁盘队列中缓冲，待 agent 恢复后送达） |
 
 **前提条件**：
 - 需要 root 权限运行 LoongCollector
