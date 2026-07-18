@@ -30,7 +30,7 @@ dev
 |  ProbeConfig.LogPath  |  string  |  否  |  `""`  |  ebpf 日志的输出位置  |
 |  ProbeConfig.CmdlineWhitelist  |  array  |  否（**推荐填写**）  |  内置 11 条  |  进程 **agent 筛选白名单**。每一项为对象：`AgentType`（上报字段 `gen_ai.agent.type`）+ `Args`（字符串数组，与进程 cmdline 各参数（即 `argv`）按位置 glob 匹配）。**未配置**且 `CmdlineBlacklist` 也为空时注入「默认 `CmdlineWhitelist`」（见下文）；**填写后只使用用户规则**，不再叠加内置。空数组 `[]` 视为非法配置。  |
 |  ProbeConfig.CmdlineBlacklist  |  array  |  否  |  /  |  进程 **agent 筛选黑名单**，每项为 glob 字符串数组（无 `AgentType`）；**命中则排除**，不采集。**优先级高于白名单**。  |
-|  ProbeConfig.Https  |  array  |  否  |  内置 4 条  |  HTTPS 加密流量的域名白名单（字符串数组，glob 通配符 `*`，不区分大小写）。访问白名单内域名的进程可被识别为采集目标。未配置时注入默认精确主机名列表，见下文。  |
+|  ProbeConfig.Https  |  array  |  否  |  内置 6 条  |  HTTPS 加密流量的域名白名单（字符串数组，glob 通配符 `*`，不区分大小写）。访问白名单内域名的进程可被识别为采集目标。未配置时注入默认列表，见下文。  |
 |  ProbeConfig.Http  |  array  |  否  |  `[]`（关闭）  |  HTTP 明文流量的目标列表（字符串数组）。每项可为 `:端口`、`IP`、`IP:端口` 或域名（如 `model-svc.default.svc`、`*.internal.svc`）。**留空时不采集明文 HTTP 流量**。  |
 |  ProbeConfig.EventStreamFormat  |  bool  |  否  |  `true`  |  为 `true` 时，每次 LLM 调用在同一 `PipelineEventGroup` 内输出两条日志（各有 `event.id`）：`event.name=gen_ai.model.request`（请求开始时间戳）与 `gen_ai.model.response`（请求结束时间戳）。为 `false` 时输出单条合并日志，**无** `event.name` / `event.id`。  |
 |  ProbeConfig.MessageDeltaOnly  |  bool  |  否  |  `true`  |  为 `true` 时**不**输出全量 `gen_ai.input.messages`；仍输出 `gen_ai.input.messages_delta`、`gen_ai.system_instructions_hash` / `gen_ai.tool.definitions_hash`（非空时），以及 hash 相对上一轮变化时的 `gen_ai.system_instructions` / `gen_ai.tool.definitions`。为 `false` 时**每次**输出非空的全量 `gen_ai.input.messages`。**不影响** `gen_ai.output.messages`；`messages_delta` 及 session 状态维护**不受**本开关影响。  |
@@ -142,14 +142,21 @@ ProbeConfig:
 1. **多条 Https 规则之间**：**OR**，命中任一条即可。
 2. **默认注入条件**：`Https` 列表 **为空** 时，注入下表；一旦配置了 **任意一条** 用户规则，则 **不再** 注入默认值。
 
-**默认 `Https`（4 条，精确主机名）**
+**默认 `Https`（6 条）**
 
-| 域名 |
-| --- |
-| `api.openai.com` |
-| `api.anthropic.com` |
-| `dashscope.aliyuncs.com` |
-| `dashscope-intl.aliyuncs.com` |
+| 域名 | 说明 |
+| --- | --- |
+| `api.openai.com` | OpenAI |
+| `api.anthropic.com` | Anthropic |
+| `dashscope.aliyuncs.com` | DashScope/百炼 按量付费·华北2（北京） |
+| `dashscope-intl.aliyuncs.com` | DashScope/百炼 按量付费·新加坡 |
+| `dashscope-us.aliyuncs.com` | DashScope/百炼 按量付费·美国（弗吉尼亚） |
+| `coding.dashscope.aliyuncs.com` | DashScope/百炼 Coding Plan |
+| `*.maas.aliyuncs.com` | DashScope/百炼 业务空间专属 / 试用 / Token Plan 域名 |
+
+> DashScope/百炼 的业务空间专属、试用与 Token Plan 均使用 `[workspace-id｜trial｜token-plan].[region].maas.aliyuncs.com` 形式的域名——`workspace-id` 与地域（`cn-beijing`、`ap-southeast-1`、`ap-northeast-1`、`eu-central-1` 等）为动态前缀，无法穷举，因此用通配 `*.maas.aliyuncs.com` 统一覆盖（glob `*` 可跨 `.`）。
+>
+> 通配域名仅用于 **SNI 层的 SSL/TLS 探针挂载**（HTTPS 加密流量采集主路径）；基于 TCP 连接目的 IP 的进程发现会跳过通配域名（无法 DNS 解析），对加密流量采集本身无影响。
 
 #### Http 规则优先级和默认注入值
 
@@ -228,21 +235,12 @@ Http:
 
 ### Codex 采集的版本支持说明
 
-Codex CLI 是 Rust 编译的二进制，**静态链接** BoringSSL（aws-lc），使用 `SSL_write_ex` / `SSL_read_ex` 收发加密流量。要挂载 uprobe 采集其 LLM 交互，必须先在该二进制内**定位这些 SSL 函数的地址**。插件按下列**三级回退**顺序定位（任一级命中即挂载成功）：
+Codex CLI 是 Rust 编译、**静态链接** BoringSSL（aws-lc）的二进制，挂载 uprobe 前需先在其中定位 SSL 收发函数地址。
 
-| Tier | 方式 | 适用二进制 |
-| --- | --- | --- |
-| Tier 1 | **符号表查找**：直接从 ELF 符号表读取 `SSL_write_ex` 等地址 | **未 strip**（保留符号）的二进制，**任意版本**均可 |
-| Tier 2 | **字节特征扫描**：按函数机器码特征在 `.text` 段中搜索 | 兜底，命中率有限，不保证 |
-| Tier 3 | **内置偏移表查找**：按二进制指纹（文件大小 / build-id / 头部 SHA-256）匹配内置偏移 | **已 strip** 的二进制，且**版本在内置偏移表中** |
+- **未 strip / 自行编译版本**：可通过符号表定位，兼容性较好。
+- **官方发布版（已 strip）**：缺少符号表，仅对**内置偏移表中已收录的特定版本**可采集，属**尽力而为**，不保证覆盖任意版本；定位失败时跳过该进程并在日志中提示。
 
-由此得出当前的**支持范围**：
-
-- **官方发布版（已 strip）**：由于缺少符号表，是否能采集取决于底层实现能否为该版本定位到相关 TLS 函数；失败时将跳过该进程。
-- **自行编译 / 未 strip 版本**：通常可通过符号表定位，兼容性更好（仍以实际二进制符号为准）。
-- **版本兼容性**：内置兼容清单/偏移随底层采集库与 LoongCollector 版本变化，请以当前版本实现/Release Notes 为准；需支持新版本时按同样方式补充后重新编译。
-
-> 若定位失败，会在日志中提示跳过该进程。
+> 需支持新版本时按底层实现的方式补充偏移后重新编译；具体清单以当前版本 / Release Notes 为准。
 
 ### `EventStreamFormat: false`（合并日志）
 
