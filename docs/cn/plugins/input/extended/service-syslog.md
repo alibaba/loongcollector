@@ -93,14 +93,35 @@ flushers:
 
 > **副作用与清理**：由于 rsyslog v8+ 的 `reload`/`SIGHUP` 不会重载配置，应用或撤销转发配置只能通过 **重启 rsyslogd**（`systemctl restart rsyslog` 或 `service rsyslog restart`）实现。这是 **宿主机全局操作**，会短暂影响该主机上所有基于 rsyslog 的日志链路，因此仅在确有必要时触发。当采集配置被 **永久删除** 时，LoongCollector 会自动删除对应的转发配置文件并重启 rsyslogd，以避免残留的转发规则持续向已停止的端口投递并堆积磁盘队列。
 >
-> **重启次数**：仅当生成的 rsyslog 转发配置**内容真正发生变化**时才会重启 rsyslogd。各场景如下：
+> **重启判定原则**：生成的转发配置内容仅由 `Address` 解析出的 **目标地址 / 端口 / 网络协议（tcp、udp）** 以及 **`RsyslogFilters`** 决定。仅当这些字段变化、导致转发配置**内容真正改变**时才重启 rsyslogd；接收端参数（如 `MaxConnections`、`TimeoutSeconds`、`KeepAliveSeconds`、`ParseProtocol` 等）与转发规则无关，改动它们不会触发重启。判定通过“重写前先与磁盘上现有文件逐字节比对”实现，因此纯重载（reload）本身不会重启。
 >
-> | 场景 | rsyslogd 重启次数 |
-> |------|------|
-> | 修改采集配置中与 syslog/rsyslog 转发**无关**的部分（如某个 processor/flusher） | 0（转发配置内容不变，重载时按内容比对跳过重启） |
-> | 修改会影响转发的部分（监听地址/端口、`RsyslogFilters` 等） | 1（内容变化，重写并重启） |
-> | 删除采集配置 | 1（删除转发配置并重启） |
-> | LoongCollector 进程退出 / 升级重启 | 0（保留转发配置，日志继续在 rsyslog 磁盘队列中缓冲，待 agent 恢复后送达） |
+> **各场景重启行为**：
+>
+> | 场景 | 是否影响转发配置 | rsyslogd 重启次数 | 说明 |
+> |------|:---:|:---:|------|
+> | 采集配置未开启 `AutoConfigRsyslog`（默认） | — | 0 | 不生成任何转发配置，不介入 rsyslog |
+> | 首次开启 `AutoConfigRsyslog`（新建配置，或将开关由 false 改为 true） | 是（首次建立） | 1 | 转发配置文件此前不存在，写入并重启 |
+> | 修改 `MaxConnections` / `TimeoutSeconds` / `KeepAliveSeconds` 等接收端参数 | 否 | 0 | 转发配置内容不变，重载时按内容比对跳过重启（日志：`rsyslog config unchanged (no restart needed)`） |
+> | 修改 `ParseProtocol`（如 rfc3164 → rfc5424） | 否 | 0 | 报文解析协议仅作用于接收端，不写入转发配置 |
+> | 修改监听 **端口**（如 9001 → 9002） | 是 | 1 | omfwd 的 `Port` 变化，重写并重启 |
+> | 修改 **网络协议**（`Address` scheme，如 tcp → udp） | 是 | 1 | omfwd 的 `Protocol` 变化，重写并重启（注意与 `ParseProtocol` 区分） |
+> | 修改目标 **地址 / 主机** 或 `RsyslogFilters` | 是 | 1 | omfwd 的 `target` / 过滤选择器变化，重写并重启 |
+> | **永久删除** 采集配置 | 是（移除） | 1 | 删除对应转发配置文件并重启，避免残留转发规则持续向已停端口投递、堆积磁盘队列 |
+> | LoongCollector 进程退出 / 升级重启 | — | 0 | 保留转发配置，日志继续在 rsyslog 磁盘队列中缓冲，待 agent 恢复后送达 |
+>
+> 每次真正的重启在日志中都表现为一对配对记录，便于核对重启次数：
+>
+> ```text
+> [configureRsyslogIfNeeded] rsyslog config updated, restarting rsyslogd:configName ...
+> [restartRsyslog] rsyslog restarted successfully:via systemctl
+> ```
+>
+> 删除配置触发的重启则为：
+>
+> ```text
+> [cleanupRsyslogConfig] rsyslog config removed on stop, restarting rsyslogd:configName ...
+> [restartRsyslog] rsyslog restarted successfully:via systemctl
+> ```
 
 **前提条件**：
 - 需要 root 权限运行 LoongCollector
