@@ -146,8 +146,7 @@ void CheckpointManagerUnittest::TestAddCheckPointStaleFileNotOverwriteActive() {
     // Active reader dumps first, then the stale reader of the deleted file (same inode).
     CheckPointManager::Instance()->AddCheckPoint(
         MakeCheckPoint(activeFile, reusedDevInode, 1000, configName).release());
-    CheckPointManager::Instance()->AddCheckPoint(
-        MakeCheckPoint(deletedFile, reusedDevInode, 0, configName).release());
+    CheckPointManager::Instance()->AddCheckPoint(MakeCheckPoint(deletedFile, reusedDevInode, 0, configName).release());
 
     CheckPointPtr cpt;
     EXPECT_TRUE(CheckPointManager::Instance()->GetCheckPoint(reusedDevInode, configName, cpt));
@@ -172,8 +171,7 @@ void CheckpointManagerUnittest::TestAddCheckPointActiveOverwriteStale() {
     EXPECT_TRUE(fsutil::PathStat::stat(activeFile, ps));
     const DevInode reusedDevInode = ps.GetDevInode();
 
-    CheckPointManager::Instance()->AddCheckPoint(
-        MakeCheckPoint(deletedFile, reusedDevInode, 0, configName).release());
+    CheckPointManager::Instance()->AddCheckPoint(MakeCheckPoint(deletedFile, reusedDevInode, 0, configName).release());
     CheckPointManager::Instance()->AddCheckPoint(
         MakeCheckPoint(activeFile, reusedDevInode, 2000, configName).release());
 
