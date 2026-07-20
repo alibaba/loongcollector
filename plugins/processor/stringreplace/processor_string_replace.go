@@ -16,6 +16,7 @@ package stringreplace
 
 import (
 	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -23,6 +24,7 @@ import (
 	"github.com/dlclark/regexp2"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
@@ -105,28 +107,7 @@ func (p *ProcessorStringReplace) ProcessLogs(logArray []*protocol.Log) []*protoc
 			if p.SourceKey != cont.Key {
 				continue
 			}
-			var newContVal string
-			var err error
-			switch p.Method {
-			case MethodConst:
-				newContVal = strings.ReplaceAll(cont.Value, p.Match, p.ReplaceString)
-			case MethodRegex:
-				// directly replace with unlimited count (guarded by regex MatchTimeout)
-				newContVal, err = p.re.Replace(cont.Value, p.ReplaceString, -1, -1)
-			case MethodUnquote:
-				if strings.HasPrefix(cont.Value, "\"") && strings.HasSuffix(cont.Value, "\"") {
-					newContVal, err = strconv.Unquote(cont.Value)
-				} else {
-					newContVal, err = strconv.Unquote("\"" + strings.ReplaceAll(cont.Value, "\"", "\\x22") + "\"")
-				}
-			default:
-				newContVal = cont.Value
-			}
-			if err != nil {
-				logger.Warning(p.context.GetRuntimeContext(), selfmonitor.ProcessorStringReplaceAlarm, "error", err,
-					"method", p.Method, "source_key", cont.Key, "content", cont.Value)
-				newContVal = cont.Value
-			}
+			newContVal := p.replaceValue(cont.Value)
 			if len(p.DestKey) > 0 {
 				log.Contents = append(log.Contents, &protocol.Log_Content{Key: p.DestKey, Value: newContVal})
 			} else {
@@ -137,6 +118,56 @@ func (p *ProcessorStringReplace) ProcessLogs(logArray []*protocol.Log) []*protoc
 	}
 	p.logPairMetric.Add(int64(replaceCount))
 	return logArray
+}
+
+// replaceValue applies the configured replace Method to val, falling back to the
+// original value on error. Shared by the v1 (protocol.Log) and v2 (models.Log)
+// processing paths.
+func (p *ProcessorStringReplace) replaceValue(val string) string {
+	var newContVal string
+	var err error
+	switch p.Method {
+	case MethodConst:
+		newContVal = strings.ReplaceAll(val, p.Match, p.ReplaceString)
+	case MethodRegex:
+		// directly replace with unlimited count (guarded by regex MatchTimeout)
+		newContVal, err = p.re.Replace(val, p.ReplaceString, -1, -1)
+	case MethodUnquote:
+		if strings.HasPrefix(val, "\"") && strings.HasSuffix(val, "\"") {
+			newContVal, err = strconv.Unquote(val)
+		} else {
+			newContVal, err = strconv.Unquote("\"" + strings.ReplaceAll(val, "\"", "\\x22") + "\"")
+		}
+	default:
+		newContVal = val
+	}
+	if err != nil {
+		logger.Warning(p.context.GetRuntimeContext(), selfmonitor.ProcessorStringReplaceAlarm, "error", err,
+			"method", p.Method, "source_key", p.SourceKey, "content", val)
+		newContVal = val
+	}
+	return newContVal
+}
+
+// Process implements the v2 ProcessorV2 interface: it replaces the SourceKey
+// value of each Log event (writing to DestKey when set, otherwise in place);
+// Metric/Span events pass through unchanged.
+func (p *ProcessorStringReplace) Process(in *models.PipelineGroupEvents, context pipeline.PipelineContext) {
+	pipeline.ProcessLogEventsOnly(in, context, p.processLogEvent)
+}
+
+func (p *ProcessorStringReplace) processLogEvent(log *models.Log) {
+	contents := log.GetIndices()
+	if !contents.Contains(p.SourceKey) {
+		return
+	}
+	newContVal := p.replaceValue(fmt.Sprintf("%v", contents.Get(p.SourceKey)))
+	if len(p.DestKey) > 0 {
+		contents.Add(p.DestKey, newContVal)
+	} else {
+		contents.Add(p.SourceKey, newContVal)
+	}
+	p.logPairMetric.Add(1)
 }
 
 func init() {

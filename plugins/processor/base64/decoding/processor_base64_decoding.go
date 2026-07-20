@@ -16,8 +16,10 @@ package decoding
 
 import (
 	"encoding/base64"
+	"fmt"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
@@ -66,6 +68,31 @@ func (p *ProcessorBase64Decoding) ProcessLogs(logArray []*protocol.Log) []*proto
 		}
 	}
 	return logArray
+}
+
+// Process implements the v2 ProcessorV2 interface: it base64-decodes the
+// SourceKey value of each Log event into NewKey; Metric/Span events pass
+// through unchanged.
+func (p *ProcessorBase64Decoding) Process(in *models.PipelineGroupEvents, context pipeline.PipelineContext) {
+	pipeline.ProcessLogEventsOnly(in, context, p.processLogEvent)
+}
+
+func (p *ProcessorBase64Decoding) processLogEvent(log *models.Log) {
+	contents := log.GetIndices()
+	if !contents.Contains(p.SourceKey) {
+		if p.NoKeyError {
+			logger.Warning(p.context.GetRuntimeContext(), selfmonitor.Base64DFindAlarm, "cannot find key", p.SourceKey)
+		}
+		return
+	}
+	newVal, err := base64.StdEncoding.DecodeString(fmt.Sprintf("%v", contents.Get(p.SourceKey)))
+	if err != nil {
+		if p.DecodeError {
+			logger.Warning(p.context.GetRuntimeContext(), selfmonitor.Base64DAlarm, "decode base64 error", err)
+		}
+		return
+	}
+	contents.Add(p.NewKey, string(newVal))
 }
 
 func init() {
