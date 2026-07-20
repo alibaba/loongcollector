@@ -10,7 +10,13 @@
 
 | v1 接口 | v2 接口 | Log | Metric | Span |
 | --- | --- | --- | --- | --- |
-| ✓ | — | v1 | 透传未知 | 透传未知 |
+| ✓ | ✓ | v1&v2 | 透传 | 透传 |
+
+| LogGroup(v1) | EventTypeLogging | EventTypeMetric | EventTypeSpan |
+| ------------ | ---------------- | --------------- | ------------- |
+|      ✅      |      ✅           |      透传        |      透传      |
+
+> v2 场景下对每条 Log 事件打包字段（输入 Log 输出 Log），Metric/Span 事件显式透传（不处理但不丢弃）。
 
 ## 版本
 

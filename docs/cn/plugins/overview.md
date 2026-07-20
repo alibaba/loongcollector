@@ -113,15 +113,15 @@
 | `processor_add_fields`<br>[添加字段](processor/extended/processor-add-fields.md) | SLS 官方 | ✓ | ✓ | v1&v2 | 透传 | 透传 | 添加字段。 |
 | `processor_anchor`<br>(暂无文档) | SLS 官方 | ✓ | ✓ | 透传 | 透传 | 透传 | 通过起止锚点提取字段（v2 暂为显式透传）。 |
 | `processor_appender`<br>[追加字段](processor/extended/processor-appender.md) | SLS 官方 | ✓ | ✓ | v1&v2 | 透传 | 透传 | 追加字段。 |
-| `processor_base64_decoding`<br>(暂无文档) | SLS 官方 | ✓ | ✓ | v1&v2 | 透传 | 透传 | 对字段值进行 Base64 解码。 |
-| `processor_base64_encoding`<br>(暂无文档) | SLS 官方 | ✓ | ✓ | v1&v2 | 透传 | 透传 | 对字段值进行 Base64 编码。 |
+| `processor_base64_decoding`<br>[Base64 解码](processor/extended/processor-base64-decoding.md) | SLS 官方 | ✓ | ✓ | v1&v2 | 透传 | 透传 | 对字段值进行 Base64 解码。 |
+| `processor_base64_encoding`<br>[Base64 编码](processor/extended/processor-base64-encoding.md) | SLS 官方 | ✓ | ✓ | v1&v2 | 透传 | 透传 | 对字段值进行 Base64 编码。 |
 | `processor_cloud_meta`<br>[添加云资产信息](processor/extended/processor-cloudmeta.md) | SLS 官方 | ✓ | ✓ | 透传 | 透传 | 透传 | 为日志增加云平台元数据信息（v2 暂为显式透传）。 |
 | `processor_csv`<br>(暂无文档) | SLS 官方 | ✓ | ✓ | 透传 | 透传 | 透传 | 按 CSV 格式解析字段（v2 暂为显式透传）。 |
 | `processor_default`<br>[原始数据](processor/extended/processor-default.md) | SLS 官方 | ✓ | ✓ | v1&v2 | 透传 | 透传 | 不对数据任何操作，只是简单的数据透传。 |
 | `processor_desensitize`<br>[数据脱敏](processor/extended/processor-desensitize.md) | SLS 官方<br>[Takuka0311](https://github.com/Takuka0311) | ✓ | ✓ | v1&v2 | 透传 | 透传 | 对敏感数据进行脱敏处理。 |
 | `processor_dict_map`<br>[字段值映射处理](processor/extended/processor-dict-map.md) | SLS 官方 | ✓ | ✓ | v1&v2 | 透传 | 透传 | 对指定字段的值查表映射. |
 | `processor_drop`<br>[丢弃字段](processor/extended/processor-drop.md) | SLS 官方 | ✓ | ✓ | v1&v2 | 透传 | 透传 | 丢弃字段。 |
-| `processor_drop_last_key`<br>(暂无文档) | SLS 官方 | ✓ | ✓ | v1&v2 | 透传 | 透传 | 丢弃匹配到的最后一个字段。 |
+| `processor_drop_last_key`<br>[丢弃最后字段](processor/extended/processor-drop-last-key.md) | SLS 官方 | ✓ | ✓ | v1&v2 | 透传 | 透传 | 丢弃匹配到的最后一个字段。 |
 | `processor_encrypt`<br>[字段加密](processor/extended/processor-encrypy.md) | SLS 官方 | ✓ | ✓ | v1&v2 | 透传 | 透传 | 加密字段 |
 | `processor_fields_with_conditions`<br>[条件字段处理](processor/extended/processor-fields-with-condition.md) | 社区<br>[pj1987111](https://github.com/pj1987111) | ✓ | ✓ | 透传 | 透传 | 透传 | 根据日志部分字段的取值，动态进行字段扩展或删除（v2 暂为显式透传）。 |
 | `processor_filter_key_regex`<br>(暂无文档) | SLS 官方 | ✓ | ✓ | 透传 | 透传 | 透传 | 按字段名正则匹配过滤日志（v2 暂为显式透传）。 |
@@ -131,7 +131,7 @@
 | `processor_grok`<br>[Grok](processor/extended/processor-grok.md) | SLS 官方<br>[Takuka0311](https://github.com/Takuka0311) | ✓ | ✓ | 透传 | 透传 | 透传 | 通过 Grok 语法对数据进行处理（v2 暂为显式透传）。 |
 | `processor_json`<br>[Json](processor/extended/processor-json.md) | SLS 官方 | ✓ | ✓ | v1&v2 | 透传 | 透传 | 实现对 Json 格式日志的解析。 |
 | `processor_log_to_sls_metric`<br>[日志转 sls metric](processor/extended/processor-log-to-sls-metric.md) | SLS 官方 | ✓ | ✓ | 透传 | 透传 | 透传 | 将日志转 sls metric（v2 暂为显式透传）。 |
-| `processor_md5`<br>(暂无文档) | SLS 官方 | ✓ | ✓ | v1&v2 | 透传 | 透传 | 计算指定字段值的 MD5。 |
+| `processor_md5`<br>[MD5](processor/extended/processor-md5.md) | SLS 官方 | ✓ | ✓ | v1&v2 | 透传 | 透传 | 计算指定字段值的 MD5。 |
 | `processor_otel_metric`<br>[otel Metric格式转换](processor/extended/processor-otel-metric.md) | SLS 官方 | ✓ | ✓ | 透传 | 透传 | 透传 | OpenTelemetry Metric 数据格式转换（v2 暂为显式透传）。 |
 | `processor_otel_trace`<br>[otel Trace格式转换](processor/extended/processor-otel-trace.md) | SLS 官方 | ✓ | ✓ | 透传 | 透传 | 透传 | OpenTelemetry Trace 数据格式转换（v2 暂为显式透传）。 |
 | `processor_packjson`<br>[字段打包](processor/extended/processor-packjson.md) | SLS 官方 | ✓ | ✓ | v1&v2 | 透传 | 透传 | 可添加指定的字段（支持多个）以 JSON 格式打包成单个字段。 |
@@ -142,7 +142,7 @@
 | `processor_split_char`<br>[分隔符](processor/extended/processor-delimiter.md) | SLS 官方 | ✓ | ✓ | 透传 | 透传 | 透传 | 通过单字符的分隔符提取字段（v2 暂为显式透传）。 |
 | `processor_split_key_value`<br>[键值对](processor/extended/processor-split-key-value.md) | SLS 官方 | ✓ | ✓ | 透传 | 透传 | 透传 | 通过切分键值对的方式提取字段（v2 暂为显式透传）。 |
 | `processor_split_log_regex`<br>[多行切分](processor/extended/processor-split-log-regex.md) | SLS 官方 | ✓ | ✓ | 透传 | 透传 | 透传 | 实现多行日志（例如 Java 程序日志）的采集（v2 暂为显式透传）。 |
-| `processor_split_log_string`<br>(暂无文档) | SLS 官方 | ✓ | ✓ | v1&v2 | — | — | 按分隔符将单条日志切分为多条（仅处理 Log 事件）。 |
+| `processor_split_log_string`<br>[日志字符串切分](processor/extended/processor-split-log-string.md) | SLS 官方 | ✓ | ✓ | v1&v2 | — | — | 按分隔符将单条日志切分为多条（仅处理 Log 事件）。 |
 | `processor_split_string`<br>[分隔符](processor/extended/processor-delimiter.md) | SLS 官方 | ✓ | ✓ | 透传 | 透传 | 透传 | 通过多字符的分隔符提取字段（v2 暂为显式透传）。 |
 | `processor_string_replace`<br>[字符串替换](processor/extended/processor-string-replace.md) | SLS 官方<br>[pj1987111](https://github.com/pj1987111) | ✓ | ✓ | v1&v2 | 透传 | 透传 | 通过全文匹配、正则匹配、去转义字符等方式对文本日志进行内容替换。 |
 | `processor_strptime`<br>[时间提取（strptime 格式）](processor/extended/processor-strptime.md) | SLS 官方 | ✓ | ✓ | 透传 | 透传 | 透传 | 从指定字段中提取日志时间，时间格式为 [Linux strptime](http://man7.org/linux/man-pages/man3/strptime.3.html)（v2 暂为显式透传）。 |
