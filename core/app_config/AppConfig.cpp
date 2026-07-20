@@ -1206,6 +1206,16 @@ void AppConfig::LoadResourceConf(const Json::Value& confJson) {
     mSendRequestGlobalConcurrency = mSendRequestConcurrency * (1 + GLOBAL_CONCURRENCY_FREE_PERCENTAGE_FOR_ONE_REGION);
 }
 
+const std::string& AppConfig::GetBindInterface() const {
+    // When working_interface is configured, it takes precedence over bind_interface so that
+    // outgoing data sockets (curl CURLOPT_INTERFACE) bind to the same interface used to resolve
+    // the reported host IP (GetHostIp), keeping the reported IP and the actual egress consistent.
+    if (!STRING_FLAG(working_interface).empty()) {
+        return STRING_FLAG(working_interface);
+    }
+    return mBindInterface;
+}
+
 bool AppConfig::CheckAndResetProxyEnv() {
     // envs capitalized prioritize those in lower case
     string httpProxy = ToString(getenv("HTTP_PROXY"));

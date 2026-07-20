@@ -534,7 +534,10 @@ public:
 
     const Json::Value& GetConfig() const { return mLocalInstanceConfig; }
 
-    const std::string& GetBindInterface() const { return mBindInterface; }
+    // Returns the interface used to bind outgoing data sockets (curl CURLOPT_INTERFACE).
+    // When working_interface is configured, it takes precedence so that the reported host IP
+    // (GetHostIp) and the actual data egress interface stay consistent.
+    const std::string& GetBindInterface() const;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class SenderUnittest;

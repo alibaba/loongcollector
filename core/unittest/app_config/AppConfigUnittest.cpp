@@ -46,6 +46,7 @@ public:
     void TestGenerateFileTagsDir();
     void TestIgnoredInterfacesConfig();
     void TestIgnoredInterfacesEnv();
+    void TestBindInterfaceWorkingInterfacePrecedence();
 
 private:
     static Json::Value MakeDefaultIgnoredInterfacesConfig() {
@@ -283,6 +284,29 @@ void AppConfigUnittest::TestIgnoredInterfacesEnv() {
     cfg->ParseJsonToFlags(MakeDefaultIgnoredInterfacesConfig());
 }
 
+void AppConfigUnittest::TestBindInterfaceWorkingInterfacePrecedence() {
+    AppConfig* cfg = AppConfig::GetInstance();
+    std::string savedWorking = STRING_FLAG(working_interface);
+    std::string savedBind = cfg->mBindInterface;
+
+    // working_interface empty: GetBindInterface returns the configured bind_interface as-is.
+    STRING_FLAG(working_interface) = "";
+    cfg->mBindInterface = "eth0";
+    APSARA_TEST_EQUAL(cfg->GetBindInterface(), "eth0");
+
+    // working_interface set: it takes precedence over bind_interface so data egress binds to the
+    // same interface used to resolve the reported host IP.
+    STRING_FLAG(working_interface) = "eth1";
+    APSARA_TEST_EQUAL(cfg->GetBindInterface(), "eth1");
+
+    // Still wins even when bind_interface is empty.
+    cfg->mBindInterface = "";
+    APSARA_TEST_EQUAL(cfg->GetBindInterface(), "eth1");
+
+    STRING_FLAG(working_interface) = savedWorking;
+    cfg->mBindInterface = savedBind;
+}
+
 void AppConfigUnittest::TestGenerateFileTagsDir() {
     {
         STRING_FLAG(ALIYUN_LOG_FILE_TAGS) = "";
@@ -336,6 +360,7 @@ UNIT_TEST_CASE(AppConfigUnittest, TestLoadSingleValueEnvConfig);
 UNIT_TEST_CASE(AppConfigUnittest, TestLoadStringParameter);
 UNIT_TEST_CASE(AppConfigUnittest, TestIgnoredInterfacesConfig);
 UNIT_TEST_CASE(AppConfigUnittest, TestIgnoredInterfacesEnv);
+UNIT_TEST_CASE(AppConfigUnittest, TestBindInterfaceWorkingInterfacePrecedence);
 UNIT_TEST_CASE(AppConfigUnittest, TestGenerateFileTagsDir);
 
 } // namespace logtail

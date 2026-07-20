@@ -36,9 +36,12 @@ DEFINE_FLAG_STRING(
     "kube-ipvs0,nodelocaldns,docker0");
 
 // When non-empty, resolve host IP from this interface first (GetHostIpByInterface), then fall back to hostname.
+// It also takes precedence over bind_interface, so outgoing data sockets bind to the same interface,
+// keeping the reported host IP and the actual data egress consistent.
 DEFINE_FLAG_STRING(working_interface,
                    "Interface name used to resolve host IP first when non-empty (Linux); "
-                   "falls back to hostname resolution if the interface yields no valid IP.",
+                   "falls back to hostname resolution if the interface yields no valid IP. "
+                   "Takes precedence over bind_interface for outgoing data egress binding.",
                    "");
 
 // checkpoint
