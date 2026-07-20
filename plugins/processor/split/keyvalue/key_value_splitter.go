@@ -15,7 +15,6 @@
 package kvsplitter
 
 import (
-	"fmt"
 	"strconv"
 	"strings"
 
@@ -239,7 +238,7 @@ func (s *KeyValueSplitter) processLogEvent(log *models.Log) {
 		found := false
 		for key, value := range contents.Iterator() {
 			sourceKey = key
-			sourceValue = fmt.Sprintf("%v", value)
+			sourceValue = pipeline.GetStringValue(value)
 			found = true
 			break
 		}
@@ -257,7 +256,7 @@ func (s *KeyValueSplitter) processLogEvent(log *models.Log) {
 			return
 		}
 		sourceKey = s.SourceKey
-		sourceValue = fmt.Sprintf("%v", contents.Get(s.SourceKey))
+		sourceValue = pipeline.GetStringValue(contents.Get(s.SourceKey))
 	}
 
 	if !s.KeepSource {

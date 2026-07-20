@@ -15,7 +15,6 @@
 package geoip
 
 import (
-	"fmt"
 	"net"
 	"strconv"
 
@@ -211,7 +210,7 @@ func (p *ProcessorGeoIP) processLogEvent(log *models.Log) {
 		}
 		return
 	}
-	value := fmt.Sprintf("%v", contents.Get(p.SourceKey))
+	value := pipeline.GetStringValue(contents.Get(p.SourceKey))
 	if !p.KeepSource {
 		contents.Delete(p.SourceKey)
 	}

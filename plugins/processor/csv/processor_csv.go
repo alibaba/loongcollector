@@ -167,7 +167,7 @@ func (p *ProcessorCSVDecoder) processLogEvent(log *models.Log) {
 		}
 		return
 	}
-	value := fmt.Sprintf("%v", contents.Get(p.SourceKey))
+	value := pipeline.GetStringValue(contents.Get(p.SourceKey))
 	res := p.emitCSVFields(value, func(key, val string) {
 		contents.Add(key, val)
 	})

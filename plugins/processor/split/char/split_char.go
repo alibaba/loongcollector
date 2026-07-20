@@ -222,7 +222,7 @@ func (p *ProcessorSplitChar) processLogEvent(log *models.Log) {
 		return
 	}
 
-	value := fmt.Sprintf("%v", contents.Get(sourceKey))
+	value := pipeline.GetStringValue(contents.Get(sourceKey))
 	// Reuse the tested v1 quote/escape parsing on a temporary protocol.Log.
 	tmp := &protocol.Log{}
 	splitResult := p.splitValue(tmp, value)

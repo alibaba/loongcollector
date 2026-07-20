@@ -16,7 +16,6 @@ package decoding
 
 import (
 	"encoding/base64"
-	"fmt"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
@@ -85,7 +84,7 @@ func (p *ProcessorBase64Decoding) processLogEvent(log *models.Log) {
 		}
 		return
 	}
-	newVal, err := base64.StdEncoding.DecodeString(fmt.Sprintf("%v", contents.Get(p.SourceKey)))
+	newVal, err := base64.StdEncoding.DecodeString(pipeline.GetStringValue(contents.Get(p.SourceKey)))
 	if err != nil {
 		if p.DecodeError {
 			logger.Warning(p.context.GetRuntimeContext(), selfmonitor.Base64DAlarm, "decode base64 error", err)

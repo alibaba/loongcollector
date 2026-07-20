@@ -15,7 +15,6 @@
 package anchor
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
@@ -240,7 +239,7 @@ func (p *ProcessorAnchor) processLogEvent(log *models.Log) {
 	contents := log.GetIndices()
 	beginLen := contents.Len()
 	if contents.Contains(p.SourceKey) {
-		value := fmt.Sprintf("%v", contents.Get(p.SourceKey))
+		value := pipeline.GetStringValue(contents.Get(p.SourceKey))
 		if !p.KeepSource {
 			contents.Delete(p.SourceKey)
 		}

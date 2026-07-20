@@ -340,7 +340,7 @@ func (p *ProcessorFieldsWithCondition) isCaseMatchEvent(contents models.LogConte
 			if !contents.Contains(key) {
 				continue
 			}
-			logContent := fmt.Sprintf("%v", contents.Get(key))
+			logContent := pipeline.GetStringValue(contents.Get(key))
 			if field.apply(field.reg, field.conditionContent, logContent) {
 				matchedCount++
 			}

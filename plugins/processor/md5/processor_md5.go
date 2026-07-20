@@ -80,7 +80,7 @@ func (p *ProcessorMD5) processLogEvent(log *models.Log) {
 		}
 		return
 	}
-	src := fmt.Sprintf("%v", contents.Get(p.SourceKey))
+	src := pipeline.GetStringValue(contents.Get(p.SourceKey))
 	newVal := fmt.Sprintf("%x", md5.Sum([]byte(src))) //nolint:gosec
 	contents.Add(p.MD5Key, newVal)
 }

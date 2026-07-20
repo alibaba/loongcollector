@@ -18,7 +18,6 @@ import (
 	"bufio"
 	"bytes"
 	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -485,7 +484,7 @@ func (p *ProcessorGrok) processLogEvent(log *models.Log) {
 	findKey := false
 	for _, key := range keys {
 		findKey = true
-		val := fmt.Sprintf("%v", contents.Get(key))
+		val := pipeline.GetStringValue(contents.Get(key))
 		names, captures, parseResult := p.matchGrok(val)
 
 		// no match error

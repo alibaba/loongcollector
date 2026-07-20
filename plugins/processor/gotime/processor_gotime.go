@@ -201,7 +201,7 @@ func (p *ProcessorGotime) processLogEvent(log *models.Log) {
 		return
 	}
 
-	value := fmt.Sprintf("%v", contents.Get(p.SourceKey))
+	value := pipeline.GetStringValue(contents.Get(p.SourceKey))
 	var parsedTime time.Time
 	if p.timestampFormat {
 		i, err := strconv.ParseInt(value, 10, 64)

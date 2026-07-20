@@ -198,7 +198,7 @@ func (p *ProcessorDictMap) Process(in *models.PipelineGroupEvents, context pipel
 func (p *ProcessorDictMap) processLogEvent(log *models.Log) {
 	contents := log.GetIndices()
 	if contents.Contains(p.SourceKey) {
-		value, exist := p.MapDict[fmt.Sprintf("%v", contents.Get(p.SourceKey))]
+		value, exist := p.MapDict[pipeline.GetStringValue(contents.Get(p.SourceKey))]
 		if !exist {
 			return
 		}

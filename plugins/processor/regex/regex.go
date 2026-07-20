@@ -16,7 +16,6 @@ package regex
 
 import (
 	"errors"
-	"fmt"
 	"regexp"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
@@ -193,7 +192,7 @@ func (p *ProcessorRegex) processLogEvent(log *models.Log) {
 		return
 	}
 
-	val := fmt.Sprintf("%v", contents.Get(sourceKey))
+	val := pipeline.GetStringValue(contents.Get(sourceKey))
 	keys, values, parseResult := p.matchRegex(val)
 	sourceOverwritten := false
 	for i := range keys {

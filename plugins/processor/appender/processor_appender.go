@@ -125,7 +125,7 @@ func (p *ProcessorAppender) processLogEvent(log *models.Log) {
 	contents := log.GetIndices()
 	base := ""
 	if contents.Contains(p.Key) {
-		base = fmt.Sprintf("%v", contents.Get(p.Key))
+		base = pipeline.GetStringValue(contents.Get(p.Key))
 	}
 	contents.Add(p.Key, p.appendValue(base))
 }

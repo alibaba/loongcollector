@@ -16,7 +16,6 @@ package stringreplace
 
 import (
 	"errors"
-	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -161,7 +160,7 @@ func (p *ProcessorStringReplace) processLogEvent(log *models.Log) {
 	if !contents.Contains(p.SourceKey) {
 		return
 	}
-	newContVal := p.replaceValue(fmt.Sprintf("%v", contents.Get(p.SourceKey)))
+	newContVal := p.replaceValue(pipeline.GetStringValue(contents.Get(p.SourceKey)))
 	if len(p.DestKey) > 0 {
 		contents.Add(p.DestKey, newContVal)
 	} else {

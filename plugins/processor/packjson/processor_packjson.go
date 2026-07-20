@@ -108,7 +108,7 @@ func (p *ProcessorPackjson) processLogEvent(log *models.Log) {
 		if !contents.Contains(key) {
 			continue
 		}
-		packMap[key] = fmt.Sprintf("%v", contents.Get(key))
+		packMap[key] = pipeline.GetStringValue(contents.Get(key))
 		if !p.KeepSource {
 			contents.Delete(key)
 		}

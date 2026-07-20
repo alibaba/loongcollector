@@ -15,7 +15,6 @@
 package regex
 
 import (
-	"fmt"
 	"regexp"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
@@ -143,7 +142,7 @@ func (p *ProcessorRegexFilter) isLogMatchV2(log *models.Log) bool {
 		includeCount := 0
 		for key, value := range contents.Iterator() {
 			if reg, ok := p.includeRegex[key]; ok {
-				if reg.MatchString(fmt.Sprintf("%v", value)) {
+				if reg.MatchString(pipeline.GetStringValue(value)) {
 					includeCount++
 				} else {
 					// not match
@@ -160,7 +159,7 @@ func (p *ProcessorRegexFilter) isLogMatchV2(log *models.Log) bool {
 	if p.excludeRegex != nil {
 		for key, value := range contents.Iterator() {
 			if reg, ok := p.excludeRegex[key]; ok {
-				if reg.MatchString(fmt.Sprintf("%v", value)) {
+				if reg.MatchString(pipeline.GetStringValue(value)) {
 					// if match, return false
 					return false
 				}

@@ -139,7 +139,7 @@ func (p *ProcessorEncrypt) processLogEvent(log *models.Log) {
 		if !contents.Contains(key) {
 			continue
 		}
-		ciphertext, err := p.encrypt(fmt.Sprintf("%v", contents.Get(key)))
+		ciphertext, err := p.encrypt(pipeline.GetStringValue(contents.Get(key)))
 		if err == nil {
 			contents.Add(key, hex.EncodeToString(ciphertext))
 		} else {

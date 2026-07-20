@@ -207,7 +207,7 @@ func (s *Strptime) processLogEvent(log *models.Log) {
 	contents := log.GetIndices()
 	logTime := time.Time{}
 	if contents.Contains(s.SourceKey) {
-		rawValue := fmt.Sprintf("%v", contents.Get(s.SourceKey))
+		rawValue := pipeline.GetStringValue(contents.Get(s.SourceKey))
 		value := rawValue
 		// Truncate if format is Unix timestamp.
 		if s.Format == "%s" {

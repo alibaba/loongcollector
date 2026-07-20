@@ -160,7 +160,7 @@ func (p *ProcessorSplitString) processLogEvent(log *models.Log) {
 		return
 	}
 
-	value := fmt.Sprintf("%v", contents.Get(sourceKey))
+	value := pipeline.GetStringValue(contents.Get(sourceKey))
 	// v1 string removes the source key BEFORE splitting (see ProcessLogs), so a
 	// split key equal to the source key wins over the original value.
 	if !p.KeepSource {

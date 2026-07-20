@@ -154,7 +154,7 @@ func (p *ProcessorDesensitize) processLogEvent(log *models.Log) {
 	if !contents.Contains(p.SourceKey) {
 		return
 	}
-	contents.Add(p.SourceKey, p.desensitize(fmt.Sprintf("%v", contents.Get(p.SourceKey))))
+	contents.Add(p.SourceKey, p.desensitize(pipeline.GetStringValue(contents.Get(p.SourceKey))))
 }
 
 type runes []rune

@@ -115,7 +115,7 @@ func (p *ProcessorRateLimit) makeKeyV2(log *models.Log) string {
 	contents := log.GetIndices()
 	for _, field := range p.Fields {
 		if contents.Contains(field) {
-			values = append(values, fmt.Sprintf("%v", contents.Get(field)))
+			values = append(values, pipeline.GetStringValue(contents.Get(field)))
 		} else {
 			values = append(values, "")
 		}

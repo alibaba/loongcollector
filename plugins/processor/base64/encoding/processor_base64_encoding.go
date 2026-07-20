@@ -16,7 +16,6 @@ package encoding
 
 import (
 	"encoding/base64"
-	"fmt"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
@@ -84,7 +83,7 @@ func (p *ProcessorBase64Encoding) processLogEvent(log *models.Log) {
 		}
 		return
 	}
-	newVal := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%v", contents.Get(p.SourceKey))))
+	newVal := base64.StdEncoding.EncodeToString([]byte(pipeline.GetStringValue(contents.Get(p.SourceKey))))
 	if len(p.NewKey) > 0 {
 		contents.Add(p.NewKey, newVal)
 	} else {
