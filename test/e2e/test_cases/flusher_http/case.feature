@@ -14,10 +14,12 @@ Feature: flusher http
     # Pure v2 pipeline: global.StructureType=v2 routes metric_mock through
     # FlusherV2.Export instead of the v1 Flush path. metric_mock.Read() emits Metric
     # events; flusher_http converts them via ToByteStreamWithSelectedFieldsV2 into
-    # influxdb line protocol and writes them with the db query resolved from the metric
-    # tag (Query db="%{tag.db}"). If the v2 tag templating did not resolve, the write
-    # would miss database "mydb" and the influxdb subscriber (which queries mydb) would
-    # find nothing, so asserting the record proves the v2 export + tag routing path.
+    # influxdb line protocol and writes them with the db query resolved from the group
+    # tag (Query db="%{tag.db}"). In v2 the query templating reads group tags via
+    # findTargetFieldsInGroup(group.GetTags()), so db must be a GroupTag, not a
+    # per-metric tag; otherwise %{tag.db} stays empty, the write misses database "mydb"
+    # and the influxdb subscriber (which queries mydb) finds nothing. Asserting the
+    # record therefore proves the v2 export + group-tag query routing path.
     Given {flusher-http-export-v2-case} local config as below
     """
     enable: true
@@ -27,9 +29,10 @@ Feature: flusher http
     inputs:
       - Type: metric_mock
         IntervalMs: 100
+        GroupTags:
+          db: mydb
         Tags:
           city: hz
-          db: mydb
         Fields:
           value: 32
     flushers:
