@@ -17,6 +17,7 @@ package logregex
 import (
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 
@@ -142,4 +143,12 @@ func init() {
 	pipeline.Processors["processor_split_log_regex"] = func() pipeline.Processor {
 		return &ProcessorSplitRegex{SplitRegex: ".*", PreserveOthers: false}
 	}
+}
+
+// Process implements the v2 ProcessorV2 interface so this plugin can load in a
+// v2 (models.PipelineGroupEvents) pipeline. It has no v2-native processing yet
+// and therefore explicitly passes all events (Log/Metric/Span) through
+// unchanged, rather than leaving v2 support undefined.
+func (p *ProcessorSplitRegex) Process(in *models.PipelineGroupEvents, context pipeline.PipelineContext) {
+	pipeline.CollectGroupEvents(context, in)
 }

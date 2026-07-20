@@ -21,6 +21,7 @@ import (
 	"github.com/oschwald/geoip2-golang"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
@@ -172,4 +173,12 @@ func init() {
 			Language:   "zh-CN",
 		}
 	}
+}
+
+// Process implements the v2 ProcessorV2 interface so this plugin can load in a
+// v2 (models.PipelineGroupEvents) pipeline. It has no v2-native processing yet
+// and therefore explicitly passes all events (Log/Metric/Span) through
+// unchanged, rather than leaving v2 support undefined.
+func (p *ProcessorGeoIP) Process(in *models.PipelineGroupEvents, context pipeline.PipelineContext) {
+	pipeline.CollectGroupEvents(context, in)
 }

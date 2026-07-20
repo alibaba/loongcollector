@@ -15,6 +15,7 @@
 package pickkey
 
 import (
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
@@ -114,4 +115,13 @@ func init() {
 	pipeline.Processors[pluginType] = func() pipeline.Processor {
 		return &ProcessorPickKey{}
 	}
+}
+
+// Process implements the v2 ProcessorV2 interface so this plugin can load in a
+// v2 (models.PipelineGroupEvents) pipeline. Key include/exclude filtering in v2
+// can drop events, which is not implemented yet; to avoid silently dropping
+// data it explicitly passes all events (Log/Metric/Span) through unchanged
+// rather than leaving v2 support undefined.
+func (p *ProcessorPickKey) Process(in *models.PipelineGroupEvents, context pipeline.PipelineContext) {
+	pipeline.CollectGroupEvents(context, in)
 }
