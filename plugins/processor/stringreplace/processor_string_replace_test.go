@@ -19,11 +19,14 @@ import (
 	"testing"
 	"time"
 
-	. "github.com/smartystreets/goconvey/convey"
-
+	"github.com/alibaba/ilogtail/pkg/helper"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	pm "github.com/alibaba/ilogtail/pluginmanager"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
+	. "github.com/smartystreets/goconvey/convey"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestInitError(t *testing.T) {
@@ -517,4 +520,48 @@ func TestRegexTimeoutDefault(t *testing.T) {
 		So(err, ShouldBeNil)
 		So(processor.RegexTimeoutMs, ShouldEqual, 100)
 	})
+}
+
+// ---- v2 (PipelineEvent / SendPb) Process path tests ----
+
+func TestProcessorStringReplace_ProcessV2InPlace(t *testing.T) {
+	processor := &ProcessorStringReplace{SourceKey: "k", Method: MethodConst, Match: "foo", ReplaceString: "bar"}
+	require.NoError(t, processor.Init(mock.NewEmptyContext("p", "l", "c")))
+
+	log := models.NewLog("", nil, "", "", "", models.NewTags(), 0)
+	log.GetIndices().Add("k", "foobar")
+
+	context := helper.NewObservePipelineContext(10)
+	processor.Process(&models.PipelineGroupEvents{Events: []models.PipelineEvent{log}}, context)
+
+	assert.Equal(t, "barbar", log.GetIndices().Get("k"))
+}
+
+func TestProcessorStringReplace_ProcessV2ToDestKey(t *testing.T) {
+	processor := &ProcessorStringReplace{SourceKey: "k", DestKey: "d", Method: MethodConst, Match: "foo", ReplaceString: "bar"}
+	require.NoError(t, processor.Init(mock.NewEmptyContext("p", "l", "c")))
+
+	log := models.NewLog("", nil, "", "", "", models.NewTags(), 0)
+	log.GetIndices().Add("k", "foobar")
+
+	context := helper.NewObservePipelineContext(10)
+	processor.Process(&models.PipelineGroupEvents{Events: []models.PipelineEvent{log}}, context)
+
+	assert.Equal(t, "foobar", log.GetIndices().Get("k"), "source is preserved when DestKey is set")
+	assert.Equal(t, "barbar", log.GetIndices().Get("d"))
+}
+
+func TestProcessorStringReplace_ProcessV2PassesThroughMetric(t *testing.T) {
+	processor := &ProcessorStringReplace{SourceKey: "k", Method: MethodConst, Match: "foo", ReplaceString: "bar"}
+	require.NoError(t, processor.Init(mock.NewEmptyContext("p", "l", "c")))
+
+	metric := models.NewSingleValueMetric("m", models.MetricTypeGauge, models.NewTags(), 0, 1.0)
+	context := helper.NewObservePipelineContext(10)
+	processor.Process(&models.PipelineGroupEvents{Events: []models.PipelineEvent{metric}}, context)
+
+	results := context.Collector().ToArray()
+	require.Len(t, results, 1)
+	require.Len(t, results[0].Events, 1)
+	_, ok := results[0].Events[0].(*models.Metric)
+	assert.True(t, ok, "metric event must pass through unchanged")
 }

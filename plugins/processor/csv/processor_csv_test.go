@@ -17,10 +17,13 @@ package csv
 import (
 	"testing"
 
-	. "github.com/smartystreets/goconvey/convey"
-
+	"github.com/alibaba/ilogtail/pkg/helper"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
+	. "github.com/smartystreets/goconvey/convey"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func newProcessor() (*ProcessorCSVDecoder, error) {
@@ -358,4 +361,74 @@ func TestProcessorCSVDecoder(t *testing.T) {
 			})
 		})
 	})
+}
+
+// ---- v2 (PipelineEvent / SendPb) Process path tests ----
+
+func TestProcessorCSVDecoder_ProcessV2Splits(t *testing.T) {
+	processor := &ProcessorCSVDecoder{
+		SourceKey: "content",
+		SplitSep:  ",",
+		SplitKeys: []string{"f1", "f2", "f3"},
+	}
+	require.NoError(t, processor.Init(mock.NewEmptyContext("p", "l", "c")))
+
+	log := models.NewLog("", nil, "", "", "", models.NewTags(), 0)
+	log.GetIndices().Add("content", "12,34,56")
+
+	context := helper.NewObservePipelineContext(10)
+	processor.Process(&models.PipelineGroupEvents{Events: []models.PipelineEvent{log}}, context)
+
+	contents := log.GetIndices()
+	assert.Equal(t, "12", contents.Get("f1"))
+	assert.Equal(t, "34", contents.Get("f2"))
+	assert.Equal(t, "56", contents.Get("f3"))
+	// KeepSource defaults to false, so the source key is removed on success.
+	assert.False(t, contents.Contains("content"), "source key must be removed on successful decode")
+}
+
+func TestProcessorCSVDecoder_ProcessV2ExpandOthers(t *testing.T) {
+	processor := &ProcessorCSVDecoder{
+		SourceKey:       "content",
+		SplitSep:        ",",
+		SplitKeys:       []string{"f1", "f2", "f3"},
+		PreserveOthers:  true,
+		ExpandOthers:    true,
+		ExpandKeyPrefix: "expand_",
+		KeepSource:      true,
+	}
+	require.NoError(t, processor.Init(mock.NewEmptyContext("p", "l", "c")))
+
+	log := models.NewLog("", nil, "", "", "", models.NewTags(), 0)
+	log.GetIndices().Add("content", "12,34,56,78,90")
+
+	context := helper.NewObservePipelineContext(10)
+	processor.Process(&models.PipelineGroupEvents{Events: []models.PipelineEvent{log}}, context)
+
+	contents := log.GetIndices()
+	assert.Equal(t, "12", contents.Get("f1"))
+	assert.Equal(t, "34", contents.Get("f2"))
+	assert.Equal(t, "56", contents.Get("f3"))
+	assert.Equal(t, "78", contents.Get("expand_1"))
+	assert.Equal(t, "90", contents.Get("expand_2"))
+	assert.True(t, contents.Contains("content"), "source key must be kept when KeepSource is true")
+}
+
+func TestProcessorCSVDecoder_ProcessV2PassesThroughMetric(t *testing.T) {
+	processor := &ProcessorCSVDecoder{
+		SourceKey: "content",
+		SplitSep:  ",",
+		SplitKeys: []string{"f1"},
+	}
+	require.NoError(t, processor.Init(mock.NewEmptyContext("p", "l", "c")))
+
+	metric := models.NewSingleValueMetric("m", models.MetricTypeGauge, models.NewTags(), 0, 1.0)
+	context := helper.NewObservePipelineContext(10)
+	processor.Process(&models.PipelineGroupEvents{Events: []models.PipelineEvent{metric}}, context)
+
+	results := context.Collector().ToArray()
+	require.Len(t, results, 1)
+	require.Len(t, results[0].Events, 1)
+	_, ok := results[0].Events[0].(*models.Metric)
+	assert.True(t, ok, "metric event must pass through unchanged")
 }

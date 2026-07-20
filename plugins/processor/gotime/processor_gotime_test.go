@@ -15,14 +15,15 @@
 package gotime
 
 import (
-	"github.com/alibaba/ilogtail/pkg/logger"
-	"github.com/alibaba/ilogtail/pkg/protocol"
-	"github.com/alibaba/ilogtail/plugins/test/mock"
-
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/alibaba/ilogtail/pkg/helper"
+	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/models"
+	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/plugins/test/mock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -201,4 +202,70 @@ func TestEmptyTimezone(t *testing.T) {
 	processedTime := localTime.In(destLocation)
 	assert.Equal(t, "d_key", log.Contents[1].Key)
 	assert.Equal(t, processedTime.Format(processor.DestFormat), log.Contents[1].Value)
+}
+
+// ---- v2 (PipelineEvent / SendPb) Process path tests ----
+
+func TestProcessorGotime_ProcessV2ReformatsDestKey(t *testing.T) {
+	processor, err := newProcessor()
+	require.NoError(t, err)
+
+	log := models.NewLog("", nil, "", "", "", models.NewTags(), 0)
+	log.GetIndices().Add("s_key", "2019-07-05 19:28:01")
+
+	context := helper.NewObservePipelineContext(10)
+	processor.Process(&models.PipelineGroupEvents{Events: []models.PipelineEvent{log}}, context)
+
+	// Source parsed in UTC+8, reformatted into UTC+9.
+	assert.Equal(t, "2019/07/05 20:28:01", log.GetIndices().Get("d_key"))
+
+	// SetTime is true: log timestamp is set (nanoseconds) from the parsed time.
+	destLocation := time.FixedZone("SpecifiedTimezone", 9*60*60)
+	expected, _ := time.ParseInLocation("2006-01-02 15:04:05", "2019-07-05 20:28:01", destLocation)
+	assert.Equal(t, uint64(expected.Unix())*uint64(time.Second), log.GetTimestamp())
+}
+
+func TestProcessorGotime_ProcessV2KeepSourceFalse(t *testing.T) {
+	processor, err := newProcessor()
+	require.NoError(t, err)
+	processor.KeepSource = false
+
+	log := models.NewLog("", nil, "", "", "", models.NewTags(), 0)
+	log.GetIndices().Add("s_key", "2019-07-05 19:28:01")
+
+	context := helper.NewObservePipelineContext(10)
+	processor.Process(&models.PipelineGroupEvents{Events: []models.PipelineEvent{log}}, context)
+
+	assert.False(t, log.GetIndices().Contains("s_key"), "source key must be removed when KeepSource is false")
+	assert.Equal(t, "2019/07/05 20:28:01", log.GetIndices().Get("d_key"))
+}
+
+func TestProcessorGotime_ProcessV2TimestampSeconds(t *testing.T) {
+	processor, err := newProcessor()
+	require.NoError(t, err)
+	processor.SourceFormat = fixedSecondsTimestampPattern
+	require.NoError(t, processor.Init(processor.context))
+
+	log := models.NewLog("", nil, "", "", "", models.NewTags(), 0)
+	log.GetIndices().Add("s_key", "1645595256")
+
+	context := helper.NewObservePipelineContext(10)
+	processor.Process(&models.PipelineGroupEvents{Events: []models.PipelineEvent{log}}, context)
+
+	assert.Equal(t, "2022/02/23 14:47:36", log.GetIndices().Get("d_key"))
+}
+
+func TestProcessorGotime_ProcessV2PassesThroughMetric(t *testing.T) {
+	processor, err := newProcessor()
+	require.NoError(t, err)
+
+	metric := models.NewSingleValueMetric("m", models.MetricTypeGauge, models.NewTags(), 0, 1.0)
+	context := helper.NewObservePipelineContext(10)
+	processor.Process(&models.PipelineGroupEvents{Events: []models.PipelineEvent{metric}}, context)
+
+	results := context.Collector().ToArray()
+	require.Len(t, results, 1)
+	require.Len(t, results[0].Events, 1)
+	_, ok := results[0].Events[0].(*models.Metric)
+	assert.True(t, ok, "metric event must pass through unchanged")
 }

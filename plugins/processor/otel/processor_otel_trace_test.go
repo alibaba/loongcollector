@@ -17,9 +17,12 @@ package otel
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-
+	"github.com/alibaba/ilogtail/pkg/helper"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/plugins/test/mock"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const protoJSONData = `
@@ -77,4 +80,51 @@ func TestParserOtelBase64Data(t *testing.T) {
 		assert.Equal(t, 2, len(result))
 		assert.Equal(t, "test-service", result[0].Contents[1].Value)
 	}
+}
+
+// ---- v2 (PipelineEvent / SendPb) Process path tests ----
+
+// A Log carrying an OTLP trace payload is converted to native models.Span
+// events ("v2场景下输入Log输出Span"); the source Log is replaced (not preserved).
+func TestProcessorOtelTraceParser_ProcessV2LogToSpan(t *testing.T) {
+	parser := &ProcessorOtelTraceParser{SourceKey: "otel", Format: "protojson"}
+	require.NoError(t, parser.Init(mock.NewEmptyContext("p", "l", "c")))
+
+	log := models.NewLog("", nil, "", "", "", models.NewTags(), 0)
+	log.GetIndices().Add("otel", protoJSONData)
+
+	context := helper.NewObservePipelineContext(10)
+	parser.Process(&models.PipelineGroupEvents{Group: models.NewGroup(models.NewMetadata(), models.NewTags()), Events: []models.PipelineEvent{log}}, context)
+
+	results := context.Collector().ToArray()
+	require.NotEmpty(t, results)
+
+	spanCount := 0
+	for _, group := range results {
+		for _, event := range group.Events {
+			assert.Equal(t, models.EventTypeSpan, event.GetType(), "source log must be replaced by span events")
+			_, ok := event.(*models.Span)
+			assert.True(t, ok)
+			spanCount++
+		}
+	}
+	// protoJSONData carries ten spans.
+	assert.Equal(t, 10, spanCount)
+}
+
+// A pre-existing Span event passes through unchanged.
+func TestProcessorOtelTraceParser_ProcessV2PassesThroughSpan(t *testing.T) {
+	parser := &ProcessorOtelTraceParser{SourceKey: "otel", Format: "protojson"}
+	require.NoError(t, parser.Init(mock.NewEmptyContext("p", "l", "c")))
+
+	span := models.NewSpan("preexist", "trace", "span", models.SpanKindClient, 0, 0, models.NewTags(), nil, nil)
+	context := helper.NewObservePipelineContext(10)
+	parser.Process(&models.PipelineGroupEvents{Group: models.NewGroup(models.NewMetadata(), models.NewTags()), Events: []models.PipelineEvent{span}}, context)
+
+	results := context.Collector().ToArray()
+	require.Len(t, results, 1)
+	require.Len(t, results[0].Events, 1)
+	passed, ok := results[0].Events[0].(*models.Span)
+	require.True(t, ok, "span event must pass through unchanged")
+	assert.Equal(t, "preexist", passed.GetName())
 }

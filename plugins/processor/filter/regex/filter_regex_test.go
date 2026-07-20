@@ -18,13 +18,16 @@ import (
 	"context"
 	"testing"
 
-	"github.com/pingcap/check"
-
+	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/plugins/test"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
+	"github.com/pingcap/check"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var _ = check.Suite(&processorTestSuite{})
@@ -132,4 +135,58 @@ func (s *processorTestSuite) TestNotMatch(c *check.C) {
 		outLogs := s.processor.ProcessLogs(logArray)
 		c.Assert(len(outLogs), check.Equals, 0)
 	}
+}
+
+// ---- v2 (PipelineEvent / SendPb) Process path tests ----
+
+func newV2Log(kv ...string) *models.Log {
+	log := models.NewLog("", nil, "", "", "", models.NewTags(), 0)
+	for i := 0; i+1 < len(kv); i += 2 {
+		log.GetIndices().Add(kv[i], kv[i+1])
+	}
+	return log
+}
+
+// TestProcessorRegexFilter_ProcessV2Filter verifies that the v2 Process drops
+// Log events failing the Include/Exclude rules while keeping matching ones and
+// passing Metric events through unchanged.
+func TestProcessorRegexFilter_ProcessV2Filter(t *testing.T) {
+	processor := &ProcessorRegexFilter{
+		Include: map[string]string{"key1": "value.*"},
+		Exclude: map[string]string{"key2": "drop.*"},
+	}
+	require.NoError(t, processor.Init(mock.NewEmptyContext("p", "l", "c")))
+
+	keep := newV2Log("key1", "value1", "key2", "ok")            // matches include, not exclude -> keep
+	dropInclude := newV2Log("key1", "nope", "key2", "ok")       // include mismatch -> drop
+	dropExclude := newV2Log("key1", "value2", "key2", "dropme") // exclude match -> drop
+	metric := models.NewSingleValueMetric("m", models.MetricTypeCounter, models.NewTags(), 0, 1.0)
+
+	context := helper.NewObservePipelineContext(10)
+	processor.Process(&models.PipelineGroupEvents{
+		Events: []models.PipelineEvent{keep, dropInclude, metric, dropExclude},
+	}, context)
+
+	results := context.Collector().ToArray()
+	require.Len(t, results, 1)
+	events := results[0].Events
+	require.Len(t, events, 2, "only the matching log and the metric survive")
+	assert.Equal(t, keep, events[0])
+	assert.Equal(t, metric, events[1], "metric events must pass through unchanged")
+}
+
+// TestProcessorRegexFilter_ProcessV2AllDropped verifies zero surviving log
+// events results in no collected group.
+func TestProcessorRegexFilter_ProcessV2AllDropped(t *testing.T) {
+	processor := &ProcessorRegexFilter{
+		Include: map[string]string{"key1": "value.*"},
+	}
+	require.NoError(t, processor.Init(mock.NewEmptyContext("p", "l", "c")))
+
+	context := helper.NewObservePipelineContext(10)
+	processor.Process(&models.PipelineGroupEvents{
+		Events: []models.PipelineEvent{newV2Log("key1", "nope")},
+	}, context)
+
+	require.Len(t, context.Collector().ToArray(), 0)
 }

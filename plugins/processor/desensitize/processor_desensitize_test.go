@@ -21,10 +21,13 @@ import (
 	"testing"
 	"time"
 
-	. "github.com/smartystreets/goconvey/convey"
-
+	"github.com/alibaba/ilogtail/pkg/helper"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
+	. "github.com/smartystreets/goconvey/convey"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func newProcessor() *ProcessorDesensitize {
@@ -371,4 +374,36 @@ func TestTimeoutDefaults(t *testing.T) {
 		So(err, ShouldBeNil)
 		So(p.RegexTimeoutMs, ShouldEqual, 100)
 	})
+}
+
+// ---- v2 (PipelineEvent / SendPb) Process path tests ----
+
+func TestProcessorDesensitize_ProcessV2ConstReplace(t *testing.T) {
+	processor := &ProcessorDesensitize{SourceKey: "pwd", Method: "const", Match: "full", ReplaceString: "***"}
+	require.NoError(t, processor.Init(mock.NewEmptyContext("p", "l", "c")))
+
+	log := models.NewLog("", nil, "", "", "", models.NewTags(), 0)
+	log.GetIndices().Add("pwd", "secret-value")
+	log.GetIndices().Add("keep", "plain")
+
+	context := helper.NewObservePipelineContext(10)
+	processor.Process(&models.PipelineGroupEvents{Events: []models.PipelineEvent{log}}, context)
+
+	assert.Equal(t, "***", log.GetIndices().Get("pwd"), "source value must be desensitized")
+	assert.Equal(t, "plain", log.GetIndices().Get("keep"), "other keys must be untouched")
+}
+
+func TestProcessorDesensitize_ProcessV2PassesThroughMetric(t *testing.T) {
+	processor := &ProcessorDesensitize{SourceKey: "pwd", Method: "const", Match: "full", ReplaceString: "***"}
+	require.NoError(t, processor.Init(mock.NewEmptyContext("p", "l", "c")))
+
+	metric := models.NewSingleValueMetric("m", models.MetricTypeGauge, models.NewTags(), 0, 1.0)
+	context := helper.NewObservePipelineContext(10)
+	processor.Process(&models.PipelineGroupEvents{Events: []models.PipelineEvent{metric}}, context)
+
+	results := context.Collector().ToArray()
+	require.Len(t, results, 1)
+	require.Len(t, results[0].Events, 1)
+	_, ok := results[0].Events[0].(*models.Metric)
+	assert.True(t, ok, "metric event must pass through unchanged")
 }

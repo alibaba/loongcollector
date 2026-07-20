@@ -21,11 +21,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-
+	"github.com/alibaba/ilogtail/pkg/helper"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func newProcessor() (*ProcessorDictMap, error) {
@@ -340,4 +341,68 @@ func TestDontHandleMissing(t *testing.T) {
 	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "_Another_ip_", Value: "0.0.0.0"})
 	processor.processLog(log)
 	assert.Equal(t, 1, len(log.Contents))
+}
+
+// ---- v2 (PipelineEvent / SendPb) Process path tests ----
+
+func newDictMapV2(t *testing.T, p *ProcessorDictMap) *ProcessorDictMap {
+	if p.MaxDictSize == 0 {
+		p.MaxDictSize = 1000
+	}
+	if p.Mode == "" {
+		p.Mode = "overwrite"
+	}
+	require.NoError(t, p.Init(mock.NewEmptyContext("p", "l", "c")))
+	return p
+}
+
+func TestProcessorDictMap_ProcessV2InPlace(t *testing.T) {
+	processor := newDictMapV2(t, &ProcessorDictMap{SourceKey: "k", MapDict: map[string]string{"a": "b"}})
+
+	log := models.NewLog("", nil, "", "", "", models.NewTags(), 0)
+	log.GetIndices().Add("k", "a")
+
+	context := helper.NewObservePipelineContext(10)
+	processor.Process(&models.PipelineGroupEvents{Events: []models.PipelineEvent{log}}, context)
+
+	assert.Equal(t, "b", log.GetIndices().Get("k"))
+}
+
+func TestProcessorDictMap_ProcessV2ToDestKey(t *testing.T) {
+	processor := newDictMapV2(t, &ProcessorDictMap{SourceKey: "k", DestKey: "d", MapDict: map[string]string{"a": "b"}})
+
+	log := models.NewLog("", nil, "", "", "", models.NewTags(), 0)
+	log.GetIndices().Add("k", "a")
+
+	context := helper.NewObservePipelineContext(10)
+	processor.Process(&models.PipelineGroupEvents{Events: []models.PipelineEvent{log}}, context)
+
+	assert.Equal(t, "a", log.GetIndices().Get("k"), "source is preserved")
+	assert.Equal(t, "b", log.GetIndices().Get("d"))
+}
+
+func TestProcessorDictMap_ProcessV2MissingHandled(t *testing.T) {
+	processor := newDictMapV2(t, &ProcessorDictMap{SourceKey: "k", DestKey: "d", MapDict: map[string]string{"a": "b"}, HandleMissing: true, Missing: "Unknown"})
+
+	log := models.NewLog("", nil, "", "", "", models.NewTags(), 0)
+	log.GetIndices().Add("other", "x")
+
+	context := helper.NewObservePipelineContext(10)
+	processor.Process(&models.PipelineGroupEvents{Events: []models.PipelineEvent{log}}, context)
+
+	assert.Equal(t, "Unknown", log.GetIndices().Get("d"))
+}
+
+func TestProcessorDictMap_ProcessV2PassesThroughMetric(t *testing.T) {
+	processor := newDictMapV2(t, &ProcessorDictMap{SourceKey: "k", MapDict: map[string]string{"a": "b"}})
+
+	metric := models.NewSingleValueMetric("m", models.MetricTypeGauge, models.NewTags(), 0, 1.0)
+	context := helper.NewObservePipelineContext(10)
+	processor.Process(&models.PipelineGroupEvents{Events: []models.PipelineEvent{metric}}, context)
+
+	results := context.Collector().ToArray()
+	require.Len(t, results, 1)
+	require.Len(t, results[0].Events, 1)
+	_, ok := results[0].Events[0].(*models.Metric)
+	assert.True(t, ok, "metric event must pass through unchanged")
 }
