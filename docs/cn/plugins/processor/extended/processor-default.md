@@ -12,10 +12,6 @@
 | --- | --- | --- | --- | --- |
 | ✓ | ✓ | v1&v2 | 透传未知 | 透传未知 |
 
-| LogGroup(v1) | EventTypeLogging | EventTypeMetric | EventTypeSpan |
-| ------------ | ---------------- | --------------- | ------------- |
-|      ✅      |      ✅           |       ✅        |       ✅      |
-
 ## 版本
 
 [Stable](../../stability-level.md)

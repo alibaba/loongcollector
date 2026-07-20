@@ -8,10 +8,6 @@
 | --- | --- | --- | --- | --- |
 | ✓ | ✓ | v1&v2 | v2 | 透传 |
 
-| LogGroup(v1) | EventTypeLogging | EventTypeMetric | EventTypeSpan |
-| ------------ | ---------------- | --------------- | ------------- |
-|      ✅      |      ✅           |      ✅          |      透传      |
-
 > v2 场景下输入 Log 输出 Metric 事件（解析 OTLP 数据转换为 models.Metric）；已有 Metric/Span 事件透传。
 
 

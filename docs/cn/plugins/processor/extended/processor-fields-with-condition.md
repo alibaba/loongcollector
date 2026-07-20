@@ -12,10 +12,6 @@
 | --- | --- | --- | --- | --- |
 | ✓ | ✓ | v1&v2 | 透传 | 透传 |
 
-| LogGroup(v1) | EventTypeLogging | EventTypeMetric | EventTypeSpan |
-| ------------ | ---------------- | --------------- | ------------- |
-|      ✅      |      ✅           |      透传        |      透传      |
-
 > v2 场景下对每条 Log 事件按条件扩展/删除字段（输入 Log 输出 Log），Metric/Span 事件显式透传（不处理但不丢弃）；当未命中条件且 DropIfNotMatchCondition=true 时该 Log 被丢弃。
 
 ## 版本

@@ -12,10 +12,6 @@
 | --- | --- | --- | --- | --- |
 | ✓ | ✓ | v1&v2 | 透传 | 透传 |
 
-| LogGroup(v1) | EventTypeLogging | EventTypeMetric | EventTypeSpan |
-| ------------ | ---------------- | --------------- | ------------- |
-|      ✅      |      ✅           |      透传        |      透传      |
-
 > v2 场景下根据 Log 事件中 SourceKey 的 IP 值补充地理位置信息（输入 Log 输出 Log），Metric/Span 事件显式透传（不处理但不丢弃）。
 
 ## 版本
