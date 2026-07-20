@@ -16,6 +16,7 @@ package logtoslsmetric
 
 import (
 	"errors"
+	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
@@ -381,10 +382,221 @@ func init() {
 	}
 }
 
-// Process implements the v2 ProcessorV2 interface so this plugin can load in a
-// v2 (models.PipelineGroupEvents) pipeline. It has no v2-native processing yet
-// and therefore explicitly passes all events (Log/Metric/Span) through
-// unchanged, rather than leaving v2 support undefined.
+// Process implements the v2 ProcessorV2 interface. Mirroring the v1 semantics
+// (v1 inputs Log and outputs SLS-metric-format Logs), the v2 path inputs Log
+// events and OUTPUTS models.Metric events: each matched Log is converted into
+// one *models.Metric per configured (name, value) pair, all sharing the same
+// tags and timestamp.
+//
+// Just like v1 (see ProcessLogs), a source Log is NEVER preserved: on success
+// it is replaced by the produced Metric events; on any validation error it is
+// logged and dropped entirely (v1 does `continue TraverseLogArray`, emitting
+// only metric logs). Logs that do not carry the configured name/value/label
+// fields fail the count checks and are likewise dropped. Metric and Span events
+// (and any other non-Log kind) pass through unchanged.
 func (p *ProcessorLogToSlsMetric) Process(in *models.PipelineGroupEvents, context pipeline.PipelineContext) {
-	pipeline.CollectGroupEvents(context, in)
+	if in == nil || len(in.Events) == 0 {
+		return
+	}
+	outEvents := make([]models.PipelineEvent, 0, len(in.Events))
+	for _, event := range in.Events {
+		if event.GetType() == models.EventTypeLogging {
+			log, ok := event.(*models.Log)
+			if !ok {
+				continue
+			}
+			for _, metric := range p.logToMetrics(log) {
+				outEvents = append(outEvents, metric)
+			}
+			// v1 does not preserve the source log; only metrics are emitted.
+			continue
+		}
+		// Non-Log events (Metric/Span/...) pass through unchanged.
+		outEvents = append(outEvents, event)
+	}
+	if len(outEvents) == 0 {
+		return
+	}
+	context.Collector().Collect(in.Group, outEvents...)
+}
+
+// logToMetrics reproduces the v1 ProcessLogs extraction + validation for a
+// single v2 models.Log, returning the produced metrics or nil when the log
+// fails any validation (in which case it is logged and dropped, matching the
+// v1 `continue TraverseLogArray` skip semantics).
+func (p *ProcessorLogToSlsMetric) logToMetrics(log *models.Log) []*models.Metric {
+	contents := log.GetIndices()
+
+	names := map[string]string{}
+	values := map[string]string{}
+	// __time_nano__ (nanoseconds, as a decimal string) parsed from MetricTimeKey.
+	var timeNano string
+	// Collected labels shared by every produced metric.
+	labels := map[string]string{}
+	labelExisted := map[string]bool{}
+
+	for key, rawValue := range contents.Iterator() {
+		value := contentToString(rawValue)
+
+		// __labels__
+		if key == metricLabelsKey {
+			splitLabels := strings.Split(value, converter.LabelSeparator)
+			for _, label := range splitLabels {
+				keyValues := strings.Split(label, converter.KeyValueSeparator)
+				if len(keyValues) != 2 {
+					p.logError(errInvalidMetricLabelValue)
+					return nil
+				}
+				labelKey := keyValues[0]
+				if p.metricLabelKeysMap[labelKey] {
+					p.logError(errFieldRepeated)
+					return nil
+				}
+				// The Key of Label must follow the regular expression: ^[a-zA-Z_][a-zA-Z0-9_]*$
+				if !metricLabelKeyRegex.MatchString(labelKey) {
+					p.logError(errInvalidMetricLabelKey)
+					return nil
+				}
+				labelValue := keyValues[1]
+				// The value of Label cannot contain "|" or "#$#".
+				if strings.Contains(labelValue, converter.LabelSeparator) || strings.Contains(labelValue, converter.KeyValueSeparator) {
+					p.logError(errInvalidMetricLabelValue)
+					return nil
+				}
+				labels[labelKey] = labelValue
+			}
+			continue
+		}
+
+		// Match to the label field
+		if p.metricLabelKeysMap[key] {
+			// The value of Label cannot contain "|" or "#$#".
+			if strings.Contains(value, converter.LabelSeparator) || strings.Contains(value, converter.KeyValueSeparator) {
+				p.logError(errInvalidMetricLabelValue)
+				return nil
+			}
+			labelExisted[key] = true
+			labels[key] = value
+			continue
+		}
+
+		// Match to the name field
+		if p.metricNamesMap[key] {
+			// Metric name needs to follow the regular expression: ^[a-zA-Z_:][a-zA-Z0-9_:]*$
+			if !metricNameRegex.MatchString(value) {
+				p.logError(errInvalidMetricName)
+				return nil
+			}
+			names[key] = value
+			continue
+		}
+
+		// Match to the value field
+		if p.metricValuesMap[key] {
+			// Metric value needs to be a float type string.
+			if !canParseToFloat64(value) {
+				p.logError(errInvalidMetricValue)
+				return nil
+			}
+			values[key] = value
+			continue
+		}
+
+		if p.MetricTimeKey != "" && key == p.MetricTimeKey {
+			if !isTimeNano(value) {
+				p.logError(errInvalidMetricTime)
+				return nil
+			}
+			switch len(value) {
+			case 19:
+				// nanosecond
+				timeNano = value
+			case 16:
+				// microsecond
+				timeNano = value + "000"
+			case 13:
+				// millisecond
+				timeNano = value + "000000"
+			case 10:
+				// second
+				timeNano = value + "000000000"
+			}
+			continue
+		}
+	}
+
+	if timeNano == "" {
+		if p.MetricTimeKey != "" {
+			p.logError(errInvalidMetricTime)
+			return nil
+		}
+		// models.Log.Timestamp is already in nanoseconds (see plugin_runner_v2
+		// conversion), matching v1 GetLogTimeNano.
+		timeNano = strconv.FormatUint(log.GetTimestamp(), 10)
+	}
+
+	// The number of labels must be equal to the number of label fields.
+	if len(labelExisted) != len(p.MetricLabelKeys) {
+		p.logError(errInvalidMetricLabelKeyCount)
+		return nil
+	}
+
+	// The number of names must be equal to the number of name fields.
+	if len(names) != len(p.metricNamesMap) {
+		p.logError(errInvalidMetricNameCount)
+		return nil
+	}
+
+	// The number of values must be equal to the number of value fields.
+	if len(values) != len(p.metricValuesMap) {
+		p.logError(errInvalidMetricValueCount)
+		return nil
+	}
+
+	for key, value := range p.CustomMetricLabels {
+		labels[key] = value
+	}
+
+	timestamp, err := strconv.ParseInt(timeNano, 10, 64)
+	if err != nil {
+		p.logError(errInvalidMetricTime)
+		return nil
+	}
+
+	metrics := make([]*models.Metric, 0, len(p.MetricValues))
+	for name, value := range p.MetricValues {
+		// Already validated by canParseToFloat64 above.
+		metricValue, _ := strconv.ParseFloat(values[value], 64)
+		metrics = append(metrics, models.NewSingleValueMetric(
+			names[name],
+			models.MetricTypeGauge,
+			newTagsFromMap(labels),
+			timestamp,
+			metricValue,
+		))
+	}
+	return metrics
+}
+
+// contentToString normalizes a v2 log content value (interface{}) into a string
+// for the string-oriented extraction/validation reused from v1.
+func contentToString(value interface{}) string {
+	switch v := value.(type) {
+	case string:
+		return v
+	case []byte:
+		return string(v)
+	default:
+		return fmt.Sprintf("%v", v)
+	}
+}
+
+// newTagsFromMap builds a fresh models.Tags so each produced metric owns an
+// independent copy of the shared labels.
+func newTagsFromMap(labels map[string]string) models.Tags {
+	tags := models.NewTags()
+	for key, value := range labels {
+		tags.Add(key, value)
+	}
+	return tags
 }

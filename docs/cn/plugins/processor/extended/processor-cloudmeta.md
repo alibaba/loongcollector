@@ -10,7 +10,13 @@
 
 | v1 接口 | v2 接口 | Log | Metric | Span |
 | --- | --- | --- | --- | --- |
-| ✓ | — | v1 | 透传未知 | 透传未知 |
+| ✓ | ✓ | v1&v2 | v2 | v2 |
+
+| LogGroup(v1) | EventTypeLogging | EventTypeMetric | EventTypeSpan |
+| ------------ | ---------------- | --------------- | ------------- |
+|      ✅      |      ✅           |      ✅          |      ✅        |
+
+> v2 场景下将云资产元数据加入 PipelineEventGroup 的 Tag（对所有事件类型生效），事件本身透传不修改。
 
 ## 版本
 

@@ -15,6 +15,7 @@
 package kvsplitter
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -98,6 +99,16 @@ func (s *KeyValueSplitter) processLog(log *protocol.Log) {
 }
 
 func (s *KeyValueSplitter) splitKeyValue(log *protocol.Log, content string) {
+	s.splitKeyValueInto(content, func(key, value string) {
+		log.Contents = append(log.Contents, &protocol.Log_Content{Key: key, Value: value})
+	})
+}
+
+// splitKeyValueInto parses content into key/value pairs and hands each parsed
+// pair to emit. It contains the shared parsing logic used by both the v1
+// (protocol.Log) and v2 (models.Log) paths so that their behavior stays
+// identical.
+func (s *KeyValueSplitter) splitKeyValueInto(content string, emit func(key, value string)) {
 	emptyKeyIndex := 0
 	noSeparatorKeyIndex := 0
 	for {
@@ -116,10 +127,7 @@ func (s *KeyValueSplitter) splitKeyValue(log *protocol.Log, content string) {
 				logger.Warningf(s.context.GetRuntimeContext(), selfmonitor.KvSplitterAlarm, "can not find separator in %v", pair)
 			}
 			if !s.DiscardWhenSeparatorNotFound {
-				log.Contents = append(log.Contents, &protocol.Log_Content{
-					Key:   s.NoSeparatorKeyPrefix + strconv.Itoa(noSeparatorKeyIndex),
-					Value: s.getValue(pair),
-				})
+				emit(s.NoSeparatorKeyPrefix+strconv.Itoa(noSeparatorKeyIndex), s.getValue(pair))
 				noSeparatorKeyIndex++
 			}
 		} else {
@@ -132,7 +140,7 @@ func (s *KeyValueSplitter) splitKeyValue(log *protocol.Log, content string) {
 					logger.Warningf(s.context.GetRuntimeContext(), selfmonitor.KvSplitterAlarm, "the key of pair with value (%v) is empty", value)
 				}
 			}
-			log.Contents = append(log.Contents, &protocol.Log_Content{Key: key, Value: value})
+			emit(key, value)
 		}
 
 		if dIdx == -1 || dIdx+len(s.Delimiter) > len(content) {
@@ -212,10 +220,50 @@ func init() {
 	}
 }
 
-// Process implements the v2 ProcessorV2 interface so this plugin can load in a
-// v2 (models.PipelineGroupEvents) pipeline. It has no v2-native processing yet
-// and therefore explicitly passes all events (Log/Metric/Span) through
-// unchanged, rather than leaving v2 support undefined.
+// Process implements the v2 ProcessorV2 interface: it parses the SourceKey
+// value of each Log event into key/value pairs and adds them to the log,
+// mirroring the v1 path (KeepSource/Quote/EmptyKeyPrefix/NoSeparatorKeyPrefix/
+// DiscardWhenSeparatorNotFound semantics). Metric/Span events pass through
+// unchanged.
 func (s *KeyValueSplitter) Process(in *models.PipelineGroupEvents, context pipeline.PipelineContext) {
-	pipeline.CollectGroupEvents(context, in)
+	pipeline.ProcessLogEventsOnly(in, context, s.processLogEvent)
+}
+
+func (s *KeyValueSplitter) processLogEvent(log *models.Log) {
+	contents := log.GetIndices()
+	var sourceKey, sourceValue string
+	if len(s.SourceKey) == 0 {
+		// v1 splits the first content when SourceKey is empty; the v2 content
+		// map is unordered, so take any single entry to match the
+		// "one source field" semantics.
+		found := false
+		for key, value := range contents.Iterator() {
+			sourceKey = key
+			sourceValue = fmt.Sprintf("%v", value)
+			found = true
+			break
+		}
+		if !found {
+			if s.ErrIfSourceKeyNotFound {
+				logger.Warningf(s.context.GetRuntimeContext(), selfmonitor.KvSplitterAlarm, "can not find key: %v", s.SourceKey)
+			}
+			return
+		}
+	} else {
+		if !contents.Contains(s.SourceKey) {
+			if s.ErrIfSourceKeyNotFound {
+				logger.Warningf(s.context.GetRuntimeContext(), selfmonitor.KvSplitterAlarm, "can not find key: %v", s.SourceKey)
+			}
+			return
+		}
+		sourceKey = s.SourceKey
+		sourceValue = fmt.Sprintf("%v", contents.Get(s.SourceKey))
+	}
+
+	if !s.KeepSource {
+		contents.Delete(sourceKey)
+	}
+	s.splitKeyValueInto(sourceValue, func(key, value string) {
+		contents.Add(key, value)
+	})
 }

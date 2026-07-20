@@ -15,6 +15,7 @@
 package regex
 
 import (
+	"fmt"
 	"regexp"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
@@ -134,11 +135,62 @@ func init() {
 	}
 }
 
-// Process implements the v2 ProcessorV2 interface so this plugin can load in a
-// v2 (models.PipelineGroupEvents) pipeline. Filtering in v2 can drop events,
-// which is not implemented yet; to avoid silently dropping data it explicitly
-// passes all events (Log/Metric/Span) through unchanged rather than leaving v2
-// support undefined.
+// isLogMatchV2 mirrors IsLogMatch for the v2 models.Log representation, matching
+// Include/Exclude regexes against the field values held in log.GetIndices().
+func (p *ProcessorRegexFilter) isLogMatchV2(log *models.Log) bool {
+	contents := log.GetIndices()
+	if p.includeRegex != nil {
+		includeCount := 0
+		for key, value := range contents.Iterator() {
+			if reg, ok := p.includeRegex[key]; ok {
+				if reg.MatchString(fmt.Sprintf("%v", value)) {
+					includeCount++
+				} else {
+					// not match
+					return false
+				}
+			}
+		}
+		// not match all
+		if includeCount < len(p.includeRegex) {
+			return false
+		}
+	}
+
+	if p.excludeRegex != nil {
+		for key, value := range contents.Iterator() {
+			if reg, ok := p.excludeRegex[key]; ok {
+				if reg.MatchString(fmt.Sprintf("%v", value)) {
+					// if match, return false
+					return false
+				}
+			}
+		}
+	}
+
+	return true
+}
+
+// Process implements the v2 ProcessorV2 interface. Log events are filtered by
+// the Include/Exclude field-value regexes (dropping logs that do not match,
+// mirroring the v1 semantics), while Metric/Span and any other non-Log events
+// always pass through unchanged. The original event order is preserved.
 func (p *ProcessorRegexFilter) Process(in *models.PipelineGroupEvents, context pipeline.PipelineContext) {
-	pipeline.CollectGroupEvents(context, in)
+	if in == nil {
+		return
+	}
+	survivors := make([]models.PipelineEvent, 0, len(in.Events))
+	for _, event := range in.Events {
+		if event.GetType() == models.EventTypeLogging {
+			if p.isLogMatchV2(event.(*models.Log)) {
+				survivors = append(survivors, event)
+			} else {
+				p.filterMetric.Add(1)
+			}
+			continue
+		}
+		// Metric/Span/other events are never dropped.
+		survivors = append(survivors, event)
+	}
+	context.Collector().Collect(in.Group, survivors...)
 }

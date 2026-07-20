@@ -59,9 +59,19 @@ func (*ProcessorCSVDecoder) Description() string {
 }
 
 func (p *ProcessorCSVDecoder) decodeCSV(log *protocol.Log, value string) bool {
+	return p.emitCSVFields(value, func(key, val string) {
+		log.Contents = append(log.Contents, &protocol.Log_Content{Key: key, Value: val})
+	})
+}
+
+// emitCSVFields decodes value as a CSV record and emits the decoded fields via
+// add, returning false only when the record cannot be decoded. It is shared by
+// the v1 (decodeCSV) and v2 (processLogEvent) paths so both stay behaviorally
+// identical.
+func (p *ProcessorCSVDecoder) emitCSVFields(value string, add func(key, value string)) bool {
 	if len(p.SplitKeys) == 0 {
 		if p.PreserveOthers {
-			log.Contents = append(log.Contents, &protocol.Log_Content{Key: "_decode_preserve_", Value: value})
+			add("_decode_preserve_", value)
 		}
 		return true
 	}
@@ -85,13 +95,13 @@ func (p *ProcessorCSVDecoder) decodeCSV(log *protocol.Log, value string) bool {
 
 	var keyIndex int
 	for keyIndex = 0; keyIndex < len(p.SplitKeys) && keyIndex < len(record); keyIndex++ {
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: p.SplitKeys[keyIndex], Value: record[keyIndex]})
+		add(p.SplitKeys[keyIndex], record[keyIndex])
 	}
 
 	if keyIndex < len(record) && p.PreserveOthers {
 		if p.ExpandOthers {
 			for ; keyIndex < len(record); keyIndex++ {
-				log.Contents = append(log.Contents, &protocol.Log_Content{Key: p.ExpandKeyPrefix + strconv.Itoa(keyIndex+1-len(p.SplitKeys)), Value: record[keyIndex]})
+				add(p.ExpandKeyPrefix+strconv.Itoa(keyIndex+1-len(p.SplitKeys)), record[keyIndex])
 			}
 		} else {
 			var b strings.Builder
@@ -100,7 +110,7 @@ func (p *ProcessorCSVDecoder) decodeCSV(log *protocol.Log, value string) bool {
 			_ = w.Write(record[keyIndex:])
 			w.Flush()
 			remained := b.String()
-			log.Contents = append(log.Contents, &protocol.Log_Content{Key: "_decode_preserve_", Value: remained[:len(remained)-1]})
+			add("_decode_preserve_", remained[:len(remained)-1])
 		}
 	}
 
@@ -142,10 +152,26 @@ func init() {
 	}
 }
 
-// Process implements the v2 ProcessorV2 interface so this plugin can load in a
-// v2 (models.PipelineGroupEvents) pipeline. It has no v2-native processing yet
-// and therefore explicitly passes all events (Log/Metric/Span) through
-// unchanged, rather than leaving v2 support undefined.
+// Process implements the v2 ProcessorV2 interface: for each Log event it decodes
+// the SourceKey value into the configured SplitKeys (honoring PreserveOthers,
+// ExpandOthers and KeepSource); Metric/Span events pass through unchanged.
 func (p *ProcessorCSVDecoder) Process(in *models.PipelineGroupEvents, context pipeline.PipelineContext) {
-	pipeline.CollectGroupEvents(context, in)
+	pipeline.ProcessLogEventsOnly(in, context, p.processLogEvent)
+}
+
+func (p *ProcessorCSVDecoder) processLogEvent(log *models.Log) {
+	contents := log.GetIndices()
+	if !contents.Contains(p.SourceKey) {
+		if p.NoKeyError {
+			logger.Warning(p.context.GetRuntimeContext(), selfmonitor.DecodeFindAlarm, "cannot find key", p.SourceKey)
+		}
+		return
+	}
+	value := fmt.Sprintf("%v", contents.Get(p.SourceKey))
+	res := p.emitCSVFields(value, func(key, val string) {
+		contents.Add(key, val)
+	})
+	if !p.shouldKeepSrc(res) {
+		contents.Delete(p.SourceKey)
+	}
 }

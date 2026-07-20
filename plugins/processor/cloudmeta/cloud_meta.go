@@ -221,10 +221,32 @@ func init() {
 	}
 }
 
-// Process implements the v2 ProcessorV2 interface so this plugin can load in a
-// v2 (models.PipelineGroupEvents) pipeline. It has no v2-native processing yet
-// and therefore explicitly passes all events (Log/Metric/Span) through
-// unchanged, rather than leaving v2 support undefined.
+// Process implements the v2 ProcessorV2 interface.
+//
+// v1 (ProcessLogs) enriches every Log's Contents with cloud metadata. In v2 the
+// data model is a PipelineEventGroup that carries group-level Tags shared by all
+// its events, so instead of mutating each Log the v2 path adds the same cloud
+// metadata key/values ONCE to the group Tags and then passes ALL events
+// (Log/Metric/Span) through unchanged. The metadata set (including RenameMetadata
+// and instance-tag handling) is computed by readMeta, exactly as the v1 path.
+//
+// Guard: if the platform meta provider is unavailable (readMeta keeps c.meta
+// empty, e.g. c.manager == nil), no tags are added and events simply pass
+// through, mirroring the v1 no-op condition in ProcessLogs.
 func (c *ProcessorCloudMeta) Process(in *models.PipelineGroupEvents, context pipeline.PipelineContext) {
+	if in == nil {
+		return
+	}
+	c.readMeta()
+	if len(c.meta) != 0 {
+		logger.Debugf(c.context.GetRuntimeContext(), "meta: %v", c.meta)
+		if in.Group != nil && in.Group.Tags == nil {
+			in.Group.Tags = models.NewTags()
+		}
+		tags := in.Group.GetTags()
+		for k, v := range c.meta {
+			tags.Add(k, v)
+		}
+	}
 	pipeline.CollectGroupEvents(context, in)
 }

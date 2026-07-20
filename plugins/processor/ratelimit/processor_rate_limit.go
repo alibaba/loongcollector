@@ -103,11 +103,49 @@ func init() {
 	}
 }
 
-// Process implements the v2 ProcessorV2 interface so this plugin can load in a
-// v2 (models.PipelineGroupEvents) pipeline. Rate limiting in v2 can drop
-// events, which is not implemented yet; to avoid silently dropping data it
-// explicitly passes all events (Log/Metric/Span) through unchanged rather than
-// leaving v2 support undefined.
+// makeKeyV2 mirrors makeKey for the v2 models.Log representation, building the
+// limit key from the configured fields held in log.GetIndices().
+func (p *ProcessorRateLimit) makeKeyV2(log *models.Log) string {
+	if len(p.Fields) == 0 {
+		return ""
+	}
+
+	sort.Strings(p.Fields)
+	values := make([]string, len(p.Fields))
+	contents := log.GetIndices()
+	for _, field := range p.Fields {
+		if contents.Contains(field) {
+			values = append(values, fmt.Sprintf("%v", contents.Get(field)))
+		} else {
+			values = append(values, "")
+		}
+	}
+
+	return strings.Join(values, "_")
+}
+
+// Process implements the v2 ProcessorV2 interface. Log events are rate limited
+// via the shared token-bucket algorithm (dropping logs when their limit key is
+// exhausted, mirroring the v1 semantics), while Metric/Span and any other
+// non-Log events always pass through unchanged. The original event order is
+// preserved.
 func (p *ProcessorRateLimit) Process(in *models.PipelineGroupEvents, context pipeline.PipelineContext) {
-	pipeline.CollectGroupEvents(context, in)
+	if in == nil {
+		return
+	}
+	survivors := make([]models.PipelineEvent, 0, len(in.Events))
+	for _, event := range in.Events {
+		if event.GetType() == models.EventTypeLogging {
+			key := p.makeKeyV2(event.(*models.Log))
+			if p.Algorithm.IsAllowed(key) {
+				survivors = append(survivors, event)
+			} else {
+				p.limitMetric.Add(1)
+			}
+			continue
+		}
+		// Metric/Span/other events are never dropped.
+		survivors = append(survivors, event)
+	}
+	context.Collector().Collect(in.Group, survivors...)
 }

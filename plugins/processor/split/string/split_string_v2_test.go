@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package regex
+package string
 
 import (
 	"testing"
@@ -25,84 +25,73 @@ import (
 	"github.com/alibaba/ilogtail/plugins/test/mock"
 )
 
-// TestProcessorRegex_ProcessV2Parse verifies the v2 Process path extracts the
-// configured capture groups from the SourceKey value into new keys.
-func TestProcessorRegex_ProcessV2Parse(t *testing.T) {
-	processor := &ProcessorRegex{
-		Regex:      `(\w+)\s(\w+)\s(\w+)`,
-		Keys:       []string{"key1", "key2", "key3"},
-		SourceKey:  "content",
+func TestProcessorSplitString_ProcessV2SplitsIntoKeys(t *testing.T) {
+	processor := &ProcessorSplitString{
+		SplitSep:  "|",
+		SplitKeys: []string{"k1", "k2", "k3"},
+		SourceKey: "src",
+	}
+	require.NoError(t, processor.Init(mock.NewEmptyContext("p", "l", "c")))
+
+	log := models.NewLog("", nil, "", "", "", models.NewTags(), 0)
+	log.GetIndices().Add("src", "a|b|c")
+
+	context := helper.NewObservePipelineContext(10)
+	processor.Process(&models.PipelineGroupEvents{Events: []models.PipelineEvent{log}}, context)
+
+	contents := log.GetIndices()
+	assert.Equal(t, "a", contents.Get("k1"))
+	assert.Equal(t, "b", contents.Get("k2"))
+	assert.Equal(t, "c", contents.Get("k3"))
+	// KeepSource defaults to false, so the source key is removed.
+	assert.False(t, contents.Contains("src"), "source key must be removed by default")
+}
+
+func TestProcessorSplitString_ProcessV2KeepSource(t *testing.T) {
+	processor := &ProcessorSplitString{
+		SplitSep:   "|",
+		SplitKeys:  []string{"k1", "k2"},
+		SourceKey:  "src",
 		KeepSource: true,
 	}
 	require.NoError(t, processor.Init(mock.NewEmptyContext("p", "l", "c")))
 
 	log := models.NewLog("", nil, "", "", "", models.NewTags(), 0)
-	log.GetIndices().Add("content", "xxxx yyyy zzzz")
+	log.GetIndices().Add("src", "a|b")
 
 	context := helper.NewObservePipelineContext(10)
 	processor.Process(&models.PipelineGroupEvents{Events: []models.PipelineEvent{log}}, context)
 
 	contents := log.GetIndices()
-	assert.Equal(t, "xxxx", contents.Get("key1"))
-	assert.Equal(t, "yyyy", contents.Get("key2"))
-	assert.Equal(t, "zzzz", contents.Get("key3"))
-	// KeepSource=true keeps the original field.
-	assert.Equal(t, "xxxx yyyy zzzz", contents.Get("content"))
+	assert.Equal(t, "a", contents.Get("k1"))
+	assert.Equal(t, "b", contents.Get("k2"))
+	assert.True(t, contents.Contains("src"), "source key must be kept when KeepSource is set")
 }
 
-// TestProcessorRegex_ProcessV2KeepSourceFalse verifies the source field is
-// dropped on a successful parse when KeepSource is false.
-func TestProcessorRegex_ProcessV2KeepSourceFalse(t *testing.T) {
-	processor := &ProcessorRegex{
-		Regex:      `(\w+)\s(\w+)\s(\w+)`,
-		Keys:       []string{"key1", "key2", "key3"},
-		SourceKey:  "content",
-		KeepSource: false,
+func TestProcessorSplitString_ProcessV2MissingSourceKey(t *testing.T) {
+	processor := &ProcessorSplitString{
+		SplitSep:  "|",
+		SplitKeys: []string{"k1", "k2"},
+		SourceKey: "src",
 	}
 	require.NoError(t, processor.Init(mock.NewEmptyContext("p", "l", "c")))
 
 	log := models.NewLog("", nil, "", "", "", models.NewTags(), 0)
-	log.GetIndices().Add("content", "xxxx yyyy zzzz")
+	log.GetIndices().Add("other", "a|b")
 
 	context := helper.NewObservePipelineContext(10)
 	processor.Process(&models.PipelineGroupEvents{Events: []models.PipelineEvent{log}}, context)
 
 	contents := log.GetIndices()
-	assert.False(t, contents.Contains("content"), "source key must be removed when KeepSource is false")
-	assert.Equal(t, "xxxx", contents.Get("key1"))
-	assert.Equal(t, "zzzz", contents.Get("key3"))
+	assert.False(t, contents.Contains("k1"), "missing source key must not produce split keys")
+	assert.Equal(t, "a|b", contents.Get("other"), "unrelated key must be untouched")
 }
 
-// TestProcessorRegex_ProcessV2NoMatchKeepsSource verifies that on a parse
-// failure the source is kept (KeepSourceIfParseError) and no keys are added.
-func TestProcessorRegex_ProcessV2NoMatchKeepsSource(t *testing.T) {
-	processor := &ProcessorRegex{
-		Regex:                  `(\d+)\s(\w+)\s(\w+)`,
-		Keys:                   []string{"key1", "key2", "key3"},
-		SourceKey:              "content",
-		KeepSource:             false,
-		KeepSourceIfParseError: true,
-	}
-	require.NoError(t, processor.Init(mock.NewEmptyContext("p", "l", "c")))
-
-	log := models.NewLog("", nil, "", "", "", models.NewTags(), 0)
-	log.GetIndices().Add("content", "xxxx yyyy zzzz")
-
-	context := helper.NewObservePipelineContext(10)
-	processor.Process(&models.PipelineGroupEvents{Events: []models.PipelineEvent{log}}, context)
-
-	contents := log.GetIndices()
-	assert.True(t, contents.Contains("content"), "source kept on parse error (KeepSourceIfParseError)")
-	assert.False(t, contents.Contains("key1"), "no keys extracted on no-match")
-}
-
-// TestProcessorRegex_ProcessV2PassesThroughMetric verifies a Metric event is
-// emitted unchanged (not dropped) by the log-only processor.
-func TestProcessorRegex_ProcessV2PassesThroughMetric(t *testing.T) {
-	processor := &ProcessorRegex{
-		Regex:     `(\w+)`,
-		Keys:      []string{"key1"},
-		SourceKey: "content",
+func TestProcessorSplitString_ProcessV2PassesThroughMetric(t *testing.T) {
+	processor := &ProcessorSplitString{
+		SplitSep:  "|",
+		SplitKeys: []string{"k1"},
+		SourceKey: "src",
 	}
 	require.NoError(t, processor.Init(mock.NewEmptyContext("p", "l", "c")))
 

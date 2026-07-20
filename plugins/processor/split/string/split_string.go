@@ -130,10 +130,46 @@ func init() {
 	}
 }
 
-// Process implements the v2 ProcessorV2 interface so this plugin can load in a
-// v2 (models.PipelineGroupEvents) pipeline. It has no v2-native processing yet
-// and therefore explicitly passes all events (Log/Metric/Span) through
-// unchanged, rather than leaving v2 support undefined.
+// Process implements the v2 ProcessorV2 interface: it splits the SourceKey value
+// of each Log event into SplitKeys on the same log. Metric/Span events pass
+// through unchanged.
 func (p *ProcessorSplitString) Process(in *models.PipelineGroupEvents, context pipeline.PipelineContext) {
-	pipeline.CollectGroupEvents(context, in)
+	pipeline.ProcessLogEventsOnly(in, context, p.processLogEvent)
+}
+
+func (p *ProcessorSplitString) processLogEvent(log *models.Log) {
+	contents := log.GetIndices()
+	sourceKey := p.SourceKey
+	if sourceKey == "" {
+		// v1 splits the first content when SourceKey is empty. The v2 index map
+		// iteration order is unspecified, so this picks the first key best-effort.
+		for k := range contents.Iterator() {
+			sourceKey = k
+			break
+		}
+		if sourceKey == "" {
+			if p.NoKeyError {
+				logger.Warning(p.context.GetRuntimeContext(), selfmonitor.SplitFindAlarm, "cannot find key", p.SourceKey)
+			}
+			return
+		}
+	} else if !contents.Contains(sourceKey) {
+		if p.NoKeyError {
+			logger.Warning(p.context.GetRuntimeContext(), selfmonitor.SplitFindAlarm, "cannot find key", p.SourceKey)
+		}
+		return
+	}
+
+	value := fmt.Sprintf("%v", contents.Get(sourceKey))
+	// v1 string removes the source key BEFORE splitting (see ProcessLogs), so a
+	// split key equal to the source key wins over the original value.
+	if !p.KeepSource {
+		contents.Delete(sourceKey)
+	}
+	// Reuse the tested v1 parsing on a temporary protocol.Log.
+	tmp := &protocol.Log{}
+	p.SplitValue(tmp, value)
+	for _, c := range tmp.Contents {
+		contents.Add(c.Key, c.Value)
+	}
 }

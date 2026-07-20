@@ -18,6 +18,7 @@ import (
 	"bufio"
 	"bytes"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -147,23 +148,38 @@ func (p *ProcessorGrok) processLog(log *protocol.Log) {
 }
 
 func (p *ProcessorGrok) processGrok(log *protocol.Log, val *string) MatchResult {
+	names, captures, result := p.matchGrok(*val)
+	if result == matchSuccess {
+		for i := 0; i < len(captures); i++ {
+			log.Contents = append(log.Contents, &protocol.Log_Content{Key: names[i], Value: captures[i]})
+		}
+	}
+	return result
+}
+
+// matchGrok tries the configured patterns in order against val and, on the
+// first pattern that matches, returns the extracted field names and captures
+// plus matchSuccess; it returns matchTimeOut on timeout/regex error and
+// matchFail when nothing matches. This is the shared match logic reused by both
+// the v1 (ProcessLogs) and v2 (Process) code paths so their semantics stay
+// identical.
+func (p *ProcessorGrok) matchGrok(val string) ([]string, []string, MatchResult) {
 	deadline := time.Now().Add(time.Duration(p.TimeoutMilliSeconds) * time.Millisecond)
 
-	findMatch := false
 	for _, gr := range p.compiledPatterns {
 		if time.Now().After(deadline) {
-			return matchTimeOut
+			return nil, nil, matchTimeOut
 		}
-		m, err := gr.FindStringMatch(*val)
+		m, err := gr.FindStringMatch(val)
 		if err != nil {
-			return matchTimeOut
+			return nil, nil, matchTimeOut
 		}
 
 		names := []string{}
 		captures := []string{}
 		for m != nil {
 			if time.Now().After(deadline) {
-				return matchTimeOut
+				return nil, nil, matchTimeOut
 			}
 			gps := m.Groups()
 			for i := range gps {
@@ -176,22 +192,15 @@ func (p *ProcessorGrok) processGrok(log *protocol.Log, val *string) MatchResult 
 			}
 			m, err = gr.FindNextMatch(m)
 			if err != nil {
-				return matchTimeOut
+				return nil, nil, matchTimeOut
 			}
 		}
 
 		if len(captures) > 0 {
-			for i := 0; i < len(captures); i++ {
-				log.Contents = append(log.Contents, &protocol.Log_Content{Key: names[i], Value: captures[i]})
-			}
-			findMatch = true
-			break
+			return names, captures, matchSuccess
 		}
 	}
-	if !findMatch {
-		return matchFail
-	}
-	return matchSuccess
+	return nil, nil, matchFail
 }
 
 // Add patterns from path to processor_grok
@@ -449,10 +458,67 @@ func sortGraph(g graph) ([]string, []string) {
 	return order, nil
 }
 
-// Process implements the v2 ProcessorV2 interface so this plugin can load in a
-// v2 (models.PipelineGroupEvents) pipeline. It has no v2-native processing yet
-// and therefore explicitly passes all events (Log/Metric/Span) through
-// unchanged, rather than leaving v2 support undefined.
+// Process implements the v2 ProcessorV2 interface: it matches the SourceKey
+// value of each Log event against the configured grok patterns and writes the
+// extracted fields into the log, faithfully reproducing the v1 transform
+// (KeepSource / IgnoreParseFailure / NoKeyError / NoMatchError / TimeoutError).
+// Metric and Span events pass through unchanged.
 func (p *ProcessorGrok) Process(in *models.PipelineGroupEvents, context pipeline.PipelineContext) {
-	pipeline.CollectGroupEvents(context, in)
+	pipeline.ProcessLogEventsOnly(in, context, p.processLogEvent)
+}
+
+func (p *ProcessorGrok) processLogEvent(log *models.Log) {
+	contents := log.GetIndices()
+
+	// v1 parses the field named by SourceKey, or every field when SourceKey is
+	// not configured. Snapshot the keys first so we do not mutate the map while
+	// iterating it.
+	var keys []string
+	if len(p.SourceKey) == 0 {
+		for key := range contents.Iterator() {
+			keys = append(keys, key)
+		}
+	} else if contents.Contains(p.SourceKey) {
+		keys = append(keys, p.SourceKey)
+	}
+
+	findKey := false
+	for _, key := range keys {
+		findKey = true
+		val := fmt.Sprintf("%v", contents.Get(key))
+		names, captures, parseResult := p.matchGrok(val)
+
+		// no match error
+		if parseResult == matchFail && p.NoMatchError {
+			logger.Warning(p.context.GetRuntimeContext(), selfmonitor.GrokFindAlarm, "error", "all match fail",
+				"source_key", p.SourceKey, "content", val)
+		}
+
+		// time out error
+		if parseResult == matchTimeOut && p.TimeoutError {
+			logger.Warning(p.context.GetRuntimeContext(), selfmonitor.GrokFindAlarm, "error", "match time out",
+				"source_key", p.SourceKey, "content", val)
+		}
+
+		sourceOverwritten := false
+		if parseResult == matchSuccess {
+			for i := 0; i < len(captures); i++ {
+				contents.Add(names[i], captures[i])
+				if names[i] == key {
+					sourceOverwritten = true
+				}
+			}
+		}
+
+		// keep source
+		if ((parseResult == matchSuccess && !p.KeepSource) || (parseResult != matchSuccess && !p.IgnoreParseFailure)) && !sourceOverwritten {
+			contents.Delete(key)
+		}
+	}
+
+	// no key err
+	if !findKey && p.NoKeyError {
+		logger.Warning(p.context.GetRuntimeContext(), selfmonitor.GrokFindAlarm, "error", "anchor cannot find key",
+			"source_key", p.SourceKey)
+	}
 }
