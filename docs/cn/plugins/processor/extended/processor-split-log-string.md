@@ -10,13 +10,13 @@
 
 | v1 接口 | v2 接口 | Log | Metric | Span |
 | --- | --- | --- | --- | --- |
-| ✓ | ✓ | v1&v2 | — | — |
+| ✓ | ✓ | v1&v2 | 透传 | 透传 |
 
 | LogGroup(v1) | EventTypeLogging | EventTypeMetric | EventTypeSpan |
 | ------------ | ---------------- | --------------- | ------------- |
-|      ✅      |      ✅           |       ❌        |      ❌       |
+|      ✅      |      ✅           |       ✅        |      ✅       |
 
-> 该插件仅处理 Log 事件（v2 场景下输入 Log、输出多条 Log），不处理 Metric/Span 事件。
+> 该插件仅切分 Log 事件（v2 场景下输入 Log、输出多条 Log）；Metric/Span 事件原样透传，不做处理。
 
 ## 版本
 

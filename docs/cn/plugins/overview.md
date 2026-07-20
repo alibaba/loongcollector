@@ -142,7 +142,7 @@
 | `processor_split_char`<br>[分隔符](processor/extended/processor-delimiter.md) | SLS 官方 | ✓ | ✓ | 透传 | 透传 | 透传 | 通过单字符的分隔符提取字段（v2 暂为显式透传）。 |
 | `processor_split_key_value`<br>[键值对](processor/extended/processor-split-key-value.md) | SLS 官方 | ✓ | ✓ | 透传 | 透传 | 透传 | 通过切分键值对的方式提取字段（v2 暂为显式透传）。 |
 | `processor_split_log_regex`<br>[多行切分](processor/extended/processor-split-log-regex.md) | SLS 官方 | ✓ | ✓ | 透传 | 透传 | 透传 | 实现多行日志（例如 Java 程序日志）的采集（v2 暂为显式透传）。 |
-| `processor_split_log_string`<br>[日志字符串切分](processor/extended/processor-split-log-string.md) | SLS 官方 | ✓ | ✓ | v1&v2 | — | — | 按分隔符将单条日志切分为多条（仅处理 Log 事件）。 |
+| `processor_split_log_string`<br>[日志字符串切分](processor/extended/processor-split-log-string.md) | SLS 官方 | ✓ | ✓ | v1&v2 | 透传 | 透传 | 按分隔符将单条日志切分为多条（Log 事件切分，Metric/Span 透传）。 |
 | `processor_split_string`<br>[分隔符](processor/extended/processor-delimiter.md) | SLS 官方 | ✓ | ✓ | 透传 | 透传 | 透传 | 通过多字符的分隔符提取字段（v2 暂为显式透传）。 |
 | `processor_string_replace`<br>[字符串替换](processor/extended/processor-string-replace.md) | SLS 官方<br>[pj1987111](https://github.com/pj1987111) | ✓ | ✓ | v1&v2 | 透传 | 透传 | 通过全文匹配、正则匹配、去转义字符等方式对文本日志进行内容替换。 |
 | `processor_strptime`<br>[时间提取（strptime 格式）](processor/extended/processor-strptime.md) | SLS 官方 | ✓ | ✓ | 透传 | 透传 | 透传 | 从指定字段中提取日志时间，时间格式为 [Linux strptime](http://man7.org/linux/man-pages/man3/strptime.3.html)（v2 暂为显式透传）。 |
