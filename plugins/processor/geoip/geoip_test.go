@@ -17,10 +17,11 @@ package geoip
 import (
 	"testing"
 
-	"github.com/alibaba/ilogtail/pkg/helper"
-	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/alibaba/ilogtail/pkg/helper"
+	"github.com/alibaba/ilogtail/pkg/models"
 )
 
 // ---- v2 (PipelineEvent / SendPb) Process path tests ----

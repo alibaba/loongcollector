@@ -19,6 +19,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/helper/platformmeta"
 	_ "github.com/alibaba/ilogtail/pkg/logger/test"
@@ -26,7 +28,6 @@ import (
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/plugins/test"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
-	"github.com/stretchr/testify/require"
 )
 
 func Test_cloudMeta_ProcessLogs(t *testing.T) {

@@ -18,11 +18,12 @@ import (
 	"math/rand"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	pm "github.com/alibaba/ilogtail/pluginmanager"
-	"github.com/stretchr/testify/require"
 )
 
 func searchPair(contents []*protocol.Log_Content, key string, value string) bool {
