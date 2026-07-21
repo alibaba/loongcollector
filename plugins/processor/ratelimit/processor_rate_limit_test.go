@@ -218,6 +218,26 @@ func TestProcessorRateLimit_ProcessV2Filter(t *testing.T) {
 	assert.Equal(t, int64(1), int64(processor.limitMetric.Collect().Value))
 }
 
+// TestProcessorRateLimit_MakeKeyNoEmptyPrefix guards against the regression
+// where makeKey/makeKeyV2 preallocated values with len(Fields), so append built
+// keys like "___a_b" (leading empty segments). Both the v1 and v2 key builders
+// must emit exactly one segment per field, and Init must sort Fields once so the
+// key is independent of the configured field order.
+func TestProcessorRateLimit_MakeKeyNoEmptyPrefix(t *testing.T) {
+	// Fields deliberately unsorted to prove Init sorts them.
+	processor := &ProcessorRateLimit{Limit: "3/s", Fields: []string{"key2", "key1"}}
+	require.NoError(t, processor.Init(mock.NewEmptyContext("p", "l", "c")))
+
+	v1Key := processor.makeKey(test.CreateLogs("content", "x", "key1", "a", "key2", "b"))
+	assert.Equal(t, "a_b", v1Key, "v1 key: sorted key1,key2 -> a_b, no empty prefix")
+
+	v2Key := processor.makeKeyV2(newV2Log("key1", "a", "key2", "b"))
+	assert.Equal(t, "a_b", v2Key, "v2 key must mirror v1")
+
+	// Missing field yields a single empty segment, not extra leading separators.
+	assert.Equal(t, "_b", processor.makeKeyV2(newV2Log("key2", "b")))
+}
+
 // TestProcessorRateLimit_ProcessV2Fields verifies the per-key limiting when
 // Fields are configured: separate limit keys have independent budgets.
 func TestProcessorRateLimit_ProcessV2Fields(t *testing.T) {

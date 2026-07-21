@@ -45,6 +45,11 @@ func (p *ProcessorRateLimit) Init(context pipeline.Context) error {
 	}
 	p.Algorithm = newTokenBucket(limit)
 
+	// Sort the limit-key fields once here rather than on every makeKey call:
+	// Fields is fixed config, and sorting it in the hot path would both waste
+	// work and race when Process/ProcessLogs run concurrently on the shared slice.
+	sort.Strings(p.Fields)
+
 	metricsRecord := p.context.GetMetricRecord()
 	p.limitMetric = selfmonitor.NewCounterMetricAndRegister(metricsRecord, selfmonitor.MetricPluginDiscardedEventsTotal)
 	return nil
@@ -78,20 +83,19 @@ func (p *ProcessorRateLimit) makeKey(log *protocol.Log) string {
 		return ""
 	}
 
-	sort.Strings(p.Fields)
-	values := make([]string, len(p.Fields))
+	// Fields is already sorted in Init. Start from len=0 so the joined key holds
+	// exactly one segment per field (append below), instead of len(p.Fields)
+	// leading empty segments that would prefix every key with "_" separators.
+	values := make([]string, 0, len(p.Fields))
 	for _, field := range p.Fields {
-		exist := false
+		value := ""
 		for _, logContent := range log.Contents {
 			if field == logContent.GetKey() {
-				values = append(values, fmt.Sprintf("%v", logContent.GetValue()))
-				exist = true
+				value = fmt.Sprintf("%v", logContent.GetValue())
 				break
 			}
 		}
-		if !exist {
-			values = append(values, "")
-		}
+		values = append(values, value)
 	}
 
 	return strings.Join(values, "_")
@@ -110,15 +114,16 @@ func (p *ProcessorRateLimit) makeKeyV2(log *models.Log) string {
 		return ""
 	}
 
-	sort.Strings(p.Fields)
-	values := make([]string, len(p.Fields))
+	// Fields is already sorted in Init; start from len=0 (see makeKey) so the
+	// key has exactly one segment per field with no empty leading segments.
+	values := make([]string, 0, len(p.Fields))
 	contents := log.GetIndices()
 	for _, field := range p.Fields {
+		value := ""
 		if contents.Contains(field) {
-			values = append(values, pipeline.GetStringValue(contents.Get(field)))
-		} else {
-			values = append(values, "")
+			value = pipeline.GetStringValue(contents.Get(field))
 		}
+		values = append(values, value)
 	}
 
 	return strings.Join(values, "_")
