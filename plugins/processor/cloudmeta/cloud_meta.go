@@ -240,10 +240,18 @@ func (c *ProcessorCloudMeta) Process(in *models.PipelineGroupEvents, context pip
 	c.readMeta()
 	if len(c.meta) != 0 {
 		logger.Debugf(c.context.GetRuntimeContext(), "meta: %v", c.meta)
-		if in.Group != nil && in.Group.Tags == nil {
+		// Ensure the group carries a writable Tags before adding cloud metadata.
+		// An input may emit Group == nil, Group.Tags == nil, or Group.Tags set to
+		// the shared immutable NilStringValues sentinel (e.g. a bare
+		// &models.GroupInfo{} or a ByteArray event). Adding to the sentinel is a
+		// silent no-op, so in all these cases install a fresh mutable Tags.
+		if in.Group == nil {
+			in.Group = &models.GroupInfo{}
+		}
+		if in.Group.Tags == nil || in.Group.Tags.IsNil() {
 			in.Group.Tags = models.NewTags()
 		}
-		tags := in.Group.GetTags()
+		tags := in.Group.Tags
 		for k, v := range c.meta {
 			tags.Add(k, v)
 		}

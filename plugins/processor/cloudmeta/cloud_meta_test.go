@@ -342,6 +342,65 @@ func Test_cloudMeta_Process_EnrichesGroupTags(t *testing.T) {
 	require.True(t, logEvent.GetIndices().Contains("orig_key"))
 }
 
+// Test_cloudMeta_Process_InitializesUnwritableTags asserts that cloud metadata is
+// still written when the input group has no writable Tags: a nil Group, a nil
+// Tags field, or Tags set to the shared immutable NilStringValues sentinel. All
+// three must end up carrying the cloud meta tags rather than silently dropping
+// them into a no-op sentinel.
+func Test_cloudMeta_Process_InitializesUnwritableTags(t *testing.T) {
+	newProcessor := func(t *testing.T) *ProcessorCloudMeta {
+		c := new(ProcessorCloudMeta)
+		c.Platform = platformmeta.Mock
+		c.RenameMetadata = map[string]string{
+			platformmeta.FlagInstanceID: "__instance_id__",
+		}
+		c.Metadata = []string{platformmeta.FlagInstanceID}
+		require.NoError(t, c.Init(mock.NewEmptyContext("a", "b", "c")))
+		return c
+	}
+
+	tests := []struct {
+		name  string
+		group func() *models.GroupInfo
+	}{
+		{
+			name:  "nil Group",
+			group: func() *models.GroupInfo { return nil },
+		},
+		{
+			name:  "nil Tags",
+			group: func() *models.GroupInfo { return &models.GroupInfo{} },
+		},
+		{
+			name:  "NilStringValues sentinel Tags",
+			group: func() *models.GroupInfo { return &models.GroupInfo{Tags: models.NilStringValues} },
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := newProcessor(t)
+			// A group needs at least one event to be collected downstream.
+			logEvent := models.NewLog("test_log", []byte("body"), "", "", "", models.NewTags(), 0)
+			group := &models.PipelineGroupEvents{
+				Group:  tt.group(),
+				Events: []models.PipelineEvent{logEvent},
+			}
+			context := helper.NewObservePipelineContext(10)
+			c.Process(group, context)
+
+			results := context.Collector().ToArray()
+			require.Equal(t, 1, len(results))
+			tags := results[0].Group.GetTags()
+			require.True(t, tags.Contains("__instance_id__"))
+			require.Equal(t, "id_xxx", tags.Get("__instance_id__"))
+			// Event still passes through unchanged.
+			require.Equal(t, 1, len(results[0].Events))
+			require.Equal(t, logEvent, results[0].Events[0])
+		})
+	}
+}
+
 // Test_cloudMeta_Process_NoMetaPassThrough asserts the guard: when the platform
 // meta provider is unavailable (no manager), group tags are left untouched and
 // events still pass through.
