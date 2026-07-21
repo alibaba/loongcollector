@@ -56,7 +56,7 @@ func (p *ProcessorOtelMetricParser) ProcessLogs(logArray []*protocol.Log) []*pro
 	var logs = make([]*protocol.Log, 0)
 	for _, log := range logArray {
 		if l, err := p.processLog(log); err != nil {
-			logger.Warningf(p.context.GetRuntimeContext(), selfmonitor.ProcessorOTELTraceParserAlarm, "parser otel trace error %v", err)
+			logger.Warningf(p.context.GetRuntimeContext(), selfmonitor.ProcessorOTELMetricParserAlarm, "parser otel metric error %v", err)
 		} else {
 			logs = append(logs, l...)
 		}
@@ -174,7 +174,7 @@ func (p *ProcessorOtelMetricParser) Process(in *models.PipelineGroupEvents, cont
 		groups, err := p.convertLogToMetricGroups(log)
 		if err != nil {
 			// Mirror v1 ProcessLogs error handling: log and skip.
-			logger.Warningf(p.context.GetRuntimeContext(), selfmonitor.ProcessorOTELTraceParserAlarm, "parser otel metric error %v", err)
+			logger.Warningf(p.context.GetRuntimeContext(), selfmonitor.ProcessorOTELMetricParserAlarm, "parser otel metric error %v", err)
 			continue
 		}
 		for _, group := range groups {
