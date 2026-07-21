@@ -407,9 +407,8 @@ func (d *EtwInput) createSession(options ...etwSessionOption) (etwSession, error
 	if sessionName == "" {
 		sessionName = d.SessionName
 	}
-	logger.Warningf(d.context.GetRuntimeContext(),
-		etwAlarmType, "ETW session %q already exists; stopping stale session before recreate", sessionName)
-	if killErr := killEtwSession(sessionName); killErr != nil {
+	logger.Infof(d.context.GetRuntimeContext(),
+		"ETW session %q already exists; stopping stale session before recreate", sessionName)
 		return nil, fmt.Errorf("stop existing ETW session %q: %w", sessionName, killErr)
 	}
 
