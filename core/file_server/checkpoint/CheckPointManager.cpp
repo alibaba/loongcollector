@@ -47,12 +47,7 @@ bool CheckPointManager::CheckVersion() {
     return (mLoadVersion == NO_CHECKPOINT_VERSION) || (mLoadVersion / 10000 == INT32_FLAG(check_point_version) / 10000);
 }
 
-namespace {
-// A checkpoint's physical file still exists when its path currently resolves to the
-// same (dev, inode). After a fake rotation the deleted file's path is gone or points
-// to a different inode, so such a checkpoint is treated as stale. Both the host path
-// and the resolved real path are probed so a rotated-but-present file is not misjudged.
-bool CheckPointFileStillExists(const CheckPoint& checkPoint) {
+bool CheckPointManager::CheckPointFileStillExists(const CheckPoint& checkPoint) {
     if (checkPoint.mDevInode == GetFileDevInode(checkPoint.mFileName)) {
         return true;
     }
@@ -61,7 +56,6 @@ bool CheckPointFileStillExists(const CheckPoint& checkPoint) {
     }
     return false;
 }
-} // namespace
 
 void CheckPointManager::AddCheckPoint(CheckPoint* checkPointPtr) {
     CheckPointPtr newCheckPoint(checkPointPtr);
