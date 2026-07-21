@@ -135,11 +135,6 @@ func (s *Syslog) Start(collector pipeline.Collector) error {
 		return fmt.Errorf("unknown protocol '%s' in '%s'", scheme, host)
 	}
 
-	// Auto-configure rsyslog if enabled
-	if s.AutoConfigRsyslog {
-		s.configureRsyslogIfNeeded(scheme, host)
-	}
-
 	if s.isStream {
 		l, err := net.Listen(scheme, host)
 		if err != nil {
@@ -164,6 +159,12 @@ func (s *Syslog) Start(collector pipeline.Collector) error {
 
 		s.wg.Add(1)
 		go s.listenPacket(collector)
+	}
+
+	// Auto-configure rsyslog only after the listener is bound successfully, so a
+	// failed bind never leaves rsyslog forwarding to an unlistened port.
+	if s.AutoConfigRsyslog {
+		s.configureRsyslogIfNeeded(scheme, host)
 	}
 
 	return nil
