@@ -1195,6 +1195,12 @@ void AppConfig::LoadResourceConf(const Json::Value& confJson) {
             mBindInterface.clear();
         LOG_INFO(sLogger, ("bind_interface", mBindInterface));
     }
+    // working_interface takes precedence over bind_interface, so the egress binding matches the
+    // interface GetHostIp resolves the reported IP from. The flag is already parsed at this point.
+    if (!STRING_FLAG(working_interface).empty()) {
+        mBindInterface = STRING_FLAG(working_interface);
+        LOG_INFO(sLogger, ("bind_interface overridden by working_interface", mBindInterface));
+    }
 
     // mSendRequestConcurrency was limited
     if (mSendRequestConcurrency < MIN_SEND_REQUEST_CONCURRENCY) {
@@ -1204,16 +1210,6 @@ void AppConfig::LoadResourceConf(const Json::Value& confJson) {
         mSendRequestConcurrency = MAX_SEND_REQUEST_CONCURRENCY;
     }
     mSendRequestGlobalConcurrency = mSendRequestConcurrency * (1 + GLOBAL_CONCURRENCY_FREE_PERCENTAGE_FOR_ONE_REGION);
-}
-
-const std::string& AppConfig::GetBindInterface() const {
-    // When working_interface is configured, it takes precedence over bind_interface so that
-    // outgoing data sockets (curl CURLOPT_INTERFACE) bind to the same interface used to resolve
-    // the reported host IP (GetHostIp), keeping the reported IP and the actual egress consistent.
-    if (!STRING_FLAG(working_interface).empty()) {
-        return STRING_FLAG(working_interface);
-    }
-    return mBindInterface;
 }
 
 bool AppConfig::CheckAndResetProxyEnv() {
