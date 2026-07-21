@@ -28,7 +28,7 @@ dev
 |  ProbeConfig  |  object  |  否  |  /  |  AgentSight 探测配置。**整体未配置**时所有子项走默认。  |
 |  ProbeConfig.Verbose  |  uint  |  否  |  `0`  |  是否打印 ebpf 的详细日志，`1` 代表开启，`0` 代表关闭  |
 |  ProbeConfig.LogPath  |  string  |  否  |  `""`  |  ebpf 日志的输出位置  |
-|  ProbeConfig.CmdlineWhitelist  |  array  |  否（**推荐填写**）  |  内置 11 条  |  进程 **agent 筛选白名单**。每一项为对象：`AgentType`（上报字段 `gen_ai.agent.type`）+ `Args`（字符串数组，与进程 cmdline 各参数（即 `argv`）按位置 glob 匹配）。**未配置**且 `CmdlineBlacklist` 也为空时注入「默认 `CmdlineWhitelist`」（见下文）；**填写后只使用用户规则**，不再叠加内置。空数组 `[]` 视为非法配置。  |
+|  ProbeConfig.CmdlineWhitelist  |  array  |  否（**推荐填写**）  |  内置 9 条  |  进程 **agent 筛选白名单**。每一项为对象：`AgentType`（上报字段 `gen_ai.agent.type`）+ `Args`（字符串数组，与进程 cmdline 各参数（即 `argv`）按位置 glob 匹配）。**未配置**且 `CmdlineBlacklist` 也为空时注入「默认 `CmdlineWhitelist`」（见下文）；**填写后只使用用户规则**，不再叠加内置。空数组 `[]` 视为非法配置。  |
 |  ProbeConfig.CmdlineBlacklist  |  array  |  否  |  /  |  进程 **agent 筛选黑名单**，每项为 glob 字符串数组（无 `AgentType`）；**命中则排除**，不采集。**优先级高于白名单**。  |
 |  ProbeConfig.Https  |  array  |  否  |  内置 6 条  |  HTTPS 加密流量的域名白名单（字符串数组，glob 通配符 `*`，不区分大小写）。访问白名单内域名的进程可被识别为采集目标。未配置时注入默认列表，见下文。  |
 |  ProbeConfig.Http  |  array  |  否  |  `[]`（关闭）  |  HTTP 明文流量的目标列表（字符串数组）。每项可为 `:端口`、`IP`、`IP:端口` 或域名（如 `model-svc.default.svc`、`*.internal.svc`）。**留空时不采集明文 HTTP 流量**。  |
@@ -108,7 +108,7 @@ graph TD
 3. **默认注入条件**：`CmdlineWhitelist` 与 `CmdlineBlacklist` **均未配置**时，注入下表；一旦配置了 **任意一条** 用户 cmdline 白名单或黑名单，则 **不再** 注入默认 cmdline。
 4. **空数组拒绝**：显式写 `CmdlineWhitelist: []` 会被视为非法配置；不写该字段才会走默认注入。
 
-**默认 `CmdlineWhitelist`（11 条）**
+**默认 `CmdlineWhitelist`（9 条）**
 
 | AgentType | Args（cmdline 各段 glob） |
 | --- | --- |
@@ -121,8 +121,6 @@ graph TD
 | `cosh` | `node*`, `*copilot-shell*` |
 | `openclaw` | `*openclaw-gatewa*` |
 | `openclaw` | `node*`, `*openclaw*` |
-| `codex` | `*codex*` |
-| `codex` | `*node*`, `*codex*` |
 
 #### 自定义示例（覆盖默认）
 
@@ -173,10 +171,10 @@ ProbeConfig:
 `gen_ai.agent.type` **只来自 cmdline 白名单**（用户配置或内置默认）中命中规则的 `AgentType`，与 `Https` / `Http` 列表无直接映射关系。按下列顺序确定：
 
 1. 进程被当前生效的 cmdline 白名单命中 → 取**第一条**命中规则的 `AgentType`。
-2. 进程仅靠 `Https` 纳入采集，且 cmdline 未命中（用户已覆盖默认时）→ 二次匹配 **内置默认 11 条**；命中则输出对应类型（如 `openclaw`）。
+2. 进程仅靠 `Https` 纳入采集，且 cmdline 未命中（用户已覆盖默认时）→ 二次匹配 **内置默认 9 条**；命中则输出对应类型（如 `openclaw`）。
 3. 仍匹配不上 → **不输出** `gen_ai.agent.type`。
 
-「只配 `Https`、不配 cmdline」是允许的：cmdline 走内置默认 11 条 + `Https` 走用户配置，互相独立生效。**`Https` / `Http` 列表中的条目本身不会作为** `gen_ai.agent.type`。
+「只配 `Https`、不配 cmdline」是允许的：cmdline 走内置默认 9 条 + `Https` 走用户配置，互相独立生效。**`Https` / `Http` 列表中的条目本身不会作为** `gen_ai.agent.type`。
 
 ### Cmdline 规则自定义写法
 
@@ -233,9 +231,9 @@ Http:
   - "*.internal.svc"
 ```
 
-### Codex 采集的版本支持说明
+### Codex 采集支持说明
 
-官方发布的 Codex CLI 目前仅支持 **0.137.0** 与 **0.141.0** 两个版本（自行编译的未 strip 版本不受此限制）。
+官方发布的 Codex CLI 是 strip 后的静态链接二进制，缺少符号表，**不支持** HTTPS 流量采集。如需采集，请使用**自行编译的未 strip 版本**（保留符号表即可自动定位 SSL 收发函数）。
 
 ### `EventStreamFormat: false`（合并日志）
 

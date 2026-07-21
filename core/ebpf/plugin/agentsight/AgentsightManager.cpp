@@ -124,8 +124,6 @@ static const std::vector<BuiltinCmdlineAllowRule>& GetBuiltinCmdlineAllowRules()
         {"cosh", {"node*", "*copilot-shell*"}},
         {"openclaw", {"*openclaw-gatewa*"}},
         {"openclaw", {"node*", "*openclaw*"}},
-        {"codex", {"*codex*"}},
-        {"codex", {"*node*", "*codex*"}},
     };
     return kRules;
 }
