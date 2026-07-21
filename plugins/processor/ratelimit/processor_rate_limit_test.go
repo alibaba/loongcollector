@@ -15,6 +15,8 @@ package ratelimit
 
 import (
 	"context"
+	"strconv"
+	"sync"
 	"testing"
 	"time"
 
@@ -236,6 +238,33 @@ func TestProcessorRateLimit_MakeKeyNoEmptyPrefix(t *testing.T) {
 
 	// Missing field yields a single empty segment, not extra leading separators.
 	assert.Equal(t, "_b", processor.makeKeyV2(newV2Log("key2", "b")))
+}
+
+// TestTokenBucketGCConcurrentNoRace guards the token-bucket GC counter reset
+// against the data race where runGC overwrote the whole atomic.Int32 counter
+// while IsAllowed atomically Add/Load it. Many goroutines cross the NumCalls GC
+// threshold together so runGC fires concurrently with in-flight IsAllowed calls;
+// under `go test -race` this fails if the reset is not done atomically.
+func TestTokenBucketGCConcurrentNoRace(t *testing.T) {
+	limit := rate{}
+	require.NoError(t, limit.Unpack("100/s"))
+	tb := newTokenBucket(limit)
+
+	const (
+		goroutines = 8
+		perG       = 3000 // 8*3000 = 24000 > NumCalls threshold (10000)
+	)
+	var wg sync.WaitGroup
+	wg.Add(goroutines)
+	for g := 0; g < goroutines; g++ {
+		go func(g int) {
+			defer wg.Done()
+			for i := 0; i < perG; i++ {
+				tb.IsAllowed("key" + strconv.Itoa((g*perG+i)%64))
+			}
+		}(g)
+	}
+	wg.Wait()
 }
 
 // TestProcessorRateLimit_ProcessV2Fields verifies the per-key limiting when
