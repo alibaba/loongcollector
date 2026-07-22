@@ -71,6 +71,8 @@ public:
     bool mAgentsightEventStreamFormat = true;
     /// When true, omit system instructions, tool definitions, and full input messages (per dedup).
     bool mAgentsightMessageDeltaOnly = true;
+    /// When true, forward raw HTTPS fallback events (unparsable traffic from attached processes).
+    bool mAgentsightEnableRawHttps = false;
 };
 
 /////////////////////  /////////////////////
