@@ -40,6 +40,12 @@ static std::string CopyProcessName(const char name[16]) {
     return std::string(name, strnlen(name, 16U));
 }
 
+static std::string CopyCmdline(const char cmdline[128]) {
+    // agentsight.h: cmdline is a fixed char[128] buffer, space-joined argv truncated to 127 bytes
+    // and NUL-terminated (empty when the process has already exited). Bound the read to the buffer.
+    return std::string(cmdline, strnlen(cmdline, 128U));
+}
+
 AgentsightLlmRecord::AgentsightLlmRecord(std::string pipelineConfigName, const AgentsightLLMData& d)
     : CommonEvent(KernelEventType::AGENTSIGHT_LLM_RECORD), mPipelineConfigName(std::move(pipelineConfigName)) {
     mSessionId = CopyCStr(d.session_id);
@@ -57,7 +63,9 @@ AgentsightLlmRecord::AgentsightLlmRecord(std::string pipelineConfigName, const A
     mCacheCreationInputTokens = d.cache_creation_input_tokens;
     mCacheReadInputTokens = d.cache_read_input_tokens;
     mProcessName = CopyProcessName(d.process_name);
+    mCmdline = CopyCmdline(d.cmdline);
     mAgentType = CopyCStr(d.agent_name);
+    mContainerId = CopyCStr(d.container_id);
     mRequestUrl = CopyCStr(d.request_url);
     mProvider = CopyCStr(d.provider);
     mModel = CopyCStr(d.model);

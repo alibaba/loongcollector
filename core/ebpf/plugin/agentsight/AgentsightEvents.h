@@ -49,7 +49,13 @@ public:
     uint32_t mCacheCreationInputTokens = 0;
     uint32_t mCacheReadInputTokens = 0;
     std::string mProcessName;
+    // Space-joined process command line (argv), truncated to 127 bytes; empty when the
+    // process has already exited. Maps to AgentsightLLMData.cmdline (char[128]).
+    std::string mCmdline;
     std::string mAgentType;
+    // Container id resolved from the pid on the agentsight side; empty when the process is
+    // not in a container (or resolution failed). Maps to AgentsightLLMData.container_id.
+    std::string mContainerId;
     std::string mRequestUrl;
     std::string mProvider;
     std::string mModel;
