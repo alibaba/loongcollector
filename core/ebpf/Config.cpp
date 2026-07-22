@@ -690,6 +690,7 @@ bool SecurityOptions::Init(SecurityProbeType probeType,
         mAgentsightHttp.clear();
         mAgentsightEventStreamFormat = true;
         mAgentsightMessageDeltaOnly = true;
+        mAgentsightEnableRawHttps = false;
     }
 
     SecurityOption thisSecurityOption;
@@ -748,6 +749,11 @@ bool SecurityOptions::Init(SecurityProbeType probeType,
                 }
                 if (innerConfig.isMember("MessageDeltaOnly")) {
                     if (!GetOptionalBoolParam(innerConfig, "MessageDeltaOnly", mAgentsightMessageDeltaOnly, errorMsg)) {
+                        warnOptionalParse();
+                    }
+                }
+                if (innerConfig.isMember("EnableRawHttps")) {
+                    if (!GetOptionalBoolParam(innerConfig, "EnableRawHttps", mAgentsightEnableRawHttps, errorMsg)) {
                         warnOptionalParse();
                     }
                 }

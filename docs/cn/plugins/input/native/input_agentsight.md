@@ -34,6 +34,7 @@ dev
 |  ProbeConfig.Http  |  array  |  否  |  `[]`（关闭）  |  HTTP 明文流量的目标列表（字符串数组）。每项可为 `:端口`、`IP`、`IP:端口` 或域名（如 `model-svc.default.svc`、`*.internal.svc`）。**留空时不采集明文 HTTP 流量**。  |
 |  ProbeConfig.EventStreamFormat  |  bool  |  否  |  `true`  |  为 `true` 时，每次 LLM 调用在同一 `PipelineEventGroup` 内输出两条日志（各有 `event.id`）：`event.name=gen_ai.model.request`（请求开始时间戳）与 `gen_ai.model.response`（请求结束时间戳）。为 `false` 时输出单条合并日志，**无** `event.name` / `event.id`。  |
 |  ProbeConfig.MessageDeltaOnly  |  bool  |  否  |  `true`  |  为 `true` 时**不**输出全量 `gen_ai.input.messages`；仍输出 `gen_ai.input.messages_delta`、`gen_ai.system_instructions_hash` / `gen_ai.tool.definitions_hash`（非空时），以及 hash 相对上一轮变化时的 `gen_ai.system_instructions` / `gen_ai.tool.definitions`。为 `false` 时**每次**输出非空的全量 `gen_ai.input.messages`。**不影响** `gen_ai.output.messages`；`messages_delta` 及 session 状态维护**不受**本开关影响。  |
+|  ProbeConfig.EnableRawHttps  |  bool  |  否  |  `false`  |  是否上报**不可解析的 raw HTTPS 流量**。默认 `false`，即只采集可识别为 LLM API 调用的流量；为 `true` 时，被纳入采集的进程发出的、无法解析为 LLM 语义的 HTTPS 流量会以 fallback 事件（`http.request`/`http.response`）额外上报，见下文。  |
 
 ### `AgentType` 取值命名规范
 
@@ -329,6 +330,19 @@ Http:
 - 每次 LLM 调用 **一条** 日志，**无** `event.name`、**无** `event.id`；时间戳为请求开始时刻。
 - **有**：关联字段、HTTP/`usage` 元数据、`gen_ai.input.messages_delta`（非空时）、system/tools hash（非空时）、hash 变化时的 system/tools 全文、`gen_ai.output.messages`。
 - **无**：全量 `gen_ai.input.messages`、拆分后的 `gen_ai.model.request` / `gen_ai.model.response`。
+
+### 不可解析 HTTPS 流量（fallback）
+
+**默认关闭**。仅当 `ProbeConfig.EnableRawHttps: true` 时启用：被纳入采集的进程（见「黑白名单判定逻辑」）发出的 HTTPS 流量，若无法解析为 LLM API 调用，会以 **fallback 事件** 形式上报原始 HTTP 报文，**不受** `Https` 域名列表、`EventStreamFormat` 与 `MessageDeltaOnly` 影响。关闭时（默认）底层不会构造或入队这类 fallback 事件。收到完整响应的 HTTPS 交互输出 **两条** 日志，共享同一 `event.id`：
+
+| `event.name` | 时间戳 | 主要字段 |
+| :--- | :--- | :--- |
+| `http.request` | 请求开始时刻 | `url.scheme=https`、`http.request.method`、`url.path`、`server.address` / `server.port`（从请求头 `host`/`:authority` 提取，可提取时）、`http.request.header`（请求头整包 JSON）、`http.request.body.content` / `http.request.body.size`（非空时） |
+| `http.response` | 请求开始 + 耗时 | `url.scheme=https`、`http.response.status_code`、`is_sse`、`http.response.header`（响应头整包 JSON）、`http.response.body.content` / `http.response.body.size`（非空时） |
+
+两条日志均包含：`event.id`、`pid`、`comm`、`time_unix_nano`、`observed_time_unix_nano`。
+
+若只捕获到请求、尚未收到响应（RequestOnly），仅输出 `http.request`，不生成 `http.response`。
 
 ## 样例
 

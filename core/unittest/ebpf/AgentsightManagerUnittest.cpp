@@ -20,11 +20,15 @@
 #include <variant>
 
 #include "collection_pipeline/CollectionPipelineContext.h"
+#include "collection_pipeline/queue/ProcessQueueItem.h"
+#include "collection_pipeline/queue/ProcessQueueManager.h"
+#include "collection_pipeline/queue/QueueKeyManager.h"
 #include "ebpf/Config.h"
 #include "ebpf/EBPFAdapter.h"
 #include "ebpf/plugin/agentsight/AgentsightEvents.h"
 #include "ebpf/plugin/agentsight/AgentsightManager.h"
 #include "ebpf/type/FileEvent.h"
+#include "models/LogEvent.h"
 #include "unittest/Unittest.h"
 #include "unittest/ebpf/ManagerUnittestBase.h"
 
@@ -38,7 +42,7 @@ AgentsightHandle* gFakeHandle = reinterpret_cast<AgentsightHandle*>(0x20U);
 
 struct FakeReadControl {
     int start_ret = 0;
-    /// 0: always 0; 1: return 1 once then 0; 2: call LLM callback once then 0
+    /// 0: always 0; 1: return 1 once then 0; 2: call LLM callback once then 0; 3: call HTTPS callback once then 0
     int read_mode = 0;
     int read_step = 0;
 } gRead;
@@ -74,6 +78,12 @@ int g_ut_cmdline_allow_calls = 0;
 int g_ut_cmdline_deny_calls = 0;
 int g_ut_https_calls = 0;
 int g_ut_http_calls = 0;
+std::vector<int> g_ut_raw_https_values;
+
+void fake_config_set_enable_raw_https(AgentsightConfigHandle* cfg, int enabled) {
+    (void)cfg;
+    g_ut_raw_https_values.push_back(enabled);
+}
 
 void fake_config_add_cmdline_rule(AgentsightConfigHandle* cfg,
                                   const char* const* rule,
@@ -131,10 +141,11 @@ int fake_get_eventfd(AgentsightHandle* h) {
 
 // Static so pointers remain valid in LLM callback
 static AgentsightLLMData sUtLlmData{};
+static AgentsightHttpsData sUtHttpsData{};
 
 int fake_handle_read(AgentsightHandle* h,
-                     agentsight_https_callback_fn,
-                     void*,
+                     agentsight_https_callback_fn https,
+                     void* https_user_data,
                      agentsight_llm_callback_fn llm,
                      void* user_data,
                      int flags) {
@@ -166,6 +177,36 @@ int fake_handle_read(AgentsightHandle* h,
         gRead.read_mode = 0;
         return 1;
     }
+    if (gRead.read_mode == 3) {
+        static const char method[] = "POST";
+        static const char path[] = "/v1/custom";
+        static const char reqHeaders[] = "{\"host\":\"my-svc.example.com:8443\"}";
+        static const char reqBody[] = "{\"q\":1}";
+        static const char respHeaders[] = "{\"content-type\":\"application/octet-stream\"}";
+        static const char respBody[] = "{\"a\":1}";
+        std::memset(&sUtHttpsData, 0, sizeof(sUtHttpsData));
+        sUtHttpsData.pid = 4321;
+        std::memcpy(sUtHttpsData.process_name, "utp", 3U);
+        sUtHttpsData.timestamp_ns = 1700000000000000000ULL;
+        sUtHttpsData.duration_ns = 1500000000ULL;
+        sUtHttpsData.method = method;
+        sUtHttpsData.path = path;
+        sUtHttpsData.status_code = 502;
+        sUtHttpsData.is_sse = 1;
+        sUtHttpsData.request_headers = reqHeaders;
+        sUtHttpsData.request_headers_len = static_cast<uint32_t>(sizeof(reqHeaders) - 1U);
+        sUtHttpsData.request_body = reqBody;
+        sUtHttpsData.request_body_len = static_cast<uint32_t>(sizeof(reqBody) - 1U);
+        sUtHttpsData.response_headers = respHeaders;
+        sUtHttpsData.response_headers_len = static_cast<uint32_t>(sizeof(respHeaders) - 1U);
+        sUtHttpsData.response_body = respBody;
+        sUtHttpsData.response_body_len = static_cast<uint32_t>(sizeof(respBody) - 1U);
+        if (https != nullptr) {
+            https(&sUtHttpsData, https_user_data);
+        }
+        gRead.read_mode = 0;
+        return 1;
+    }
     return 0;
 }
 
@@ -176,6 +217,7 @@ std::unique_ptr<AgentSightSymbolTable> makeFullSymbolTable() {
     t->config_free = fake_config_free;
     t->config_set_verbose = fake_config_set_verbose;
     t->config_set_log_path = fake_config_set_log_path;
+    t->config_set_enable_raw_https = fake_config_set_enable_raw_https;
     t->config_add_cmdline_rule = fake_config_add_cmdline_rule;
     t->config_add_https = fake_config_add_https;
     t->config_add_http = fake_config_add_http;
@@ -196,6 +238,36 @@ std::shared_ptr<AgentsightLlmRecord> makeMinimalLlmRecord(const char* configName
     data.response_id = "resp-ut";
     data.timestamp_ns = 1U;
     return std::make_shared<AgentsightLlmRecord>(std::string(configName), data);
+}
+
+std::shared_ptr<AgentsightHttpsRecord> makeHttpsRecord(
+    const char* configName,
+    const char* requestHeaders = "{\"host\":\"my-svc.example.com:8443\",\"content-type\":\"application/json\"}",
+    uint16_t statusCode = 502) {
+    static const char method[] = "POST";
+    static const char path[] = "/v1/custom";
+    static const char reqBody[] = "{\"unparsable\":true}";
+    static const char respHeaders[] = "{\"content-type\":\"application/octet-stream\"}";
+    static const char respBody[] = "{\"raw\":\"bytes\"}";
+    static AgentsightHttpsData d{};
+    std::memset(&d, 0, sizeof(d));
+    d.pid = 4321;
+    std::memcpy(d.process_name, "ut-agent", 8U);
+    d.timestamp_ns = 1700000000000000000ULL;
+    d.duration_ns = statusCode == 0 ? 0 : 1500000000ULL;
+    d.method = method;
+    d.path = path;
+    d.status_code = statusCode;
+    d.is_sse = statusCode == 0 ? 0 : 1;
+    d.request_headers = requestHeaders;
+    d.request_headers_len = static_cast<uint32_t>(std::strlen(requestHeaders));
+    d.request_body = reqBody;
+    d.request_body_len = static_cast<uint32_t>(sizeof(reqBody) - 1U);
+    d.response_headers = statusCode == 0 ? nullptr : respHeaders;
+    d.response_headers_len = statusCode == 0 ? 0 : static_cast<uint32_t>(sizeof(respHeaders) - 1U);
+    d.response_body = statusCode == 0 ? nullptr : respBody;
+    d.response_body_len = statusCode == 0 ? 0 : static_cast<uint32_t>(sizeof(respBody) - 1U);
+    return std::make_shared<AgentsightHttpsRecord>(std::string(configName), d);
 }
 
 class AgentSightTestEBPFAdapter : public EBPFAdapter {
@@ -239,6 +311,7 @@ public:
         g_ut_cmdline_deny_calls = 0;
         g_ut_https_calls = 0;
         g_ut_http_calls = 0;
+        g_ut_raw_https_values.clear();
         auto& o = agentsightOptions();
         o.mAgentsightCmdlineWhitelist.clear();
         o.mAgentsightCmdlineBlacklist.clear();
@@ -264,6 +337,7 @@ public:
         o.mProbeType = SecurityProbeType::AGENTSIGHT_OBSERVE;
         o.mVerbose = 0;
         o.mLogPath.clear();
+        o.mAgentsightEnableRawHttps = false;
         return o;
     }
 
@@ -294,14 +368,19 @@ public:
 
     void TestAddOrUpdateValidation();
     void TestAddOrUpdateNoSymbols();
+    void TestMissingRawHttpsSetter();
     void TestRestartStartFailure();
     void TestConfigNewNull();
     void TestAddRemoveDestroy();
     void TestSecondAddOrUpdate();
     void TestOnEpollDrain();
+    void TestOnEpollDrainHttps();
+    void TestOnEpollDrainHttpsGatedOff();
     void TestOnEpollNoHandle();
     void TestAddOrUpdateInvalidEventFd();
     void TestHandleEventBranches();
+    void TestHandleHttpsEvent();
+    void TestHandleHttpsRequestOnlyAndIpv6();
     void TestResumeInvalidOptions();
     void TestResumeWithNoRegistration();
     void TestSuspend();
@@ -356,6 +435,22 @@ void AgentsightManagerUnittest::TestAddOrUpdateNoSymbols() {
     mAgentSightAdapter->setAgentSightSymbols(makeFullSymbolTable());
 }
 
+void AgentsightManagerUnittest::TestMissingRawHttpsSetter() {
+    auto symbols = makeFullSymbolTable();
+    symbols->config_set_enable_raw_https = nullptr;
+    mAgentSightAdapter->setAgentSightSymbols(std::move(symbols));
+
+    auto mgr = makeManager();
+    CollectionPipelineContext ctx;
+    ctx.SetConfigName("p1");
+    ctx.SetProcessQueueKey(1);
+    APSARA_TEST_NOT_EQUAL(0, mgr->AddOrUpdateConfig(&ctx, 0, nullptr, asVariant()));
+    APSARA_TEST_EQUAL(0, mgr->RegisteredConfigCount());
+    mgr->Destroy();
+
+    mAgentSightAdapter->setAgentSightSymbols(makeFullSymbolTable());
+}
+
 void AgentsightManagerUnittest::TestRestartStartFailure() {
     gRead.start_ret = 1;
     auto mgr = makeManager();
@@ -396,9 +491,17 @@ void AgentsightManagerUnittest::TestSecondAddOrUpdate() {
     CollectionPipelineContext ctx;
     ctx.SetConfigName("p1");
     ctx.SetProcessQueueKey(1);
-    APSARA_TEST_EQUAL(0, mgr->AddOrUpdateConfig(&ctx, 0, nullptr, asVariant()));
-    APSARA_TEST_EQUAL(0, mgr->AddOrUpdateConfig(&ctx, 1, nullptr, asVariant()));
+    auto& opts = agentsightOptions();
+    APSARA_TEST_EQUAL(0, mgr->AddOrUpdateConfig(&ctx, 0, nullptr, PluginOptions(&opts)));
+    opts.mAgentsightEnableRawHttps = true;
+    APSARA_TEST_EQUAL(0, mgr->AddOrUpdateConfig(&ctx, 1, nullptr, PluginOptions(&opts)));
+    opts.mAgentsightEnableRawHttps = false;
+    APSARA_TEST_EQUAL(0, mgr->AddOrUpdateConfig(&ctx, 1, nullptr, PluginOptions(&opts)));
     APSARA_TEST_EQUAL(1, mgr->RegisteredConfigCount());
+    APSARA_TEST_EQUAL(3UL, g_ut_raw_https_values.size());
+    APSARA_TEST_EQUAL(0, g_ut_raw_https_values[0]);
+    APSARA_TEST_EQUAL(1, g_ut_raw_https_values[1]);
+    APSARA_TEST_EQUAL(0, g_ut_raw_https_values[2]);
     mgr->RemoveConfig("p1");
     mgr->Destroy();
 }
@@ -437,6 +540,60 @@ void AgentsightManagerUnittest::TestOnEpollDrain() {
     mgr->Destroy();
 }
 
+void AgentsightManagerUnittest::TestOnEpollDrainHttps() {
+    auto mgr = makeManager();
+    CollectionPipelineContext ctx;
+    ctx.SetConfigName("p1");
+    ctx.SetProcessQueueKey(1);
+    auto& opts = agentsightOptions();
+    opts.mAgentsightEnableRawHttps = true; // gate on: HTTPS callback registered
+    APSARA_TEST_EQUAL(0, mgr->AddOrUpdateConfig(&ctx, 0, nullptr, PluginOptions(&opts)));
+
+    gRead.read_mode = 3;
+    APSARA_TEST_NOT_EQUAL(0, mgr->OnEpollReadable());
+    gRead = decltype(gRead){};
+
+    // The HTTPS callback must have enqueued exactly one deep-copied record.
+    std::shared_ptr<CommonEvent> evt;
+    APSARA_TEST_TRUE(mEventQueue->try_dequeue(evt));
+    auto* rec = static_cast<AgentsightHttpsRecord*>(evt.get());
+    APSARA_TEST_EQUAL(KernelEventType::AGENTSIGHT_HTTPS_RECORD, evt->GetKernelEventType());
+    APSARA_TEST_EQUAL("p1", rec->GetPipelineConfigName());
+    APSARA_TEST_EQUAL(4321, rec->mPid);
+    APSARA_TEST_EQUAL("utp", rec->mProcessName);
+    APSARA_TEST_EQUAL(1700000000000000000ULL, rec->mTimestampNs);
+    APSARA_TEST_EQUAL(1500000000ULL, rec->mDurationNs);
+    APSARA_TEST_EQUAL("POST", rec->mMethod);
+    APSARA_TEST_EQUAL("/v1/custom", rec->mPath);
+    APSARA_TEST_EQUAL(502, rec->mStatusCode);
+    APSARA_TEST_EQUAL(1, rec->mIsSse);
+    APSARA_TEST_EQUAL("{\"host\":\"my-svc.example.com:8443\"}", rec->mRequestHeaders);
+    APSARA_TEST_EQUAL("{\"q\":1}", rec->mRequestBody);
+    APSARA_TEST_EQUAL("{\"content-type\":\"application/octet-stream\"}", rec->mResponseHeaders);
+    APSARA_TEST_EQUAL("{\"a\":1}", rec->mResponseBody);
+
+    mgr->Destroy();
+}
+
+void AgentsightManagerUnittest::TestOnEpollDrainHttpsGatedOff() {
+    auto mgr = makeManager();
+    CollectionPipelineContext ctx;
+    ctx.SetConfigName("p1");
+    ctx.SetProcessQueueKey(1);
+    // Default gate (EnableRawHttps=false): HTTPS callback passed as nullptr, so the fallback
+    // event is consumed by coolbpf and dropped -- nothing must be enqueued.
+    APSARA_TEST_EQUAL(0, mgr->AddOrUpdateConfig(&ctx, 0, nullptr, asVariant()));
+
+    gRead.read_mode = 3;
+    APSARA_TEST_NOT_EQUAL(0, mgr->OnEpollReadable());
+    gRead = decltype(gRead){};
+
+    std::shared_ptr<CommonEvent> evt;
+    APSARA_TEST_FALSE(mEventQueue->try_dequeue(evt));
+
+    mgr->Destroy();
+}
+
 void AgentsightManagerUnittest::TestAddOrUpdateInvalidEventFd() {
     auto mgr = makeManager();
     CollectionPipelineContext ctx;
@@ -470,6 +627,113 @@ void AgentsightManagerUnittest::TestHandleEventBranches() {
     auto rec2 = std::make_shared<AgentsightLlmRecord>(std::string("p1"), d);
     APSARA_TEST_EQUAL(0, mgr->HandleEvent(rec2));
     mgr->Destroy();
+}
+
+void AgentsightManagerUnittest::TestHandleHttpsEvent() {
+    const QueueKey queueKey = QueueKeyManager::GetInstance()->GetKey("p_https");
+    CollectionPipelineContext ctx;
+    ctx.SetConfigName("p_https");
+    ProcessQueueManager::GetInstance()->CreateOrUpdateCountBoundedQueue(queueKey, 0, ctx);
+    ProcessQueueManager::GetInstance()->EnablePop("p_https");
+
+    auto mgr = makeManager();
+    // Before AddOrUpdateConfig, mPipelineCtx is null: event is dropped silently.
+    APSARA_TEST_EQUAL(0, mgr->HandleEvent(makeHttpsRecord("orphan")));
+
+    ctx.SetProcessQueueKey(queueKey);
+    APSARA_TEST_EQUAL(0, mgr->AddOrUpdateConfig(&ctx, 0, nullptr, asVariant()));
+
+    APSARA_TEST_EQUAL(0, mgr->HandleEvent(makeHttpsRecord("p_https")));
+
+    std::unique_ptr<ProcessQueueItem> item;
+    std::string configName;
+    APSARA_TEST_TRUE(ProcessQueueManager::GetInstance()->PopItem(0, item, configName));
+    if (!item) {
+        return;
+    }
+    APSARA_TEST_EQUAL("p_https", configName);
+    const auto& events = item->mEventGroup.GetEvents();
+    APSARA_TEST_EQUAL(2UL, events.size());
+
+    const auto* req = events[0].Get<LogEvent>();
+    const auto* resp = events[1].Get<LogEvent>();
+
+    // Shared correlation id and request-side fields.
+    APSARA_TEST_TRUE(req->HasContent("event.id"));
+    APSARA_TEST_EQUAL(req->GetContent("event.id").to_string(), resp->GetContent("event.id").to_string());
+    APSARA_TEST_EQUAL("http.request", req->GetContent("event.name"));
+    APSARA_TEST_EQUAL("http.response", resp->GetContent("event.name"));
+    APSARA_TEST_EQUAL("4321", req->GetContent("pid"));
+    APSARA_TEST_EQUAL("ut-agent", req->GetContent("comm"));
+    APSARA_TEST_EQUAL("https", req->GetContent("url.scheme"));
+    APSARA_TEST_EQUAL("POST", req->GetContent("http.request.method"));
+    APSARA_TEST_EQUAL("/v1/custom", req->GetContent("url.path"));
+    APSARA_TEST_EQUAL("my-svc.example.com", req->GetContent("server.address"));
+    APSARA_TEST_EQUAL("8443", req->GetContent("server.port"));
+    APSARA_TEST_TRUE(req->HasContent("http.request.header"));
+    APSARA_TEST_EQUAL("{\"unparsable\":true}", req->GetContent("http.request.body.content"));
+    APSARA_TEST_EQUAL(std::to_string(std::string("{\"unparsable\":true}").size()),
+                      req->GetContent("http.request.body.size"));
+
+    // Response-side fields.
+    APSARA_TEST_EQUAL("https", resp->GetContent("url.scheme"));
+    APSARA_TEST_EQUAL("502", resp->GetContent("http.response.status_code"));
+    APSARA_TEST_EQUAL("1", resp->GetContent("is_sse"));
+    APSARA_TEST_TRUE(resp->HasContent("http.response.header"));
+    APSARA_TEST_EQUAL("{\"raw\":\"bytes\"}", resp->GetContent("http.response.body.content"));
+    APSARA_TEST_EQUAL(std::to_string(std::string("{\"raw\":\"bytes\"}").size()),
+                      resp->GetContent("http.response.body.size"));
+
+    // Timestamps: request at timestamp_ns, response at timestamp_ns + duration_ns.
+    APSARA_TEST_EQUAL(1700000000, req->GetTimestamp());
+    APSARA_TEST_EQUAL(1700000000 + 1, resp->GetTimestamp());
+    APSARA_TEST_TRUE(resp->GetTimestampNanosecond().has_value());
+    APSARA_TEST_EQUAL(500000000U, resp->GetTimestampNanosecond().value());
+
+    mgr->Destroy();
+    ProcessQueueManager::GetInstance()->DeleteQueue(queueKey);
+}
+
+void AgentsightManagerUnittest::TestHandleHttpsRequestOnlyAndIpv6() {
+    const QueueKey queueKey = QueueKeyManager::GetInstance()->GetKey("p_https_edges");
+    CollectionPipelineContext ctx;
+    ctx.SetConfigName("p_https_edges");
+    ctx.SetProcessQueueKey(queueKey);
+    ProcessQueueManager::GetInstance()->CreateOrUpdateCountBoundedQueue(queueKey, 0, ctx);
+    ProcessQueueManager::GetInstance()->EnablePop("p_https_edges");
+
+    auto mgr = makeManager();
+    APSARA_TEST_EQUAL(0, mgr->AddOrUpdateConfig(&ctx, 0, nullptr, asVariant()));
+
+    APSARA_TEST_EQUAL(
+        0,
+        mgr->HandleEvent(makeHttpsRecord("p_https_edges", "{\":authority\":\"[2001:db8::1]:9443\"}", 200)));
+    std::unique_ptr<ProcessQueueItem> item;
+    std::string configName;
+    APSARA_TEST_TRUE(ProcessQueueManager::GetInstance()->PopItem(0, item, configName));
+    APSARA_TEST_TRUE(item != nullptr);
+    if (item) {
+        const auto& events = item->mEventGroup.GetEvents();
+        APSARA_TEST_EQUAL(2UL, events.size());
+        const auto* request = events[0].Get<LogEvent>();
+        APSARA_TEST_EQUAL("2001:db8::1", request->GetContent("server.address"));
+        APSARA_TEST_EQUAL("9443", request->GetContent("server.port"));
+    }
+
+    APSARA_TEST_EQUAL(0, mgr->HandleEvent(makeHttpsRecord("p_https_edges", "{\"host\":\"request-only\"}", 0)));
+    item.reset();
+    APSARA_TEST_TRUE(ProcessQueueManager::GetInstance()->PopItem(0, item, configName));
+    APSARA_TEST_TRUE(item != nullptr);
+    if (item) {
+        const auto& events = item->mEventGroup.GetEvents();
+        APSARA_TEST_EQUAL(1UL, events.size());
+        const auto* request = events[0].Get<LogEvent>();
+        APSARA_TEST_EQUAL("http.request", request->GetContent("event.name"));
+        APSARA_TEST_EQUAL("request-only", request->GetContent("server.address"));
+    }
+
+    mgr->Destroy();
+    ProcessQueueManager::GetInstance()->DeleteQueue(queueKey);
 }
 
 void AgentsightManagerUnittest::TestResumeInvalidOptions() {
@@ -623,14 +887,19 @@ void AgentsightManagerUnittest::TestSessionInputCacheLruEviction() {
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestGetPluginType);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestAddOrUpdateValidation);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestAddOrUpdateNoSymbols);
+UNIT_TEST_CASE(AgentsightManagerUnittest, TestMissingRawHttpsSetter);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestRestartStartFailure);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestConfigNewNull);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestAddRemoveDestroy);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestSecondAddOrUpdate);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestOnEpollNoHandle);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestOnEpollDrain);
+UNIT_TEST_CASE(AgentsightManagerUnittest, TestOnEpollDrainHttps);
+UNIT_TEST_CASE(AgentsightManagerUnittest, TestOnEpollDrainHttpsGatedOff);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestAddOrUpdateInvalidEventFd);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestHandleEventBranches);
+UNIT_TEST_CASE(AgentsightManagerUnittest, TestHandleHttpsEvent);
+UNIT_TEST_CASE(AgentsightManagerUnittest, TestHandleHttpsRequestOnlyAndIpv6);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestResumeInvalidOptions);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestResumeWithNoRegistration);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestSuspend);
