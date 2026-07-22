@@ -28,6 +28,7 @@ public:
     void SendMetrics();
     void Reset();
     void SetAutoMetricMeta(double scrapeDurationSeconds, bool upState, const std::string& scrapeState);
+    void ClearEventGroup();
 
     size_t mRawSize = 0;
     static size_t mMaxSampleLength;
