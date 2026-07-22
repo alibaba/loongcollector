@@ -32,6 +32,30 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestGetAddressPartsHostFormat(t *testing.T) {
+	cases := []struct {
+		address    string
+		wantScheme string
+		wantHost   string
+	}{
+		{"tcp://127.0.0.1:9000", "tcp", "127.0.0.1:9000"},
+		{"udp://127.0.0.1", "udp", "127.0.0.1:6514"}, // default port
+		{"tcp6://[::1]:9000", "tcp6", "[::1]:9000"},  // IPv6 must stay bracketed
+		{"tcp6://[::1]", "tcp6", "[::1]:6514"},       // IPv6 + default port
+	}
+	for _, c := range cases {
+		scheme, host, err := getAddressParts(c.address)
+		require.NoError(t, err, "address=%q", c.address)
+		assert.Equal(t, c.wantScheme, scheme, "address=%q", c.address)
+		assert.Equal(t, c.wantHost, host, "address=%q", c.address)
+
+		// The produced host must round-trip through net.SplitHostPort, which is what
+		// parseTargetPort relies on to derive the rsyslog target.
+		_, _, splitErr := net.SplitHostPort(host)
+		require.NoError(t, splitErr, "address=%q host=%q", c.address, host)
+	}
+}
+
 func TestStartAndStop(t *testing.T) {
 	ctx := &pluginmanager.ContextImp{}
 	ctx.InitContext("test_project", "test_logstore", "test_configname")

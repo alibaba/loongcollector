@@ -132,8 +132,14 @@ static const std::vector<const char*>& GetBuiltinHttpsAllowRules() {
     static const std::vector<const char*> kRules = {
         "api.openai.com",
         "api.anthropic.com",
+        // DashScope/Bailian shared domains (pay-as-you-go)
         "dashscope.aliyuncs.com",
         "dashscope-intl.aliyuncs.com",
+        "dashscope-us.aliyuncs.com",
+        // Coding Plan domain
+        "coding.dashscope.aliyuncs.com",
+        // Workspace-dedicated / trial / Token Plan domains (dynamic prefixes)
+        "*.maas.aliyuncs.com",
     };
     return kRules;
 }
@@ -286,6 +292,8 @@ void FillAgentsightCommonCorrelation(const AgentsightLlmRecord& rec,
         log->SetContent("pid", std::to_string(rec.mPid));
     }
     setStr(StringView("comm"), rec.mProcessName);
+    setStr(StringView("cmdline"), rec.mCmdline);
+    setStr(StringView("container.id"), rec.mContainerId);
     setStr(StringView("gen_ai.agent.type"), rec.mAgentType);
 }
 

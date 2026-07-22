@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/bi-zone/etw"
 	"golang.org/x/sys/windows"
 
 	"github.com/miekg/dns"
@@ -715,7 +716,7 @@ func TestParseDNSPacketData_NXDomain(t *testing.T) {
 }
 
 func TestParseDNSPacketData_HexPrefix(t *testing.T) {
-	// Same packet with 0x prefix and spaces — should still parse
+	// Same packet with 0x prefix and spaces should still parse.
 	packetHex := "0x 1234 8180 0001 0001 0000 0000 0765" +
 		"78616d706c6503636f6d0000010001" +
 		"c00c000100010000003c00045db8d822"
@@ -831,4 +832,117 @@ func TestFormatRR_SOA(t *testing.T) {
 func TestFormatRR_SRV(t *testing.T) {
 	rr, _ := dns.NewRR("_sip._tcp.example.com. 60 IN SRV 10 60 5060 sip.example.com.")
 	assert.Equal(t, "10 60 5060 sip.example.com", formatRR(rr))
+}
+
+func TestEtwInput_RunSessionClosesSessionWhenProcessReturns(t *testing.T) {
+	input := &EtwInput{
+		ProviderGUID: "{22FB2CD6-0E7B-422B-A0C7-2FAD1FD0E716}",
+	}
+	ctx := mock.NewEmptyContext("test", "test", "test")
+	_, err := input.Init(ctx)
+	require.NoError(t, err)
+	input.prepareRun()
+
+	fake := &fakeEtwSession{processErr: assert.AnError}
+	originalFactory := newEtwSession
+	newEtwSession = func(windows.GUID, ...etwSessionOption) (etwSession, error) {
+		return fake, nil
+	}
+	defer func() { newEtwSession = originalFactory }()
+
+	err = input.runSession()
+
+	require.Error(t, err)
+	assert.Equal(t, 1, fake.processCalls)
+	assert.Equal(t, 1, fake.closeCalls)
+}
+
+func TestEtwInput_RunSessionUsesConfiguredSessionName(t *testing.T) {
+	input := &EtwInput{
+		ProviderGUID: "{22FB2CD6-0E7B-422B-A0C7-2FAD1FD0E716}",
+		SessionName:  "loongcollector-etw-dns",
+	}
+	ctx := mock.NewEmptyContext("test", "test", "test")
+	_, err := input.Init(ctx)
+	require.NoError(t, err)
+	input.prepareRun()
+
+	fake := &fakeEtwSession{processErr: assert.AnError}
+	var gotOptions []etwSessionOption
+	originalFactory := newEtwSession
+	newEtwSession = func(_ windows.GUID, options ...etwSessionOption) (etwSession, error) {
+		gotOptions = append([]etwSessionOption(nil), options...)
+		return fake, nil
+	}
+	defer func() { newEtwSession = originalFactory }()
+
+	err = input.runSession()
+
+	require.Error(t, err)
+	cfg := applySessionOptions(gotOptions)
+	assert.Equal(t, "loongcollector-etw-dns", cfg.Name)
+	assert.Equal(t, 1, fake.closeCalls)
+}
+
+func TestEtwInput_RunSessionStopsExistingNamedSessionBeforeRetry(t *testing.T) {
+	input := &EtwInput{
+		ProviderGUID: "{22FB2CD6-0E7B-422B-A0C7-2FAD1FD0E716}",
+		SessionName:  "loongcollector-etw-dns",
+	}
+	ctx := mock.NewEmptyContext("test", "test", "test")
+	_, err := input.Init(ctx)
+	require.NoError(t, err)
+	input.prepareRun()
+
+	fake := &fakeEtwSession{processErr: assert.AnError}
+	createCalls := 0
+	originalFactory := newEtwSession
+	newEtwSession = func(_ windows.GUID, _ ...etwSessionOption) (etwSession, error) {
+		createCalls++
+		if createCalls == 1 {
+			return nil, etw.ExistsError{SessionName: "loongcollector-etw-dns"}
+		}
+		return fake, nil
+	}
+	defer func() { newEtwSession = originalFactory }()
+
+	var killed []string
+	originalKill := killEtwSession
+	killEtwSession = func(name string) error {
+		killed = append(killed, name)
+		return nil
+	}
+	defer func() { killEtwSession = originalKill }()
+
+	err = input.runSession()
+
+	require.Error(t, err)
+	assert.Equal(t, 2, createCalls)
+	assert.Equal(t, []string{"loongcollector-etw-dns"}, killed)
+	assert.Equal(t, 1, fake.processCalls)
+	assert.Equal(t, 1, fake.closeCalls)
+}
+
+func applySessionOptions(options []etwSessionOption) etw.SessionOptions {
+	var cfg etw.SessionOptions
+	for _, opt := range options {
+		opt(&cfg)
+	}
+	return cfg
+}
+
+type fakeEtwSession struct {
+	processErr   error
+	processCalls int
+	closeCalls   int
+}
+
+func (s *fakeEtwSession) Process(etw.EventCallback) error {
+	s.processCalls++
+	return s.processErr
+}
+
+func (s *fakeEtwSession) Close() error {
+	s.closeCalls++
+	return nil
 }

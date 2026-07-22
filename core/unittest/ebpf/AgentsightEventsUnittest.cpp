@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <cstring>
+
 #include "agentsight.h"
 #include "ebpf/plugin/agentsight/AgentsightEvents.h"
 #include "unittest/Unittest.h"
@@ -21,6 +23,7 @@ using namespace logtail::ebpf;
 class AgentsightEventsUnittest : public testing::Test {
 public:
     void TestLlmRecordCopiesNonNullSizedBuffers();
+    void TestLlmRecordCopiesProcessNameAndCmdline();
 };
 
 void AgentsightEventsUnittest::TestLlmRecordCopiesNonNullSizedBuffers() {
@@ -42,6 +45,39 @@ void AgentsightEventsUnittest::TestLlmRecordCopiesNonNullSizedBuffers() {
     APSARA_TEST_EQUAL(r.mToolDefinitionsJson, "[{}]");
 }
 
+void AgentsightEventsUnittest::TestLlmRecordCopiesProcessNameAndCmdline() {
+    // Normal case: process_name and cmdline are NUL-terminated within their fixed buffers.
+    {
+        AgentsightLLMData d{};
+        std::memcpy(d.process_name, "node", 4U);
+        std::memcpy(d.cmdline, "node /app/server.js --port 8080", 31U);
+        static const char kCid[] = "abc123def456";
+        d.container_id = kCid;
+
+        AgentsightLlmRecord r("pipe-a", d);
+        APSARA_TEST_EQUAL(r.mProcessName, "node");
+        APSARA_TEST_EQUAL(r.mCmdline, "node /app/server.js --port 8080");
+        APSARA_TEST_EQUAL(r.mContainerId, "abc123def456");
+    }
+
+    // Exited process / non-container: empty cmdline and null container_id map to empty strings.
+    {
+        AgentsightLLMData d{};
+        AgentsightLlmRecord r("pipe-a", d);
+        APSARA_TEST_TRUE(r.mCmdline.empty());
+        APSARA_TEST_TRUE(r.mContainerId.empty());
+    }
+
+    // Non-NUL-terminated full buffer: copy is bounded to the 128-byte buffer (strnlen).
+    {
+        AgentsightLLMData d{};
+        std::memset(d.cmdline, 'x', sizeof(d.cmdline));
+        AgentsightLlmRecord r("pipe-a", d);
+        APSARA_TEST_EQUAL(r.mCmdline.size(), sizeof(d.cmdline));
+    }
+}
+
 UNIT_TEST_CASE(AgentsightEventsUnittest, TestLlmRecordCopiesNonNullSizedBuffers)
+UNIT_TEST_CASE(AgentsightEventsUnittest, TestLlmRecordCopiesProcessNameAndCmdline)
 
 UNIT_TEST_MAIN

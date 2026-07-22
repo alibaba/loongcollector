@@ -64,6 +64,8 @@
 #include "plugin/input/InputNetworkObserver.h"
 #include "plugin/input/InputNetworkSecurity.h"
 #include "plugin/input/InputProcessSecurity.h"
+#endif
+#if !defined(__ANDROID__)
 #include "plugin/input/InputPrometheus.h"
 #include "plugin/processor/inner/ProcessorPromParseMetricNative.h"
 #include "plugin/processor/inner/ProcessorPromRelabelMetricNative.h"
@@ -162,9 +164,11 @@ void PluginRegistry::LoadStaticPlugins() {
     RegisterContinuousInputCreator(new StaticInputCreator<InputInternalAlarms>(), true);
     RegisterContinuousInputCreator(new StaticInputCreator<InputInternalMetrics>(), true);
     RegisterContinuousInputCreator(new StaticInputCreator<InputInternalMatchedContainerInfo>(), true);
+#if !defined(__ANDROID__)
+    RegisterContinuousInputCreator(new StaticInputCreator<InputPrometheus>());
+#endif
 #if defined(__linux__) && !defined(__ANDROID__)
     RegisterContinuousInputCreator(new StaticInputCreator<InputContainerStdio>());
-    RegisterContinuousInputCreator(new StaticInputCreator<InputPrometheus>());
     // TODO: remove these gflag when plugin is stablized
     if (BOOL_FLAG(enable_ebpf_network_observer)) {
         RegisterContinuousInputCreator(new StaticInputCreator<InputNetworkObserver>(), false);
@@ -196,7 +200,7 @@ void PluginRegistry::LoadStaticPlugins() {
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorMergeMultilineLogNative>());
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorParseContainerLogNative>());
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorParseFromPBNative>());
-#if defined(__linux__) && !defined(__ANDROID__)
+#if !defined(__ANDROID__)
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorPromRelabelMetricNative>());
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorPromParseMetricNative>());
 #endif

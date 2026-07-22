@@ -30,7 +30,7 @@ dev
 |  ProbeConfig.LogPath  |  string  |  否  |  `""`  |  ebpf 日志的输出位置  |
 |  ProbeConfig.CmdlineWhitelist  |  array  |  否（**推荐填写**）  |  内置 9 条  |  进程 **agent 筛选白名单**。每一项为对象：`AgentType`（上报字段 `gen_ai.agent.type`）+ `Args`（字符串数组，与进程 cmdline 各参数（即 `argv`）按位置 glob 匹配）。**未配置**且 `CmdlineBlacklist` 也为空时注入「默认 `CmdlineWhitelist`」（见下文）；**填写后只使用用户规则**，不再叠加内置。空数组 `[]` 视为非法配置。  |
 |  ProbeConfig.CmdlineBlacklist  |  array  |  否  |  /  |  进程 **agent 筛选黑名单**，每项为 glob 字符串数组（无 `AgentType`）；**命中则排除**，不采集。**优先级高于白名单**。  |
-|  ProbeConfig.Https  |  array  |  否  |  内置 4 条  |  HTTPS 加密流量的域名白名单（字符串数组，glob 通配符 `*`，不区分大小写）。访问白名单内域名的进程可被识别为采集目标。未配置时注入默认精确主机名列表，见下文。  |
+|  ProbeConfig.Https  |  array  |  否  |  内置 6 条  |  HTTPS 加密流量的域名白名单（字符串数组，glob 通配符 `*`，不区分大小写）。访问白名单内域名的进程可被识别为采集目标。未配置时注入默认列表，见下文。  |
 |  ProbeConfig.Http  |  array  |  否  |  `[]`（关闭）  |  HTTP 明文流量的目标列表（字符串数组）。每项可为 `:端口`、`IP`、`IP:端口` 或域名（如 `model-svc.default.svc`、`*.internal.svc`）。**留空时不采集明文 HTTP 流量**。  |
 |  ProbeConfig.EventStreamFormat  |  bool  |  否  |  `true`  |  为 `true` 时，每次 LLM 调用在同一 `PipelineEventGroup` 内输出两条日志（各有 `event.id`）：`event.name=gen_ai.model.request`（请求开始时间戳）与 `gen_ai.model.response`（请求结束时间戳）。为 `false` 时输出单条合并日志，**无** `event.name` / `event.id`。  |
 |  ProbeConfig.MessageDeltaOnly  |  bool  |  否  |  `true`  |  为 `true` 时**不**输出全量 `gen_ai.input.messages`；仍输出 `gen_ai.input.messages_delta`、`gen_ai.system_instructions_hash` / `gen_ai.tool.definitions_hash`（非空时），以及 hash 相对上一轮变化时的 `gen_ai.system_instructions` / `gen_ai.tool.definitions`。为 `false` 时**每次**输出非空的全量 `gen_ai.input.messages`。**不影响** `gen_ai.output.messages`；`messages_delta` 及 session 状态维护**不受**本开关影响。  |
@@ -51,6 +51,7 @@ dev
 | `claude-code` | `Claude Code`、`claude_code` |
 | `hermes` | `Hermes` |
 | `cosh` | `Cosh` |
+| `codex` | `Codex` |
 
 `AgentType` 必须是**非空字符串**；具体取值不做硬校验，写什么就上报什么到 `gen_ai.agent.type`。统一遵循上述规范便于跨产品聚合分析。
 
@@ -139,14 +140,21 @@ ProbeConfig:
 1. **多条 Https 规则之间**：**OR**，命中任一条即可。
 2. **默认注入条件**：`Https` 列表 **为空** 时，注入下表；一旦配置了 **任意一条** 用户规则，则 **不再** 注入默认值。
 
-**默认 `Https`（4 条，精确主机名）**
+**默认 `Https`（6 条）**
 
-| 域名 |
-| --- |
-| `api.openai.com` |
-| `api.anthropic.com` |
-| `dashscope.aliyuncs.com` |
-| `dashscope-intl.aliyuncs.com` |
+| 域名 | 说明 |
+| --- | --- |
+| `api.openai.com` | OpenAI |
+| `api.anthropic.com` | Anthropic |
+| `dashscope.aliyuncs.com` | DashScope/百炼 按量付费·华北2（北京） |
+| `dashscope-intl.aliyuncs.com` | DashScope/百炼 按量付费·新加坡 |
+| `dashscope-us.aliyuncs.com` | DashScope/百炼 按量付费·美国（弗吉尼亚） |
+| `coding.dashscope.aliyuncs.com` | DashScope/百炼 Coding Plan |
+| `*.maas.aliyuncs.com` | DashScope/百炼 业务空间专属 / 试用 / Token Plan 域名 |
+
+> DashScope/百炼 的业务空间专属、试用与 Token Plan 均使用 `[workspace-id｜trial｜token-plan].[region].maas.aliyuncs.com` 形式的域名——`workspace-id` 与地域（`cn-beijing`、`ap-southeast-1`、`ap-northeast-1`、`eu-central-1` 等）为动态前缀，无法穷举，因此用通配 `*.maas.aliyuncs.com` 统一覆盖（glob `*` 可跨 `.`）。
+>
+> 通配域名仅用于 **SNI 层的 SSL/TLS 探针挂载**（HTTPS 加密流量采集主路径）；基于 TCP 连接目的 IP 的进程发现会跳过通配域名（无法 DNS 解析），对加密流量采集本身无影响。
 
 #### Http 规则优先级和默认注入值
 
@@ -223,6 +231,10 @@ Http:
   - "*.internal.svc"
 ```
 
+### Codex 采集支持说明
+
+官方发布的 Codex CLI 是 strip 后的静态链接二进制，缺少符号表，**不支持** HTTPS 流量采集。如需采集，请使用**自行编译的未 strip 版本**（保留符号表即可自动定位 SSL 收发函数）。
+
 ### `EventStreamFormat: false`（合并日志）
 
 一次 LLM 调用输出 **一条** 日志，同时包含请求与响应字段（见下表）。
@@ -242,7 +254,7 @@ Http:
 | `gen_ai.model.request` | 请求开始时刻 | `gen_ai.input.messages`（`MessageDeltaOnly: false` 且非空时**每次**）、`gen_ai.input.messages_delta`、`gen_ai.system_instructions_hash` / `gen_ai.tool.definitions_hash`（非空时）、`gen_ai.system_instructions` / `gen_ai.tool.definitions`（hash 相对 session 上一轮变化时）、`gen_ai.request.model`、`server.*`、`time_unix_nano`、`observed_time_unix_nano` |
 | `gen_ai.model.response` | 请求结束时刻（开始 + 耗时） | `gen_ai.output.messages`（始终）、`gen_ai.response.id`、`gen_ai.response.model`（非空时）、`gen_ai.response.finish_reasons`、`gen_ai.usage.*`（token，无 cost）、`status_code`、`is_sse`、`gen_ai.response.duration`、`gen_ai.provider.name` |
 
-两条日志均可能包含：`event.id`（仅流式拆分）、`gen_ai.session.id`、`gen_ai.turn.id`、`pid`、`comm`、`gen_ai.agent.type`、`gen_ai.provider.name`。
+两条日志均可能包含：`event.id`（仅流式拆分）、`gen_ai.session.id`、`gen_ai.turn.id`、`pid`、`comm`、`cmdline`、`container.id`、`gen_ai.agent.type`、`gen_ai.provider.name`。
 
 ### 字段表（合并模式 / 拆分模式中的并集）
 
@@ -255,6 +267,8 @@ Http:
 | `gen_ai.response.id` | string | 一次对话中其中一次对大模型请求的回复 id |
 | `pid` | string | 进程号（十进制字符串） |
 | `comm` | string | 进程名称 |
+| `cmdline` | string | 进程完整命令行（`argv` 空格拼接，截断到 127 字节），来自 `/proc/<PID>/cmdline`；进程已退出时为空则不输出 |
+| `container.id` | string | 进程所属容器 id，由 agentsight 侧按 pid 解析；非容器进程或解析失败时为空则不输出 |
 | `gen_ai.agent.type` | string | Agent **类型**（如 `openclaw`、`claude-code`），来自 cmdline 白名单 |
 | `time_unix_nano` | string | 本条日志事件时刻，Unix 纪元纳秒（十进制字符串）；与 `SetLogTimestampFromNs` 所用时间戳一致 |
 | `observed_time_unix_nano` | string | 观测时刻，与 `time_unix_nano` **相同**（十进制字符串） |
