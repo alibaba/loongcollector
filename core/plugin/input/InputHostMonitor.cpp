@@ -20,7 +20,10 @@
 #include "common/ParamExtractor.h"
 #include "host_monitor/HostMonitorInputRunner.h"
 #include "host_monitor/collector/CPUCollector.h"
+#include "host_monitor/collector/CgroupCollector.h"
+#include "host_monitor/collector/DentryCollector.h"
 #include "host_monitor/collector/DiskCollector.h"
+#include "host_monitor/collector/FsStatCollector.h"
 #include "host_monitor/collector/GPUCollector.h"
 #include "host_monitor/collector/MemCollector.h"
 #include "host_monitor/collector/NetCollector.h"
@@ -173,8 +176,59 @@ bool InputHostMonitor::Init(const Json::Value& config, Json::Value& optionalGoPi
                            mContext->GetLogstoreName(),
                            mContext->GetRegion());
     }
+
+    // cgroup
+    bool enableCgroup = true;
+    if (!GetOptionalBoolParam(config, "EnableCgroup", enableCgroup, errorMsg)) {
+        PARAM_ERROR_RETURN(mContext->GetLogger(),
+                           mContext->GetAlarm(),
+                           errorMsg,
+                           sName,
+                           mContext->GetConfigName(),
+                           mContext->GetProjectName(),
+                           mContext->GetLogstoreName(),
+                           mContext->GetRegion());
+    }
     if (enableGPU) {
         mCollectors.push_back(GPUCollector::sName);
+    }
+
+    if (enableCgroup) {
+        mCollectors.push_back(CgroupCollector::sName);
+    }
+
+    // dentry
+    bool enableDentry = true;
+    if (!GetOptionalBoolParam(config, "EnableDentry", enableDentry, errorMsg)) {
+        PARAM_ERROR_RETURN(mContext->GetLogger(),
+                           mContext->GetAlarm(),
+                           errorMsg,
+                           sName,
+                           mContext->GetConfigName(),
+                           mContext->GetProjectName(),
+                           mContext->GetLogstoreName(),
+                           mContext->GetRegion());
+    }
+
+    if (enableDentry) {
+        mCollectors.push_back(DentryCollector::sName);
+    }
+
+    // fsstat
+    bool enableFsStat = true;
+    if (!GetOptionalBoolParam(config, "EnableFsStat", enableFsStat, errorMsg)) {
+        PARAM_ERROR_RETURN(mContext->GetLogger(),
+                           mContext->GetAlarm(),
+                           errorMsg,
+                           sName,
+                           mContext->GetConfigName(),
+                           mContext->GetProjectName(),
+                           mContext->GetLogstoreName(),
+                           mContext->GetRegion());
+    }
+
+    if (enableFsStat) {
+        mCollectors.push_back(FsStatCollector::sName);
     }
 
     return true;

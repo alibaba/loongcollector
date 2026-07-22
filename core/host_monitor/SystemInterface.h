@@ -291,6 +291,7 @@ enum EnumTcpState : int8_t {
 
 struct NetState {
     uint64_t tcpStates[TCP_STATE_END] = {0};
+    uint64_t tcpMem = 0;
     unsigned int tcpInboundTotal = 0;
     unsigned int tcpOutboundTotal = 0;
     unsigned int allInboundTotal = 0;
@@ -386,12 +387,14 @@ struct ResTCPStat {
     uint64_t tcpListen = 0;
     uint64_t tcpTotal = 0;
     uint64_t tcpNonEstablished = 0;
+    uint64_t tcpMem = 0;
 
     static inline const FieldName<ResTCPStat, uint64_t> resTCPStatFields[] = {
         FIELD_ENTRY(ResTCPStat, tcpEstablished),
         FIELD_ENTRY(ResTCPStat, tcpListen),
         FIELD_ENTRY(ResTCPStat, tcpTotal),
         FIELD_ENTRY(ResTCPStat, tcpNonEstablished),
+        FIELD_ENTRY(ResTCPStat, tcpMem),
     };
 
     static void enumerate(const std::function<void(const FieldName<ResTCPStat, uint64_t>&)>& callback) {
@@ -400,7 +403,6 @@ struct ResTCPStat {
         }
     };
 };
-
 
 // 每秒发包数，上行带宽，下行带宽.每秒发送错误包数量
 struct ResNetRatePerSec {
@@ -412,7 +414,6 @@ struct ResNetRatePerSec {
     double rxErrorRate = 0.0;
     double rxDropRate = 0.0;
     double txDropRate = 0.0;
-
 
     static inline const FieldName<ResNetRatePerSec> resRatePerSecFields[] = {
         FIELD_ENTRY(ResNetRatePerSec, rxPackRate),
@@ -646,6 +647,92 @@ struct FieldMap {
     // BinaryFieldMap binaryFields;
 };
 
+// /proc/cgroups
+// #subsys_name    hierarchy       num_cgroups     enabled
+// cpuset  10      5       1
+// cpu     3       89      1
+// cpuacct 3       89      1
+// blkio   7       84      1
+// memory  12      522     1
+// devices 9       84      1
+// freezer 11      5       1
+// net_cls 13      5       1
+// perf_event      4       5       1
+// net_prio        13      5       1
+// hugetlb 8       5       1
+// pids    5       91      1
+// ioasids 2       1       1
+// rdma    6       5       1
+struct CgroupStat {
+    unsigned int cpuset = 0;
+    unsigned int cpu = 0;
+    unsigned int cpuacct = 0;
+    unsigned int blkio = 0;
+    unsigned int memory = 0;
+    unsigned int devices = 0;
+    unsigned int freezer = 0;
+    unsigned int net_cls = 0;
+    unsigned int perf_event = 0;
+    unsigned int net_prio = 0;
+    unsigned int hugetlb = 0;
+    unsigned int pids = 0;
+    unsigned int ioasids = 0;
+    unsigned int rdma = 0;
+
+    static inline const FieldName<CgroupStat, unsigned int> cgroupStatFields[] = {
+        FIELD_ENTRY(CgroupStat, cpuset),
+        FIELD_ENTRY(CgroupStat, cpu),
+        FIELD_ENTRY(CgroupStat, cpuacct),
+        FIELD_ENTRY(CgroupStat, blkio),
+        FIELD_ENTRY(CgroupStat, memory),
+        FIELD_ENTRY(CgroupStat, devices),
+        FIELD_ENTRY(CgroupStat, freezer),
+        FIELD_ENTRY(CgroupStat, net_cls),
+        FIELD_ENTRY(CgroupStat, perf_event),
+        FIELD_ENTRY(CgroupStat, net_prio),
+        FIELD_ENTRY(CgroupStat, hugetlb),
+        FIELD_ENTRY(CgroupStat, pids),
+        FIELD_ENTRY(CgroupStat, ioasids),
+        FIELD_ENTRY(CgroupStat, rdma),
+    };
+
+    static void enumerate(const std::function<void(const FieldName<CgroupStat, unsigned int>&)>& callback) {
+        for (const auto& field : cgroupStatFields) {
+            callback(field);
+        }
+    }
+};
+
+struct CgroupStatInformation : public BaseInformation {
+    CgroupStat stat;
+};
+
+struct DentryStat {
+    unsigned int nrDentry = 0;
+    unsigned int nrUnused = 0;
+    unsigned int ageLimit = 0;
+    unsigned int wantPages = 0;
+    unsigned int nrNegative = 0;
+
+    static inline const FieldName<DentryStat, unsigned int> dentryStatFields[] = {
+        FIELD_ENTRY(DentryStat, nrDentry),
+        FIELD_ENTRY(DentryStat, nrUnused),
+        FIELD_ENTRY(DentryStat, ageLimit),
+        FIELD_ENTRY(DentryStat, wantPages),
+        FIELD_ENTRY(DentryStat, nrNegative),
+    };
+
+    static void enumerate(const std::function<void(const FieldName<DentryStat, unsigned int>&)>& callback) {
+        for (const auto& field : dentryStatFields) {
+            callback(field);
+        }
+    }
+};
+
+struct DentryStatInformation : public BaseInformation {
+    DentryStat stat;
+};
+
 class SystemInterface {
 public:
     template <typename InfoT, typename... Args>
@@ -735,6 +822,8 @@ public:
     bool GetNetInterfaceInformation(time_t now, NetInterfaceInformation& netInterfaceInfo);
     bool InitGPUCollector(const FieldMap& fieldMap);
     bool GetGPUInformation(time_t now, GPUInformation& gpuInfo);
+    bool GetCgroupStatInformation(CgroupStatInformation& cgroupStatInfo);
+    bool GetDentryStatInformation(DentryStatInformation& dentryStatInfo);
     explicit SystemInterface(size_t cacheSize = INT32_FLAG(system_interface_cache_queue_size))
         : mSystemInformationCache(),
           mCPUInformationCache(cacheSize),
@@ -755,7 +844,9 @@ public:
           mExecutePathCache(cacheSize),
           mTCPStatInformationCache(cacheSize),
           mNetInterfaceInformationCache(cacheSize),
-          mGPUInformationCache(cacheSize) {
+          mGPUInformationCache(cacheSize),
+          mCgroupStatInformationCache(cacheSize),
+          mDentryStatInformationCache(cacheSize) {
         InitMetrics();
     }
     virtual ~SystemInterface() = default;
@@ -794,6 +885,8 @@ private:
     virtual bool GetNetInterfaceInformationOnce(NetInterfaceInformation& netInterfaceInfo) = 0;
     virtual bool InitGPUCollectorOnce(const FieldMap& fieldMap) = 0;
     virtual bool GetGPUInformationOnce(GPUInformation& gpuInfo) = 0;
+    virtual bool GetCgroupStatInformationOnce(CgroupStatInformation& cgroupStatInfo) = 0;
+    virtual bool GetDentryStatInformationOnce(DentryStatInformation& dentryStatInfo) = 0;
 
     SystemInformation mSystemInformationCache;
     SystemInformationCache<CPUInformation> mCPUInformationCache;
@@ -815,7 +908,8 @@ private:
     SystemInformationCache<TCPStatInformation> mTCPStatInformationCache;
     SystemInformationCache<NetInterfaceInformation> mNetInterfaceInformationCache;
     SystemInformationCache<GPUInformation> mGPUInformationCache;
-
+    SystemInformationCache<CgroupStatInformation> mCgroupStatInformationCache;
+    SystemInformationCache<DentryStatInformation> mDentryStatInformationCache;
     // Metrics
     MetricsRecordRef mMetricsRecordRef;
     CounterPtr mSystemOpTotal;
