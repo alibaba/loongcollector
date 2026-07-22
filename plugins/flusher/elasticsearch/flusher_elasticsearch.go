@@ -43,6 +43,8 @@ type FlusherElasticSearch struct {
 	Authentication Authentication
 	// The container of logs
 	Index string
+	// Elasticsearch bulk action
+	Action string
 	// HTTP config
 	HTTPConfig *HTTPConfig
 
@@ -79,7 +81,8 @@ func NewFlusherElasticSearch() *FlusherElasticSearch {
 				Password: "",
 			},
 		},
-		Index: "",
+		Index:  "",
+		Action: "",
 		Convert: convertConfig{
 			Protocol: converter.ProtocolCustomSingle,
 			Encoding: converter.EncodingJSON,
@@ -188,6 +191,11 @@ func (f *FlusherElasticSearch) Stop() error {
 }
 
 func (f *FlusherElasticSearch) Flush(projectName string, logstoreName string, configName string, logGroupList []*protocol.LogGroup) error {
+	bulkAction := "index"
+	if f.Action != "" {
+		bulkAction = f.Action
+	}
+	logger.Info(f.context.GetRuntimeContext(), "flush elasticsearch bulk action is", bulkAction)
 	nowTime := time.Now().Local()
 	for _, logGroup := range logGroupList {
 		logger.Debug(f.context.GetRuntimeContext(), "[LogGroup] topic", logGroup.Topic, "logstore", logGroup.Category, "logcount", len(logGroup.Logs), "tags", logGroup.LogTags)
@@ -208,7 +216,7 @@ func (f *FlusherElasticSearch) Flush(projectName string, logstoreName string, co
 				}
 			}
 			var builder strings.Builder
-			builder.WriteString(`{"index": {"_index": "`)
+			builder.WriteString(`{"` + bulkAction + `": {"_index": "`)
 			builder.WriteString(*ESIndex)
 			builder.WriteString(`"}}`)
 			buffer = append(buffer, builder.String())
