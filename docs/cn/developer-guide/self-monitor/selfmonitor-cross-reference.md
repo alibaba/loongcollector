@@ -796,6 +796,7 @@
 | `ProcessorJSONParserAlarm` | `PROCESSOR_JSON_PARSER_ALARM` | JSON 处理器解析异常 |
 | `ProcessorOTELMetricDataFormat` | `PROCESSOR_OTEL_METRIC_DATA_FORMAT` | OTEL Metric 数据格式异常 |
 | `ProcessorOTELMetricFindAlarm` | `PROCESSOR_OTEL_METRIC_FIND_ALARM` | OTEL Metric 查找异常 |
+| `ProcessorOTELMetricParserAlarm` | `PROCESSOR_OTEL_METRIC_PARSER_ALARM` | OTEL Metric 解析异常 |
 | `ProcessorOTELTraceDataFormat` | `PROCESSOR_OTEL_TRACE_DATA_FORMAT` | OTEL Trace 数据格式异常 |
 | `ProcessorOTELTraceFindAlarm` | `PROCESSOR_OTEL_TRACE_FIND_ALARM` | OTEL Trace 查找异常 |
 | `ProcessorOTELTraceParserAlarm` | `PROCESSOR_OTEL_TRACE_PARSER_ALARM` | OTEL Trace 解析异常 |

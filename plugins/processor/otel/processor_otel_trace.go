@@ -23,6 +23,7 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/protocol/decoder/opentelemetry"
@@ -154,4 +155,94 @@ func init() {
 			Format:     "",
 		}
 	}
+}
+
+// Process implements the v2 ProcessorV2 interface: "v2场景下输入Log输出Span".
+// For each Log event it reads the OTLP trace payload from p.SourceKey, decodes
+// it per the configured format and emits native models.Span events produced by
+// the canonical OTLP→models converter. As in v1 (ProcessLogs/processLog), the
+// source Log is NOT preserved: it is replaced by the converted spans. Non-Log
+// events (Metric/Span) are passed through unchanged.
+//
+// Note: the v1 protojson-only TraceIDNeedDecode/SpanIDNeedDecode/
+// ParentSpanIDNeedDecode flags do not apply here. The pdata trace unmarshaler
+// decodes span/trace IDs itself, and the canonical converter renders them via
+// (*ptrace.Span).TraceID().String(); those v1 flags are ignored in v2.
+func (p *ProcessorOtelTraceParser) Process(in *models.PipelineGroupEvents, context pipeline.PipelineContext) {
+	if in == nil {
+		return
+	}
+
+	passThrough := make([]models.PipelineEvent, 0, len(in.Events))
+	for _, event := range in.Events {
+		log, ok := event.(*models.Log)
+		if !ok || event.GetType() != models.EventTypeLogging {
+			passThrough = append(passThrough, event)
+			continue
+		}
+
+		groups, err := p.convertLogToSpanGroups(log)
+		if err != nil {
+			// Mirror v1 ProcessLogs error handling: log and skip.
+			logger.Warningf(p.context.GetRuntimeContext(), selfmonitor.ProcessorOTELTraceParserAlarm, "parser otel trace error %v", err)
+			continue
+		}
+		for _, group := range groups {
+			pipeline.CollectGroupEvents(context, group)
+		}
+	}
+
+	if len(passThrough) > 0 {
+		context.Collector().Collect(in.Group, passThrough...)
+	}
+}
+
+// convertLogToSpanGroups reads the OTLP trace payload from p.SourceKey in the
+// log indices, decodes it per the configured format and converts it into native
+// models.Span events grouped by OTLP resource.
+func (p *ProcessorOtelTraceParser) convertLogToSpanGroups(log *models.Log) ([]*models.PipelineGroupEvents, error) {
+	raw := log.GetIndices().Get(p.SourceKey)
+	if raw == nil {
+		if p.NoKeyError {
+			logger.Warningf(p.context.GetRuntimeContext(), selfmonitor.ProcessorOTELTraceFindAlarm, "cannot find key %v", p.SourceKey)
+		}
+		return nil, nil
+	}
+
+	var data []byte
+	switch v := raw.(type) {
+	case []byte:
+		data = v
+	case string:
+		data = []byte(v)
+	default:
+		return nil, nil
+	}
+
+	traces, err := p.unmarshalTraces(data)
+	if err != nil {
+		return nil, err
+	}
+	return opentelemetry.ConvertOtlpTracesToGroupEvents(traces)
+}
+
+// unmarshalTraces decodes the OTLP trace payload into pdata ptrace.Traces (the
+// input accepted by the canonical converter). json/protobuf mirror v1 exactly;
+// protojson wraps the single ResourceSpans object (v1's protojson input shape)
+// into the standard OTLP request envelope so the pdata JSON unmarshaler can
+// parse it.
+func (p *ProcessorOtelTraceParser) unmarshalTraces(data []byte) (ptrace.Traces, error) {
+	switch strings.ToLower(p.Format) {
+	case "json":
+		unmarshaler := ptrace.JSONUnmarshaler{}
+		return unmarshaler.UnmarshalTraces(data)
+	case "protobuf":
+		unmarshaler := ptrace.ProtoUnmarshaler{}
+		return unmarshaler.UnmarshalTraces(data)
+	case "protojson":
+		unmarshaler := ptrace.JSONUnmarshaler{}
+		wrapped := []byte(`{"resourceSpans":[` + string(data) + `]}`)
+		return unmarshaler.UnmarshalTraces(wrapped)
+	}
+	return ptrace.NewTraces(), nil
 }

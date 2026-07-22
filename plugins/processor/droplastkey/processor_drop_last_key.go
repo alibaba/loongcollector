@@ -17,6 +17,7 @@ package droplastkey
 import (
 	"fmt"
 
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
@@ -86,6 +87,30 @@ func (p *ProcessorDropLastKey) ProcessLogs(logArray []*protocol.Log) []*protocol
 		p.process(log)
 	}
 	return logArray
+}
+
+// Process implements the v2 ProcessorV2 interface: when any Include key is
+// present it drops DropKey from the Log event; Metric/Span events pass through.
+func (p *ProcessorDropLastKey) Process(in *models.PipelineGroupEvents, context pipeline.PipelineContext) {
+	pipeline.ProcessLogEventsOnly(in, context, p.processLogEvent)
+}
+
+func (p *ProcessorDropLastKey) processLogEvent(log *models.Log) {
+	contents := log.GetIndices()
+	dropFlag := false
+	for key := range p.includeMap {
+		if contents.Contains(key) {
+			dropFlag = true
+			break
+		}
+	}
+	if !dropFlag {
+		return
+	}
+	if contents.Contains(p.DropKey) {
+		contents.Delete(p.DropKey)
+		p.filterMetric.Add(1)
+	}
 }
 
 func init() {

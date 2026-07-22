@@ -22,7 +22,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
@@ -92,4 +94,48 @@ func TestDescription(t *testing.T) {
 func TestInit(t *testing.T) {
 	p := pipeline.Processors["processor_base64_encoding"]()
 	assert.Equal(t, reflect.TypeOf(p).String(), "*encoding.ProcessorBase64Encoding")
+}
+
+// ---- v2 (PipelineEvent / SendPb) Process path tests ----
+
+func TestProcessorBase64Encoding_ProcessV2ToNewKey(t *testing.T) {
+	processor := &ProcessorBase64Encoding{SourceKey: "src", NewKey: "dst"}
+	require.NoError(t, processor.Init(mock.NewEmptyContext("p", "l", "c")))
+
+	log := models.NewLog("", nil, "", "", "", models.NewTags(), 0)
+	log.GetIndices().Add("src", "123")
+
+	context := helper.NewObservePipelineContext(10)
+	processor.Process(&models.PipelineGroupEvents{Events: []models.PipelineEvent{log}}, context)
+
+	assert.Equal(t, "123", log.GetIndices().Get("src"), "source is preserved when NewKey is set")
+	assert.Equal(t, "MTIz", log.GetIndices().Get("dst"))
+}
+
+func TestProcessorBase64Encoding_ProcessV2InPlace(t *testing.T) {
+	processor := &ProcessorBase64Encoding{SourceKey: "src"}
+	require.NoError(t, processor.Init(mock.NewEmptyContext("p", "l", "c")))
+
+	log := models.NewLog("", nil, "", "", "", models.NewTags(), 0)
+	log.GetIndices().Add("src", "123")
+
+	context := helper.NewObservePipelineContext(10)
+	processor.Process(&models.PipelineGroupEvents{Events: []models.PipelineEvent{log}}, context)
+
+	assert.Equal(t, "MTIz", log.GetIndices().Get("src"))
+}
+
+func TestProcessorBase64Encoding_ProcessV2PassesThroughMetric(t *testing.T) {
+	processor := &ProcessorBase64Encoding{SourceKey: "src", NewKey: "dst"}
+	require.NoError(t, processor.Init(mock.NewEmptyContext("p", "l", "c")))
+
+	metric := models.NewSingleValueMetric("m", models.MetricTypeGauge, models.NewTags(), 0, 1.0)
+	context := helper.NewObservePipelineContext(10)
+	processor.Process(&models.PipelineGroupEvents{Events: []models.PipelineEvent{metric}}, context)
+
+	results := context.Collector().ToArray()
+	require.Len(t, results, 1)
+	require.Len(t, results[0].Events, 1)
+	_, ok := results[0].Events[0].(*models.Metric)
+	assert.True(t, ok, "metric event must pass through unchanged")
 }

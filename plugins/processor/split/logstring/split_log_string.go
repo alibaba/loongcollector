@@ -111,56 +111,61 @@ func (p *ProcessorSplit) ProcessLogs(logArray []*protocol.Log) []*protocol.Log {
 
 func (p *ProcessorSplit) Process(in *models.PipelineGroupEvents, context pipeline.PipelineContext) {
 	for _, event := range in.Events {
-		if log, ok := event.(*models.Log); ok {
-			tmpLog := &models.Log{
-				Name:      log.Name,
-				Level:     log.Level,
-				Timestamp: log.Timestamp,
-				SpanID:    log.SpanID,
-				TraceID:   log.TraceID,
-				Contents:  log.Contents,
+		log, ok := event.(*models.Log)
+		if !ok {
+			// Metric/Span and other non-Log events are not splittable, so pass
+			// them through unchanged rather than silently dropping them.
+			context.Collector().Collect(in.Group, event)
+			continue
+		}
+		tmpLog := &models.Log{
+			Name:      log.Name,
+			Level:     log.Level,
+			Timestamp: log.Timestamp,
+			SpanID:    log.SpanID,
+			TraceID:   log.TraceID,
+			Contents:  log.Contents,
+		}
+		tmpLog.SetBody(log.GetBody())
+		tmpLog.Tags = models.NewTags()
+		body := util.ZeroCopyBytesToString(log.GetBody())
+		for k, v := range log.GetTags().Iterator() {
+			if len(body) == 0 && k == p.SplitKey {
+				body = v
+			} else if p.PreserveOthers {
+				tmpLog.Tags.Add(k, v)
 			}
-			tmpLog.SetBody(log.GetBody())
-			tmpLog.Tags = models.NewTags()
-			body := util.ZeroCopyBytesToString(log.GetBody())
-			for k, v := range log.GetTags().Iterator() {
-				if len(body) == 0 && k == p.SplitKey {
-					body = v
-				} else if p.PreserveOthers {
-					tmpLog.Tags.Add(k, v)
-				}
+		}
+		if tmpLog.Timestamp == uint64(0) {
+			tmpLog.Timestamp = uint64(time.Now().UnixNano())
+		}
+		if len(body) > 0 {
+			strArray := strings.Split(body, p.SplitSep)
+			if len(strArray) == 0 {
+				continue
 			}
-			if tmpLog.Timestamp == uint64(0) {
-				tmpLog.Timestamp = uint64(time.Now().UnixNano())
-			}
-			if len(body) > 0 {
-				strArray := strings.Split(body, p.SplitSep)
-				if len(strArray) == 0 {
+			var offset int64
+			for i := 0; i < len(strArray); i++ {
+				if len(strArray[i]) == 0 {
 					continue
 				}
-				var offset int64
-				for i := 0; i < len(strArray); i++ {
-					if len(strArray[i]) == 0 {
-						continue
-					}
-					var newLog *models.Log
-					if i < len(strArray)-1 {
-						newLog = tmpLog.Clone().(*models.Log)
-					} else {
-						newLog = tmpLog
-					}
-					newLog.SetBody(util.ZeroCopyStringToBytes(strArray[i]))
-					newLog.Offset += uint64(offset)
-					offset += int64(len(strArray[i]) + len(p.SplitSep))
-					context.Collector().Collect(in.Group, newLog)
+				var newLog *models.Log
+				if i < len(strArray)-1 {
+					newLog = tmpLog.Clone().(*models.Log)
+				} else {
+					newLog = tmpLog
 				}
-			} else {
-				if p.NoKeyError {
-					logger.Warning(p.context.GetRuntimeContext(), selfmonitor.ProcessorSplitLogStringFindAlarm, "can't find split key", p.SplitKey)
-				}
-				if p.PreserveOthers {
-					context.Collector().Collect(in.Group, tmpLog)
-				}
+				newLog.SetBody(util.ZeroCopyStringToBytes(strArray[i]))
+				newLog.Offset += uint64(offset)
+				offset += int64(len(strArray[i]) + len(p.SplitSep))
+				context.Collector().Collect(in.Group, newLog)
+			}
+		} else {
+			if p.NoKeyError {
+				logger.Warning(p.context.GetRuntimeContext(), selfmonitor.ProcessorSplitLogStringFindAlarm, "can't find split key", p.SplitKey)
+			}
+			if p.PreserveOthers {
+				context.Collector().Collect(in.Group, tmpLog)
 			}
 		}
 	}
