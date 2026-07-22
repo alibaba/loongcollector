@@ -47,13 +47,40 @@ bool CheckPointManager::CheckVersion() {
     return (mLoadVersion == NO_CHECKPOINT_VERSION) || (mLoadVersion / 10000 == INT32_FLAG(check_point_version) / 10000);
 }
 
+bool CheckPointManager::CheckPointFileStillExists(const CheckPoint& checkPoint) {
+    if (checkPoint.mDevInode == GetFileDevInode(checkPoint.mFileName)) {
+        return true;
+    }
+    if (!checkPoint.mRealFileName.empty() && checkPoint.mDevInode == GetFileDevInode(checkPoint.mRealFileName)) {
+        return true;
+    }
+    return false;
+}
+
 void CheckPointManager::AddCheckPoint(CheckPoint* checkPointPtr) {
-    DevInodeCheckPointHashMap::iterator it
-        = mDevInodeCheckPointPtrMap.find(CheckPointKey(checkPointPtr->mDevInode, checkPointPtr->mConfigName));
-    if (it != mDevInodeCheckPointPtrMap.end())
-        mDevInodeCheckPointPtrMap.erase(it);
-    mDevInodeCheckPointPtrMap.insert(std::make_pair<CheckPointKey, CheckPointPtr>(
-        CheckPointKey(checkPointPtr->mDevInode, checkPointPtr->mConfigName), CheckPointPtr(checkPointPtr)));
+    CheckPointPtr newCheckPoint(checkPointPtr);
+    CheckPointKey key(newCheckPoint->mDevInode, newCheckPoint->mConfigName);
+    DevInodeCheckPointHashMap::iterator it = mDevInodeCheckPointPtrMap.find(key);
+    if (it != mDevInodeCheckPointPtrMap.end()) {
+        // Active-priority on key collision: the key (dev, inode, configName) cannot tell apart
+        // two physical files that reuse the same inode (fake rotation). Keep the checkpoint whose
+        // file still exists, so a stale reader of an already-deleted file cannot overwrite the
+        // active reader's offset and cause re-collection from the beginning. When neither or both
+        // files exist, fall back to the legacy last-writer-wins behavior to avoid losing state.
+        const CheckPointPtr& oldCheckPoint = it->second;
+        if (!CheckPointFileStillExists(*newCheckPoint) && CheckPointFileStillExists(*oldCheckPoint)) {
+            LOG_INFO(
+                sLogger,
+                ("skip stale checkpoint", "keep active file checkpoint")("config", newCheckPoint->mConfigName)(
+                    "dev", ToString(newCheckPoint->mDevInode.dev))("inode", ToString(newCheckPoint->mDevInode.inode))(
+                    "stale file", newCheckPoint->mFileName)("active file", oldCheckPoint->mFileName));
+            return;
+        }
+        // Same key: replace in place (last-writer-wins) to avoid erase+reinsert hash churn.
+        it->second = newCheckPoint;
+        return;
+    }
+    mDevInodeCheckPointPtrMap.insert(std::make_pair(key, newCheckPoint));
 }
 
 void CheckPointManager::DeleteCheckPoint(DevInode devInode, const std::string& configName) {
