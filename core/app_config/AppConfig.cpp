@@ -1195,6 +1195,12 @@ void AppConfig::LoadResourceConf(const Json::Value& confJson) {
             mBindInterface.clear();
         LOG_INFO(sLogger, ("bind_interface", mBindInterface));
     }
+    // working_interface takes precedence over bind_interface, so the egress binding matches the
+    // interface GetHostIp resolves the reported IP from. The flag is already parsed at this point.
+    if (!STRING_FLAG(working_interface).empty()) {
+        mBindInterface = STRING_FLAG(working_interface);
+        LOG_INFO(sLogger, ("bind_interface overridden by working_interface", mBindInterface));
+    }
 
     // mSendRequestConcurrency was limited
     if (mSendRequestConcurrency < MIN_SEND_REQUEST_CONCURRENCY) {
