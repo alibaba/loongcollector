@@ -15,7 +15,6 @@
 #include "config/CollectionConfig.h"
 
 #include <string>
-#include <unordered_set>
 
 #include "boost/regex.hpp"
 
@@ -96,39 +95,6 @@ static void ReplaceEnvVarRef(Json::Value& value, bool& res) {
     }
 }
 
-static const unordered_set<string>& GetNativeInputBlacklistWhenUsingGoPlugin() {
-    // A1: explicit blacklist framework; populated to match pre-A1 legacy whitelist parity
-    // (does NOT expand Parse allow surface). Allowed native inputs:
-    //   input_file, input_container_stdio, input_static_file_onetime,
-    //   input_*_security, input_internal_metrics, input_internal_alarms.
-    // Remove one blacklist entry after B-line matrix/E2E proves end-to-end reachability.
-    static const unordered_set<string> kBlacklist = {
-        "input_agentsight",
-        "input_cpu_profiling",
-        "input_forward",
-        "input_host_meta",
-        "input_host_monitor",
-        "input_internal_config_container_info",
-        "input_network_observer",
-        "input_prometheus",
-    };
-    return kBlacklist;
-}
-
-static bool IsNativeInputBlockedWhenUsingGoPlugin(const string& pluginType) {
-    // This blacklist is intentionally NOT a subset of PluginRegistry::IsValidNativeInputPlugin.
-    // IsValidNativeInputPlugin reflects what is actually *registered*, which is conditional on
-    // platform (#if defined(__linux__)) and eBPF gflags (e.g. input_cpu_profiling is only
-    // registered when enable_ebpf_cpu_profiling is on, which defaults to false). The blacklist,
-    // by contrast, is unconditional. This gap matters because IsValidGoPlugin treats any name
-    // that is not a registered native plugin as a Go plugin: a blacklisted native input that
-    // happens to be unregistered (Linux-only input on Windows, or eBPF input with its gflag off)
-    // would otherwise be misclassified as a Go input and slip through the gate. Checking the
-    // blacklist first keeps such inputs classified as native and rejected when paired with Go
-    // plugins, regardless of build target or gflags.
-    return GetNativeInputBlacklistWhenUsingGoPlugin().count(pluginType) > 0;
-}
-
 bool CollectionConfig::Parse() {
     if (BOOL_FLAG(enable_env_ref_in_config)) {
         if (ReplaceEnvVar()) {
@@ -176,8 +142,13 @@ bool CollectionConfig::Parse() {
 
     // inputs, processors and flushers module must be parsed first and parsed by order, since aggregators and
     // extensions module parsing will rely on their results.
+    // Native file inputs (input_file / input_container_stdio / input_static_file_onetime) register their
+    // per-input state in FileServer keyed by the config (pipeline) name, not by input index (see
+    // FileServer::AddFileDiscoveryConfig / AddPluginMetricManager). Two such inputs in one pipeline would
+    // therefore overwrite each other's registration and silently lose data. Until FileServer keys these by
+    // (config, index), a file input must remain the sole input of its pipeline. See issue tracking multi
+    // native file input support.
     bool hasFileInput = false;
-    bool hasNativeInputBlockedWhenUsingGoPlugin = false;
     key = "inputs";
     itr = mDetail->find(key.c_str(), key.c_str() + key.size());
     if (!itr) {
@@ -248,9 +219,7 @@ bool CollectionConfig::Parse() {
             }
         }
         if (i == 0) {
-            if (IsNativeInputBlockedWhenUsingGoPlugin(pluginType)) {
-                mHasNativeInput = true;
-            } else if (PluginRegistry::GetInstance()->IsValidGoPlugin(pluginType)) {
+            if (PluginRegistry::GetInstance()->IsValidGoPlugin(pluginType)) {
                 mHasGoInput = true;
             } else if (PluginRegistry::GetInstance()->IsValidNativeInputPlugin(pluginType, IsOnetime())) {
                 mHasNativeInput = true;
@@ -303,15 +272,15 @@ bool CollectionConfig::Parse() {
             hasFileInput = true;
         }
 #endif
-        if (IsNativeInputBlockedWhenUsingGoPlugin(pluginType)) {
-            hasNativeInputBlockedWhenUsingGoPlugin = true;
-        }
     }
-    // TODO: remove these special restrictions
+    // TODO: remove this restriction once FileServer keys registrations by (config, input index) (tracked in #2644).
+    // A native file input registers in FileServer keyed by config name only, so it cannot coexist with any
+    // other input in the same pipeline without overwriting registrations. Keep it as the sole input for now.
     if (hasFileInput && (*mDetail)["inputs"].size() > 1) {
         PARAM_ERROR_RETURN(sLogger,
                            alarm,
-                           "more than 1 input_file or input_container_stdio is given",
+                           "input_file, input_container_stdio or input_static_file_onetime cannot coexist "
+                           "with other inputs in the same pipeline",
                            noModule,
                            mName,
                            mProject,
@@ -393,18 +362,8 @@ bool CollectionConfig::Parse() {
             } else {
                 if (isCurrentPluginNative) {
                     if (PluginRegistry::GetInstance()->IsValidGoPlugin(pluginType)) {
-                        // TODO: remove these special restrictions
-                        if (hasNativeInputBlockedWhenUsingGoPlugin) {
-                            PARAM_ERROR_RETURN(sLogger,
-                                               alarm,
-                                               "extended processor plugins coexist with native input plugins in "
-                                               "blacklist",
-                                               noModule,
-                                               mName,
-                                               mProject,
-                                               mLogstore,
-                                               mRegion);
-                        }
+                        // Any registered native input may coexist with Go processors; the
+                        // former input-type whitelist/blacklist gate has been removed.
                         isCurrentPluginNative = false;
                         mHasGoProcessor = true;
                     } else if (!PluginRegistry::GetInstance()->IsValidNativeProcessorPlugin(pluginType)) {
@@ -522,17 +481,8 @@ bool CollectionConfig::Parse() {
         }
         const string pluginType = it->asString();
         if (PluginRegistry::GetInstance()->IsValidGoPlugin(pluginType)) {
-            // TODO: remove these special restrictions
-            if (mHasNativeInput && hasNativeInputBlockedWhenUsingGoPlugin) {
-                PARAM_ERROR_RETURN(sLogger,
-                                   alarm,
-                                   "extended flusher plugins coexist with native input plugins in blacklist",
-                                   noModule,
-                                   mName,
-                                   mProject,
-                                   mLogstore,
-                                   mRegion);
-            }
+            // Any registered native input may coexist with Go flushers; the former
+            // input-type whitelist/blacklist gate has been removed.
             mHasGoFlusher = true;
         } else if (PluginRegistry::GetInstance()->IsValidNativeFlusherPlugin(pluginType)) {
             mHasNativeFlusher = true;
@@ -547,7 +497,13 @@ bool CollectionConfig::Parse() {
         }
         mFlushers.push_back(&plugin);
     }
-    // TODO: remove these special restrictions
+    // TODO: remove this restriction once extended flushers implement FlusherV2.Export end to end.
+    // Native + Go flusher coexistence rule (intentional, not part of the removed input whitelist):
+    // when a Go (extended) flusher is present the native flushers are fed by the Go pipeline
+    // (see ShouldNativeFlusherConnectedByGoPipeline), and flusher_sls is currently the only native
+    // flusher able to consume that output. Therefore at most one native flusher may coexist with Go
+    // flushers, and it must be flusher_sls. This rule is lifted once extended flushers implement
+    // FlusherV2.Export end to end.
     if (mHasGoFlusher && nativeFlusherCnt > 1) {
         PARAM_ERROR_RETURN(sLogger,
                            alarm,
