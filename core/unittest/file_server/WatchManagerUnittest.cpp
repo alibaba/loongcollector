@@ -105,8 +105,8 @@ public:
     // MetricsRecordRef and commits it to WriteMetrics.
     void TestMetricsRecordRegistered() {
         WatchManager* wm = WatchManager::GetInstance();
-        APSARA_TEST_TRUE_FATAL(wm->GetMetricsRecordRef().HasLabel(
-            METRIC_LABEL_KEY_RUNNER_NAME, METRIC_LABEL_VALUE_RUNNER_NAME_WATCH_MANAGER));
+        APSARA_TEST_TRUE_FATAL(wm->GetMetricsRecordRef().HasLabel(METRIC_LABEL_KEY_RUNNER_NAME,
+                                                                  METRIC_LABEL_VALUE_RUNNER_NAME_WATCH_MANAGER));
 
         // GetHead() is private to WriteMetrics; iterate committed records via the
         // public DoSnapshot() instead. It returns caller-owned copies of the
