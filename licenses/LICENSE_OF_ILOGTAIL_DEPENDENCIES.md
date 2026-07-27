@@ -277,6 +277,7 @@ When distributed in a binary form, iLogtail may contain portions of the followin
 
 ## iLogtail used or modified source code from these projects
 
+- [github.com/EvanLjp/ping fork from github.com/go-ping/ping](https://github.com/EvanLjp/ping) based on MIT
 - [github.com/iLogtail/jfr-parser fork from github.com/pyroscope-io/jfr-parser](http://github.com/iLogtail/jfr-parser) based on Apache-2.0
 - [github.com/iLogtail/pyroscope-lib fork from github.com/pyroscope-io/pyroscope](http://github.com/iLogtail/pyroscope-lib) based on Apache-2.0
 - [github.com/iLogtail/gonvml fork from github.com/mindprince/gonvml](https://github.com/iLogtail/gonvml) based on Apache-2.0

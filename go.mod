@@ -23,7 +23,7 @@ require (
 	github.com/elastic/go-elasticsearch/v8 v8.6.0
 	github.com/elastic/go-lumber v0.1.0
 	github.com/go-mysql-org/go-mysql v1.8.0
-	github.com/go-ping/ping v0.0.0-20211130115550-779d1e919534
+	github.com/go-ping/ping v1.2.2
 	github.com/go-playground/validator/v10 v10.22.0
 	github.com/go-sql-driver/mysql v1.7.1
 	github.com/gogo/protobuf v1.3.2
@@ -298,6 +298,7 @@ replace (
 	github.com/alibaba/ilogtail/pkg => ./pkg
 	github.com/aliyun/alibaba-cloud-sdk-go/services/sls_inner => ./external/github.com/aliyun/alibaba-cloud-sdk-go/services/sls_inner
 	github.com/elastic/beats/v7 => ./external/github.com/elastic/beats/v7
+	github.com/go-ping/ping => github.com/EvanLjp/ping v1.2.2
 	github.com/jeromer/syslogparser => ./external/github.com/jeromer/syslogparser
 	github.com/mindprince/gonvml => github.com/iLogtail/gonvml v1.0.0
 	github.com/opencontainers/runc => github.com/opencontainers/runc v1.1.12

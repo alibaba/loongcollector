@@ -48,7 +48,21 @@ const (
 	DefaultTimeoutSeconds  = 5     // default timeout is 5s
 	MinTimeoutSeconds      = 1     // min timeout seconds
 	MaxTimeoutSeconds      = 30    // max timeout seconds
+
+	icmpPayloadSize  = 56
+	icmpSpreadWindow = time.Second
 )
+
+func durationToMilliseconds(duration time.Duration) float64 {
+	return float64(duration) / float64(time.Millisecond)
+}
+
+func icmpStartDelay(index, total int) time.Duration {
+	if index <= 0 || total <= 1 {
+		return 0
+	}
+	return time.Duration(index) * icmpSpreadWindow / time.Duration(total)
+}
 
 type Result struct {
 	Valid   bool // if the result is meaningful for count
@@ -296,7 +310,8 @@ func (m *NetPing) Collect(collector pipeline.Collector) error {
 
 	counter := 0
 	for i := range m.ICMPConfigs {
-		go m.doICMPing(&m.ICMPConfigs[i])
+		delay := icmpStartDelay(i, len(m.ICMPConfigs))
+		go m.doICMPingAfter(&m.ICMPConfigs[i], delay)
 		counter++
 	}
 
@@ -394,6 +409,25 @@ func (m *NetPing) getRealTarget(target string) string {
 	return realTarget
 }
 
+func (m *NetPing) doICMPingAfter(config *ICMPConfig, delay time.Duration) {
+	if delay > 0 {
+		timer := time.NewTimer(delay)
+		defer timer.Stop()
+		<-timer.C
+	}
+	m.doICMPing(config)
+}
+
+func configureICMPPinger(pinger *goping.Pinger, config *ICMPConfig, timeout time.Duration, privileged bool) {
+	pinger.Timeout = timeout
+	pinger.Source = config.Src
+	pinger.Size = icmpPayloadSize
+	pinger.Count = config.Count
+	if privileged {
+		pinger.SetPrivileged(true)
+	}
+}
+
 func (m *NetPing) doICMPing(config *ICMPConfig) {
 	// prepare labels
 	var label helper.MetricLabels
@@ -418,12 +452,7 @@ func (m *NetPing) doICMPing(config *ICMPConfig) {
 		}
 		return
 	}
-	pinger.Timeout = m.timeout
-
-	if m.icmpPrivileged {
-		pinger.SetPrivileged(true)
-	}
-	pinger.Count = config.Count
+	configureICMPPinger(pinger, config, m.timeout, m.icmpPrivileged)
 	err = pinger.Run() // Blocks until finished or timeout.
 	if err != nil {
 		logger.Warning(m.context.GetRuntimeContext(), selfmonitor.FailToRunPing, err.Error())
@@ -451,11 +480,11 @@ func (m *NetPing) doICMPing(config *ICMPConfig) {
 		Total:       pinger.Count,
 		Success:     stats.PacketsRecv,
 		Failed:      pinger.Count - stats.PacketsRecv,
-		MinRTTMs:    float64(stats.MinRtt / time.Millisecond),
-		MaxRTTMs:    float64(stats.MaxRtt / time.Millisecond),
-		AvgRTTMs:    float64(stats.AvgRtt / time.Millisecond),
-		TotalRTTMs:  float64(totalRtt / time.Millisecond),
-		StdDevRTTMs: float64(stats.StdDevRtt / time.Millisecond),
+		MinRTTMs:    durationToMilliseconds(stats.MinRtt),
+		MaxRTTMs:    durationToMilliseconds(stats.MaxRtt),
+		AvgRTTMs:    durationToMilliseconds(stats.AvgRtt),
+		TotalRTTMs:  durationToMilliseconds(totalRtt),
+		StdDevRTTMs: durationToMilliseconds(stats.StdDevRtt),
 	}
 }
 
