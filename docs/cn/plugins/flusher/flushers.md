@@ -45,6 +45,7 @@ LoongCollector 提供两类输出插件：
 | `flusher_kafka_v2`<br>[Kafka V2](extended/flusher-kafka-v2.md) | 社区<br>[shalousun](https://github.com/shalousun) | 输出到 Kafka，优先推荐。 |
 | `flusher_loki`<br>[Loki](extended/flusher-loki.md) | 社区<br>[abingcbc](https://github.com/abingcbc) | 推送到 Grafana Loki。 |
 | `flusher_otlp_log`<br>[OTLP 日志](extended/flusher-otlp.md) | 社区<br>[liuhaoyang](https://github.com/liuhaoyang) | 兼容 OpenTelemetry Logs 的后端。 |
+| `flusher_otlp_http`<br>[OTLP/HTTP](extended/flusher-otlp-http.md) | 社区 | 通过 OTLP/HTTP 协议写入 OpenTelemetry 兼容后端。 |
 | `flusher_prometheus`<br>[Prometheus](extended/flusher-prometheus.md) | 社区 | Remote Write 写入 Prometheus 兼容时序库。 |
 | `flusher_pulsar`<br>[Pulsar](extended/flusher-pulsar.md) | 社区<br>[shalousun](https://github.com/shalousun) | 写入 Apache Pulsar。 |
 | `flusher_stdout`<br>[标准输出/文件](extended/flusher-stdout.md) | SLS 官方 | 标准输出或文件，便于本地调试与排障。 |
