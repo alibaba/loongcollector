@@ -44,10 +44,15 @@ dev
 | --- | --- |
 | `event.name` | 固定为 `agentsight.http.raw`，用于与 `gen_ai.*` 数据流区分 |
 | `pid` / `comm` | 进程 ID 与进程名。**无** `gen_ai.session.id` / `gen_ai.turn.id` / `gen_ai.agent.type` / `container.id` —— 底层 `AgentsightHttpsData` 不携带这些字段，关联只能靠 `(pid, comm)` |
-| `http.request.method` / `url.path` | 请求方法与路径。**无完整 URL**，目标 host 需从 `http.request.headers` 里取 |
+| `http.request.method` / `url.path` | 请求方法与路径。**无完整 URL** |
+| `server.address` / `server.port` | 目标主机与端口，从请求头的 `host`（HTTP/2 为 `:authority`）提取而来 |
 | `http.response.status_code` / `is_sse` / `http.response.duration` | 状态码、是否 SSE、耗时（毫秒） |
-| `http.request.headers` / `http.request.body` / `http.response.headers` / `http.response.body` | 原始字节，**按长度**原样拷贝。可能是压缩内容或非 UTF-8，解码由下游负责 |
+| `http.request.body` / `http.response.headers` / `http.response.body` | 原始字节，**按长度**原样拷贝。可能是压缩内容或非 UTF-8，解码由下游负责 |
 | `time_unix_nano` / `observed_time_unix_nano` | 同 `gen_ai.*` 日志 |
+
+> **不输出请求头。** `http.request.headers` 携带 `Authorization` / `x-api-key`，而本路径原样上报、不做任何脱敏，输出即等于把有效凭据写入磁盘（实测确认过）。因此请求头只在内存中用于提取 host，不落盘。
+>
+> 但请注意 **body 仍是原文**：部分厂商在请求体内传凭据，这类内容依然会落盘 —— 这是原始采集的固有性质。`http.response.headers` 目前保留输出（含 `set-cookie` 时同样敏感），如需一并去掉可自行调整 `FillAgentsightRawHttpLog`。
 
 ### `AgentType` 取值命名规范
 

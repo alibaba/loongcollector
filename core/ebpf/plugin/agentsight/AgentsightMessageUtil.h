@@ -49,6 +49,17 @@ std::string ComputeSystemInstructionsHash(const std::string& requestMessagesJson
 /// SHA-256 (hex) of the raw tool-definitions JSON string.
 std::string ComputeToolDefinitionsHash(const std::string& toolDefinitionsJson);
 
+/// Extracts the target host from a raw HTTP headers JSON object — the flat, lowercase-keyed
+/// string→string map that AgentSight's FFI layer produces for `AgentsightHttpsData`.
+///
+/// Exists because `AgentsightHttpsData` carries no request URL: for raw HTTP events the host is
+/// only available inside the headers, and those headers are deliberately never emitted (they
+/// carry `Authorization` / `x-api-key`). This pulls out the one field worth keeping.
+///
+/// Looks up `host`, then the HTTP/2 `:authority` pseudo-header, then falls back to a
+/// case-insensitive scan. Any `:port` suffix is returned as-is. Empty when absent or unparsable.
+std::string ExtractHostFromHeadersJson(const std::string& headersJson);
+
 /// Builds `gen_ai.response.finish_reasons` as a JSON string array, e.g. `["stop"]`.
 /// Collects `finish_reason` from each object in `responseMessagesJson`; uses
 /// `fallbackFinishReason` when the array is empty or unparsable.

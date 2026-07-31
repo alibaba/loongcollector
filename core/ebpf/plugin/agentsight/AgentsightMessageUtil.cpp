@@ -14,8 +14,10 @@
 
 #include "ebpf/plugin/agentsight/AgentsightMessageUtil.h"
 
+#include <cctype>
 #include <cstring>
 
+#include <algorithm>
 #include <limits>
 
 #include "rapidjson/document.h"
@@ -237,6 +239,38 @@ std::string ComputeSystemInstructionsHash(const std::string& requestMessagesJson
 
 std::string ComputeToolDefinitionsHash(const std::string& toolDefinitionsJson) {
     return ComputeContentSha256Hex(toolDefinitionsJson);
+}
+
+std::string ExtractHostFromHeadersJson(const std::string& headersJson) {
+    if (headersJson.empty()) {
+        return {};
+    }
+    rapidjson::Document doc;
+    if (doc.Parse(headersJson.c_str(), headersJson.size()).HasParseError() || !doc.IsObject()) {
+        return {};
+    }
+    // AgentSight lowercases header names, so the direct lookups hit in practice; `:authority`
+    // covers HTTP/2, where there is no `host` header at all.
+    for (const char* key : {"host", ":authority"}) {
+        const auto it = doc.FindMember(key);
+        if (it != doc.MemberEnd() && it->value.IsString() && it->value.GetStringLength() > 0) {
+            return std::string(it->value.GetString(), it->value.GetStringLength());
+        }
+    }
+    // Fallback for producers that preserve the original header casing (e.g. `Host`).
+    for (auto it = doc.MemberBegin(); it != doc.MemberEnd(); ++it) {
+        if (!it->name.IsString() || !it->value.IsString() || it->value.GetStringLength() == 0) {
+            continue;
+        }
+        std::string name(it->name.GetString(), it->name.GetStringLength());
+        std::transform(name.begin(), name.end(), name.begin(), [](unsigned char c) {
+            return static_cast<char>(std::tolower(c));
+        });
+        if (name == "host" || name == ":authority") {
+            return std::string(it->value.GetString(), it->value.GetStringLength());
+        }
+    }
+    return {};
 }
 
 std::string ExtractSystemInstructionsJson(const std::string& requestMessagesJson) {

@@ -440,8 +440,14 @@ void FillAgentsightModelResponseLog(const AgentsightLlmRecord& rec,
 /// `event.name = agentsight.http.raw` so downstream can separate it from the gen_ai.* stream;
 /// no gen_ai.* field is set here because none of them could be resolved.
 ///
-/// Header/body values are copied verbatim (SetContent copies by length into the SourceBuffer, so
-/// embedded NULs survive). They may be compressed or non-UTF-8 — decoding is the consumer's job.
+/// Request headers are deliberately NOT emitted: they carry `Authorization` / `x-api-key`, and this
+/// path reports verbatim bytes with no redaction, so emitting them writes live credentials to disk
+/// (observed in testing). Only the target host is salvaged from them, as `server.address` /
+/// `server.port` — matching the field names the gen_ai.* logs already use.
+///
+/// Body values are copied verbatim (SetContent copies by length into the SourceBuffer, so embedded
+/// NULs survive). They may be compressed or non-UTF-8 — decoding is the consumer's job. Note they
+/// can still carry secrets for providers that authenticate in-body; that is inherent to raw capture.
 void FillAgentsightRawHttpLog(const AgentsightHttpsRecord& rec, logtail::LogEvent* log) {
     auto setStr = [&](StringView k, const std::string& v) {
         if (!v.empty()) {
@@ -464,7 +470,20 @@ void FillAgentsightRawHttpLog(const AgentsightHttpsRecord& rec, logtail::LogEven
     log->SetContent(StringView("is_sse"), StringView(rec.mIsSse ? "1" : "0"));
     log->SetContent("http.response.duration", std::to_string(rec.mDurationNs / 1000000ULL));
 
-    setStr(StringView("http.request.headers"), rec.mRequestHeaders);
+    // Salvage the host from the (unemitted) request headers. Reuses the URL authority parser by
+    // synthesizing a URL, so IPv6 brackets and `:port` splitting are handled in one place.
+    const std::string hostHeader = ExtractHostFromHeadersJson(rec.mRequestHeaders);
+    if (!hostHeader.empty()) {
+        std::string host;
+        std::string port;
+        if (ParseHostAndPortFromRequestUrl("https://" + hostHeader + "/", host, port)) {
+            setStr(StringView("server.address"), host);
+            setStr(StringView("server.port"), port);
+        } else {
+            setStr(StringView("server.address"), hostHeader);
+        }
+    }
+
     setStr(StringView("http.request.body"), rec.mRequestBody);
     setStr(StringView("http.response.headers"), rec.mResponseHeaders);
     setStr(StringView("http.response.body"), rec.mResponseBody);

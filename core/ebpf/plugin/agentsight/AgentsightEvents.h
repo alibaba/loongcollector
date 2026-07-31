@@ -96,6 +96,10 @@ public:
     // Length-delimited payloads: AgentsightHttpsData reports these as (ptr, len) pairs and they may
     // contain embedded NULs (compressed or binary bodies), so they are copied by length, not by
     // NUL scan, and may not be valid UTF-8.
+    //
+    // mRequestHeaders is captured but **never emitted** — it carries Authorization / x-api-key and
+    // this path does no redaction. It is kept in memory only so the host can be salvaged into
+    // `server.address` (see FillAgentsightRawHttpLog / ExtractHostFromHeadersJson).
     std::string mRequestHeaders;
     std::string mRequestBody;
     std::string mResponseHeaders;
