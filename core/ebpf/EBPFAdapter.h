@@ -22,9 +22,9 @@
 #include <memory>
 #include <string>
 
-#include "agentsight.h"
 #include "common/DynamicLibHelper.h"
 #include "ebpf/include/export.h"
+#include "ebpf/plugin/agentsight/AgentSightV2Compat.h"
 
 namespace logtail::ebpf {
 
@@ -36,6 +36,8 @@ struct AgentSightSymbolTable {
     void (*config_free)(AgentsightConfigHandle*) = nullptr;
     void (*config_set_verbose)(AgentsightConfigHandle*, int) = nullptr;
     void (*config_set_log_path)(AgentsightConfigHandle*, const char*) = nullptr;
+    void (*config_set_enable_security_audit)(AgentsightConfigHandle*, int) = nullptr;
+    void (*config_set_enforcer_socket)(AgentsightConfigHandle*, const char*) = nullptr;
     void (*config_add_cmdline_rule)(AgentsightConfigHandle*, const char* const*, const char*, int) = nullptr;
     void (*config_add_https)(AgentsightConfigHandle*, const char*) = nullptr;
     int (*config_add_http)(AgentsightConfigHandle*, const char*) = nullptr;
@@ -45,6 +47,15 @@ struct AgentSightSymbolTable {
     int (*handle_stop)(AgentsightHandle*) = nullptr;
     int (*handle_get_eventfd)(AgentsightHandle*) = nullptr;
     int (*handle_read)(AgentsightHandle*, agentsight_https_callback_fn, void*, agentsight_llm_callback_fn, void*, int)
+        = nullptr;
+    int (*handle_read_v2)(AgentsightHandle*,
+                          agentsight_https_callback_fn,
+                          void*,
+                          agentsight_llm_callback_fn,
+                          void*,
+                          agentsight_event_callback_fn,
+                          void*,
+                          int)
         = nullptr;
 };
 

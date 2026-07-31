@@ -19,6 +19,8 @@
 #include <utility>
 #include <vector>
 
+#include "json/json.h"
+
 #include "collection_pipeline/queue/ProcessQueueItem.h"
 #include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "common/StringView.h"
@@ -436,6 +438,47 @@ void FillAgentsightModelResponseLog(const AgentsightLlmRecord& rec,
     setStr(StringView("gen_ai.output.messages"), rec.mResponseMessagesJson);
 }
 
+std::string JsonScalarToString(const Json::Value& value) {
+    if (value.isString()) {
+        return value.asString();
+    }
+    if (value.isBool()) {
+        return value.asBool() ? "true" : "false";
+    }
+    if (value.isInt64()) {
+        return std::to_string(value.asInt64());
+    }
+    if (value.isUInt64()) {
+        return std::to_string(value.asUInt64());
+    }
+    if (value.isDouble()) {
+        return std::to_string(value.asDouble());
+    }
+    return {};
+}
+
+void FlattenSecurityJson(const Json::Value& value, const std::string& prefix, logtail::LogEvent* log) {
+    if (!value.isObject()) {
+        const std::string scalar = JsonScalarToString(value);
+        if (!scalar.empty()) {
+            log->SetContent(prefix, scalar);
+        }
+        return;
+    }
+    for (const auto& key : value.getMemberNames()) {
+        const auto& child = value[key];
+        const std::string childKey = prefix.empty() ? key : prefix + "." + key;
+        if (child.isObject()) {
+            FlattenSecurityJson(child, childKey, log);
+        } else {
+            const std::string scalar = JsonScalarToString(child);
+            if (!scalar.empty()) {
+                log->SetContent(childKey, scalar);
+            }
+        }
+    }
+}
+
 } // namespace
 
 AgentsightManager::AgentsightManager(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
@@ -491,6 +534,7 @@ void AgentsightManager::StopAgentSightLocked() {
     }
     mHandle = nullptr;
     mRunning = false;
+    mSecurityAuditEnabled = false;
 }
 
 bool AgentsightManager::RestartAgentSightLocked(const SecurityOptions& opts) {
@@ -515,6 +559,21 @@ bool AgentsightManager::RestartAgentSightLocked(const SecurityOptions& opts) {
     }
 
     ApplyAgentsightRulesToConfig(cfg, sym, opts);
+
+    mSecurityAuditEnabled = false;
+    if (opts.mAgentsightSecurityAuditEnabled) {
+        if (sym->config_set_enable_security_audit && sym->config_set_enforcer_socket && sym->handle_read_v2) {
+            sym->config_set_enable_security_audit(cfg, 1);
+            sym->config_set_enforcer_socket(cfg, opts.mAgentsightEnforcerSocket.c_str());
+            mSecurityAuditEnabled = true;
+        } else {
+            LOG_WARNING(sLogger,
+                        ("AgentSight security audit",
+                         "requested but read_v2/configuration symbols are unavailable; continuing with LLM only"));
+        }
+    } else if (sym->config_set_enable_security_audit) {
+        sym->config_set_enable_security_audit(cfg, 0);
+    }
 
     mHandle = sym->handle_new(cfg);
     if (sym->config_free) {
@@ -551,7 +610,16 @@ int AgentsightManager::DrainReadsLocked() {
     }
     int total = 0;
     for (;;) {
-        const int r = sym->handle_read(mHandle, nullptr, nullptr, &AgentsightManager::OnLlmCallback, this, 0);
+        const int r = mSecurityAuditEnabled && sym->handle_read_v2
+            ? sym->handle_read_v2(mHandle,
+                                  nullptr,
+                                  nullptr,
+                                  &AgentsightManager::OnLlmCallback,
+                                  this,
+                                  &AgentsightManager::OnEventCallback,
+                                  this,
+                                  0)
+            : sym->handle_read(mHandle, nullptr, nullptr, &AgentsightManager::OnLlmCallback, this, 0);
         if (r <= 0) {
             break;
         }
@@ -589,6 +657,32 @@ void AgentsightManager::OnLlmCallback(const AgentsightLLMData* data, void* user_
     } else {
         ADD_COUNTER(self->mLossKernelEventsTotal, 1);
         LOG_WARNING(sLogger, ("AgentSight LLM event enqueue failed", ""));
+    }
+}
+
+void AgentsightManager::OnEventCallback(const AgentsightEvent* data, void* user_data) {
+    static constexpr uint32_t kSecurityEventType = 3;
+    static constexpr uint32_t kMaxSecurityPayloadBytes = 4U * 1024U * 1024U;
+    if (!data || !user_data || static_cast<uint32_t>(data->event_type) != kSecurityEventType) {
+        return;
+    }
+    if (data->schema_version != 1 || !data->payload_json || data->payload_json_len == 0
+        || data->payload_json_len > kMaxSecurityPayloadBytes) {
+        LOG_WARNING(sLogger,
+                    ("AgentSight security event rejected",
+                     "invalid envelope")("schema", data->schema_version)("payload_bytes", data->payload_json_len));
+        return;
+    }
+    auto* self = static_cast<AgentsightManager*>(user_data);
+    auto event = std::make_shared<AgentsightSecurityRecord>(self->mConfigName,
+                                                            data->timestamp_ns,
+                                                            data->schema_version,
+                                                            std::string(data->payload_json, data->payload_json_len));
+    if (self->mCommonEventQueue.try_enqueue(event)) {
+        ADD_COUNTER(self->mPluginInEventsTotal, 1);
+    } else {
+        ADD_COUNTER(self->mLossKernelEventsTotal, 1);
+        LOG_WARNING(sLogger, ("AgentSight security event enqueue failed", ""));
     }
 }
 
@@ -676,6 +770,7 @@ int AgentsightManager::RemoveConfig(const std::string&) {
     mPluginIndex = 0;
     mEventStreamFormat = true;
     mMessageDeltaOnly = true;
+    mSecurityAuditEnabled = false;
     StopAgentSightLocked();
     return 0;
 }
@@ -692,6 +787,7 @@ int AgentsightManager::Destroy() {
     mPluginIndex = 0;
     mEventStreamFormat = true;
     mMessageDeltaOnly = true;
+    mSecurityAuditEnabled = false;
     mInited = false;
     return 0;
 }
@@ -746,7 +842,13 @@ std::unique_ptr<PluginConfig> AgentsightManager::GeneratePluginConfig(const Plug
 }
 
 int AgentsightManager::HandleEvent(const std::shared_ptr<CommonEvent>& event) {
-    if (!event || event->GetKernelEventType() != KernelEventType::AGENTSIGHT_LLM_RECORD) {
+    if (!event) {
+        return 0;
+    }
+    if (event->GetKernelEventType() == KernelEventType::AGENTSIGHT_SECURITY_RECORD) {
+        return HandleSecurityEvent(*static_cast<AgentsightSecurityRecord*>(event.get()));
+    }
+    if (event->GetKernelEventType() != KernelEventType::AGENTSIGHT_LLM_RECORD) {
         return 0;
     }
     auto* rec = static_cast<AgentsightLlmRecord*>(event.get());
@@ -836,6 +938,82 @@ int AgentsightManager::HandleEvent(const std::shared_ptr<CommonEvent>& event) {
         LOG_WARNING(
             sLogger,
             ("Agentsight push queue failed", "")("config", rec->GetPipelineConfigName())("pluginIdx", pluginIndex));
+    }
+    return 0;
+}
+
+int AgentsightManager::HandleSecurityEvent(const AgentsightSecurityRecord& rec) {
+    logtail::QueueKey queueKey;
+    uint32_t pluginIndex;
+    {
+        std::lock_guard<std::mutex> lock(mLibMutex);
+        if (mPipelineCtx == nullptr) {
+            return 0;
+        }
+        queueKey = mQueueKey;
+        pluginIndex = mPluginIndex;
+    }
+
+    auto sourceBuffer = std::make_shared<SourceBuffer>();
+    PipelineEventGroup eventGroup(sourceBuffer);
+    auto* log = eventGroup.AddLogEvent(true, mEventPool);
+    SetLogTimestampFromNs(log, rec.mTimestampNs);
+    log->SetContent("time_unix_nano", std::to_string(rec.mTimestampNs));
+    log->SetContent("event.name", "agentsight.security");
+    log->SetContent("event.kind", "event");
+    log->SetContent("event.category", "security");
+    log->SetContent("agentsight.schema_version", std::to_string(rec.mSchemaVersion));
+    log->SetContent("event.original", rec.mPayloadJson);
+
+    Json::Value root;
+    Json::CharReaderBuilder builder;
+    std::string errors;
+    const std::unique_ptr<Json::CharReader> reader(builder.newCharReader());
+    if (reader->parse(rec.mPayloadJson.data(), rec.mPayloadJson.data() + rec.mPayloadJson.size(), &root, &errors)
+        && root.isObject()) {
+        if (root["event_type"].isString()) {
+            log->SetContent("event.name", "agentsight.security." + root["event_type"].asString());
+            log->SetContent("event.type", root["event_type"].asString());
+        }
+        if (root["event_id"].isString()) {
+            log->SetContent("event.id", root["event_id"].asString());
+        }
+        if (root["observed_at_ns"].isUInt64()) {
+            log->SetContent("observed_time_unix_nano", std::to_string(root["observed_at_ns"].asUInt64()));
+        }
+        const auto& identity = root["identity"];
+        if (identity.isObject()) {
+            if (identity["agent_id"].isString()) {
+                log->SetContent("agent.id", identity["agent_id"].asString());
+            }
+            if (identity["agent_name"].isString()) {
+                log->SetContent("gen_ai.agent.type", identity["agent_name"].asString());
+            }
+            if (identity["session_id"].isString()) {
+                log->SetContent("gen_ai.session.id", identity["session_id"].asString());
+            }
+            if (identity["conversation_id"].isString()) {
+                log->SetContent("gen_ai.turn.id", identity["conversation_id"].asString());
+            }
+            if (identity["pid"].isInt()) {
+                log->SetContent("process.pid", std::to_string(identity["pid"].asInt()));
+            }
+            FlattenSecurityJson(identity, "agentsight.identity", log);
+        }
+        FlattenSecurityJson(root["event"], "security", log);
+    } else {
+        LOG_WARNING(sLogger, ("AgentSight security event JSON parse failed", errors));
+    }
+
+    auto item = std::make_unique<ProcessQueueItem>(std::move(eventGroup), pluginIndex);
+    if (QueueStatus::OK == ProcessQueueManager::GetInstance()->PushQueue(queueKey, std::move(item))) {
+        ADD_COUNTER(mPushLogsTotal, 1);
+        ADD_COUNTER(mPushLogGroupTotal, 1);
+    } else {
+        ADD_COUNTER(mPushLogFailedTotal, 1);
+        LOG_WARNING(sLogger,
+                    ("Agentsight security push queue failed", "")("config", rec.GetPipelineConfigName())("pluginIdx",
+                                                                                                         pluginIndex));
     }
     return 0;
 }

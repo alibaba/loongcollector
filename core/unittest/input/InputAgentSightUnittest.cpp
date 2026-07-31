@@ -29,6 +29,7 @@ public:
     void TestNameAndQueueType();
     void TestInitWithProbeConfig();
     void TestInitWithHttpsAndHttp();
+    void TestInitWithSecurityAudit();
 
 protected:
     void SetUp() override {
@@ -91,9 +92,27 @@ void InputAgentSightUnittest::TestInitWithHttpsAndHttp() {
     APSARA_TEST_EQUAL("model-svc.default.svc", input.mSecurityOptions.mAgentsightHttp[1]);
 }
 
+void InputAgentSightUnittest::TestInitWithSecurityAudit() {
+    std::string err;
+    Json::Value configJson;
+    Json::Value optionalGoPipeline;
+    APSARA_TEST_TRUE(ParseJsonTable(
+        R"({"Type":"input_agentsight","ProbeConfig":{"SecurityAudit":{"Enabled":true,"EnforcerSocket":"/tmp/enforcer.sock"}}})",
+        configJson,
+        err));
+    InputAgentSight input;
+    input.SetContext(mContex);
+    input.CreateMetricsRecordRef("t", "1");
+    APSARA_TEST_TRUE(input.Init(configJson, optionalGoPipeline));
+    input.CommitMetricsRecordRef();
+    APSARA_TEST_TRUE(input.mSecurityOptions.mAgentsightSecurityAuditEnabled);
+    APSARA_TEST_EQUAL("/tmp/enforcer.sock", input.mSecurityOptions.mAgentsightEnforcerSocket);
+}
+
 UNIT_TEST_CASE(InputAgentSightUnittest, TestNameAndQueueType)
 UNIT_TEST_CASE(InputAgentSightUnittest, TestInitWithProbeConfig)
 UNIT_TEST_CASE(InputAgentSightUnittest, TestInitWithHttpsAndHttp)
+UNIT_TEST_CASE(InputAgentSightUnittest, TestInitWithSecurityAudit)
 
 } // namespace logtail
 

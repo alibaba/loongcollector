@@ -76,4 +76,15 @@ AgentsightLlmRecord::AgentsightLlmRecord(std::string pipelineConfigName, const A
     mToolDefinitionsJson = CopyBuffer(d.tools, d.tools_len);
 }
 
+AgentsightSecurityRecord::AgentsightSecurityRecord(std::string pipelineConfigName,
+                                                   uint64_t timestampNs,
+                                                   uint16_t schemaVersion,
+                                                   std::string payloadJson)
+    : CommonEvent(KernelEventType::AGENTSIGHT_SECURITY_RECORD),
+      mPipelineConfigName(std::move(pipelineConfigName)),
+      mTimestampNs(timestampNs),
+      mSchemaVersion(schemaVersion),
+      mPayloadJson(std::move(payloadJson)) {
+}
+
 } // namespace logtail::ebpf

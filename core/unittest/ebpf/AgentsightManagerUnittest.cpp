@@ -38,7 +38,7 @@ AgentsightHandle* gFakeHandle = reinterpret_cast<AgentsightHandle*>(0x20U);
 
 struct FakeReadControl {
     int start_ret = 0;
-    /// 0: always 0; 1: return 1 once then 0; 2: call LLM callback once then 0
+    /// 0: always 0; 1: return 1 once then 0; 2: LLM once; 3: security once via read_v2
     int read_mode = 0;
     int read_step = 0;
 } gRead;
@@ -74,6 +74,21 @@ int g_ut_cmdline_allow_calls = 0;
 int g_ut_cmdline_deny_calls = 0;
 int g_ut_https_calls = 0;
 int g_ut_http_calls = 0;
+int g_ut_security_enable_calls = 0;
+int g_ut_security_enabled = 0;
+std::string g_ut_enforcer_socket;
+int g_ut_read_v2_calls = 0;
+
+void fake_config_set_enable_security_audit(AgentsightConfigHandle* cfg, int enabled) {
+    (void)cfg;
+    ++g_ut_security_enable_calls;
+    g_ut_security_enabled = enabled;
+}
+
+void fake_config_set_enforcer_socket(AgentsightConfigHandle* cfg, const char* path) {
+    (void)cfg;
+    g_ut_enforcer_socket = path ? path : "";
+}
 
 void fake_config_add_cmdline_rule(AgentsightConfigHandle* cfg,
                                   const char* const* rule,
@@ -169,6 +184,33 @@ int fake_handle_read(AgentsightHandle* h,
     return 0;
 }
 
+int fake_handle_read_v2(AgentsightHandle* h,
+                        agentsight_https_callback_fn http,
+                        void* http_user_data,
+                        agentsight_llm_callback_fn llm,
+                        void* llm_user_data,
+                        agentsight_event_callback_fn event,
+                        void* event_user_data,
+                        int flags) {
+    ++g_ut_read_v2_calls;
+    if (gRead.read_mode != 3) {
+        return fake_handle_read(h, http, http_user_data, llm, llm_user_data, flags);
+    }
+    static const char payload[]
+        = R"({"event_id":"00000000-0000-0000-0000-000000000001","occurred_at_ns":7,"observed_at_ns":8,"identity":{"agent_id":"agent-1","agent_name":"claude","session_id":"session-1","pid":42},"event_type":"policy_decision","event":{"policy_id":"credential-exfiltration","policy_revision":3,"mode":"audit","risk_score":85,"reason":"test"}})";
+    AgentsightEvent data{};
+    data.event_type = static_cast<AgentsightEventType>(3);
+    data.schema_version = 1;
+    data.timestamp_ns = 7;
+    data.payload_json = payload;
+    data.payload_json_len = sizeof(payload) - 1U;
+    if (event) {
+        event(&data, event_user_data);
+    }
+    gRead.read_mode = 0;
+    return 1;
+}
+
 std::unique_ptr<AgentSightSymbolTable> makeFullSymbolTable() {
     auto t = std::make_unique<AgentSightSymbolTable>();
     t->last_error = fake_last_error;
@@ -176,6 +218,8 @@ std::unique_ptr<AgentSightSymbolTable> makeFullSymbolTable() {
     t->config_free = fake_config_free;
     t->config_set_verbose = fake_config_set_verbose;
     t->config_set_log_path = fake_config_set_log_path;
+    t->config_set_enable_security_audit = fake_config_set_enable_security_audit;
+    t->config_set_enforcer_socket = fake_config_set_enforcer_socket;
     t->config_add_cmdline_rule = fake_config_add_cmdline_rule;
     t->config_add_https = fake_config_add_https;
     t->config_add_http = fake_config_add_http;
@@ -185,6 +229,7 @@ std::unique_ptr<AgentSightSymbolTable> makeFullSymbolTable() {
     t->handle_stop = fake_handle_stop;
     t->handle_get_eventfd = fake_get_eventfd;
     t->handle_read = fake_handle_read;
+    t->handle_read_v2 = fake_handle_read_v2;
     return t;
 }
 
@@ -239,11 +284,17 @@ public:
         g_ut_cmdline_deny_calls = 0;
         g_ut_https_calls = 0;
         g_ut_http_calls = 0;
+        g_ut_security_enable_calls = 0;
+        g_ut_security_enabled = 0;
+        g_ut_enforcer_socket.clear();
+        g_ut_read_v2_calls = 0;
         auto& o = agentsightOptions();
         o.mAgentsightCmdlineWhitelist.clear();
         o.mAgentsightCmdlineBlacklist.clear();
         o.mAgentsightHttps.clear();
         o.mAgentsightHttp.clear();
+        o.mAgentsightSecurityAuditEnabled = false;
+        o.mAgentsightEnforcerSocket = "/run/agentsight/enforcer.sock";
     }
 
     void TearDown() override {
@@ -313,6 +364,8 @@ public:
     void TestRemoveConfigClearsSessionInputCache();
     void TestDestroyClearsSessionInputCache();
     void TestSessionInputCacheLruEviction();
+    void TestSecurityAuditUsesReadV2AndEnqueuesSecurityRecord();
+    void TestSecurityAuditFallsBackWhenV2SymbolsAreMissing();
 
 protected:
     std::shared_ptr<AgentSightTestEBPFAdapter> mAgentSightAdapter;
@@ -620,6 +673,45 @@ void AgentsightManagerUnittest::TestSessionInputCacheLruEviction() {
     mgr->Destroy();
 }
 
+void AgentsightManagerUnittest::TestSecurityAuditUsesReadV2AndEnqueuesSecurityRecord() {
+    auto& options = agentsightOptions();
+    options.mAgentsightSecurityAuditEnabled = true;
+    options.mAgentsightEnforcerSocket = "/tmp/enforcer.sock";
+    auto mgr = makeManager();
+    registerConfig(*mgr, "security-pipeline");
+
+    APSARA_TEST_EQUAL(1, g_ut_security_enabled);
+    APSARA_TEST_EQUAL("/tmp/enforcer.sock", g_ut_enforcer_socket);
+    gRead.read_mode = 3;
+    APSARA_TEST_EQUAL(1, mgr->OnEpollReadable());
+    APSARA_TEST_TRUE(g_ut_read_v2_calls >= 1);
+
+    std::shared_ptr<CommonEvent> event;
+    APSARA_TEST_TRUE(mEventQueue->try_dequeue(event));
+    APSARA_TEST_EQUAL(KernelEventType::AGENTSIGHT_SECURITY_RECORD, event->GetKernelEventType());
+    auto* security = static_cast<AgentsightSecurityRecord*>(event.get());
+    APSARA_TEST_EQUAL(1, security->mSchemaVersion);
+    APSARA_TEST_EQUAL(7, security->mTimestampNs);
+    APSARA_TEST_TRUE(security->mPayloadJson.find("credential-exfiltration") != std::string::npos);
+    mgr->Destroy();
+}
+
+void AgentsightManagerUnittest::TestSecurityAuditFallsBackWhenV2SymbolsAreMissing() {
+    auto symbols = makeFullSymbolTable();
+    symbols->handle_read_v2 = nullptr;
+    mAgentSightAdapter->setAgentSightSymbols(std::move(symbols));
+    auto& options = agentsightOptions();
+    options.mAgentsightSecurityAuditEnabled = true;
+    auto mgr = makeManager();
+    registerConfig(*mgr, "legacy-pipeline");
+
+    APSARA_TEST_EQUAL(0, g_ut_security_enabled);
+    gRead.read_mode = 2;
+    APSARA_TEST_EQUAL(1, mgr->OnEpollReadable());
+    APSARA_TEST_EQUAL(0, g_ut_read_v2_calls);
+    mgr->Destroy();
+}
+
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestGetPluginType);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestAddOrUpdateValidation);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestAddOrUpdateNoSymbols);
@@ -641,5 +733,7 @@ UNIT_TEST_CASE(AgentsightManagerUnittest, TestUserBlacklistOnlySkipsBuiltinAllow
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestRemoveConfigClearsSessionInputCache);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestDestroyClearsSessionInputCache);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestSessionInputCacheLruEviction);
+UNIT_TEST_CASE(AgentsightManagerUnittest, TestSecurityAuditUsesReadV2AndEnqueuesSecurityRecord);
+UNIT_TEST_CASE(AgentsightManagerUnittest, TestSecurityAuditFallsBackWhenV2SymbolsAreMissing);
 
 UNIT_TEST_MAIN
