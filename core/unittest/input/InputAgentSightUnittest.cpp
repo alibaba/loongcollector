@@ -145,9 +145,7 @@ void InputAgentSightUnittest::TestRejectInvalidSecurityAuditFields() {
         std::string err;
         Json::Value configJson;
         APSARA_TEST_TRUE(ParseJsonTable(
-            R"({"Type":"input_agentsight","ProbeConfig":{"SecurityAudit":{"Enabled":"yes"}}})",
-            configJson,
-            err));
+            R"({"Type":"input_agentsight","ProbeConfig":{"SecurityAudit":{"Enabled":"yes"}}})", configJson, err));
         InputAgentSight input;
         input.SetContext(mContex);
         input.CreateMetricsRecordRef("t", "1");
@@ -157,9 +155,7 @@ void InputAgentSightUnittest::TestRejectInvalidSecurityAuditFields() {
         std::string err;
         Json::Value configJson;
         APSARA_TEST_TRUE(ParseJsonTable(
-            R"({"Type":"input_agentsight","ProbeConfig":{"SecurityAudit":{"EnforcerSocket":""}}})",
-            configJson,
-            err));
+            R"({"Type":"input_agentsight","ProbeConfig":{"SecurityAudit":{"EnforcerSocket":""}}})", configJson, err));
         InputAgentSight input;
         input.SetContext(mContex);
         input.CreateMetricsRecordRef("t", "1");
