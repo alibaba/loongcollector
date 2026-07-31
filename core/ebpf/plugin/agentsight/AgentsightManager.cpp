@@ -959,9 +959,9 @@ int AgentsightManager::HandleSecurityEvent(const AgentsightSecurityRecord& rec) 
     auto* log = eventGroup.AddLogEvent(true, mEventPool);
     SetLogTimestampFromNs(log, rec.mTimestampNs);
     log->SetContent("time_unix_nano", std::to_string(rec.mTimestampNs));
-    log->SetContent("event.name", "agentsight.security");
-    log->SetContent("event.kind", "event");
-    log->SetContent("event.category", "security");
+    log->SetContent(StringView("event.name"), StringView("agentsight.security"));
+    log->SetContent(StringView("event.kind"), StringView("event"));
+    log->SetContent(StringView("event.category"), StringView("security"));
     log->SetContent("agentsight.schema_version", std::to_string(rec.mSchemaVersion));
     log->SetContent("event.original", rec.mPayloadJson);
 
