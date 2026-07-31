@@ -20,15 +20,17 @@
 #include <mutex>
 #include <string>
 
-#include "agentsight.h"
 #include "collection_pipeline/queue/QueueKey.h"
 #include "common/LRUCache.h"
 #include "ebpf/EBPFAdapter.h"
 #include "ebpf/plugin/AbstractManager.h"
+#include "ebpf/plugin/agentsight/AgentSightV2Compat.h"
 #include "ebpf/plugin/agentsight/AgentsightMessageUtil.h"
 #include "monitor/metric_models/ReentrantMetricsRecord.h"
 
 namespace logtail::ebpf {
+
+class AgentsightSecurityRecord;
 
 class AgentsightManager : public AbstractManager {
 public:
@@ -94,6 +96,7 @@ protected:
 
 private:
     static void OnLlmCallback(const AgentsightLLMData* data, void* user_data);
+    static void OnEventCallback(const AgentsightEvent* data, void* user_data);
 
     void StopAgentSightLocked();
     bool RestartAgentSightLocked(const SecurityOptions& opts);
@@ -101,6 +104,7 @@ private:
     void LogAgentSightError(const char* what);
     void releaseMetricRefs();
     void clearSessionInputState();
+    int HandleSecurityEvent(const AgentsightSecurityRecord& rec);
 
     static constexpr size_t kMaxSessionInputStates = 4096;
 
@@ -122,6 +126,7 @@ private:
     bool mRunning = false;
     bool mEventStreamFormat = true;
     bool mMessageDeltaOnly = true;
+    bool mSecurityAuditEnabled = false;
 
     CounterPtr mLossKernelEventsTotal;
     CounterPtr mPushLogFailedTotal;

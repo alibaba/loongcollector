@@ -18,8 +18,8 @@
 
 #include <string>
 
-#include "agentsight.h"
 #include "ebpf/include/export.h"
+#include "ebpf/plugin/agentsight/AgentSightV2Compat.h"
 #include "ebpf/type/CommonDataEvent.h"
 
 namespace logtail::ebpf {
@@ -66,6 +66,23 @@ public:
     std::string mInputMessageDeltaJson;
     std::string mResponseMessagesJson;
     std::string mToolDefinitionsJson;
+};
+
+class AgentsightSecurityRecord : public CommonEvent {
+public:
+    AgentsightSecurityRecord(std::string pipelineConfigName,
+                             uint64_t timestampNs,
+                             uint16_t schemaVersion,
+                             std::string payloadJson);
+
+    PluginType GetPluginType() const override { return PluginType::AGENTSIGHT_OBSERVE; }
+
+    const std::string& GetPipelineConfigName() const { return mPipelineConfigName; }
+
+    std::string mPipelineConfigName;
+    uint64_t mTimestampNs = 0;
+    uint16_t mSchemaVersion = 0;
+    std::string mPayloadJson;
 };
 
 } // namespace logtail::ebpf

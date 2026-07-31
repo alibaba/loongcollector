@@ -40,6 +40,7 @@ enum class KernelEventType {
     FILE_PERMISSION_EVENT_READ,
 
     AGENTSIGHT_LLM_RECORD,
+    AGENTSIGHT_SECURITY_RECORD,
 };
 
 class CommonEvent {
