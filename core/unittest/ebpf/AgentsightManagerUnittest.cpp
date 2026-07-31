@@ -18,13 +18,17 @@
 
 #include <memory>
 #include <variant>
+#include <vector>
 
 #include "collection_pipeline/CollectionPipelineContext.h"
+#include "collection_pipeline/queue/ProcessQueueManager.h"
+#include "collection_pipeline/queue/QueueKeyManager.h"
 #include "ebpf/Config.h"
 #include "ebpf/EBPFAdapter.h"
 #include "ebpf/plugin/agentsight/AgentsightEvents.h"
 #include "ebpf/plugin/agentsight/AgentsightManager.h"
 #include "ebpf/type/FileEvent.h"
+#include "models/LogEvent.h"
 #include "unittest/Unittest.h"
 #include "unittest/ebpf/ManagerUnittestBase.h"
 
@@ -298,6 +302,10 @@ public:
     }
 
     void TearDown() override {
+        for (const auto key : mProcessQueueKeys) {
+            ProcessQueueManager::GetInstance()->DeleteQueue(key);
+        }
+        mProcessQueueKeys.clear();
         if (gFakeAgentSightEventFd >= 0) {
             ::close(gFakeAgentSightEventFd);
             gFakeAgentSightEventFd = -1;
@@ -337,6 +345,17 @@ public:
         APSARA_TEST_EQUAL(0, mgr.AddOrUpdateConfig(&ctx, 0, nullptr, asVariant()));
     }
 
+    void registerConfigWithQueue(AgentsightManager& mgr, const char* configName) {
+        const QueueKey key = QueueKeyManager::GetInstance()->GetKey(configName);
+        CollectionPipelineContext ctx;
+        ctx.SetConfigName(configName);
+        ctx.SetProcessQueueKey(key);
+        APSARA_TEST_TRUE(ProcessQueueManager::GetInstance()->CreateOrUpdateCountBoundedQueue(key, 0, ctx));
+        ProcessQueueManager::GetInstance()->EnablePop(configName);
+        APSARA_TEST_EQUAL(0, mgr.AddOrUpdateConfig(&ctx, 0, nullptr, asVariant()));
+        mProcessQueueKeys.push_back(key);
+    }
+
     void populateSessionInputCache(AgentsightManager& mgr, const char* configName, const char* const* sessionIds) {
         for (const char* const* it = sessionIds; *it != nullptr; ++it) {
             APSARA_TEST_EQUAL(0, mgr.HandleEvent(makeMinimalLlmRecord(configName, *it)));
@@ -366,9 +385,12 @@ public:
     void TestSessionInputCacheLruEviction();
     void TestSecurityAuditUsesReadV2AndEnqueuesSecurityRecord();
     void TestSecurityAuditFallsBackWhenV2SymbolsAreMissing();
+    void TestSecurityEventProducesSearchableLog();
+    void TestMalformedSecurityEventPreservesEnvelope();
 
 protected:
     std::shared_ptr<AgentSightTestEBPFAdapter> mAgentSightAdapter;
+    std::vector<QueueKey> mProcessQueueKeys;
 };
 
 void AgentsightManagerUnittest::TestGetPluginType() {
@@ -514,6 +536,8 @@ void AgentsightManagerUnittest::TestHandleEventBranches() {
     // No pipeline: mPipelineCtx is null
     auto orphan = std::make_shared<AgentsightLlmRecord>(std::string("orphan"), d0);
     APSARA_TEST_EQUAL(0, mgr->HandleEvent(orphan));
+    auto orphanSecurity = std::make_shared<AgentsightSecurityRecord>("orphan", 1U, 1U, "{}");
+    APSARA_TEST_EQUAL(0, mgr->HandleEvent(orphanSecurity));
 
     CollectionPipelineContext cctx;
     cctx.SetConfigName("p1");
@@ -712,6 +736,76 @@ void AgentsightManagerUnittest::TestSecurityAuditFallsBackWhenV2SymbolsAreMissin
     mgr->Destroy();
 }
 
+void AgentsightManagerUnittest::TestSecurityEventProducesSearchableLog() {
+    static const std::string kConfigName = "security-log-pipeline";
+    static const std::string kPayload
+        = R"({"event_id":"00000000-0000-0000-0000-000000000001","observed_at_ns":8,"identity":{"agent_id":"agent-1","agent_name":"claude","session_id":"session-1","conversation_id":"turn-1","pid":42},"event_type":"policy_decision","event":{"policy_id":"credential-exfiltration","policy_revision":3,"mode":"audit","risk_score":85,"large_counter":9223372036854775808,"blocked":true,"confidence":0.75,"details":{"source":"unit-test"}}})";
+
+    auto mgr = makeManager();
+    registerConfigWithQueue(*mgr, kConfigName.c_str());
+
+    auto record = std::make_shared<AgentsightSecurityRecord>(kConfigName, 7U, 1U, kPayload);
+    APSARA_TEST_EQUAL(0, mgr->HandleEvent(record));
+
+    std::unique_ptr<ProcessQueueItem> item;
+    std::string configName;
+    APSARA_TEST_TRUE(ProcessQueueManager::GetInstance()->PopItem(0, item, configName));
+    APSARA_TEST_EQUAL(kConfigName, configName);
+    APSARA_TEST_EQUAL(1U, item->mEventGroup.GetEvents().size());
+    const auto& log = item->mEventGroup.GetEvents().at(0).Cast<LogEvent>();
+    APSARA_TEST_EQUAL("7", log.GetContent("time_unix_nano").to_string());
+    APSARA_TEST_EQUAL("agentsight.security.policy_decision", log.GetContent("event.name").to_string());
+    APSARA_TEST_EQUAL("event", log.GetContent("event.kind").to_string());
+    APSARA_TEST_EQUAL("security", log.GetContent("event.category").to_string());
+    APSARA_TEST_EQUAL("policy_decision", log.GetContent("event.type").to_string());
+    APSARA_TEST_EQUAL("00000000-0000-0000-0000-000000000001", log.GetContent("event.id").to_string());
+    APSARA_TEST_EQUAL("8", log.GetContent("observed_time_unix_nano").to_string());
+    APSARA_TEST_EQUAL("1", log.GetContent("agentsight.schema_version").to_string());
+    APSARA_TEST_EQUAL("agent-1", log.GetContent("agent.id").to_string());
+    APSARA_TEST_EQUAL("claude", log.GetContent("gen_ai.agent.type").to_string());
+    APSARA_TEST_EQUAL("session-1", log.GetContent("gen_ai.session.id").to_string());
+    APSARA_TEST_EQUAL("turn-1", log.GetContent("gen_ai.turn.id").to_string());
+    APSARA_TEST_EQUAL("42", log.GetContent("process.pid").to_string());
+    APSARA_TEST_EQUAL("agent-1", log.GetContent("agentsight.identity.agent_id").to_string());
+    APSARA_TEST_EQUAL("credential-exfiltration", log.GetContent("security.policy_id").to_string());
+    APSARA_TEST_EQUAL("3", log.GetContent("security.policy_revision").to_string());
+    APSARA_TEST_EQUAL("audit", log.GetContent("security.mode").to_string());
+    APSARA_TEST_EQUAL("85", log.GetContent("security.risk_score").to_string());
+    APSARA_TEST_EQUAL("9223372036854775808", log.GetContent("security.large_counter").to_string());
+    APSARA_TEST_EQUAL("true", log.GetContent("security.blocked").to_string());
+    APSARA_TEST_EQUAL("0.750000", log.GetContent("security.confidence").to_string());
+    APSARA_TEST_EQUAL("unit-test", log.GetContent("security.details.source").to_string());
+    APSARA_TEST_EQUAL(kPayload, log.GetContent("event.original").to_string());
+
+    mgr->Destroy();
+}
+
+void AgentsightManagerUnittest::TestMalformedSecurityEventPreservesEnvelope() {
+    static const std::string kConfigName = "security-malformed-pipeline";
+    static const std::string kPayload = "{not-json";
+
+    auto mgr = makeManager();
+    registerConfigWithQueue(*mgr, kConfigName.c_str());
+
+    auto record = std::make_shared<AgentsightSecurityRecord>(kConfigName, 9U, 2U, kPayload);
+    APSARA_TEST_EQUAL(0, mgr->HandleEvent(record));
+
+    std::unique_ptr<ProcessQueueItem> item;
+    std::string configName;
+    APSARA_TEST_TRUE(ProcessQueueManager::GetInstance()->PopItem(0, item, configName));
+    APSARA_TEST_EQUAL(1U, item->mEventGroup.GetEvents().size());
+    const auto& log = item->mEventGroup.GetEvents().at(0).Cast<LogEvent>();
+    APSARA_TEST_EQUAL("9", log.GetContent("time_unix_nano").to_string());
+    APSARA_TEST_EQUAL("agentsight.security", log.GetContent("event.name").to_string());
+    APSARA_TEST_EQUAL("event", log.GetContent("event.kind").to_string());
+    APSARA_TEST_EQUAL("security", log.GetContent("event.category").to_string());
+    APSARA_TEST_EQUAL("2", log.GetContent("agentsight.schema_version").to_string());
+    APSARA_TEST_EQUAL(kPayload, log.GetContent("event.original").to_string());
+    APSARA_TEST_TRUE(log.GetContent("event.id").empty());
+
+    mgr->Destroy();
+}
+
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestGetPluginType);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestAddOrUpdateValidation);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestAddOrUpdateNoSymbols);
@@ -735,5 +829,7 @@ UNIT_TEST_CASE(AgentsightManagerUnittest, TestDestroyClearsSessionInputCache);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestSessionInputCacheLruEviction);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestSecurityAuditUsesReadV2AndEnqueuesSecurityRecord);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestSecurityAuditFallsBackWhenV2SymbolsAreMissing);
+UNIT_TEST_CASE(AgentsightManagerUnittest, TestSecurityEventProducesSearchableLog);
+UNIT_TEST_CASE(AgentsightManagerUnittest, TestMalformedSecurityEventPreservesEnvelope);
 
 UNIT_TEST_MAIN
