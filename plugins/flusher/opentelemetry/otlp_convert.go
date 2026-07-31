@@ -32,7 +32,8 @@ import (
 )
 
 // otlpConvertLogGroupToRequest converts v1 log groups into an OTLP logs export request.
-// Shared by the gRPC (flusher_otlp) and HTTP (flusher_otlp_http) flushers.
+// Used by flusher_otlp_http; flusher_otlp keeps its own equivalent method so that the
+// existing gRPC flusher stays untouched.
 func otlpConvertLogGroupToRequest(conv *converter.Converter, logGroupList []*protocol.LogGroup) plogotlp.ExportRequest {
 	logs := plog.NewLogs()
 	for _, logGroup := range logGroupList {
@@ -49,18 +50,19 @@ func otlpConvertLogGroupToRequest(conv *converter.Converter, logGroupList []*pro
 }
 
 // otlpConvertPipelineEventsToRequests converts v2 pipeline group events into OTLP logs/metrics/traces
-// export requests. Shared by the gRPC (flusher_otlp) and HTTP (flusher_otlp_http) flushers.
+// export requests. Used by flusher_otlp_http; flusher_otlp keeps its own equivalent method so that
+// the existing gRPC flusher stays untouched.
 // runtimeCtx is only used for logging.
-func otlpConvertPipelineEventsToRequests(conv *converter.Converter, pipelinegroupeEventSlice []*models.PipelineGroupEvents,
-	runtimeCtx context.Context) (plogotlp.ExportRequest, pmetricotlp.ExportRequest, ptraceotlp.ExportRequest) {
+func otlpConvertPipelineEventsToRequests(runtimeCtx context.Context, conv *converter.Converter,
+	groupEventsSlice []*models.PipelineGroupEvents) (plogotlp.ExportRequest, pmetricotlp.ExportRequest, ptraceotlp.ExportRequest) {
 	logs := plog.NewLogs()
 	metrics := pmetric.NewMetrics()
 	traces := ptrace.NewTraces()
 
-	for _, ps := range pipelinegroupeEventSlice {
+	for _, ps := range groupEventsSlice {
 		resourceLog, resourceMetric, resourceTrace, err := converter.ConvertPipelineEventToOtlpEvent(conv, ps)
 		if err != nil {
-			logger.Warning(runtimeCtx, selfmonitor.FlusherInitAlarm, "convert pipeline events to otlp events fail, error", err)
+			logger.Warning(runtimeCtx, selfmonitor.FlusherFlushAlarm, "convert pipeline events to otlp events fail, error", err)
 		}
 		if resourceLog.ScopeLogs().Len() > 0 {
 			newLog := logs.ResourceLogs().AppendEmpty()

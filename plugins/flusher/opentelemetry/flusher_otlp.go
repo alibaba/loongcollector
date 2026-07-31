@@ -20,8 +20,11 @@ import (
 	"sync"
 	"time"
 
+	"go.opentelemetry.io/collector/pdata/plog"
 	"go.opentelemetry.io/collector/pdata/plog/plogotlp"
+	"go.opentelemetry.io/collector/pdata/pmetric"
 	"go.opentelemetry.io/collector/pdata/pmetric/pmetricotlp"
+	"go.opentelemetry.io/collector/pdata/ptrace"
 	"go.opentelemetry.io/collector/pdata/ptrace/ptraceotlp"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
@@ -182,11 +185,49 @@ func (f *FlusherOTLP) Stop() error {
 }
 
 func (f *FlusherOTLP) convertPipelinesGroupeEventsToRequest(pipelinegroupeEventSlice []*models.PipelineGroupEvents) (plogotlp.ExportRequest, pmetricotlp.ExportRequest, ptraceotlp.ExportRequest) {
-	return otlpConvertPipelineEventsToRequests(f.converter, pipelinegroupeEventSlice, f.context.GetRuntimeContext())
+	logs := plog.NewLogs()
+	metrics := pmetric.NewMetrics()
+	traces := ptrace.NewTraces()
+
+	for _, ps := range pipelinegroupeEventSlice {
+		resourceLog, resourceMetric, resourceTrace, err := converter.ConvertPipelineEventToOtlpEvent(f.converter, ps)
+		if err != nil {
+			logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherInitAlarm, "init gRPC client options fail, error", err)
+		}
+		if resourceLog.ScopeLogs().Len() > 0 {
+			newLog := logs.ResourceLogs().AppendEmpty()
+			resourceLog.MoveTo(newLog)
+		}
+
+		if resourceMetric.ScopeMetrics().Len() > 0 {
+			newMetric := metrics.ResourceMetrics().AppendEmpty()
+			resourceMetric.MoveTo(newMetric)
+		}
+
+		if resourceTrace.ScopeSpans().Len() > 0 {
+			newTrace := traces.ResourceSpans().AppendEmpty()
+			resourceTrace.MoveTo(newTrace)
+		}
+	}
+
+	return plogotlp.NewExportRequestFromLogs(logs),
+		pmetricotlp.NewExportRequestFromMetrics(metrics),
+		ptraceotlp.NewExportRequestFromTraces(traces)
 }
 
 func (f *FlusherOTLP) convertLogGroupToRequest(logGroupList []*protocol.LogGroup) plogotlp.ExportRequest {
-	return otlpConvertLogGroupToRequest(f.converter, logGroupList)
+	logs := plog.NewLogs()
+	for _, logGroup := range logGroupList {
+		c, _ := f.converter.Do(logGroup)
+		if log, ok := c.(plog.ResourceLogs); ok {
+			if log.ScopeLogs().Len() > 0 {
+				newLog := logs.ResourceLogs().AppendEmpty()
+				log.MoveTo(newLog)
+			}
+		}
+	}
+
+	return plogotlp.NewExportRequestFromLogs(logs)
 }
 
 func (f *FlusherOTLP) flushRequests(log plogotlp.ExportRequest, metric pmetricotlp.ExportRequest, trace ptraceotlp.ExportRequest) error {

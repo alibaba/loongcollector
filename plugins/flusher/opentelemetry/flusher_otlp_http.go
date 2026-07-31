@@ -24,9 +24,12 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"go.opentelemetry.io/collector/pdata/plog/plogotlp"
+	"go.opentelemetry.io/collector/pdata/pmetric/pmetricotlp"
+	"go.opentelemetry.io/collector/pdata/ptrace/ptraceotlp"
 	spb "google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/protobuf/proto"
 
@@ -47,7 +50,14 @@ const (
 	otlpHTTPCompressionGzip = "gzip"
 	otlpHTTPCompressionNone = "none"
 
-	otlpHTTPLogsPath = "/v1/logs"
+	otlpHTTPLogsPath    = "/v1/logs"
+	otlpHTTPMetricsPath = "/v1/metrics"
+	otlpHTTPTracesPath  = "/v1/traces"
+
+	// Signal names, only used in log messages.
+	otlpHTTPSignalLogs    = "logs"
+	otlpHTTPSignalMetrics = "metrics"
+	otlpHTTPSignalTraces  = "traces"
 
 	otlpHTTPProtobufContentType = "application/x-protobuf"
 	otlpHTTPJSONContentType     = "application/json"
@@ -89,18 +99,22 @@ type otlpHTTPRetryConfig struct {
 }
 
 // FlusherOTLPHTTP exports data over the OTLP/HTTP protocol, i.e. an HTTP POST carrying a
-// protobuf or JSON encoded OTLP ExportRequest. Protocol behaviour follows the OpenTelemetry
+// protobuf or JSON encoded OTLP ExportRequest. Protocol behavior follows the OpenTelemetry
 // Collector otlphttpexporter.
 //
-// Only the Logs signal is supported for now. Metrics and Traces will be added later; the
-// config layout already leaves room for them.
+// All three signals are supported through the v2 Export entry point. The v1 Flush entry point
+// only carries logs, since protocol.LogGroup has no notion of metrics or traces.
 type FlusherOTLPHTTP struct {
 	Version Version `json:"Version"`
-	// Endpoint is the base URL, e.g. http://collector:4318. The signal path (/v1/logs) is
-	// appended to it. It may be omitted when every used signal sets its own Endpoint.
+	// Endpoint is the base URL, e.g. http://collector:4318. The signal path (/v1/logs,
+	// /v1/metrics, /v1/traces) is appended to it, so a single Endpoint enables every signal.
+	// It may be omitted when every used signal sets its own Endpoint.
 	Endpoint string `json:"Endpoint"`
-	// Logs optionally overrides the URL and headers used for the Logs signal.
-	Logs *otlpHTTPSignalConfig `json:"Logs"`
+	// Logs, Metrics and Traces optionally override the URL and headers of a single signal.
+	// A signal with neither a base Endpoint nor its own Endpoint is disabled, its data is dropped.
+	Logs    *otlpHTTPSignalConfig `json:"Logs"`
+	Metrics *otlpHTTPSignalConfig `json:"Metrics"`
+	Traces  *otlpHTTPSignalConfig `json:"Traces"`
 
 	// Encoding is the OTLP payload encoding, either proto (default) or json.
 	Encoding string `json:"Encoding"`
@@ -123,16 +137,41 @@ type FlusherOTLPHTTP struct {
 	// RequestInterceptors is a chain of extensions.RequestInterceptor extensions to use.
 	RequestInterceptors []extensions.ExtensionConfig `json:"RequestInterceptors"`
 
-	converter *converter.Converter
-	context   pipeline.Context
-	client    httpDoer
-	logClient *otlpHTTPSignalClient
+	converter    *converter.Converter
+	context      pipeline.Context
+	client       httpDoer
+	logClient    *otlpHTTPSignalClient
+	metricClient *otlpHTTPSignalClient
+	traceClient  *otlpHTTPSignalClient
+
+	// stopCh is closed by Stop, it aborts a retry backoff that is currently waiting so that
+	// shutdown is not held hostage by a server suggested Retry-After.
+	stopCh   chan struct{}
+	stopOnce sync.Once
 }
 
 // otlpHTTPSignalClient is the resolved destination of one signal, immutable after Init.
 type otlpHTTPSignalClient struct {
+	// signal is logs, metrics or traces, it is only used in log messages.
+	signal  string
 	url     string
 	headers map[string]string
+	// partialSuccess decodes an accepted response body into the number of rejected records and
+	// the server message. The rejected counter is signal specific: log records, data points or spans.
+	partialSuccess func(body []byte, jsonEncoding bool) (rejected int64, message string, err error)
+}
+
+// otlpRequest is the marshalling surface shared by the logs, metrics and traces export requests.
+type otlpRequest interface {
+	MarshalProto() ([]byte, error)
+	MarshalJSON() ([]byte, error)
+}
+
+// otlpUnmarshaler is the unmarshalling surface shared by the OTLP export request and response
+// wrappers, it lets the encoding be picked once for every signal.
+type otlpUnmarshaler interface {
+	UnmarshalProto(data []byte) error
+	UnmarshalJSON(data []byte) error
 }
 
 func NewFlusherOTLPHTTP() *FlusherOTLPHTTP {
@@ -147,6 +186,7 @@ func NewFlusherOTLPHTTP() *FlusherOTLPHTTP {
 			InitialDelay:  otlpHTTPDefaultInitialDelay,
 			MaxDelay:      otlpHTTPDefaultMaxDelay,
 		},
+		stopCh: make(chan struct{}),
 	}
 }
 
@@ -157,6 +197,11 @@ func (f *FlusherOTLPHTTP) Description() string {
 func (f *FlusherOTLPHTTP) Init(ctx pipeline.Context) error {
 	f.context = ctx
 	logger.Info(f.context.GetRuntimeContext(), "otlp http flusher init", "initializing")
+
+	if f.stopCh == nil {
+		// The flusher may have been built by the config loader rather than NewFlusherOTLPHTTP.
+		f.stopCh = make(chan struct{})
+	}
 
 	f.fillDefaults()
 
@@ -177,12 +222,11 @@ func (f *FlusherOTLPHTTP) Init(ctx pipeline.Context) error {
 		return err
 	}
 
-	if logURL := f.buildSignalURL(f.Logs, otlpHTTPLogsPath); logURL != "" {
-		f.logClient = &otlpHTTPSignalClient{url: logURL, headers: f.buildSignalHeaders(f.Logs)}
-		logger.Info(f.context.GetRuntimeContext(), "otlp http logs flusher endpoint", logURL)
-	}
+	f.logClient = f.buildSignalClient(otlpHTTPSignalLogs, f.Logs, otlpHTTPLogsPath, decodeLogsPartialSuccess)
+	f.metricClient = f.buildSignalClient(otlpHTTPSignalMetrics, f.Metrics, otlpHTTPMetricsPath, decodeMetricsPartialSuccess)
+	f.traceClient = f.buildSignalClient(otlpHTTPSignalTraces, f.Traces, otlpHTTPTracesPath, decodeTracesPartialSuccess)
 
-	if f.logClient == nil {
+	if f.logClient == nil && f.metricClient == nil && f.traceClient == nil {
 		err = fmt.Errorf("invalid_otlp_http_configs")
 		logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherInitAlarm, "init otlp http flusher fail, error", "no endpoint configured")
 		return err
@@ -199,6 +243,9 @@ func (f *FlusherOTLPHTTP) fillDefaults() {
 	}
 	if f.Encoding == "" {
 		f.Encoding = otlpHTTPEncodingProto
+	}
+	if f.Compression == "" {
+		f.Compression = otlpHTTPCompressionGzip
 	}
 	if f.Timeout <= 0 {
 		f.Timeout = otlpHTTPDefaultTimeout
@@ -225,9 +272,9 @@ func (f *FlusherOTLPHTTP) validate() error {
 	}
 
 	switch f.Compression {
-	case "", otlpHTTPCompressionNone, otlpHTTPCompressionGzip:
+	case otlpHTTPCompressionNone, otlpHTTPCompressionGzip:
 	default:
-		return fmt.Errorf("unsupported otlp http compression: %s, only gzip is supported", f.Compression)
+		return fmt.Errorf("unsupported otlp http compression: %s, only gzip and none are supported", f.Compression)
 	}
 	return nil
 }
@@ -241,9 +288,27 @@ func (f *FlusherOTLPHTTP) getConverter() (*converter.Converter, error) {
 	}
 }
 
+// buildSignalClient resolves one signal into a client, or nil when the signal has no destination
+// and is therefore disabled.
+func (f *FlusherOTLPHTTP) buildSignalClient(signal string, signalCfg *otlpHTTPSignalConfig, signalPath string,
+	partialSuccess func(body []byte, jsonEncoding bool) (int64, string, error)) *otlpHTTPSignalClient {
+	url := f.buildSignalURL(signalCfg, signalPath)
+	if url == "" {
+		return nil
+	}
+
+	logger.Info(f.context.GetRuntimeContext(), "otlp http flusher endpoint", url, "signal", signal)
+	return &otlpHTTPSignalClient{
+		signal:         signal,
+		url:            url,
+		headers:        f.buildSignalHeaders(signalCfg),
+		partialSuccess: partialSuccess,
+	}
+}
+
 // buildSignalURL resolves the destination URL of a signal. A signal level Endpoint is used
 // verbatim, otherwise the signal path is appended to the base Endpoint. An empty result means
-// the signal is not configured. Behaviour matches otlphttpexporter's composeSignalURL.
+// the signal is not configured. Behavior matches otlphttpexporter's composeSignalURL.
 func (f *FlusherOTLPHTTP) buildSignalURL(signalCfg *otlpHTTPSignalConfig, signalPath string) string {
 	if signalCfg != nil && signalCfg.Endpoint != "" {
 		return signalCfg.Endpoint
@@ -335,7 +400,7 @@ func (f *FlusherOTLPHTTP) SetHTTPDoer(doer httpDoer) {
 
 // IsReady is ready to flush
 func (f *FlusherOTLPHTTP) IsReady(projectName string, logstoreName string, logstoreKey int64) bool {
-	ready := f.client != nil && f.logClient != nil
+	ready := f.client != nil && (f.logClient != nil || f.metricClient != nil || f.traceClient != nil)
 	if !ready {
 		logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherReadyAlarm, "otlp http flusher is not ready", "no available endpoint")
 	}
@@ -347,6 +412,12 @@ func (f *FlusherOTLPHTTP) SetUrgent(flag bool) {
 
 // Stop ...
 func (f *FlusherOTLPHTTP) Stop() error {
+	// Wake up a retry backoff that is currently waiting, so that shutdown is not blocked by it.
+	f.stopOnce.Do(func() {
+		if f.stopCh != nil {
+			close(f.stopCh)
+		}
+	})
 	if c, ok := f.client.(*http.Client); ok {
 		c.CloseIdleConnections()
 	}
@@ -355,46 +426,63 @@ func (f *FlusherOTLPHTTP) Stop() error {
 
 func (f *FlusherOTLPHTTP) Flush(projectName string, logstoreName string, configName string, logGroupList []*protocol.LogGroup) error {
 	if f.logClient == nil {
+		// The logs signal is disabled, so there is nothing to convert the log groups into.
+		logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "otlp http flusher dropped data",
+			"no endpoint configured for this signal", "signal", otlpHTTPSignalLogs)
 		return nil
 	}
-	return f.flushLogRequest(otlpConvertLogGroupToRequest(f.converter, logGroupList))
+	// v1 log groups only carry logs.
+	req := otlpConvertLogGroupToRequest(f.converter, logGroupList)
+	return f.exportSignal(f.logClient, req, otlpHTTPSignalLogs, req.Logs().LogRecordCount())
 }
 
 // Export data to destination, such as gRPC, console, file, etc.
 // It is expected to return no error at most time because IsReady will be called
 // before it to make sure there is space for next data.
-func (f *FlusherOTLPHTTP) Export(pipelinegroupeEventSlice []*models.PipelineGroupEvents, ctx pipeline.PipelineContext) error {
-	logReq, metricReq, traceReq := otlpConvertPipelineEventsToRequests(f.converter, pipelinegroupeEventSlice, f.context.GetRuntimeContext())
+func (f *FlusherOTLPHTTP) Export(groupEventsSlice []*models.PipelineGroupEvents, ctx pipeline.PipelineContext) error {
+	logReq, metricReq, traceReq := otlpConvertPipelineEventsToRequests(f.context.GetRuntimeContext(), f.converter, groupEventsSlice)
 
-	if metricReq.Metrics().ResourceMetrics().Len() > 0 || traceReq.Traces().ResourceSpans().Len() > 0 {
-		logger.Debug(f.context.GetRuntimeContext(), "otlp http flusher dropped metrics/traces",
-			"only the logs signal is supported for now",
-			"resource_metrics", metricReq.Metrics().ResourceMetrics().Len(),
-			"resource_spans", traceReq.Traces().ResourceSpans().Len())
+	// One request per non empty signal, sent one after another. A batch normally carries a single
+	// event type, so in practice this is a single request. The first failure is reported, the
+	// remaining signals are still attempted so that one broken signal cannot block the others.
+	err := f.exportSignal(f.logClient, logReq, otlpHTTPSignalLogs, logReq.Logs().LogRecordCount())
+	if e := f.exportSignal(f.metricClient, metricReq, otlpHTTPSignalMetrics, metricReq.Metrics().DataPointCount()); e != nil && err == nil {
+		err = e
 	}
-
-	if f.logClient == nil {
-		return nil
-	}
-	return f.flushLogRequest(logReq)
-}
-
-func (f *FlusherOTLPHTTP) flushLogRequest(req plogotlp.ExportRequest) error {
-	data, contentType, err := f.marshalLogRequest(req)
-	if err != nil {
-		// A marshal failure is permanent, retrying cannot help.
-		logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "otlp http flusher marshal logs fail, data dropped, error", err)
-		return err
-	}
-
-	if err = f.sendWithRetry(f.logClient, data, contentType); err != nil {
-		logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "send log data to otlp http server fail, error", err,
-			"url", f.logClient.url)
+	if e := f.exportSignal(f.traceClient, traceReq, otlpHTTPSignalTraces, traceReq.Traces().SpanCount()); e != nil && err == nil {
+		err = e
 	}
 	return err
 }
 
-func (f *FlusherOTLPHTTP) marshalLogRequest(req plogotlp.ExportRequest) (data []byte, contentType string, err error) {
+// exportSignal sends one signal, unless it carries no data or has no configured destination.
+func (f *FlusherOTLPHTTP) exportSignal(client *otlpHTTPSignalClient, req otlpRequest, signal string, count int) error {
+	if count == 0 {
+		// Nothing to send, an empty OTLP request would only waste a round trip.
+		return nil
+	}
+	if client == nil {
+		logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "otlp http flusher dropped data",
+			"no endpoint configured for this signal", "signal", signal, "count", count)
+		return nil
+	}
+
+	data, contentType, err := f.marshalRequest(req)
+	if err != nil {
+		// A marshal failure is permanent, retrying cannot help.
+		logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "otlp http flusher marshal request fail, data dropped, error", err,
+			"signal", client.signal)
+		return err
+	}
+
+	if err = f.sendWithRetry(client, data, contentType); err != nil {
+		logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "send data to otlp http server fail, error", err,
+			"signal", client.signal, "url", client.url)
+	}
+	return err
+}
+
+func (f *FlusherOTLPHTTP) marshalRequest(req otlpRequest) (data []byte, contentType string, err error) {
 	if f.Encoding == otlpHTTPEncodingJSON {
 		data, err = req.MarshalJSON()
 		return data, otlpHTTPJSONContentType, err
@@ -430,9 +518,26 @@ func (f *FlusherOTLPHTTP) sendWithRetry(client *otlpHTTPSignalClient, data []byt
 		if !retryable || !f.Retry.Enable || attempt == f.Retry.MaxRetryTimes {
 			break
 		}
-		<-time.After(f.nextRetryDelay(attempt, retryAfter))
+		if !f.waitBeforeRetry(f.nextRetryDelay(attempt, retryAfter)) {
+			// Stopping, give up instead of holding the flush goroutine hostage.
+			break
+		}
 	}
 	return err
+}
+
+// waitBeforeRetry sleeps for delay, unless Stop is called first. It reports whether the wait
+// completed, i.e. whether another attempt should be made.
+func (f *FlusherOTLPHTTP) waitBeforeRetry(delay time.Duration) bool {
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+	select {
+	case <-timer.C:
+		return true
+	case <-f.stopCh:
+		// A nil stopCh never fires, which is exactly the pre-Init behavior.
+		return false
+	}
 }
 
 // sendOnce performs a single OTLP/HTTP POST. It reports whether the failure is worth retrying
@@ -460,6 +565,10 @@ func (f *FlusherOTLPHTTP) sendOnce(client *otlpHTTPSignalClient, data []byte,
 	req.Header.Set("Content-Type", contentType)
 	if contentEncoding != "" {
 		req.Header.Set("Content-Encoding", contentEncoding)
+	} else {
+		// The body is not compressed, so a Content-Encoding coming from the config must go, it
+		// would make the server decode a body that was never encoded.
+		req.Header.Del("Content-Encoding")
 	}
 
 	resp, err := f.client.Do(req)
@@ -477,7 +586,7 @@ func (f *FlusherOTLPHTTP) sendOnce(client *otlpHTTPSignalClient, data []byte,
 	_, _ = io.Copy(io.Discard, resp.Body)
 
 	if resp.StatusCode >= http.StatusOK && resp.StatusCode <= 299 {
-		f.checkLogPartialSuccess(respBody)
+		f.checkPartialSuccess(client, respBody)
 		return false, 0, nil
 	}
 
@@ -510,7 +619,12 @@ func (f *FlusherOTLPHTTP) nextRetryDelay(attempt int, retryAfter time.Duration) 
 		delay = time.Duration(half + jitter.Int64())
 	}
 
+	// A server suggested Retry-After raises the delay, but never above MaxDelay: it is external
+	// input, and honoring an arbitrarily large value would park the flush goroutine for that long.
 	if retryAfter > delay {
+		if retryAfter > f.Retry.MaxDelay {
+			return f.Retry.MaxDelay
+		}
 		return retryAfter
 	}
 	return delay
@@ -530,30 +644,57 @@ func (f *FlusherOTLPHTTP) decodeErrorStatus(body []byte) string {
 	return string(body)
 }
 
-// checkLogPartialSuccess warns about records the server rejected. A partial success is not an
+// checkPartialSuccess warns about records the server rejected. A partial success is not an
 // error for the retry machinery, resending the whole batch would duplicate the accepted records.
-func (f *FlusherOTLPHTTP) checkLogPartialSuccess(body []byte) {
+func (f *FlusherOTLPHTTP) checkPartialSuccess(client *otlpHTTPSignalClient, body []byte) {
 	if len(body) == 0 {
 		return
 	}
 
-	resp := plogotlp.NewExportResponse()
-	var err error
-	if f.Encoding == otlpHTTPEncodingJSON {
-		err = resp.UnmarshalJSON(body)
-	} else {
-		err = resp.UnmarshalProto(body)
-	}
+	rejected, message, err := client.partialSuccess(body, f.Encoding == otlpHTTPEncodingJSON)
 	if err != nil {
 		logger.Debug(f.context.GetRuntimeContext(), "otlp http flusher cannot decode export response", err)
 		return
 	}
 
-	partial := resp.PartialSuccess()
-	if partial.RejectedLogRecords() != 0 || partial.ErrorMessage() != "" {
-		logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "otlp http server partially rejected logs",
-			"rejected_log_records", partial.RejectedLogRecords(), "message", partial.ErrorMessage())
+	if rejected != 0 || message != "" {
+		logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "otlp http server partially rejected data",
+			"signal", client.signal, "rejected", rejected, "message", message)
 	}
+}
+
+func decodeLogsPartialSuccess(body []byte, jsonEncoding bool) (int64, string, error) {
+	resp := plogotlp.NewExportResponse()
+	if err := unmarshalOTLP(resp, body, jsonEncoding); err != nil {
+		return 0, "", err
+	}
+	partial := resp.PartialSuccess()
+	return partial.RejectedLogRecords(), partial.ErrorMessage(), nil
+}
+
+func decodeMetricsPartialSuccess(body []byte, jsonEncoding bool) (int64, string, error) {
+	resp := pmetricotlp.NewExportResponse()
+	if err := unmarshalOTLP(resp, body, jsonEncoding); err != nil {
+		return 0, "", err
+	}
+	partial := resp.PartialSuccess()
+	return partial.RejectedDataPoints(), partial.ErrorMessage(), nil
+}
+
+func decodeTracesPartialSuccess(body []byte, jsonEncoding bool) (int64, string, error) {
+	resp := ptraceotlp.NewExportResponse()
+	if err := unmarshalOTLP(resp, body, jsonEncoding); err != nil {
+		return 0, "", err
+	}
+	partial := resp.PartialSuccess()
+	return partial.RejectedSpans(), partial.ErrorMessage(), nil
+}
+
+func unmarshalOTLP(msg otlpUnmarshaler, body []byte, jsonEncoding bool) error {
+	if jsonEncoding {
+		return msg.UnmarshalJSON(body)
+	}
+	return msg.UnmarshalProto(body)
 }
 
 // parseRetryAfterDuration reads a Retry-After header value, which is either delay seconds or an
