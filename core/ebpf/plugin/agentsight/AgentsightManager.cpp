@@ -436,6 +436,40 @@ void FillAgentsightModelResponseLog(const AgentsightLlmRecord& rec,
     setStr(StringView("gen_ai.output.messages"), rec.mResponseMessagesJson);
 }
 
+/// Raw HTTP exchange that AgentSight could not map onto GenAI semantics. Emitted under
+/// `event.name = agentsight.http.raw` so downstream can separate it from the gen_ai.* stream;
+/// no gen_ai.* field is set here because none of them could be resolved.
+///
+/// Header/body values are copied verbatim (SetContent copies by length into the SourceBuffer, so
+/// embedded NULs survive). They may be compressed or non-UTF-8 — decoding is the consumer's job.
+void FillAgentsightRawHttpLog(const AgentsightHttpsRecord& rec, logtail::LogEvent* log) {
+    auto setStr = [&](StringView k, const std::string& v) {
+        if (!v.empty()) {
+            log->SetContent(k, StringView(v.data(), v.size()));
+        }
+    };
+
+    SetLogTimestampFromNs(log, rec.mTimestampNs);
+    FillAgentsightOtlpTimeFields(log, rec.mTimestampNs);
+    log->SetContent(StringView("event.name"), StringView("agentsight.http.raw"));
+
+    if (rec.mPid != 0) {
+        log->SetContent("pid", std::to_string(rec.mPid));
+    }
+    setStr(StringView("comm"), rec.mProcessName);
+
+    setStr(StringView("http.request.method"), rec.mMethod);
+    setStr(StringView("url.path"), rec.mPath);
+    log->SetContent("http.response.status_code", std::to_string(rec.mStatusCode));
+    log->SetContent(StringView("is_sse"), StringView(rec.mIsSse ? "1" : "0"));
+    log->SetContent("http.response.duration", std::to_string(rec.mDurationNs / 1000000ULL));
+
+    setStr(StringView("http.request.headers"), rec.mRequestHeaders);
+    setStr(StringView("http.request.body"), rec.mRequestBody);
+    setStr(StringView("http.response.headers"), rec.mResponseHeaders);
+    setStr(StringView("http.response.body"), rec.mResponseBody);
+}
+
 } // namespace
 
 AgentsightManager::AgentsightManager(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
@@ -514,6 +548,23 @@ bool AgentsightManager::RestartAgentSightLocked(const SecurityOptions& opts) {
         sym->config_set_log_path(cfg, opts.mLogPath.c_str());
     }
 
+    // Raw HTTPS fallback is opt-in on both sides: the Rust FfiEventSender drops these events unless
+    // the config flag is set, and handle_read below only registers the callback when it is on. Keep
+    // mRawHttpsFallback in sync with what the library actually accepted so a missing symbol on an
+    // older library does not leave us registering a callback that can never fire.
+    mRawHttpsFallback = false;
+    if (opts.mAgentsightRawHttpsFallback) {
+        if (sym->config_set_enable_raw_https) {
+            sym->config_set_enable_raw_https(cfg, 1);
+            mRawHttpsFallback = true;
+        } else {
+            LOG_WARNING(sLogger,
+                        ("AgentSight",
+                         "RawHttpsFallback requested but agentsight_config_set_enable_raw_https symbol not found; "
+                         "raw HTTP reporting disabled (requires libagentsight >= 0.9.0)"));
+        }
+    }
+
     ApplyAgentsightRulesToConfig(cfg, sym, opts);
 
     mHandle = sym->handle_new(cfg);
@@ -549,9 +600,13 @@ int AgentsightManager::DrainReadsLocked() {
     if (!mHandle || !sym || !sym->handle_read) {
         return 0;
     }
+    // A null https callback makes the Rust dispatcher drop raw HTTP events outright, which is what we
+    // want when the fallback is off — no allocation, no enqueue.
+    agentsight_https_callback_fn httpsCb = mRawHttpsFallback ? &AgentsightManager::OnHttpsCallback : nullptr;
+    void* httpsUd = mRawHttpsFallback ? this : nullptr;
     int total = 0;
     for (;;) {
-        const int r = sym->handle_read(mHandle, nullptr, nullptr, &AgentsightManager::OnLlmCallback, this, 0);
+        const int r = sym->handle_read(mHandle, httpsCb, httpsUd, &AgentsightManager::OnLlmCallback, this, 0);
         if (r <= 0) {
             break;
         }
@@ -589,6 +644,23 @@ void AgentsightManager::OnLlmCallback(const AgentsightLLMData* data, void* user_
     } else {
         ADD_COUNTER(self->mLossKernelEventsTotal, 1);
         LOG_WARNING(sLogger, ("AgentSight LLM event enqueue failed", ""));
+    }
+}
+
+void AgentsightManager::OnHttpsCallback(const AgentsightHttpsData* data, void* user_data) {
+    if (!data || !user_data) {
+        return;
+    }
+    auto* self = static_cast<AgentsightManager*>(user_data);
+    // Same locking contract as OnLlmCallback: runs inside handle_read while OnEpollReadable already
+    // holds mLibMutex, so taking it here would deadlock.
+    const std::string configName = self->mConfigName;
+    auto evt = std::make_shared<AgentsightHttpsRecord>(configName, *data);
+    if (self->mCommonEventQueue.try_enqueue(evt)) {
+        ADD_COUNTER(self->mPluginInEventsTotal, 1);
+    } else {
+        ADD_COUNTER(self->mLossKernelEventsTotal, 1);
+        LOG_WARNING(sLogger, ("AgentSight raw HTTP event enqueue failed", ""));
     }
 }
 
@@ -676,6 +748,7 @@ int AgentsightManager::RemoveConfig(const std::string&) {
     mPluginIndex = 0;
     mEventStreamFormat = true;
     mMessageDeltaOnly = true;
+    mRawHttpsFallback = false;
     StopAgentSightLocked();
     return 0;
 }
@@ -692,6 +765,7 @@ int AgentsightManager::Destroy() {
     mPluginIndex = 0;
     mEventStreamFormat = true;
     mMessageDeltaOnly = true;
+    mRawHttpsFallback = false;
     mInited = false;
     return 0;
 }
@@ -746,10 +820,57 @@ std::unique_ptr<PluginConfig> AgentsightManager::GeneratePluginConfig(const Plug
 }
 
 int AgentsightManager::HandleEvent(const std::shared_ptr<CommonEvent>& event) {
-    if (!event || event->GetKernelEventType() != KernelEventType::AGENTSIGHT_LLM_RECORD) {
+    if (!event) {
         return 0;
     }
-    auto* rec = static_cast<AgentsightLlmRecord*>(event.get());
+    switch (event->GetKernelEventType()) {
+        case KernelEventType::AGENTSIGHT_LLM_RECORD:
+            return HandleLlmEvent(static_cast<AgentsightLlmRecord*>(event.get()));
+        case KernelEventType::AGENTSIGHT_HTTPS_RECORD:
+            return HandleHttpsEvent(static_cast<AgentsightHttpsRecord*>(event.get()));
+        default:
+            return 0;
+    }
+}
+
+int AgentsightManager::HandleHttpsEvent(const AgentsightHttpsRecord* rec) {
+    if (!rec) {
+        return 1;
+    }
+
+    logtail::QueueKey queueKey;
+    uint32_t pluginIndex;
+    {
+        std::lock_guard<std::mutex> lock(mLibMutex);
+        if (mPipelineCtx == nullptr) {
+            return 0;
+        }
+        queueKey = mQueueKey;
+        pluginIndex = mPluginIndex;
+    }
+
+    auto sourceBuffer = std::make_shared<SourceBuffer>();
+    PipelineEventGroup eventGroup(sourceBuffer);
+    // One log per exchange: unlike the LLM path there is no request/response split to make, since
+    // AgentsightHttpsData already carries both halves of a completed exchange.
+    FillAgentsightRawHttpLog(*rec, eventGroup.AddLogEvent(true, mEventPool));
+
+    std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(eventGroup), pluginIndex);
+    if (QueueStatus::OK == ProcessQueueManager::GetInstance()->PushQueue(queueKey, std::move(item))) {
+        ADD_COUNTER(mPushLogsTotal, 1);
+        ADD_COUNTER(mPushLogGroupTotal, 1);
+    } else {
+        if (mPushLogFailedTotal) {
+            ADD_COUNTER(mPushLogFailedTotal, 1);
+        }
+        LOG_WARNING(sLogger,
+                    ("Agentsight raw HTTP push queue failed", "")("config", rec->GetPipelineConfigName())(
+                        "pluginIdx", pluginIndex));
+    }
+    return 0;
+}
+
+int AgentsightManager::HandleLlmEvent(AgentsightLlmRecord* rec) {
     if (!rec) {
         return 1;
     }

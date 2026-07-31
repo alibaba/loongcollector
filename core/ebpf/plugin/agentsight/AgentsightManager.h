@@ -30,6 +30,10 @@
 
 namespace logtail::ebpf {
 
+// Defined in AgentsightEvents.h; only used through pointers here.
+class AgentsightLlmRecord;
+class AgentsightHttpsRecord;
+
 class AgentsightManager : public AbstractManager {
 public:
     AgentsightManager() = delete;
@@ -94,6 +98,12 @@ protected:
 
 private:
     static void OnLlmCallback(const AgentsightLLMData* data, void* user_data);
+    /// Raw HTTP fallback for traffic AgentSight could not parse as an LLM call. Only registered with
+    /// handle_read when mRawHttpsFallback is on; otherwise the Rust side never emits these events.
+    static void OnHttpsCallback(const AgentsightHttpsData* data, void* user_data);
+
+    int HandleLlmEvent(AgentsightLlmRecord* rec);
+    int HandleHttpsEvent(const AgentsightHttpsRecord* rec);
 
     void StopAgentSightLocked();
     bool RestartAgentSightLocked(const SecurityOptions& opts);
@@ -122,6 +132,7 @@ private:
     bool mRunning = false;
     bool mEventStreamFormat = true;
     bool mMessageDeltaOnly = true;
+    bool mRawHttpsFallback = false;
 
     CounterPtr mLossKernelEventsTotal;
     CounterPtr mPushLogFailedTotal;

@@ -30,10 +30,24 @@ dev
 |  ProbeConfig.LogPath  |  string  |  否  |  `""`  |  ebpf 日志的输出位置  |
 |  ProbeConfig.CmdlineWhitelist  |  array  |  否（**推荐填写**）  |  内置 9 条  |  进程 **agent 筛选白名单**。每一项为对象：`AgentType`（上报字段 `gen_ai.agent.type`）+ `Args`（字符串数组，与进程 cmdline 各参数（即 `argv`）按位置 glob 匹配）。**未配置**且 `CmdlineBlacklist` 也为空时注入「默认 `CmdlineWhitelist`」（见下文）；**填写后只使用用户规则**，不再叠加内置。空数组 `[]` 视为非法配置。  |
 |  ProbeConfig.CmdlineBlacklist  |  array  |  否  |  /  |  进程 **agent 筛选黑名单**，每项为 glob 字符串数组（无 `AgentType`）；**命中则排除**，不采集。**优先级高于白名单**。  |
-|  ProbeConfig.Https  |  array  |  否  |  内置 6 条  |  HTTPS 加密流量的域名白名单（字符串数组，glob 通配符 `*`，不区分大小写）。访问白名单内域名的进程可被识别为采集目标。未配置时注入默认列表，见下文。  |
+|  ProbeConfig.Https  |  array  |  否  |  内置 7 条  |  HTTPS 加密流量的域名白名单（字符串数组，glob 通配符 `*`，不区分大小写）。访问白名单内域名的进程可被识别为采集目标。未配置时注入默认列表，见下文。  |
 |  ProbeConfig.Http  |  array  |  否  |  `[]`（关闭）  |  HTTP 明文流量的目标列表（字符串数组）。每项可为 `:端口`、`IP`、`IP:端口` 或域名（如 `model-svc.default.svc`、`*.internal.svc`）。**留空时不采集明文 HTTP 流量**。  |
 |  ProbeConfig.EventStreamFormat  |  bool  |  否  |  `true`  |  为 `true` 时，每次 LLM 调用在同一 `PipelineEventGroup` 内输出两条日志（各有 `event.id`）：`event.name=gen_ai.model.request`（请求开始时间戳）与 `gen_ai.model.response`（请求结束时间戳）。为 `false` 时输出单条合并日志，**无** `event.name` / `event.id`。  |
 |  ProbeConfig.MessageDeltaOnly  |  bool  |  否  |  `true`  |  为 `true` 时**不**输出全量 `gen_ai.input.messages`；仍输出 `gen_ai.input.messages_delta`、`gen_ai.system_instructions_hash` / `gen_ai.tool.definitions_hash`（非空时），以及 hash 相对上一轮变化时的 `gen_ai.system_instructions` / `gen_ai.tool.definitions`。为 `false` 时**每次**输出非空的全量 `gen_ai.input.messages`。**不影响** `gen_ai.output.messages`；`messages_delta` 及 session 状态维护**不受**本开关影响。  |
+|  ProbeConfig.RawHttpsFallback  |  bool  |  否  |  `false`  |  为 `true` 时，**无法解析为 LLM 语义**的流量（未知 API path、非标准 body）不再被丢弃，而是以原始 HTTP 形式上报（`event.name=agentsight.http.raw`，见下文）。需要 `libagentsight >= 0.9.0`；旧版动态库上该开关无效（日志告警后自动降级为关闭）。**默认关闭**：原始 body 未做任何脱敏。  |
+
+### `RawHttpsFallback: true` 输出的原始 HTTP 日志
+
+仅在 AgentSight 无法把流量解析成 GenAI 语义时产生，与 `gen_ai.*` 日志**互斥**（一次流量最多产生一种）。每次完整请求/响应输出**单条**日志，不受 `EventStreamFormat` 影响。
+
+| 字段 | 说明 |
+| --- | --- |
+| `event.name` | 固定为 `agentsight.http.raw`，用于与 `gen_ai.*` 数据流区分 |
+| `pid` / `comm` | 进程 ID 与进程名。**无** `gen_ai.session.id` / `gen_ai.turn.id` / `gen_ai.agent.type` / `container.id` —— 底层 `AgentsightHttpsData` 不携带这些字段，关联只能靠 `(pid, comm)` |
+| `http.request.method` / `url.path` | 请求方法与路径。**无完整 URL**，目标 host 需从 `http.request.headers` 里取 |
+| `http.response.status_code` / `is_sse` / `http.response.duration` | 状态码、是否 SSE、耗时（毫秒） |
+| `http.request.headers` / `http.request.body` / `http.response.headers` / `http.response.body` | 原始字节，**按长度**原样拷贝。可能是压缩内容或非 UTF-8，解码由下游负责 |
+| `time_unix_nano` / `observed_time_unix_nano` | 同 `gen_ai.*` 日志 |
 
 ### `AgentType` 取值命名规范
 

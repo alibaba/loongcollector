@@ -690,6 +690,7 @@ bool SecurityOptions::Init(SecurityProbeType probeType,
         mAgentsightHttp.clear();
         mAgentsightEventStreamFormat = true;
         mAgentsightMessageDeltaOnly = true;
+        mAgentsightRawHttpsFallback = false;
     }
 
     SecurityOption thisSecurityOption;
@@ -748,6 +749,12 @@ bool SecurityOptions::Init(SecurityProbeType probeType,
                 }
                 if (innerConfig.isMember("MessageDeltaOnly")) {
                     if (!GetOptionalBoolParam(innerConfig, "MessageDeltaOnly", mAgentsightMessageDeltaOnly, errorMsg)) {
+                        warnOptionalParse();
+                    }
+                }
+                if (innerConfig.isMember("RawHttpsFallback")) {
+                    if (!GetOptionalBoolParam(
+                            innerConfig, "RawHttpsFallback", mAgentsightRawHttpsFallback, errorMsg)) {
                         warnOptionalParse();
                     }
                 }

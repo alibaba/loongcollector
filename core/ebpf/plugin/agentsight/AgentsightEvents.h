@@ -68,4 +68,38 @@ public:
     std::string mToolDefinitionsJson;
 };
 
+/// Raw HTTP exchange reported when AgentSight could not parse the traffic into LLM semantics
+/// (unknown API path or unrecognised body shape). Requires `RawHttpsFallback: true` plus
+/// libagentsight >= 0.9.0; see AgentsightManager::OnHttpsCallback.
+///
+/// Deliberately narrower than AgentsightLlmRecord: AgentsightHttpsData carries no session id,
+/// conversation id, agent type or container id, so correlation is limited to (pid, comm). There is
+/// no request_url either — only method + path; the target host is inside mRequestHeaders.
+class AgentsightHttpsRecord : public CommonEvent {
+public:
+    AgentsightHttpsRecord(std::string pipelineConfigName, const AgentsightHttpsData& d);
+
+    PluginType GetPluginType() const override { return PluginType::AGENTSIGHT_OBSERVE; }
+
+    const std::string& GetPipelineConfigName() const { return mPipelineConfigName; }
+
+    std::string mPipelineConfigName;
+
+    int32_t mPid = 0;
+    std::string mProcessName;
+    uint64_t mTimestampNs = 0;
+    uint64_t mDurationNs = 0;
+    std::string mMethod;
+    std::string mPath;
+    uint16_t mStatusCode = 0;
+    uint8_t mIsSse = 0;
+    // Length-delimited payloads: AgentsightHttpsData reports these as (ptr, len) pairs and they may
+    // contain embedded NULs (compressed or binary bodies), so they are copied by length, not by
+    // NUL scan, and may not be valid UTF-8.
+    std::string mRequestHeaders;
+    std::string mRequestBody;
+    std::string mResponseHeaders;
+    std::string mResponseBody;
+};
+
 } // namespace logtail::ebpf
