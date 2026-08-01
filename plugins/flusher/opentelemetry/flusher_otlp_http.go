@@ -161,13 +161,13 @@ type otlpHTTPSignalClient struct {
 	partialSuccess func(body []byte, jsonEncoding bool) (rejected int64, message string, err error)
 }
 
-// otlpRequest is the marshalling surface shared by the logs, metrics and traces export requests.
+// otlpRequest is the marshaling surface shared by the logs, metrics and traces export requests.
 type otlpRequest interface {
 	MarshalProto() ([]byte, error)
 	MarshalJSON() ([]byte, error)
 }
 
-// otlpUnmarshaler is the unmarshalling surface shared by the OTLP export request and response
+// otlpUnmarshaler is the unmarshaling surface shared by the OTLP export request and response
 // wrappers, it lets the encoding be picked once for every signal.
 type otlpUnmarshaler interface {
 	UnmarshalProto(data []byte) error
