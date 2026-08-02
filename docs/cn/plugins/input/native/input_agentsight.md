@@ -44,6 +44,7 @@ dev
 
 - `event.id`、`event.type`、`time_unix_nano`、`observed_time_unix_nano`
 - `agent.id`、`gen_ai.agent.type`、`gen_ai.session.id`、`gen_ai.turn.id`、`process.pid`
+- 跨层关联别名：`agentsight.binding.id`、`gen_ai.conversation.id`、`gen_ai.tool.call.id`、`process.start_time`、`process.parent.pid`、`container.cgroup.id`
 - 事件载荷中的标量字段以 `security.*` 前缀展开，例如 `security.policy_id`、`security.mode`、`security.risk_score`
 
 ```yaml
@@ -56,6 +57,21 @@ inputs:
 ```
 
 该能力只负责采集 enforcer 已生成的安全事实；策略下发、阻断和案件编排不由 LoongCollector 执行。若运行时 AgentSight 动态库尚未提供 `read_v2` 安全审计 ABI，插件会告警并自动退化为原有 LLM 采集。
+
+#### 应用层与系统层关联
+
+上述关联字段是 `identity.*` 的确定性别名，原始 `identity.*` 仍保留在 `agentsight.identity.*` 下，完整事件仍保留在 `event.original`。LoongCollector 不补猜缺失身份，也不在采集端维护跨事件状态。
+
+建议在 SLS 中将应用层的模型输入、工具调用或敏感数据命中事件，与系统层的文件、网络、污点传播和策略事件进行关联。高置信泄漏告警至少同时满足：
+
+1. 应用层存在敏感数据或敏感文件证据；
+2. 系统层存在同一 `agentsight.binding.id` 关联的敏感来源、出站网络去向和 `policy_decision` 证据链；
+3. 两层的非空 `agent.id` 和 `gen_ai.session.id` 相等；工具调用触发的暴露还要求非空 `gen_ai.tool.call.id` 相等；
+4. 系统层出站事件不早于应用层证据，且不晚于应用层证据 120 秒。
+
+关联键缺失时，事件仍可作为安全证据检索，但不建议直接升级为高置信泄漏告警。`process.pid` 应与 `process.start_time` 组合使用，避免 PID 复用造成误关联；容器场景可再使用 `container.cgroup.id` 收窄范围。
+
+`security.blocked=true` 表示执行侧阻止了本次暴露尝试，`security.blocked=false` 表示观察到高风险出站行为；两者都不能在缺少传输完成证据时表述为“已确认数据外泄”。
 
 ### `AgentType` 取值命名规范
 

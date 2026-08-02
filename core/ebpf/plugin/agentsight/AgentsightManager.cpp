@@ -994,9 +994,25 @@ int AgentsightManager::HandleSecurityEvent(const AgentsightSecurityRecord& rec) 
             }
             if (identity["conversation_id"].isString()) {
                 log->SetContent("gen_ai.turn.id", identity["conversation_id"].asString());
+                log->SetContent("gen_ai.conversation.id", identity["conversation_id"].asString());
+            }
+            if (identity["tool_call_id"].isString()) {
+                log->SetContent("gen_ai.tool.call.id", identity["tool_call_id"].asString());
             }
             if (identity["pid"].isInt()) {
                 log->SetContent("process.pid", std::to_string(identity["pid"].asInt()));
+            }
+            if (identity["process_start_time"].isUInt64()) {
+                log->SetContent("process.start_time", std::to_string(identity["process_start_time"].asUInt64()));
+            }
+            if (identity["ppid"].isInt() && identity["ppid"].asInt() >= 0) {
+                log->SetContent("process.parent.pid", std::to_string(identity["ppid"].asInt()));
+            }
+            if (identity["cgroup_id"].isUInt64()) {
+                log->SetContent("container.cgroup.id", std::to_string(identity["cgroup_id"].asUInt64()));
+            }
+            if (identity["binding_id"].isString()) {
+                log->SetContent("agentsight.binding.id", identity["binding_id"].asString());
             }
             FlattenSecurityJson(identity, "agentsight.identity", log);
         }
