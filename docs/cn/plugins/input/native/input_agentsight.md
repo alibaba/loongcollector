@@ -68,19 +68,27 @@ dev
 | `http.response.header` | 响应头 JSON |
 | `http.response.body.content` / `.size` / `.encoding` | 见下方「body 的编码」 |
 
-#### body 的编码
+#### body 的保真度（重要）
 
-AgentSight 转发的是对端实际发出的字节，不按 content-type 过滤 —— protobuf、gzip、图片都可能出现。原样写出会在日志里产生大段控制字符乱码（实测遇到过 OTLP 的 `application/x-protobuf` 上报）。因此：
+**一句话原因**：AgentSight 的 analyzer 把 body 存成 Rust `String`（`analyzer/result.rs`），经 `String::from_utf8_lossy` 转换 —— 每个非法字节变成 U+FFFD（占 3 字节），原始字节在交给本插件之前就已丢失，不可恢复。
 
-- body 是合法 UTF-8 → `.content` 为原文
-- body **不是**合法 UTF-8 → `.content` 为 **base64**，并输出 `.encoding = base64` 标记
-- `.size` **始终是原始字节数**，不是编码后的长度
+| 载荷类型 | `.content` | `.size` | 实测证据 |
+| --- | --- | --- | --- |
+| **JSON / 纯文本** | ✅ 线上原文 | ✅ 准确 | DashScope 原生 API 200 响应：`.size = 440`，与响应头 `content-length: 440` 完全一致 |
+| **文本 + gzip 压缩** | ✅ 解压后原文 | ✅ 准确 | 响应头带 `content-encoding: gzip`，采到 112 字节明文，与不压缩时逐字节相同 |
+| **文本 + chunked** | ✅ 去框后原文 | ✅ 准确 | 上述两例均为 `transfer-encoding: chunked`，采到的 body 无 `c3b\r\n` 残框 |
+| **二进制**（protobuf / 二进制流 / 图片） | ❌ **U+FFFD 污染，静默失真** | ❌ **虚高** | 发送 256 字节 `0x00..0xFF`，采到 `.size = 512`（128 ASCII + 128 × 3 字节替换字符） |
 
-判定只看字节本身、不看 content-type —— 后者可能缺失或不准。
+使用者必须知道的两点：
+
+1. **没有任何字段标记失真。** 二进制载荷的 `.content` 看起来"有内容"，但已不是原始数据，无法从日志本身判断是否可信。
+2. **`.size` 不能当线上长度用。** 文本场景下它等于 `content-length`，可用于交叉校验；二进制场景下是转换后的长度，每个非法字节膨胀 3 倍。
+
+本插件不做 base64 等编码兜底 —— 拿到的字节已经不是原始数据，编码也无从恢复。根治需在上游（anolisa）把 body 改成 `Vec<u8>` 贯穿 analyzer 与 FFI；`AgentsightHttpsData` 的 ABI 本来就是 `(ptr, len)` 形式，届时本插件侧无需改动。
 
 > **不输出请求头。** `http.request.header` 携带 `Authorization` / `x-api-key`，而本路径原样上报、不做任何脱敏，输出即等于把有效凭据写入磁盘（实测确认过）。因此请求头只在内存中用于提取 host，不落盘。
 >
-> 但请注意 **body 仍是原文（或其 base64）**：部分厂商在请求体内传凭据，这类内容依然会落盘 —— 这是原始采集的固有性质。`http.response.header` 目前保留输出（含 `set-cookie` 时同样敏感），如需一并去掉可自行调整 `FillAgentsightHttpResponseLog`。
+> 但请注意 **body 仍是原文**：部分厂商在请求体内传凭据，这类内容依然会落盘 —— 这是原始采集的固有性质。`http.response.header` 目前保留输出（含 `set-cookie` 时同样敏感），如需一并去掉可自行调整 `FillAgentsightHttpResponseLog`。
 >
 > 另外 body 可能仍带 **chunked 传输编码的框**（形如 `c3b\r\n...\r\n0\r\n\r\n`）：raw 路径转发的是未解码的缓冲，去框需要在 AgentSight（Rust）侧修复。
 

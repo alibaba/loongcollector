@@ -25,7 +25,6 @@
 
 #include "collection_pipeline/queue/ProcessQueueItem.h"
 #include "collection_pipeline/queue/ProcessQueueManager.h"
-#include "common/EncodingUtil.h"
 #include "common/StringView.h"
 #include "common/UUIDUtil.h"
 #include "common/magic_enum.hpp"
@@ -148,72 +147,24 @@ std::string ExtractHostFromHeadersJson(const std::string& headersJson) {
     return {};
 }
 
-/// Strict UTF-8 well-formedness check (RFC 3629): rejects overlong encodings, surrogates and
-/// anything above U+10FFFF. Used to decide whether a captured body can go out as text.
-bool IsValidUtf8(const std::string& s) {
-    const auto* p = reinterpret_cast<const unsigned char*>(s.data());
-    const auto* end = p + s.size();
-    while (p < end) {
-        const unsigned char c = *p;
-        size_t extra = 0;
-        unsigned int cp = 0;
-        if (c < 0x80U) {
-            ++p;
-            continue;
-        }
-        if ((c & 0xE0U) == 0xC0U) {
-            extra = 1;
-            cp = c & 0x1FU;
-        } else if ((c & 0xF0U) == 0xE0U) {
-            extra = 2;
-            cp = c & 0x0FU;
-        } else if ((c & 0xF8U) == 0xF0U) {
-            extra = 3;
-            cp = c & 0x07U;
-        } else {
-            return false; // continuation byte in leading position, or 0xF8..0xFF
-        }
-        if (static_cast<size_t>(end - p) <= extra) {
-            return false; // truncated sequence
-        }
-        for (size_t i = 1; i <= extra; ++i) {
-            const unsigned char cc = p[i];
-            if ((cc & 0xC0U) != 0x80U) {
-                return false;
-            }
-            cp = (cp << 6U) | (cc & 0x3FU);
-        }
-        // Overlong encodings, UTF-16 surrogates, and out-of-range code points.
-        if ((extra == 1 && cp < 0x80U) || (extra == 2 && cp < 0x800U) || (extra == 3 && cp < 0x10000U)
-            || (cp >= 0xD800U && cp <= 0xDFFFU) || cp > 0x10FFFFU) {
-            return false;
-        }
-        p += extra + 1;
-    }
-    return true;
-}
-
 /// Emits one captured body under `<prefix>.content` / `<prefix>.size`.
 ///
-/// Bodies are whatever the peer sent: protobuf, gzip, images — AgentSight forwards raw bytes with
-/// no content-type gating. Writing those verbatim produced unreadable control-character soup in the
-/// collected logs (observed with an OTLP `application/x-protobuf` upload), so non-UTF-8 bodies go
-/// out base64-encoded with `<prefix>.encoding = base64` to mark them. `.size` is always the
-/// **original** byte count, not the encoded length.
+/// No binary handling here on purpose. AgentSight's analyzer stores bodies as Rust `String`
+/// (`analyzer/result.rs`: `request_body: Option<String>`) built with `String::from_utf8_lossy`
+/// (`analyzer/unified.rs`), so non-UTF-8 payloads are already destroyed before the FFI hands them
+/// over: every invalid byte has become U+FFFD. Measured with a 256-byte 0x00..0xFF request body,
+/// which arrived as 512 bytes (128 ASCII + 128 x 3-byte replacement chars).
 ///
-/// Content-type is deliberately not consulted: it can be absent or wrong, and this check is about
-/// what the bytes actually are.
+/// Consequences the consumer must know: bodies are faithful for text (verified against
+/// `content-length`), silently lossy for binary, and `.size` is the post-conversion length, so it
+/// overstates the wire size for binary payloads. Fixing this requires carrying `Vec<u8>` through
+/// the analyzer and FFI upstream.
 void EmitHttpBody(logtail::LogEvent* log, const std::string& prefix, const std::string& body) {
     if (body.empty()) {
         return;
     }
     log->SetContent(prefix + ".size", std::to_string(body.size()));
-    if (IsValidUtf8(body)) {
-        log->SetContent(prefix + ".content", body);
-        return;
-    }
-    log->SetContent(prefix + ".content", Base64Encode(body));
-    log->SetContent(prefix + ".encoding", std::string("base64"));
+    log->SetContent(prefix + ".content", body);
 }
 
 /// Builtin cmdline allow rules used when the user does not configure any whitelist/blacklist.
