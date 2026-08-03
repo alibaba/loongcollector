@@ -290,8 +290,10 @@ void FillAgentsightCommonCorrelation(const AgentsightLlmRecord& rec,
     }
     setStr(StringView("gen_ai.session.id"), rec.mSessionId);
     setStr(StringView("gen_ai.turn.id"), rec.mConversationId);
+    setStr(StringView("agent.id"), rec.mAgentType);
     if (rec.mPid != 0) {
         log->SetContent("pid", std::to_string(rec.mPid));
+        log->SetContent("process.pid", std::to_string(rec.mPid));
     }
     setStr(StringView("comm"), rec.mProcessName);
     setStr(StringView("cmdline"), rec.mCmdline);
@@ -346,6 +348,7 @@ void FillAgentsightCombinedLlmLog(const AgentsightLlmRecord& rec,
     SetLogTimestampFromNs(log, rec.mTimestampNs);
     FillAgentsightOtlpTimeFields(log, rec.mTimestampNs);
     FillAgentsightCommonCorrelation(rec, setStr, log);
+    setStr(StringView("gen_ai.tool.call.id"), ExtractUniqueToolCallId(rec.mResponseMessagesJson));
     setStr(StringView("gen_ai.response.id"), rec.mResponseId);
 
     log->SetContent("gen_ai.response.duration", std::to_string(rec.mDurationNs / 1000000ULL));
@@ -413,6 +416,7 @@ void FillAgentsightModelResponseLog(const AgentsightLlmRecord& rec,
     log->SetContent(StringView("event.name"), StringView("gen_ai.model.response"));
     FillAgentsightCommonCorrelation(rec, setStr, log, eventId);
     setStr(StringView("gen_ai.response.id"), rec.mResponseId);
+    setStr(StringView("gen_ai.tool.call.id"), ExtractUniqueToolCallId(rec.mResponseMessagesJson));
     setStr(StringView("gen_ai.step.id"), payload.stepId);
     if (payload.eventSequenceResponse > 0) {
         log->SetContent("gen_ai.event.sequence", std::to_string(payload.eventSequenceResponse));

@@ -54,6 +54,10 @@ std::string ComputeToolDefinitionsHash(const std::string& toolDefinitionsJson);
 /// `fallbackFinishReason` when the array is empty or unparsable.
 std::string FormatFinishReasonsJson(const std::string& responseMessagesJson, const std::string& fallbackFinishReason);
 
+/// Returns the sole distinct, non-empty tool-call id in response message parts.
+/// Malformed JSON, invalid tool-call parts, or multiple distinct ids return empty.
+std::string ExtractUniqueToolCallId(const std::string& responseMessagesJson);
+
 /// Derives `gen_ai.input.messages_delta` locally (does not use AgentSight FFI delta).
 /// `previousState` stores the last round's **request** (`messageCount` / `messagesHash`) and
 /// **response** (`outputMessageCount` / `outputMessagesHash`). `messageCount` counts **non-system**

@@ -386,6 +386,7 @@ public:
     void TestSecurityAuditUsesReadV2AndEnqueuesSecurityRecord();
     void TestSecurityAuditFallsBackWhenV2SymbolsAreMissing();
     void TestSecurityEventProducesSearchableLog();
+    void TestLlmResponseProducesCrossLayerCorrelationIdentity();
     void TestSecurityEventOmitsInvalidCorrelationIdentity();
     void TestMalformedSecurityEventPreservesEnvelope();
 
@@ -787,6 +788,40 @@ void AgentsightManagerUnittest::TestSecurityEventProducesSearchableLog() {
     mgr->Destroy();
 }
 
+void AgentsightManagerUnittest::TestLlmResponseProducesCrossLayerCorrelationIdentity() {
+    static const std::string kConfigName = "llm-correlation-pipeline";
+    static const char kResponse[]
+        = R"([{"role":"assistant","parts":[{"type":"tool_call","id":"call-hermes-1","name":"shell"}]}])";
+    static AgentsightLLMData data{};
+    std::memset(&data, 0, sizeof(data));
+    data.pid = 4242;
+    data.session_id = "session-1";
+    data.conversation_id = "conversation-1";
+    data.response_id = "response-1";
+    data.agent_name = "hermes";
+    data.response_messages = kResponse;
+    data.response_messages_len = sizeof(kResponse) - 1U;
+    data.timestamp_ns = 1U;
+
+    auto mgr = makeManager();
+    agentsightOptions().mAgentsightEventStreamFormat = true;
+    registerConfigWithQueue(*mgr, kConfigName.c_str());
+    APSARA_TEST_EQUAL(0, mgr->HandleEvent(std::make_shared<AgentsightLlmRecord>(kConfigName, data)));
+
+    std::unique_ptr<ProcessQueueItem> item;
+    std::string configName;
+    APSARA_TEST_TRUE(ProcessQueueManager::GetInstance()->PopItem(0, item, configName));
+    APSARA_TEST_EQUAL(2U, item->mEventGroup.GetEvents().size());
+    const auto& request = item->mEventGroup.GetEvents().at(0).Cast<LogEvent>();
+    const auto& response = item->mEventGroup.GetEvents().at(1).Cast<LogEvent>();
+    APSARA_TEST_EQUAL("hermes", response.GetContent("agent.id").to_string());
+    APSARA_TEST_EQUAL("4242", response.GetContent("process.pid").to_string());
+    APSARA_TEST_EQUAL("call-hermes-1", response.GetContent("gen_ai.tool.call.id").to_string());
+    APSARA_TEST_TRUE(request.GetContent("gen_ai.tool.call.id").empty());
+
+    mgr->Destroy();
+}
+
 void AgentsightManagerUnittest::TestSecurityEventOmitsInvalidCorrelationIdentity() {
     static const std::string kConfigName = "security-invalid-identity-pipeline";
     static const std::string kPayload
@@ -863,6 +898,7 @@ UNIT_TEST_CASE(AgentsightManagerUnittest, TestSessionInputCacheLruEviction);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestSecurityAuditUsesReadV2AndEnqueuesSecurityRecord);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestSecurityAuditFallsBackWhenV2SymbolsAreMissing);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestSecurityEventProducesSearchableLog);
+UNIT_TEST_CASE(AgentsightManagerUnittest, TestLlmResponseProducesCrossLayerCorrelationIdentity);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestSecurityEventOmitsInvalidCorrelationIdentity);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestMalformedSecurityEventPreservesEnvelope);
 
