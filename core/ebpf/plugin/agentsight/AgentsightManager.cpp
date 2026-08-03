@@ -14,13 +14,18 @@
 
 #include "ebpf/plugin/agentsight/AgentsightManager.h"
 
+#include <cctype>
+
 #include <algorithm>
 #include <functional>
 #include <utility>
 #include <vector>
 
+#include "rapidjson/document.h"
+
 #include "collection_pipeline/queue/ProcessQueueItem.h"
 #include "collection_pipeline/queue/ProcessQueueManager.h"
+#include "common/EncodingUtil.h"
 #include "common/StringView.h"
 #include "common/UUIDUtil.h"
 #include "common/magic_enum.hpp"
@@ -38,7 +43,10 @@ namespace logtail::ebpf {
 
 namespace {
 
-bool ParseHostAndPortFromRequestUrl(const std::string& url, std::string& host, std::string& port) {
+/// Splits `host` / `port` out of either a full URL (`https://h:p/path?q`) or a bare authority
+/// (`h:p`, `[::1]:p`) — the scheme is optional, so raw HTTP events can pass the `Host` header
+/// value straight in. Handles IPv6 brackets and `user@` prefixes.
+bool ParseHostAndPortFromUrlOrAuthority(const std::string& url, std::string& host, std::string& port) {
     host.clear();
     port.clear();
     const auto schemePos = url.find("://");
@@ -102,6 +110,110 @@ bool ParseHostAndPortFromRequestUrl(const std::string& url, std::string& host, s
     }
     port = authority.substr(colonPos + 1);
     return !host.empty();
+}
+
+/// Extracts the target host from a raw HTTP headers JSON object — the flat, lowercase-keyed
+/// string→string map that AgentSight's FFI layer produces for `AgentsightHttpsData`.
+///
+/// Needed because `AgentsightHttpsData` carries no request URL, and the headers themselves are
+/// deliberately never emitted (they carry `Authorization` / `x-api-key`). This salvages the one
+/// field worth keeping. Checks `host`, then the HTTP/2 `:authority` pseudo-header, then falls back
+/// to a case-insensitive scan for producers that preserve original header casing.
+std::string ExtractHostFromHeadersJson(const std::string& headersJson) {
+    if (headersJson.empty()) {
+        return {};
+    }
+    rapidjson::Document doc;
+    if (doc.Parse(headersJson.c_str(), headersJson.size()).HasParseError() || !doc.IsObject()) {
+        return {};
+    }
+    for (const char* key : {"host", ":authority"}) {
+        const auto it = doc.FindMember(key);
+        if (it != doc.MemberEnd() && it->value.IsString() && it->value.GetStringLength() > 0) {
+            return std::string(it->value.GetString(), it->value.GetStringLength());
+        }
+    }
+    for (auto it = doc.MemberBegin(); it != doc.MemberEnd(); ++it) {
+        if (!it->name.IsString() || !it->value.IsString() || it->value.GetStringLength() == 0) {
+            continue;
+        }
+        std::string name(it->name.GetString(), it->name.GetStringLength());
+        std::transform(name.begin(), name.end(), name.begin(), [](unsigned char c) {
+            return static_cast<char>(std::tolower(c));
+        });
+        if (name == "host" || name == ":authority") {
+            return std::string(it->value.GetString(), it->value.GetStringLength());
+        }
+    }
+    return {};
+}
+
+/// Strict UTF-8 well-formedness check (RFC 3629): rejects overlong encodings, surrogates and
+/// anything above U+10FFFF. Used to decide whether a captured body can go out as text.
+bool IsValidUtf8(const std::string& s) {
+    const auto* p = reinterpret_cast<const unsigned char*>(s.data());
+    const auto* end = p + s.size();
+    while (p < end) {
+        const unsigned char c = *p;
+        size_t extra = 0;
+        unsigned int cp = 0;
+        if (c < 0x80U) {
+            ++p;
+            continue;
+        }
+        if ((c & 0xE0U) == 0xC0U) {
+            extra = 1;
+            cp = c & 0x1FU;
+        } else if ((c & 0xF0U) == 0xE0U) {
+            extra = 2;
+            cp = c & 0x0FU;
+        } else if ((c & 0xF8U) == 0xF0U) {
+            extra = 3;
+            cp = c & 0x07U;
+        } else {
+            return false; // continuation byte in leading position, or 0xF8..0xFF
+        }
+        if (static_cast<size_t>(end - p) <= extra) {
+            return false; // truncated sequence
+        }
+        for (size_t i = 1; i <= extra; ++i) {
+            const unsigned char cc = p[i];
+            if ((cc & 0xC0U) != 0x80U) {
+                return false;
+            }
+            cp = (cp << 6U) | (cc & 0x3FU);
+        }
+        // Overlong encodings, UTF-16 surrogates, and out-of-range code points.
+        if ((extra == 1 && cp < 0x80U) || (extra == 2 && cp < 0x800U) || (extra == 3 && cp < 0x10000U)
+            || (cp >= 0xD800U && cp <= 0xDFFFU) || cp > 0x10FFFFU) {
+            return false;
+        }
+        p += extra + 1;
+    }
+    return true;
+}
+
+/// Emits one captured body under `<prefix>.content` / `<prefix>.size`.
+///
+/// Bodies are whatever the peer sent: protobuf, gzip, images — AgentSight forwards raw bytes with
+/// no content-type gating. Writing those verbatim produced unreadable control-character soup in the
+/// collected logs (observed with an OTLP `application/x-protobuf` upload), so non-UTF-8 bodies go
+/// out base64-encoded with `<prefix>.encoding = base64` to mark them. `.size` is always the
+/// **original** byte count, not the encoded length.
+///
+/// Content-type is deliberately not consulted: it can be absent or wrong, and this check is about
+/// what the bytes actually are.
+void EmitHttpBody(logtail::LogEvent* log, const std::string& prefix, const std::string& body) {
+    if (body.empty()) {
+        return;
+    }
+    log->SetContent(prefix + ".size", std::to_string(body.size()));
+    if (IsValidUtf8(body)) {
+        log->SetContent(prefix + ".content", body);
+        return;
+    }
+    log->SetContent(prefix + ".content", Base64Encode(body));
+    log->SetContent(prefix + ".encoding", std::string("base64"));
 }
 
 /// Builtin cmdline allow rules used when the user does not configure any whitelist/blacklist.
@@ -303,7 +415,7 @@ void FillAgentsightServerFromUrl(const AgentsightLlmRecord& rec, SetLogStrFn set
     }
     std::string host;
     std::string port;
-    if (ParseHostAndPortFromRequestUrl(rec.mRequestUrl, host, port)) {
+    if (ParseHostAndPortFromUrlOrAuthority(rec.mRequestUrl, host, port)) {
         setStr(StringView("server.address"), host);
         setStr(StringView("server.port"), port);
     }
@@ -436,57 +548,72 @@ void FillAgentsightModelResponseLog(const AgentsightLlmRecord& rec,
     setStr(StringView("gen_ai.output.messages"), rec.mResponseMessagesJson);
 }
 
-/// Raw HTTP exchange that AgentSight could not map onto GenAI semantics. Emitted under
-/// `event.name = agentsight.http.raw` so downstream can separate it from the gen_ai.* stream;
-/// no gen_ai.* field is set here because none of them could be resolved.
+/// Fields shared by the `http.request` / `http.response` pair of a raw HTTP exchange — the traffic
+/// AgentSight could not map onto GenAI semantics. No gen_ai.* field is set on either event because
+/// none of them could be resolved.
+void FillAgentsightHttpCommon(const AgentsightHttpsRecord& rec,
+                              SetLogStrFn setStr,
+                              logtail::LogEvent* log,
+                              const std::string& eventId,
+                              uint64_t timestampNs) {
+    SetLogTimestampFromNs(log, timestampNs);
+    FillAgentsightOtlpTimeFields(log, timestampNs);
+    log->SetContent(StringView("event.id"), StringView(eventId));
+    if (rec.mPid != 0) {
+        log->SetContent("pid", std::to_string(rec.mPid));
+    }
+    setStr(StringView("comm"), rec.mProcessName);
+    log->SetContent(StringView("url.scheme"), StringView("https"));
+}
+
+/// Request half of a raw HTTP exchange.
 ///
 /// Request headers are deliberately NOT emitted: they carry `Authorization` / `x-api-key`, and this
 /// path reports verbatim bytes with no redaction, so emitting them writes live credentials to disk
 /// (observed in testing). Only the target host is salvaged from them, as `server.address` /
 /// `server.port` — matching the field names the gen_ai.* logs already use.
-///
-/// Body values are copied verbatim (SetContent copies by length into the SourceBuffer, so embedded
-/// NULs survive). They may be compressed or non-UTF-8 — decoding is the consumer's job. Note they
-/// can still carry secrets for providers that authenticate in-body; that is inherent to raw capture.
-void FillAgentsightRawHttpLog(const AgentsightHttpsRecord& rec, logtail::LogEvent* log) {
+void FillAgentsightHttpRequestLog(const AgentsightHttpsRecord& rec,
+                                  logtail::LogEvent* log,
+                                  const std::string& eventId) {
     auto setStr = [&](StringView k, const std::string& v) {
         if (!v.empty()) {
             log->SetContent(k, StringView(v.data(), v.size()));
         }
     };
 
-    SetLogTimestampFromNs(log, rec.mTimestampNs);
-    FillAgentsightOtlpTimeFields(log, rec.mTimestampNs);
-    log->SetContent(StringView("event.name"), StringView("agentsight.http.raw"));
-
-    if (rec.mPid != 0) {
-        log->SetContent("pid", std::to_string(rec.mPid));
-    }
-    setStr(StringView("comm"), rec.mProcessName);
-
+    FillAgentsightHttpCommon(rec, setStr, log, eventId, rec.mTimestampNs);
+    log->SetContent(StringView("event.name"), StringView("http.request"));
     setStr(StringView("http.request.method"), rec.mMethod);
     setStr(StringView("url.path"), rec.mPath);
-    log->SetContent("http.response.status_code", std::to_string(rec.mStatusCode));
-    log->SetContent(StringView("is_sse"), StringView(rec.mIsSse ? "1" : "0"));
-    log->SetContent("http.response.duration", std::to_string(rec.mDurationNs / 1000000ULL));
 
-    // Salvage the host from the (unemitted) request headers. Reuses the URL authority parser by
-    // synthesizing a URL, so IPv6 brackets and `:port` splitting are handled in one place.
-    const std::string hostHeader = ExtractHostFromHeadersJson(rec.mRequestHeaders);
-    if (!hostHeader.empty()) {
-        std::string host;
-        std::string port;
-        if (ParseHostAndPortFromRequestUrl("https://" + hostHeader + "/", host, port)) {
-            setStr(StringView("server.address"), host);
-            setStr(StringView("server.port"), port);
-        } else {
-            setStr(StringView("server.address"), hostHeader);
-        }
+    std::string host;
+    std::string port;
+    if (ParseHostAndPortFromUrlOrAuthority(ExtractHostFromHeadersJson(rec.mRequestHeaders), host, port)) {
+        setStr(StringView("server.address"), host);
+        setStr(StringView("server.port"), port);
     }
 
-    setStr(StringView("http.request.body"), rec.mRequestBody);
-    setStr(StringView("http.response.headers"), rec.mResponseHeaders);
-    setStr(StringView("http.response.body"), rec.mResponseBody);
+    EmitHttpBody(log, "http.request.body", rec.mRequestBody);
+}
+
+/// Response half of a raw HTTP exchange. Duration is carried by the gap between this event's
+/// timestamp and the request event's, so no separate duration field is emitted.
+void FillAgentsightHttpResponseLog(const AgentsightHttpsRecord& rec,
+                                   logtail::LogEvent* log,
+                                   const std::string& eventId) {
+    auto setStr = [&](StringView k, const std::string& v) {
+        if (!v.empty()) {
+            log->SetContent(k, StringView(v.data(), v.size()));
+        }
+    };
+
+    FillAgentsightHttpCommon(rec, setStr, log, eventId, rec.mTimestampNs + rec.mDurationNs);
+    log->SetContent(StringView("event.name"), StringView("http.response"));
+    log->SetContent("http.response.status_code", std::to_string(rec.mStatusCode));
+    log->SetContent(StringView("is_sse"), StringView(rec.mIsSse ? "1" : "0"));
+
+    setStr(StringView("http.response.header"), rec.mResponseHeaders);
+    EmitHttpBody(log, "http.response.body", rec.mResponseBody);
 }
 
 } // namespace
@@ -870,13 +997,19 @@ int AgentsightManager::HandleHttpsEvent(const AgentsightHttpsRecord* rec) {
 
     auto sourceBuffer = std::make_shared<SourceBuffer>();
     PipelineEventGroup eventGroup(sourceBuffer);
-    // One log per exchange: unlike the LLM path there is no request/response split to make, since
-    // AgentsightHttpsData already carries both halves of a completed exchange.
-    FillAgentsightRawHttpLog(*rec, eventGroup.AddLogEvent(true, mEventPool));
+    // A completed request/response pair shares one event.id for downstream correlation. Records with
+    // status_code == 0 never got a response (request-only), so they emit just the request event.
+    // Duration is represented by the two timestamps — there is no matching OTel semconv attribute.
+    const std::string eventId = CalculateRandomUUID();
+    FillAgentsightHttpRequestLog(*rec, eventGroup.AddLogEvent(true, mEventPool), eventId);
+    const size_t logCount = rec->mStatusCode == 0 ? 1U : 2U;
+    if (logCount == 2U) {
+        FillAgentsightHttpResponseLog(*rec, eventGroup.AddLogEvent(true, mEventPool), eventId);
+    }
 
     std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(eventGroup), pluginIndex);
     if (QueueStatus::OK == ProcessQueueManager::GetInstance()->PushQueue(queueKey, std::move(item))) {
-        ADD_COUNTER(mPushLogsTotal, 1);
+        ADD_COUNTER(mPushLogsTotal, logCount);
         ADD_COUNTER(mPushLogGroupTotal, 1);
     } else {
         if (mPushLogFailedTotal) {

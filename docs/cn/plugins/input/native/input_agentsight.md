@@ -34,25 +34,55 @@ dev
 |  ProbeConfig.Http  |  array  |  否  |  `[]`（关闭）  |  HTTP 明文流量的目标列表（字符串数组）。每项可为 `:端口`、`IP`、`IP:端口` 或域名（如 `model-svc.default.svc`、`*.internal.svc`）。**留空时不采集明文 HTTP 流量**。  |
 |  ProbeConfig.EventStreamFormat  |  bool  |  否  |  `true`  |  为 `true` 时，每次 LLM 调用在同一 `PipelineEventGroup` 内输出两条日志（各有 `event.id`）：`event.name=gen_ai.model.request`（请求开始时间戳）与 `gen_ai.model.response`（请求结束时间戳）。为 `false` 时输出单条合并日志，**无** `event.name` / `event.id`。  |
 |  ProbeConfig.MessageDeltaOnly  |  bool  |  否  |  `true`  |  为 `true` 时**不**输出全量 `gen_ai.input.messages`；仍输出 `gen_ai.input.messages_delta`、`gen_ai.system_instructions_hash` / `gen_ai.tool.definitions_hash`（非空时），以及 hash 相对上一轮变化时的 `gen_ai.system_instructions` / `gen_ai.tool.definitions`。为 `false` 时**每次**输出非空的全量 `gen_ai.input.messages`。**不影响** `gen_ai.output.messages`；`messages_delta` 及 session 状态维护**不受**本开关影响。  |
-|  ProbeConfig.RawHttpsFallback  |  bool  |  否  |  `false`  |  为 `true` 时，**无法解析为 LLM 语义**的流量（未知 API path、非标准 body）不再被丢弃，而是以原始 HTTP 形式上报（`event.name=agentsight.http.raw`，见下文）。需要 `libagentsight >= 0.9.0`；旧版动态库上该开关无效（日志告警后自动降级为关闭）。**默认关闭**：原始 body 未做任何脱敏。  |
+|  ProbeConfig.RawHttpsFallback  |  bool  |  否  |  `false`  |  为 `true` 时，**无法解析为 LLM 语义**的流量（未知 API path、非标准 body）不再被丢弃，而是以原始 HTTP 形式上报（`event.name=http.request` / `http.response`，见下文）。需要 `libagentsight >= 0.9.0`；旧版动态库上该开关无效（日志告警后自动降级为关闭）。**默认关闭**：原始 body 未做任何脱敏。  |
 
 ### `RawHttpsFallback: true` 输出的原始 HTTP 日志
 
-仅在 AgentSight 无法把流量解析成 GenAI 语义时产生，与 `gen_ai.*` 日志**互斥**（一次流量最多产生一种）。每次完整请求/响应输出**单条**日志，不受 `EventStreamFormat` 影响。
+仅在 AgentSight 无法把流量解析成 GenAI 语义时产生，与 `gen_ai.*` 日志**互斥**（一次流量最多产生一种）。
+
+一次完整交换在同一个 `PipelineEventGroup` 内输出**两条**日志，共享同一个 `event.id` 供下游关联：`event.name=http.request`（请求开始时间戳）与 `http.response`（请求结束时间戳）。**未收到响应**的记录（`status_code == 0`）只输出请求那一条。耗时由两条日志的时间戳之差表示，不单独输出 duration 字段。不受 `EventStreamFormat` 影响。
+
+**公共字段**
 
 | 字段 | 说明 |
 | --- | --- |
-| `event.name` | 固定为 `agentsight.http.raw`，用于与 `gen_ai.*` 数据流区分 |
+| `event.name` | `http.request` 或 `http.response`，用于与 `gen_ai.*` 数据流区分 |
+| `event.id` | 同一次交换的两条日志取相同值（UUID），用于配对 |
 | `pid` / `comm` | 进程 ID 与进程名。**无** `gen_ai.session.id` / `gen_ai.turn.id` / `gen_ai.agent.type` / `container.id` —— 底层 `AgentsightHttpsData` 不携带这些字段，关联只能靠 `(pid, comm)` |
-| `http.request.method` / `url.path` | 请求方法与路径。**无完整 URL** |
-| `server.address` / `server.port` | 目标主机与端口，从请求头的 `host`（HTTP/2 为 `:authority`）提取而来 |
-| `http.response.status_code` / `is_sse` / `http.response.duration` | 状态码、是否 SSE、耗时（毫秒） |
-| `http.request.body` / `http.response.headers` / `http.response.body` | 原始字节，**按长度**原样拷贝。可能是压缩内容或非 UTF-8，解码由下游负责 |
+| `url.scheme` | 固定 `https` |
 | `time_unix_nano` / `observed_time_unix_nano` | 同 `gen_ai.*` 日志 |
 
-> **不输出请求头。** `http.request.headers` 携带 `Authorization` / `x-api-key`，而本路径原样上报、不做任何脱敏，输出即等于把有效凭据写入磁盘（实测确认过）。因此请求头只在内存中用于提取 host，不落盘。
+**`http.request` 独有**
+
+| 字段 | 说明 |
+| --- | --- |
+| `http.request.method` / `url.path` | 请求方法与路径。**无完整 URL** |
+| `server.address` / `server.port` | 目标主机与端口，从请求头的 `host`（HTTP/2 为 `:authority`）提取而来 |
+| `http.request.body.content` / `.size` / `.encoding` | 见下方「body 的编码」 |
+
+**`http.response` 独有**
+
+| 字段 | 说明 |
+| --- | --- |
+| `http.response.status_code` / `is_sse` | 状态码、是否 SSE |
+| `http.response.header` | 响应头 JSON |
+| `http.response.body.content` / `.size` / `.encoding` | 见下方「body 的编码」 |
+
+#### body 的编码
+
+AgentSight 转发的是对端实际发出的字节，不按 content-type 过滤 —— protobuf、gzip、图片都可能出现。原样写出会在日志里产生大段控制字符乱码（实测遇到过 OTLP 的 `application/x-protobuf` 上报）。因此：
+
+- body 是合法 UTF-8 → `.content` 为原文
+- body **不是**合法 UTF-8 → `.content` 为 **base64**，并输出 `.encoding = base64` 标记
+- `.size` **始终是原始字节数**，不是编码后的长度
+
+判定只看字节本身、不看 content-type —— 后者可能缺失或不准。
+
+> **不输出请求头。** `http.request.header` 携带 `Authorization` / `x-api-key`，而本路径原样上报、不做任何脱敏，输出即等于把有效凭据写入磁盘（实测确认过）。因此请求头只在内存中用于提取 host，不落盘。
 >
-> 但请注意 **body 仍是原文**：部分厂商在请求体内传凭据，这类内容依然会落盘 —— 这是原始采集的固有性质。`http.response.headers` 目前保留输出（含 `set-cookie` 时同样敏感），如需一并去掉可自行调整 `FillAgentsightRawHttpLog`。
+> 但请注意 **body 仍是原文（或其 base64）**：部分厂商在请求体内传凭据，这类内容依然会落盘 —— 这是原始采集的固有性质。`http.response.header` 目前保留输出（含 `set-cookie` 时同样敏感），如需一并去掉可自行调整 `FillAgentsightHttpResponseLog`。
+>
+> 另外 body 可能仍带 **chunked 传输编码的框**（形如 `c3b\r\n...\r\n0\r\n\r\n`）：raw 路径转发的是未解码的缓冲，去框需要在 AgentSight（Rust）侧修复。
 
 ### `AgentType` 取值命名规范
 

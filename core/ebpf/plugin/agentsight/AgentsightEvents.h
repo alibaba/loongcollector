@@ -72,6 +72,9 @@ public:
 /// (unknown API path or unrecognised body shape). Requires `RawHttpsFallback: true` plus
 /// libagentsight >= 0.9.0; see AgentsightManager::OnHttpsCallback.
 ///
+/// Emitted as an `http.request` / `http.response` pair sharing one `event.id` (request only when no
+/// response arrived, i.e. mStatusCode == 0).
+///
 /// Deliberately narrower than AgentsightLlmRecord: AgentsightHttpsData carries no session id,
 /// conversation id, agent type or container id, so correlation is limited to (pid, comm). There is
 /// no request_url either — only method + path; the target host is inside mRequestHeaders.
@@ -99,7 +102,7 @@ public:
     //
     // mRequestHeaders is captured but **never emitted** — it carries Authorization / x-api-key and
     // this path does no redaction. It is kept in memory only so the host can be salvaged into
-    // `server.address` (see FillAgentsightRawHttpLog / ExtractHostFromHeadersJson).
+    // `server.address` (see FillAgentsightHttpRequestLog / ExtractHostFromHeadersJson).
     std::string mRequestHeaders;
     std::string mRequestBody;
     std::string mResponseHeaders;
