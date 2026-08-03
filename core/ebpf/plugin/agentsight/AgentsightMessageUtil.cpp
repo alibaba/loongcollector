@@ -17,7 +17,6 @@
 #include <cstring>
 
 #include <limits>
-#include <set>
 
 #include "rapidjson/document.h"
 #include "rapidjson/stringbuffer.h"
@@ -223,8 +222,8 @@ void UpdateSessionOutputState(const std::string& responseMessagesJson, Agentsigh
     }
 }
 
-void CollectToolCallIds(const rapidjson::Value& value, std::set<std::string>& ids, bool& invalid) {
-    if (!value.IsObject()) {
+void CollectToolCallIds(const rapidjson::Value& value, std::string& candidate, bool& seen, bool& invalid) {
+    if (invalid || !value.IsObject()) {
         return;
     }
     if (value.HasMember("type") && value["type"].IsString()
@@ -233,13 +232,21 @@ void CollectToolCallIds(const rapidjson::Value& value, std::set<std::string>& id
             invalid = true;
             return;
         }
-        ids.emplace(value["id"].GetString(), value["id"].GetStringLength());
+        const char* id = value["id"].GetString();
+        const auto idLength = value["id"].GetStringLength();
+        if (!seen) {
+            candidate.assign(id, idLength);
+            seen = true;
+        } else if (candidate.size() != idLength || std::memcmp(candidate.data(), id, idLength) != 0) {
+            invalid = true;
+            return;
+        }
     }
     if (!value.HasMember("parts") || !value["parts"].IsArray()) {
         return;
     }
     for (rapidjson::SizeType i = 0; i < value["parts"].Size(); ++i) {
-        CollectToolCallIds(value["parts"][i], ids, invalid);
+        CollectToolCallIds(value["parts"][i], candidate, seen, invalid);
     }
 }
 
@@ -392,15 +399,16 @@ std::string ExtractUniqueToolCallId(const std::string& responseMessagesJson) {
     if (!ParseMessagesArray(responseMessagesJson, doc)) {
         return {};
     }
-    std::set<std::string> ids;
+    std::string candidate;
+    bool seen = false;
     bool invalid = false;
     for (rapidjson::SizeType i = 0; i < doc.Size(); ++i) {
-        CollectToolCallIds(doc[i], ids, invalid);
+        CollectToolCallIds(doc[i], candidate, seen, invalid);
     }
-    if (invalid || ids.size() != 1) {
+    if (invalid || !seen) {
         return {};
     }
-    return *ids.begin();
+    return candidate;
 }
 
 std::string ComputeInputMessagesDelta(const std::string& fullMessagesJson,

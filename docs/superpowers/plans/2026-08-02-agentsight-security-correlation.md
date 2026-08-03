@@ -125,7 +125,8 @@ Add a short section stating that a formal leakage incident requires:
 
 ```text
 application secret/PII evidence
-AND matching agent.id + gen_ai.session.id
+AND matching gen_ai.agent.type + gen_ai.session.id
+AND matching agent.id when both layers carry a stable agent ID
 AND matching gen_ai.tool.call.id for tool-originated exposure
 AND AgentSight source -> outbound sink -> policy_decision chain
 AND a bounded 120-second causal window
@@ -167,8 +168,9 @@ system-only / system-only-tool  -> no application evidence
 
 - [ ] **Step 2: Apply the strict query predicates**
 
-The query must require non-empty equality for `agent.id`,
-`gen_ai.session.id`, and tool-call ID when applicable; require the AgentSight
+The query must require non-empty equality for `gen_ai.agent.type`,
+`gen_ai.session.id`, and tool-call ID when applicable; additionally require
+`agent.id` equality when both layers carry a stable agent ID; require the AgentSight
 `policy_decision` source/sink chain; and constrain the system sink to
 `[application_time, application_time + 120 seconds]`.
 

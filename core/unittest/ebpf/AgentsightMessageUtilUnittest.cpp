@@ -159,13 +159,16 @@ void AgentsightMessageUtilUnittest::TestExtractUniqueToolCallIdRejectsAmbiguousO
         {"type":"tool_call","id":"call-1"},
         {"type":"tool_call","id":"call-2"}
       ]}
-    ])").empty());
+    ])")
+                         .empty());
     APSARA_TEST_TRUE(ExtractUniqueToolCallId(R"([
       {"role":"assistant","parts":[{"type":"tool_call","id":""}]}
-    ])").empty());
+    ])")
+                         .empty());
     APSARA_TEST_TRUE(ExtractUniqueToolCallId(R"([
       {"role":"assistant","parts":[{"type":"tool_call"}]}
-    ])").empty());
+    ])")
+                         .empty());
 }
 
 void AgentsightMessageUtilUnittest::TestComputeDeltaFirstRound() {

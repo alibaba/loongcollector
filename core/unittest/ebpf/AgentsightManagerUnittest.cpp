@@ -728,9 +728,11 @@ void AgentsightManagerUnittest::TestSecurityAuditFallsBackWhenV2SymbolsAreMissin
     mAgentSightAdapter->setAgentSightSymbols(std::move(symbols));
     auto& options = agentsightOptions();
     options.mAgentsightSecurityAuditEnabled = true;
+    g_ut_security_enabled = 1;
     auto mgr = makeManager();
     registerConfig(*mgr, "legacy-pipeline");
 
+    APSARA_TEST_EQUAL(1, g_ut_security_enable_calls);
     APSARA_TEST_EQUAL(0, g_ut_security_enabled);
     gRead.read_mode = 2;
     APSARA_TEST_EQUAL(1, mgr->OnEpollReadable());
@@ -741,7 +743,7 @@ void AgentsightManagerUnittest::TestSecurityAuditFallsBackWhenV2SymbolsAreMissin
 void AgentsightManagerUnittest::TestSecurityEventProducesSearchableLog() {
     static const std::string kConfigName = "security-log-pipeline";
     static const std::string kPayload
-        = R"({"event_id":"00000000-0000-0000-0000-000000000001","observed_at_ns":8,"identity":{"binding_id":"10000000-0000-0000-0000-000000000001","agent_id":"agent-1","agent_name":"claude","session_id":"session-1","conversation_id":"conversation-1","tool_call_id":"tool-call-1","pid":42,"process_start_time":101,"ppid":7,"cgroup_id":9001},"event_type":"policy_decision","event":{"policy_id":"credential-exfiltration","policy_revision":3,"mode":"audit","risk_score":85,"large_counter":9223372036854775808,"blocked":true,"confidence":0.75,"details":{"source":"unit-test"}}})";
+        = R"({"event_id":"00000000-0000-0000-0000-000000000001","observed_at_ns":8,"identity":{"binding_id":"10000000-0000-0000-0000-000000000001","agent_id":"agent-1","agent_name":"claude","session_id":"session-1","conversation_id":"conversation-1","tool_call_id":"tool-call-1","pid":2147483648,"process_start_time":101,"ppid":4294967295,"cgroup_id":9001},"event_type":"policy_decision","event":{"policy_id":"credential-exfiltration","policy_revision":3,"mode":"audit","risk_score":85,"large_counter":9223372036854775808,"blocked":true,"confidence":0.75,"details":{"source":"unit-test"}}})";
 
     auto mgr = makeManager();
     registerConfigWithQueue(*mgr, kConfigName.c_str());
@@ -769,9 +771,9 @@ void AgentsightManagerUnittest::TestSecurityEventProducesSearchableLog() {
     APSARA_TEST_EQUAL("conversation-1", log.GetContent("gen_ai.turn.id").to_string());
     APSARA_TEST_EQUAL("conversation-1", log.GetContent("gen_ai.conversation.id").to_string());
     APSARA_TEST_EQUAL("tool-call-1", log.GetContent("gen_ai.tool.call.id").to_string());
-    APSARA_TEST_EQUAL("42", log.GetContent("process.pid").to_string());
+    APSARA_TEST_EQUAL("2147483648", log.GetContent("process.pid").to_string());
     APSARA_TEST_EQUAL("101", log.GetContent("process.start_time").to_string());
-    APSARA_TEST_EQUAL("7", log.GetContent("process.parent.pid").to_string());
+    APSARA_TEST_EQUAL("4294967295", log.GetContent("process.parent.pid").to_string());
     APSARA_TEST_EQUAL("9001", log.GetContent("container.cgroup.id").to_string());
     APSARA_TEST_EQUAL("10000000-0000-0000-0000-000000000001", log.GetContent("agentsight.binding.id").to_string());
     APSARA_TEST_EQUAL("agent-1", log.GetContent("agentsight.identity.agent_id").to_string());
@@ -814,7 +816,8 @@ void AgentsightManagerUnittest::TestLlmResponseProducesCrossLayerCorrelationIden
     APSARA_TEST_EQUAL(2U, item->mEventGroup.GetEvents().size());
     const auto& request = item->mEventGroup.GetEvents().at(0).Cast<LogEvent>();
     const auto& response = item->mEventGroup.GetEvents().at(1).Cast<LogEvent>();
-    APSARA_TEST_EQUAL("hermes", response.GetContent("agent.id").to_string());
+    APSARA_TEST_TRUE(response.GetContent("agent.id").empty());
+    APSARA_TEST_EQUAL("hermes", response.GetContent("gen_ai.agent.type").to_string());
     APSARA_TEST_EQUAL("4242", response.GetContent("process.pid").to_string());
     APSARA_TEST_EQUAL("call-hermes-1", response.GetContent("gen_ai.tool.call.id").to_string());
     APSARA_TEST_TRUE(request.GetContent("gen_ai.tool.call.id").empty());
@@ -825,7 +828,7 @@ void AgentsightManagerUnittest::TestLlmResponseProducesCrossLayerCorrelationIden
 void AgentsightManagerUnittest::TestSecurityEventOmitsInvalidCorrelationIdentity() {
     static const std::string kConfigName = "security-invalid-identity-pipeline";
     static const std::string kPayload
-        = R"({"identity":{"binding_id":1,"conversation_id":null,"tool_call_id":{},"process_start_time":-1,"ppid":-1,"cgroup_id":-1},"event_type":"policy_decision","event":{}})";
+        = R"({"identity":{"binding_id":1,"conversation_id":null,"tool_call_id":{},"pid":-1,"process_start_time":-1,"ppid":4294967296,"cgroup_id":-1},"event_type":"policy_decision","event":{}})";
 
     auto mgr = makeManager();
     registerConfigWithQueue(*mgr, kConfigName.c_str());
@@ -840,6 +843,7 @@ void AgentsightManagerUnittest::TestSecurityEventOmitsInvalidCorrelationIdentity
     APSARA_TEST_TRUE(log.GetContent("agentsight.binding.id").empty());
     APSARA_TEST_TRUE(log.GetContent("gen_ai.conversation.id").empty());
     APSARA_TEST_TRUE(log.GetContent("gen_ai.tool.call.id").empty());
+    APSARA_TEST_TRUE(log.GetContent("process.pid").empty());
     APSARA_TEST_TRUE(log.GetContent("process.start_time").empty());
     APSARA_TEST_TRUE(log.GetContent("process.parent.pid").empty());
     APSARA_TEST_TRUE(log.GetContent("container.cgroup.id").empty());

@@ -43,7 +43,7 @@ dev
 安全审计显式开启后，`input_agentsight` 除 LLM 日志外还会输出 `event.name=agentsight.security.<event_type>` 的单条日志。事件保留完整 JSON 于 `event.original`，并提取以下公共字段便于检索：
 
 - `event.id`、`event.type`、`time_unix_nano`、`observed_time_unix_nano`
-- `agent.id`、`gen_ai.agent.type`、`gen_ai.session.id`、`gen_ai.turn.id`、`process.pid`
+- `agent.id`（仅系统事件有真实 `identity.agent_id` 时）、`gen_ai.agent.type`、`gen_ai.session.id`、`gen_ai.turn.id`、`process.pid`
 - 跨层关联别名：`agentsight.binding.id`、`gen_ai.conversation.id`、`gen_ai.tool.call.id`、`process.start_time`、`process.parent.pid`、`container.cgroup.id`
 - 事件载荷中的标量字段以 `security.*` 前缀展开，例如 `security.policy_id`、`security.mode`、`security.risk_score`
 
@@ -66,7 +66,7 @@ inputs:
 
 1. 应用层存在敏感数据或敏感文件证据；
 2. 系统层存在同一 `agentsight.binding.id` 关联的敏感来源、出站网络去向和 `policy_decision` 证据链；
-3. 两层的非空 `agent.id` 和 `gen_ai.session.id` 相等；工具调用触发的暴露还要求非空 `gen_ai.tool.call.id` 相等；
+3. 两层的非空 `gen_ai.agent.type` 和 `gen_ai.session.id` 相等；工具调用触发的暴露还要求非空 `gen_ai.tool.call.id` 相等；若应用层也提供真实、稳定的 `agent.id`，则额外要求两层 `agent.id` 相等；
 4. 系统层出站事件不早于应用层证据，且不晚于应用层证据 120 秒。
 
 关联键缺失时，事件仍可作为安全证据检索，但不建议直接升级为高置信泄漏告警。`process.pid` 应与 `process.start_time` 组合使用，避免 PID 复用造成误关联；容器场景可再使用 `container.cgroup.id` 收窄范围。

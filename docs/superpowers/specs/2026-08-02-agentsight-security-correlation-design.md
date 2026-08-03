@@ -79,7 +79,8 @@ graph TD
 
 | AgentSight payload | LoongCollector log field | Required for strict match |
 |---|---|---|
-| `identity.agent_id` | `agent.id` | Yes |
+| `identity.agent_id` | `agent.id` | When application event has a stable agent ID |
+| `identity.agent_name` | `gen_ai.agent.type` | Yes |
 | `identity.session_id` | `gen_ai.session.id` | Yes |
 | `identity.conversation_id` | `gen_ai.conversation.id` | When application event has it |
 | `identity.conversation_id` | `gen_ai.turn.id` | Compatibility only |
@@ -103,7 +104,9 @@ following hold:
 2. The system evidence contains an AgentSight `policy_decision` and its linked
    source and sink events describe a sensitive source followed by an outbound
    network action.
-3. `agent.id` and `gen_ai.session.id` are non-empty and equal across layers.
+3. `gen_ai.agent.type` and `gen_ai.session.id` are non-empty and equal across
+   layers. If the application event also carries a real stable `agent.id`, it
+   must match as an additional narrowing predicate.
 4. For tool-originated exposure, `gen_ai.tool.call.id` is non-empty and equal.
 5. Application evidence time falls within the tool call, and the system sink
    occurs no earlier than the application evidence and no later than 120
