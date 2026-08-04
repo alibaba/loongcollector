@@ -30,7 +30,7 @@ dev
 |  ProbeConfig.LogPath  |  string  |  否  |  `""`  |  ebpf 日志的输出位置  |
 |  ProbeConfig.CmdlineWhitelist  |  array  |  否（**推荐填写**）  |  内置 9 条  |  进程 **agent 筛选白名单**。每一项为对象：`AgentType`（上报字段 `gen_ai.agent.type`）+ `Args`（字符串数组，与进程 cmdline 各参数（即 `argv`）按位置 glob 匹配）。**未配置**且 `CmdlineBlacklist` 也为空时注入「默认 `CmdlineWhitelist`」（见下文）；**填写后只使用用户规则**，不再叠加内置。空数组 `[]` 视为非法配置。  |
 |  ProbeConfig.CmdlineBlacklist  |  array  |  否  |  /  |  进程 **agent 筛选黑名单**，每项为 glob 字符串数组（无 `AgentType`）；**命中则排除**，不采集。**优先级高于白名单**。  |
-|  ProbeConfig.Https  |  array  |  否  |  内置 7 条  |  HTTPS 加密流量的域名白名单（字符串数组，glob 通配符 `*`，不区分大小写）。访问白名单内域名的进程可被识别为采集目标。未配置时注入默认列表，见下文。  |
+|  ProbeConfig.Https  |  array  |  否  |  内置 7 条  |  HTTPS 加密流量的域名白名单（字符串数组，glob 通配符 `*`，不区分大小写）。访问白名单内域名的进程可被识别为采集目标。未配置时注入默认列表，见下文。**注意本项只决定「哪些进程被纳入采集」，不限制已纳入进程的上报范围** —— 详见下文「采集范围」。  |
 |  ProbeConfig.Http  |  array  |  否  |  `[]`（关闭）  |  HTTP 明文流量的目标列表（字符串数组）。每项可为 `:端口`、`IP`、`IP:端口` 或域名（如 `model-svc.default.svc`、`*.internal.svc`）。**留空时不采集明文 HTTP 流量**。  |
 |  ProbeConfig.EventStreamFormat  |  bool  |  否  |  `true`  |  为 `true` 时，每次 LLM 调用在同一 `PipelineEventGroup` 内输出两条日志（各有 `event.id`）：`event.name=gen_ai.model.request`（请求开始时间戳）与 `gen_ai.model.response`（请求结束时间戳）。为 `false` 时输出单条合并日志，**无** `event.name` / `event.id`。  |
 |  ProbeConfig.MessageDeltaOnly  |  bool  |  否  |  `true`  |  为 `true` 时**不**输出全量 `gen_ai.input.messages`；仍输出 `gen_ai.input.messages_delta`、`gen_ai.system_instructions_hash` / `gen_ai.tool.definitions_hash`（非空时），以及 hash 相对上一轮变化时的 `gen_ai.system_instructions` / `gen_ai.tool.definitions`。为 `false` 时**每次**输出非空的全量 `gen_ai.input.messages`。**不影响** `gen_ai.output.messages`；`messages_delta` 及 session 状态维护**不受**本开关影响。  |
@@ -91,6 +91,19 @@ dev
 > 但请注意 **body 仍是原文**：部分厂商在请求体内传凭据，这类内容依然会落盘 —— 这是原始采集的固有性质。`http.response.header` 目前保留输出（含 `set-cookie` 时同样敏感），如需一并去掉可自行调整 `FillAgentsightHttpResponseLog`。
 >
 > 另外 body 可能仍带 **chunked 传输编码的框**（形如 `c3b\r\n...\r\n0\r\n\r\n`）：raw 路径转发的是未解码的缓冲，去框需要在 AgentSight（Rust）侧修复。
+
+#### 采集范围：`Https` 域名列表**不限制**上报范围
+
+容易误解的一点：`Https` 只决定**给哪些进程挂 SSL 探针**，不过滤上报内容。一旦某进程被纳入采集（无论是命中 `CmdlineWhitelist`、还是命中 `Https` 域名规则），它的**全部**无法解析为 LLM 语义的 HTTPS 流量都会产生 raw 事件，**与 `Https` 列表无关**。
+
+这是上游刻意的设计（`alibaba/anolisa#1665` 为此移除了按域名过滤上报的 `HttpReportFilter`）。实际后果：一个被纳入采集的进程，其遥测上报、健康检查、对象存储下载等全部非 LLM 流量都会被原文写出。
+
+因此收窄 `Https` 只减少「被 attach 的进程数」，**不减少已 attach 进程的上报范围**。真正能控制范围的是：
+
+- **`CmdlineBlacklist`** —— 排除不希望被采集的进程（优先级高于白名单）
+- **不开 `RawHttpsFallback`** —— LLM 调用本身走 `gen_ai.*`，raw 主要捞的是非 LLM 噪音
+
+在多用户共享的机器上尤其要注意：`Https` 里的域名一旦被别人的进程访问，那个进程也会被 attach，其全部流量随之落盘。
 
 ### `AgentType` 取值命名规范
 
