@@ -500,8 +500,14 @@ void FillAgentsightModelResponseLog(const AgentsightLlmRecord& rec,
 }
 
 /// Fields shared by the `http.request` / `http.response` pair of a raw HTTP exchange — the traffic
-/// AgentSight could not map onto GenAI semantics. No gen_ai.* field is set on either event because
-/// none of them could be resolved.
+/// AgentSight could not map onto GenAI semantics.
+///
+/// No `gen_ai.*` field is emitted here, by design: this event kind exists precisely because the
+/// payload carried no GenAI semantics, so putting anything in that namespace would misrepresent it.
+/// The agent type is therefore reported as plain `agent.type`, matching the unprefixed `pid` /
+/// `comm` / `cmdline` / `container.id` this path already uses. The gen_ai.* path keeps
+/// `gen_ai.agent.type` (see FillAgentsightCommonCorrelation) — the value is identical, only the key
+/// differs, so a downstream query spanning both streams has to coalesce the two names.
 void FillAgentsightHttpCommon(const AgentsightHttpsRecord& rec,
                               SetLogStrFn setStr,
                               logtail::LogEvent* log,
@@ -514,6 +520,9 @@ void FillAgentsightHttpCommon(const AgentsightHttpsRecord& rec,
         log->SetContent("pid", std::to_string(rec.mPid));
     }
     setStr(StringView("comm"), rec.mProcessName);
+    setStr(StringView("cmdline"), rec.mCmdline);
+    setStr(StringView("container.id"), rec.mContainerId);
+    setStr(StringView("agent.type"), rec.mAgentType);
     log->SetContent(StringView("url.scheme"), StringView("https"));
 }
 

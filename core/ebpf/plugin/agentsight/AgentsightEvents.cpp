@@ -80,6 +80,9 @@ AgentsightHttpsRecord::AgentsightHttpsRecord(std::string pipelineConfigName, con
     : CommonEvent(KernelEventType::AGENTSIGHT_HTTPS_RECORD), mPipelineConfigName(std::move(pipelineConfigName)) {
     mPid = d.pid;
     mProcessName = CopyProcessName(d.process_name);
+    mCmdline = CopyCmdline(d.cmdline);
+    mAgentType = CopyCStr(d.agent_name);
+    mContainerId = CopyCStr(d.container_id);
     mTimestampNs = d.timestamp_ns;
     mDurationNs = d.duration_ns;
     // agentsight.h: method / path are NUL-terminated C strings; the four payloads are (ptr, len).

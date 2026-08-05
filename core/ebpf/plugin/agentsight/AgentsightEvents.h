@@ -75,9 +75,12 @@ public:
 /// Emitted as an `http.request` / `http.response` pair sharing one `event.id` (request only when no
 /// response arrived, i.e. mStatusCode == 0).
 ///
-/// Deliberately narrower than AgentsightLlmRecord: AgentsightHttpsData carries no session id,
-/// conversation id, agent type or container id, so correlation is limited to (pid, comm). There is
-/// no request_url either — only method + path; the target host is inside mRequestHeaders.
+/// Narrower than AgentsightLlmRecord, but not by as much as it used to be: process attribution
+/// (cmdline / agent type / container id) is now carried too, resolved on the agentsight side from
+/// the pid with the same ladder the LLM path uses. Still absent are session id and conversation id —
+/// a raw event is by definition traffic that could not be mapped onto LLM semantics, so it has no
+/// session to belong to. There is no request_url either — only method + path; the target host is
+/// inside mRequestHeaders.
 class AgentsightHttpsRecord : public CommonEvent {
 public:
     AgentsightHttpsRecord(std::string pipelineConfigName, const AgentsightHttpsData& d);
@@ -90,6 +93,17 @@ public:
 
     int32_t mPid = 0;
     std::string mProcessName;
+    // Same semantics as the identically-named AgentsightLlmRecord members: cmdline is space-joined
+    // argv truncated to 127 bytes (empty once the process exits), mContainerId is empty outside a
+    // container, mAgentType is the config-matched agent name (lowercased by agentsight) and falls
+    // back to the process comm when no rule matches.
+    //
+    // mAgentType is emitted as `agent.type`, NOT `gen_ai.agent.type` — a raw event has no GenAI
+    // semantics, so it emits nothing in that namespace. Same value, different key; see
+    // FillAgentsightHttpCommon.
+    std::string mCmdline;
+    std::string mAgentType;
+    std::string mContainerId;
     uint64_t mTimestampNs = 0;
     uint64_t mDurationNs = 0;
     std::string mMethod;

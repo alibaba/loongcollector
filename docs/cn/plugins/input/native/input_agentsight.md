@@ -48,9 +48,18 @@ dev
 | --- | --- |
 | `event.name` | `http.request` 或 `http.response`，用于与 `gen_ai.*` 数据流区分 |
 | `event.id` | 同一次交换的两条日志取相同值（UUID），用于配对 |
-| `pid` / `comm` | 进程 ID 与进程名。**无** `gen_ai.session.id` / `gen_ai.turn.id` / `gen_ai.agent.type` / `container.id` —— 底层 `AgentsightHttpsData` 不携带这些字段，关联只能靠 `(pid, comm)` |
+| `pid` / `comm` | 进程 ID 与进程名 |
+| `cmdline` | 进程完整命令行（argv 以空格连接，截断到 127 字节）。进程已退出时为空，此时该字段不输出 |
+| `agent.type` | 命中 `CmdlineWhitelist` 的 agent 类型（小写）。未命中任何规则时回退为进程名 —— 与 `gen_ai.*` 日志同一套解析口径，**但键名不带 `gen_ai.` 前缀**，见下方说明 |
+| `container.id` | 从 `/proc/<pid>/cgroup` 解析的容器 ID；非容器进程为空，此时该字段不输出 |
 | `url.scheme` | 固定 `https` |
 | `time_unix_nano` / `observed_time_unix_nano` | 同 `gen_ai.*` 日志 |
+
+> **raw 日志不输出任何 `gen_ai.*` 字段。** 这类事件存在的前提就是「流量没能解析成 GenAI 语义」，往 `gen_ai.*` 命名空间里写东西会误导下游。因此 agent 类型用裸键名 `agent.type`，与本路径已有的 `pid` / `comm` / `cmdline` / `container.id` 保持一致。
+>
+> `gen_ai.*` 日志仍用 `gen_ai.agent.type`，**取值完全相同、仅键名不同**。所以跨两条数据流做聚合时，需要把 `agent.type` 和 `gen_ai.agent.type` 归并处理（例如 `agent.type` 为空则取 `gen_ai.agent.type`）。
+>
+> 也**没有** `gen_ai.session.id` / `gen_ai.turn.id` —— raw 事件本身不存在 session 归属，只能靠 `(pid, comm)` 与同进程的 LLM 事件关联。
 
 **`http.request` 独有**
 

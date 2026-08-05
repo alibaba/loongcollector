@@ -24,6 +24,7 @@ class AgentsightEventsUnittest : public testing::Test {
 public:
     void TestLlmRecordCopiesNonNullSizedBuffers();
     void TestLlmRecordCopiesProcessNameAndCmdline();
+    void TestHttpsRecordCopiesProcessMetadata();
 };
 
 void AgentsightEventsUnittest::TestLlmRecordCopiesNonNullSizedBuffers() {
@@ -77,7 +78,47 @@ void AgentsightEventsUnittest::TestLlmRecordCopiesProcessNameAndCmdline() {
     }
 }
 
+void AgentsightEventsUnittest::TestHttpsRecordCopiesProcessMetadata() {
+    // The raw path carries the same process attribution as the LLM path, with the same buffer
+    // shapes: process_name char[16], cmdline char[128], agent_name / container_id as C strings.
+    {
+        AgentsightHttpsData d{};
+        std::memcpy(d.process_name, "node", 4U);
+        std::memcpy(d.cmdline, "node /app/agent.js --serve", 26U);
+        static const char kAgent[] = "hermes";
+        static const char kCid[] = "abc123def456";
+        d.agent_name = kAgent;
+        d.container_id = kCid;
+
+        AgentsightHttpsRecord r("pipe-a", d);
+        APSARA_TEST_EQUAL(r.mProcessName, "node");
+        APSARA_TEST_EQUAL(r.mCmdline, "node /app/agent.js --serve");
+        APSARA_TEST_EQUAL(r.mAgentType, "hermes");
+        APSARA_TEST_EQUAL(r.mContainerId, "abc123def456");
+    }
+
+    // Exited process / non-container / no rule match: empty buffer and null pointers all map to
+    // empty strings, which FillAgentsightHttpCommon then skips instead of emitting blanks.
+    {
+        AgentsightHttpsData d{};
+        AgentsightHttpsRecord r("pipe-a", d);
+        APSARA_TEST_TRUE(r.mCmdline.empty());
+        APSARA_TEST_TRUE(r.mAgentType.empty());
+        APSARA_TEST_TRUE(r.mContainerId.empty());
+    }
+
+    // Non-NUL-terminated full buffer: the copy is bounded to the 128-byte buffer (strnlen), it does
+    // not scan past the struct.
+    {
+        AgentsightHttpsData d{};
+        std::memset(d.cmdline, 'x', sizeof(d.cmdline));
+        AgentsightHttpsRecord r("pipe-a", d);
+        APSARA_TEST_EQUAL(r.mCmdline.size(), sizeof(d.cmdline));
+    }
+}
+
 UNIT_TEST_CASE(AgentsightEventsUnittest, TestLlmRecordCopiesNonNullSizedBuffers)
 UNIT_TEST_CASE(AgentsightEventsUnittest, TestLlmRecordCopiesProcessNameAndCmdline)
+UNIT_TEST_CASE(AgentsightEventsUnittest, TestHttpsRecordCopiesProcessMetadata)
 
 UNIT_TEST_MAIN
