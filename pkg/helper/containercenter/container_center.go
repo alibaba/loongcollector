@@ -1189,6 +1189,13 @@ func (dc *ContainerCenter) mergeK8sInfo() {
 		if container.K8SInfo == nil {
 			continue
 		}
+		// Skip containers marked for removal: on an in-place pod rebuild the old
+		// container lingers here until it times out, and its already-enriched
+		// (now stale) labels would otherwise pollute the merge group for the same
+		// namespace@pod and leak back onto the freshly created containers.
+		if container.deleteFlag {
+			continue
+		}
 		key := container.K8SInfo.Namespace + "@" + container.K8SInfo.Pod
 		k8sInfoMap[key] = append(k8sInfoMap[key], container.K8SInfo)
 	}
