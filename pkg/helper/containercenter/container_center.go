@@ -28,7 +28,6 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
-	"unsafe"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/events"
@@ -186,54 +185,46 @@ func (info *K8SInfo) ExtractK8sLabels(containerInfo container.InspectResponse) {
 }
 
 func (info *K8SInfo) Merge(o *K8SInfo) {
-	if info == nil || o == nil {
+	// Guard against nil and self-merge: locking the same mutex twice would deadlock,
+	// and merging an object with itself is a no-op anyway.
+	if info == nil || o == nil || info == o {
 		return
 	}
-	// Lock in a fixed address order so concurrent Merge(A,B) vs Merge(B,A) cannot deadlock.
-	if uintptr(unsafe.Pointer(info)) < uintptr(unsafe.Pointer(o)) {
-		info.mu.Lock()
-		o.mu.Lock()
-		defer o.mu.Unlock()
-		defer info.mu.Unlock()
-	} else {
-		o.mu.Lock()
-		info.mu.Lock()
-		defer info.mu.Unlock()
-		defer o.mu.Unlock()
-	}
+	// Both call sites (mergeK8sInfo / updateContainer) run under ContainerCenter.lock,
+	// so two Merge calls never race; a simple fixed lock order is enough here.
+	info.mu.Lock()
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	defer info.mu.Unlock()
 
 	inLen := len(info.Labels)
 	outLen := len(o.Labels)
 	if inLen == 0 && outLen == 0 {
 		return
 	}
-	if inLen == 0 {
-		info.Labels = o.Labels
-		info.matchedCache = nil
-		o.matchedCache = nil
-		return
-	}
-	if outLen == 0 {
-		o.Labels = info.Labels
-		info.matchedCache = nil
-		o.matchedCache = nil
-		return
-	}
 
-	// Union by keys: prefer info's values on overlap, add keys only present on o.
-	// Picking solely by len(Labels) drops keys that exist only on the smaller map
-	// (e.g. ExternalK8sLabelTag would miss those labels).
+	// Union by keys so we never drop labels that exist only on the smaller map.
+	// Picking solely by len(Labels) (the previous behavior) loses keys unique to
+	// one side, e.g. per-container labels added by wrapperK8sInfoByLabels /
+	// ExtractK8sLabels. info's values win on overlap.
 	merged := make(map[string]string, inLen+outLen)
+	for k, v := range o.Labels {
+		merged[k] = v
+	}
 	for k, v := range info.Labels {
 		merged[k] = v
 	}
-	for k, v := range o.Labels {
-		if _, exists := merged[k]; !exists {
-			merged[k] = v
-		}
+
+	// Give each side its own copy. Sharing one map would alias the two K8SInfo
+	// objects, so a later Labels[k]=v write on one container would leak into the
+	// other (see cri_adapter.go wrapperK8sInfoByLabels).
+	infoLabels := merged
+	oLabels := make(map[string]string, len(merged))
+	for k, v := range merged {
+		oLabels[k] = v
 	}
-	info.Labels = merged
-	o.Labels = merged
+	info.Labels = infoLabels
+	o.Labels = oLabels
 	info.matchedCache = nil
 	o.matchedCache = nil
 }
