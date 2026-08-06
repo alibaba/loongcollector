@@ -882,6 +882,18 @@ func (dc *ContainerCenter) readStaticConfig(forceFlush bool) {
 		forceFlush = true
 	}
 
+	// Mark removed containers before rebuilding the map so their deleteFlag is set
+	// prior to mergeK8sInfo. On an in-place pod rebuild the old business container
+	// (its id changed) is carried over by updateContainers until it times out; if it
+	// is still unflagged during the merge, its stale, already-enriched labels get
+	// pulled into the same namespace@pod group and leak back onto the fresh
+	// containers. Flagging first lets mergeK8sInfo skip it.
+	if len(removedIDs) > 0 {
+		for _, id := range removedIDs {
+			containerCenterInstance.markRemove(id)
+		}
+	}
+
 	// 静态文件读取容器信息的时候，只能全量读取，因此使用updateContainers全量更新
 	if forceFlush || changed {
 		containerMap := make(map[string]*DockerInfoDetail)
@@ -890,12 +902,6 @@ func (dc *ContainerCenter) readStaticConfig(forceFlush bool) {
 			containerMap[info.ID] = dockerInfoDetail
 		}
 		containerCenterInstance.updateContainers(containerMap)
-	}
-
-	if len(removedIDs) > 0 {
-		for _, id := range removedIDs {
-			containerCenterInstance.markRemove(id)
-		}
 	}
 }
 
