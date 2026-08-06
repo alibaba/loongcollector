@@ -137,9 +137,8 @@ std::string ExtractHostFromHeadersJson(const std::string& headersJson) {
             continue;
         }
         std::string name(it->name.GetString(), it->name.GetStringLength());
-        std::transform(name.begin(), name.end(), name.begin(), [](unsigned char c) {
-            return static_cast<char>(std::tolower(c));
-        });
+        std::transform(
+            name.begin(), name.end(), name.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
         if (name == "host" || name == ":authority") {
             return std::string(it->value.GetString(), it->value.GetStringLength());
         }
@@ -976,8 +975,8 @@ int AgentsightManager::HandleHttpsEvent(const AgentsightHttpsRecord* rec) {
             ADD_COUNTER(mPushLogFailedTotal, 1);
         }
         LOG_WARNING(sLogger,
-                    ("Agentsight raw HTTP push queue failed", "")("config", rec->GetPipelineConfigName())(
-                        "pluginIdx", pluginIndex));
+                    ("Agentsight raw HTTP push queue failed", "")("config", rec->GetPipelineConfigName())("pluginIdx",
+                                                                                                          pluginIndex));
     }
     return 0;
 }

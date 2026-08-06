@@ -753,8 +753,7 @@ bool SecurityOptions::Init(SecurityProbeType probeType,
                     }
                 }
                 if (innerConfig.isMember("RawHttpsFallback")) {
-                    if (!GetOptionalBoolParam(
-                            innerConfig, "RawHttpsFallback", mAgentsightRawHttpsFallback, errorMsg)) {
+                    if (!GetOptionalBoolParam(innerConfig, "RawHttpsFallback", mAgentsightRawHttpsFallback, errorMsg)) {
                         warnOptionalParse();
                     }
                 }
