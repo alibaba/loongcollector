@@ -14,6 +14,8 @@
 
 #include <cstring>
 
+#include <string>
+
 #include "agentsight.h"
 #include "ebpf/plugin/agentsight/AgentsightEvents.h"
 #include "unittest/Unittest.h"
@@ -25,6 +27,7 @@ public:
     void TestLlmRecordCopiesNonNullSizedBuffers();
     void TestLlmRecordCopiesProcessNameAndCmdline();
     void TestHttpsRecordCopiesProcessMetadata();
+    void TestHttpsRecordCopiesPayloadsAndIdentity();
 };
 
 void AgentsightEventsUnittest::TestLlmRecordCopiesNonNullSizedBuffers() {
@@ -117,8 +120,51 @@ void AgentsightEventsUnittest::TestHttpsRecordCopiesProcessMetadata() {
     }
 }
 
+void AgentsightEventsUnittest::TestHttpsRecordCopiesPayloadsAndIdentity() {
+    // The four payloads are (ptr, len) pairs, not C strings: they are copied by length so embedded
+    // NULs survive instead of truncating the body.
+    static const char kReqHeaders[] = R"({"host":"api.example.com"})";
+    static const char kReqBody[] = {'a', '\0', 'b'};
+    static const char kResHeaders[] = R"({"content-type":"application/json"})";
+    static const char kResBody[] = {'c', '\0', 'd', 'e'};
+
+    AgentsightHttpsData d{};
+    d.pid = 4242;
+    d.timestamp_ns = 1234567890ULL;
+    d.duration_ns = 5000ULL;
+    d.method = "POST";
+    d.path = "/v1/unknown";
+    d.status_code = 503;
+    d.is_sse = 1;
+    d.request_headers = kReqHeaders;
+    d.request_headers_len = sizeof(kReqHeaders) - 1;
+    d.request_body = kReqBody;
+    d.request_body_len = sizeof(kReqBody);
+    d.response_headers = kResHeaders;
+    d.response_headers_len = sizeof(kResHeaders) - 1;
+    d.response_body = kResBody;
+    d.response_body_len = sizeof(kResBody);
+
+    AgentsightHttpsRecord r("pipe-raw", d);
+    APSARA_TEST_EQUAL(PluginType::AGENTSIGHT_OBSERVE, r.GetPluginType());
+    APSARA_TEST_EQUAL(KernelEventType::AGENTSIGHT_HTTPS_RECORD, r.GetKernelEventType());
+    APSARA_TEST_EQUAL("pipe-raw", r.GetPipelineConfigName());
+    APSARA_TEST_EQUAL(4242, r.mPid);
+    APSARA_TEST_EQUAL(1234567890ULL, r.mTimestampNs);
+    APSARA_TEST_EQUAL(5000ULL, r.mDurationNs);
+    APSARA_TEST_EQUAL("POST", r.mMethod);
+    APSARA_TEST_EQUAL("/v1/unknown", r.mPath);
+    APSARA_TEST_EQUAL(503, r.mStatusCode);
+    APSARA_TEST_EQUAL(1, r.mIsSse);
+    APSARA_TEST_EQUAL(kReqHeaders, r.mRequestHeaders);
+    APSARA_TEST_EQUAL(std::string(kReqBody, sizeof(kReqBody)), r.mRequestBody);
+    APSARA_TEST_EQUAL(kResHeaders, r.mResponseHeaders);
+    APSARA_TEST_EQUAL(std::string(kResBody, sizeof(kResBody)), r.mResponseBody);
+}
+
 UNIT_TEST_CASE(AgentsightEventsUnittest, TestLlmRecordCopiesNonNullSizedBuffers)
 UNIT_TEST_CASE(AgentsightEventsUnittest, TestLlmRecordCopiesProcessNameAndCmdline)
 UNIT_TEST_CASE(AgentsightEventsUnittest, TestHttpsRecordCopiesProcessMetadata)
+UNIT_TEST_CASE(AgentsightEventsUnittest, TestHttpsRecordCopiesPayloadsAndIdentity)
 
 UNIT_TEST_MAIN

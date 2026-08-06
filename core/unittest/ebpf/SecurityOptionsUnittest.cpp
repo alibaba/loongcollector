@@ -36,6 +36,7 @@ public:
     void TestAgentsightProbeConfigHttpsHttpInvalidTypes();
     void TestAgentsightEventStreamFormatParse();
     void TestAgentsightMessageDeltaOnlyDefaultAndParse();
+    void TestAgentsightRawHttpsFallbackDefaultAndParse();
 };
 
 void SecurityOptionsUnittest::TestAgentsightNoProbeConfigFallsBackToBuiltin() {
@@ -243,6 +244,37 @@ void SecurityOptionsUnittest::TestAgentsightEventStreamFormatParse() {
     APSARA_TEST_TRUE(opt.mAgentsightEventStreamFormat);
 }
 
+void SecurityOptionsUnittest::TestAgentsightRawHttpsFallbackDefaultAndParse() {
+    CollectionPipelineContext ctx;
+    ctx.SetConfigName("cfg1");
+    Json::Value config;
+    std::string err;
+    SecurityOptions opt;
+
+    // Off by default: the raw path reports unredacted request/response bytes, so it must never be
+    // enabled implicitly. Absent ProbeConfig and empty ProbeConfig both have to land on false.
+    APSARA_TEST_TRUE(opt.Init(SecurityProbeType::AGENTSIGHT_OBSERVE, config, &ctx, "input_agentsight"));
+    APSARA_TEST_FALSE(opt.mAgentsightRawHttpsFallback);
+
+    APSARA_TEST_TRUE(ParseJsonTable(R"({"ProbeConfig":{}})", config, err));
+    APSARA_TEST_TRUE(opt.Init(SecurityProbeType::AGENTSIGHT_OBSERVE, config, &ctx, "input_agentsight"));
+    APSARA_TEST_FALSE(opt.mAgentsightRawHttpsFallback);
+
+    APSARA_TEST_TRUE(ParseJsonTable(R"({"ProbeConfig":{"RawHttpsFallback":true}})", config, err));
+    APSARA_TEST_TRUE(opt.Init(SecurityProbeType::AGENTSIGHT_OBSERVE, config, &ctx, "input_agentsight"));
+    APSARA_TEST_TRUE(opt.mAgentsightRawHttpsFallback);
+
+    // Init resets to the default before parsing, so an explicit false after a true actually sticks.
+    APSARA_TEST_TRUE(ParseJsonTable(R"({"ProbeConfig":{"RawHttpsFallback":false}})", config, err));
+    APSARA_TEST_TRUE(opt.Init(SecurityProbeType::AGENTSIGHT_OBSERVE, config, &ctx, "input_agentsight"));
+    APSARA_TEST_FALSE(opt.mAgentsightRawHttpsFallback);
+
+    // Wrong type warns and keeps the safe default rather than failing the whole config.
+    APSARA_TEST_TRUE(ParseJsonTable(R"({"ProbeConfig":{"RawHttpsFallback":"true"}})", config, err));
+    APSARA_TEST_TRUE(opt.Init(SecurityProbeType::AGENTSIGHT_OBSERVE, config, &ctx, "input_agentsight"));
+    APSARA_TEST_FALSE(opt.mAgentsightRawHttpsFallback);
+}
+
 UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightNoProbeConfigFallsBackToBuiltin)
 UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightProbeConfigWrongTypeFallsBackToBuiltin)
 UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightProbeConfigParsesOptionalFields)
@@ -257,5 +289,6 @@ UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightProbeConfigParsesHttpsAndH
 UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightProbeConfigHttpsHttpInvalidTypes)
 UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightEventStreamFormatParse)
 UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightMessageDeltaOnlyDefaultAndParse)
+UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightRawHttpsFallbackDefaultAndParse)
 
 UNIT_TEST_MAIN
