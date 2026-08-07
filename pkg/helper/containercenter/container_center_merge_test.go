@@ -15,9 +15,14 @@
 package containercenter
 
 import (
+	"os"
+	"path/filepath"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/alibaba/ilogtail/pkg/helper"
 )
 
 func TestK8SInfoMerge(t *testing.T) {
@@ -148,3 +153,139 @@ func TestMergeK8sInfoSkipsDeletedContainer(t *testing.T) {
 	// The deleted container is untouched and never contributes its stale labels.
 	require.Equal(t, map[string]string{"test1": "old1", "test2": "old2", "test3": "old3"}, stale.K8SInfo.Labels)
 }
+
+// resetStaticContainerGlobals clears the package-level state used by the static
+// container provider so a test can drive readStaticConfig deterministically
+// without interference from other tests.
+func resetStaticContainerGlobals() {
+	loadStaticContainerOnce = sync.Once{}
+	staticDockerContainerFile = ""
+	staticDockerContainers = nil
+	staticDockerContainerLastStat = helper.StateOS{}
+	staticDockerContainerLastBody = ""
+	staticDockerContainerError = nil
+}
+
+// TestReadStaticConfigRefreshesLabelsOnPodRebuild is the end-to-end regression for
+// the production bug: with static container discovery, when a pod is rebuilt in
+// place (business container gets a new id, pause keeps the pod-uid id) and the pod
+// labels change, the freshly created business container must be enriched with the
+// NEW label values, not the stale ones carried by the lingering old container.
+//
+// This exercises the real readStaticConfig ordering (markRemove before
+// updateContainers/mergeK8sInfo). It is file-driven only: "changing the container
+// id" is just editing container.json, so no real container runtime is needed.
+func TestReadStaticConfigRefreshesLabelsOnPodRebuild(t *testing.T) {
+	resetContainerCenter()
+	resetStaticContainerGlobals()
+
+	file := filepath.Join(t.TempDir(), "container.json")
+	os.Setenv(staticContainerInfoPathEnvKey, file)
+	defer os.Unsetenv(staticContainerInfoPathEnvKey)
+	defer resetStaticContainerGlobals()
+
+	// readStaticConfig uses the package-global containerCenterInstance; set it up
+	// directly instead of getContainerCenterInstance() to avoid its background
+	// discovery goroutine (which would race with our synchronous calls).
+	containerCenterInstance = &ContainerCenter{
+		containerHelper: &ContainerHelperWrapper{},
+		imageCache:      make(map[string]string),
+		containerMap:    make(map[string]*DockerInfoDetail),
+	}
+
+	// v1: pause(id=uid) with test1..test3 + business sandbox(id=8131), no labels.
+	require.NoError(t, os.WriteFile(file, []byte(staticRebuildConfigV1), os.ModePerm))
+	containerCenterInstance.readStaticConfig(true)
+
+	oldSandbox := containerCenterInstance.containerMap["8131"]
+	require.NotNil(t, oldSandbox)
+	require.Equal(t, "111111", oldSandbox.K8SInfo.GetLabel("test1"), "v1: business enriched from pause")
+	require.Equal(t, "311111", oldSandbox.K8SInfo.GetLabel("test3"))
+
+	// Rebuild: change pause label values (test3 removed) and give the business
+	// container a NEW id. Remove+rewrite so the file gets a new inode and the
+	// change is detected reliably.
+	require.NoError(t, os.Remove(file))
+	require.NoError(t, os.WriteFile(file, []byte(staticRebuildConfigV2), os.ModePerm))
+	containerCenterInstance.readStaticConfig(true)
+
+	newSandbox := containerCenterInstance.containerMap["3b59"]
+	require.NotNil(t, newSandbox, "new business container must be present")
+	require.Equal(t, "111112", newSandbox.K8SInfo.GetLabel("test1"), "rebuilt business must get the NEW value, not stale 111111")
+	require.Equal(t, "211112", newSandbox.K8SInfo.GetLabel("test2"))
+	require.Empty(t, newSandbox.K8SInfo.GetLabel("test3"), "removed label must not linger")
+
+	// The old business container is flagged for removal and must not be a live source.
+	if old := containerCenterInstance.containerMap["8131"]; old != nil {
+		require.True(t, old.deleteFlag, "old business container should be marked removed")
+	}
+}
+
+const staticRebuildConfigV1 = `[
+	{
+		"ID": "uid",
+		"Name": "POD",
+		"Image": "pause:latest",
+		"LogPath": "/var/log/pods/default_code-interpreter5_uid",
+		"Labels": {
+			"io.kubernetes.pod.name": "code-interpreter5",
+			"io.kubernetes.pod.namespace": "default",
+			"io.kubernetes.pod.uid": "uid",
+			"test1": "111111",
+			"test2": "211111",
+			"test3": "311111"
+		},
+		"LogType": "json-file",
+		"Created": "2026-08-06T19:41:32.228133866+08:00",
+		"State": { "Pid": 999999999901, "Status": "running" }
+	},
+	{
+		"ID": "8131",
+		"Name": "sandbox",
+		"Image": "alinux3:latest",
+		"LogPath": "/var/log/pods/default_code-interpreter5_uid/sandbox/1.log",
+		"Labels": {
+			"io.kubernetes.container.name": "sandbox",
+			"io.kubernetes.pod.name": "code-interpreter5",
+			"io.kubernetes.pod.namespace": "default",
+			"io.kubernetes.pod.uid": "uid"
+		},
+		"LogType": "json-file",
+		"Created": "2026-08-06T19:41:32.228133866+08:00",
+		"State": { "Pid": 999999999902, "Status": "running" }
+	}
+]`
+
+const staticRebuildConfigV2 = `[
+	{
+		"ID": "uid",
+		"Name": "POD",
+		"Image": "pause:latest",
+		"LogPath": "/var/log/pods/default_code-interpreter5_uid",
+		"Labels": {
+			"io.kubernetes.pod.name": "code-interpreter5",
+			"io.kubernetes.pod.namespace": "default",
+			"io.kubernetes.pod.uid": "uid",
+			"test1": "111112",
+			"test2": "211112"
+		},
+		"LogType": "json-file",
+		"Created": "2026-08-06T19:41:32.228133866+08:00",
+		"State": { "Pid": 999999999901, "Status": "running" }
+	},
+	{
+		"ID": "3b59",
+		"Name": "sandbox",
+		"Image": "alinux3:x86-3.220822.1",
+		"LogPath": "/var/log/pods/default_code-interpreter5_uid/sandbox/2.log",
+		"Labels": {
+			"io.kubernetes.container.name": "sandbox",
+			"io.kubernetes.pod.name": "code-interpreter5",
+			"io.kubernetes.pod.namespace": "default",
+			"io.kubernetes.pod.uid": "uid"
+		},
+		"LogType": "json-file",
+		"Created": "2026-08-06T19:55:44.506191037+08:00",
+		"State": { "Pid": 999999999903, "Status": "running" }
+	}
+]`
