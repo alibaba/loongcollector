@@ -321,8 +321,9 @@ public:
         gFakeAgentSightEventFd = static_cast<int>(::eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC));
         APSARA_TEST_TRUE(gFakeAgentSightEventFd >= 0);
         gForceInvalidAgentSightEventFd = false;
-        mAgentSightAdapter = std::make_shared<AgentSightTestEBPFAdapter>();
-        mAgentSightAdapter->setAgentSightSymbols(makeFullSymbolTable());
+        // Reset the fake library's globals before building the symbol table: makeFullSymbolTable()
+        // reads g_ut_omit_raw_https_symbol, so a table built first would inherit the previous test's
+        // value and silently drop config_set_enable_raw_https.
         gRead = decltype(gRead){};
         gRead.start_ret = 0;
         g_config_new_null = false;
@@ -334,6 +335,8 @@ public:
         g_ut_raw_https_last_enabled = -1;
         g_ut_omit_raw_https_symbol = false;
         g_ut_last_read_had_https_cb = false;
+        mAgentSightAdapter = std::make_shared<AgentSightTestEBPFAdapter>();
+        mAgentSightAdapter->setAgentSightSymbols(makeFullSymbolTable());
         auto& o = agentsightOptions();
         o.mAgentsightCmdlineWhitelist.clear();
         o.mAgentsightCmdlineBlacklist.clear();
