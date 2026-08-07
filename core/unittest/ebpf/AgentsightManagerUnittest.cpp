@@ -386,6 +386,7 @@ public:
     void TestSecurityAuditUsesReadV2AndEnqueuesSecurityRecord();
     void TestSecurityAuditFallsBackWhenV2SymbolsAreMissing();
     void TestSecurityEventProducesSearchableLog();
+    void TestSecurityFileActionPreservesProductClassification();
     void TestLlmResponseProducesCrossLayerCorrelationIdentity();
     void TestSecurityEventOmitsInvalidCorrelationIdentity();
     void TestMalformedSecurityEventPreservesEnvelope();
@@ -743,7 +744,7 @@ void AgentsightManagerUnittest::TestSecurityAuditFallsBackWhenV2SymbolsAreMissin
 void AgentsightManagerUnittest::TestSecurityEventProducesSearchableLog() {
     static const std::string kConfigName = "security-log-pipeline";
     static const std::string kPayload
-        = R"({"event_id":"00000000-0000-0000-0000-000000000001","observed_at_ns":8,"identity":{"binding_id":"10000000-0000-0000-0000-000000000001","agent_id":"agent-1","agent_name":"claude","session_id":"session-1","conversation_id":"conversation-1","tool_call_id":"tool-call-1","pid":2147483648,"process_start_time":101,"ppid":4294967295,"cgroup_id":9001},"event_type":"policy_decision","event":{"policy_id":"credential-exfiltration","policy_revision":3,"mode":"audit","risk_score":85,"large_counter":9223372036854775808,"blocked":true,"confidence":0.75,"details":{"source":"unit-test"}}})";
+        = R"({"event_id":"00000000-0000-0000-0000-000000000001","observed_at_ns":8,"identity":{"binding_id":"10000000-0000-0000-0000-000000000001","agent_id":"agent-1","agent_name":"claude","session_id":"session-1","conversation_id":"conversation-1","tool_call_id":"tool-call-1","pid":2147483648,"process_start_time":101,"ppid":4294967295,"cgroup_id":9001},"event_type":"policy_decision","event":{"policy_id":"agentloop-sensitive-data-outbound","policy_revision":4,"rule_id":"cloud-credential-to-public-network","mode":"audit","risk_score":85,"large_counter":9223372036854775808,"blocked":true,"confidence":0.75,"details":{"source":"unit-test"}}})";
 
     auto mgr = makeManager();
     registerConfigWithQueue(*mgr, kConfigName.c_str());
@@ -777,8 +778,9 @@ void AgentsightManagerUnittest::TestSecurityEventProducesSearchableLog() {
     APSARA_TEST_EQUAL("9001", log.GetContent("container.cgroup.id").to_string());
     APSARA_TEST_EQUAL("10000000-0000-0000-0000-000000000001", log.GetContent("agentsight.binding.id").to_string());
     APSARA_TEST_EQUAL("agent-1", log.GetContent("agentsight.identity.agent_id").to_string());
-    APSARA_TEST_EQUAL("credential-exfiltration", log.GetContent("security.policy_id").to_string());
-    APSARA_TEST_EQUAL("3", log.GetContent("security.policy_revision").to_string());
+    APSARA_TEST_EQUAL("agentloop-sensitive-data-outbound", log.GetContent("security.policy_id").to_string());
+    APSARA_TEST_EQUAL("4", log.GetContent("security.policy_revision").to_string());
+    APSARA_TEST_EQUAL("cloud-credential-to-public-network", log.GetContent("security.rule_id").to_string());
     APSARA_TEST_EQUAL("audit", log.GetContent("security.mode").to_string());
     APSARA_TEST_EQUAL("85", log.GetContent("security.risk_score").to_string());
     APSARA_TEST_EQUAL("9223372036854775808", log.GetContent("security.large_counter").to_string());
@@ -787,6 +789,27 @@ void AgentsightManagerUnittest::TestSecurityEventProducesSearchableLog() {
     APSARA_TEST_EQUAL("unit-test", log.GetContent("security.details.source").to_string());
     APSARA_TEST_EQUAL(kPayload, log.GetContent("event.original").to_string());
 
+    mgr->Destroy();
+}
+
+void AgentsightManagerUnittest::TestSecurityFileActionPreservesProductClassification() {
+    static const std::string kConfigName = "security-file-action-pipeline";
+    static const std::string kPayload
+        = R"({"event_id":"00000000-0000-0000-0000-000000000002","occurred_at_ns":9,"observed_at_ns":10,"identity":{"agent_id":"agent-1","session_id":"session-1","pid":42,"process_start_time":101},"event_type":"file_action","event":{"policy_id":"agentloop-sensitive-data-outbound","policy_revision":4,"rule_id":"cloud-credential-to-public-network","operation":"read","path":"~/.aws/credentials","resource_class":"secret.cloud_access_key","succeeded":true}})";
+
+    auto mgr = makeManager();
+    registerConfigWithQueue(*mgr, kConfigName.c_str());
+    APSARA_TEST_EQUAL(0, mgr->HandleEvent(std::make_shared<AgentsightSecurityRecord>(kConfigName, 9U, 1U, kPayload)));
+
+    std::unique_ptr<ProcessQueueItem> item;
+    std::string configName;
+    APSARA_TEST_TRUE(ProcessQueueManager::GetInstance()->PopItem(0, item, configName));
+    const auto& log = item->mEventGroup.GetEvents().at(0).Cast<LogEvent>();
+    APSARA_TEST_EQUAL("agentsight.security.file_action", log.GetContent("event.name").to_string());
+    APSARA_TEST_EQUAL("agentloop-sensitive-data-outbound", log.GetContent("security.policy_id").to_string());
+    APSARA_TEST_EQUAL("4", log.GetContent("security.policy_revision").to_string());
+    APSARA_TEST_EQUAL("cloud-credential-to-public-network", log.GetContent("security.rule_id").to_string());
+    APSARA_TEST_EQUAL("secret.cloud_access_key", log.GetContent("security.resource_class").to_string());
     mgr->Destroy();
 }
 
@@ -902,6 +925,7 @@ UNIT_TEST_CASE(AgentsightManagerUnittest, TestSessionInputCacheLruEviction);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestSecurityAuditUsesReadV2AndEnqueuesSecurityRecord);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestSecurityAuditFallsBackWhenV2SymbolsAreMissing);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestSecurityEventProducesSearchableLog);
+UNIT_TEST_CASE(AgentsightManagerUnittest, TestSecurityFileActionPreservesProductClassification);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestLlmResponseProducesCrossLayerCorrelationIdentity);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestSecurityEventOmitsInvalidCorrelationIdentity);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestMalformedSecurityEventPreservesEnvelope);
