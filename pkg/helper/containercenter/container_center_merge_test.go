@@ -178,11 +178,14 @@ func resetStaticContainerGlobals() {
 func TestReadStaticConfigRefreshesLabelsOnPodRebuild(t *testing.T) {
 	resetContainerCenter()
 	resetStaticContainerGlobals()
+	// Always restore the package-level globals we mutate below, so this test can't
+	// contaminate other tests in the package (order-dependent flakiness).
+	t.Cleanup(resetContainerCenter)
+	t.Cleanup(resetStaticContainerGlobals)
 
 	file := filepath.Join(t.TempDir(), "container.json")
 	os.Setenv(staticContainerInfoPathEnvKey, file)
-	defer os.Unsetenv(staticContainerInfoPathEnvKey)
-	defer resetStaticContainerGlobals()
+	t.Cleanup(func() { os.Unsetenv(staticContainerInfoPathEnvKey) })
 
 	// readStaticConfig uses the package-global containerCenterInstance; set it up
 	// directly instead of getContainerCenterInstance() to avoid its background
