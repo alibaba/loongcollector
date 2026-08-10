@@ -120,10 +120,12 @@ void CurlUnittest::TestSkipInterfaceBindForLoopback() {
         return code == CURLE_INTERFACE_FAILED;
     };
 
-    // loopback endpoints: binding skipped, must not fail with CURLE_INTERFACE_FAILED
+    // loopback endpoints: binding skipped, must not fail with CURLE_INTERFACE_FAILED.
+    // IPv6 needs the bracketed form: the endpoint is concatenated into the URL verbatim, and a
+    // bare "::1" yields a malformed URL that fails before interface binding is ever attempted.
     APSARA_TEST_FALSE(performAndCheckInterfaceApplied("127.0.0.1"));
     APSARA_TEST_FALSE(performAndCheckInterfaceApplied("localhost"));
-    APSARA_TEST_FALSE(performAndCheckInterfaceApplied("::1"));
+    APSARA_TEST_FALSE(performAndCheckInterfaceApplied("[::1]"));
 
     // non-loopback endpoint: binding applied, fails on the nonexistent interface
     APSARA_TEST_TRUE(performAndCheckInterfaceApplied("192.0.2.1"));
