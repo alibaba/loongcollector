@@ -30,6 +30,7 @@
 
 #include "app_config/AppConfig.h"
 #include "common/Flags.h"
+#include "common/MachineInfoUtil.h"
 #include "common/StringTools.h"
 #include "common/http/HttpRequest.h"
 #include "common/http/HttpResponse.h"
@@ -185,10 +186,6 @@ static size_t socket_write_callback(void* socketData, curl_socket_t fd, curlsock
         setsockopt(fd, IPPROTO_IP, IP_TOS, (const char*)&(socket->mTOS.value()), sizeof(socket->mTOS.value()));
     }
     return 0;
-}
-
-static bool IsLoopbackAddress(const string& host) {
-    return host == "localhost" || host == "::1" || host == "[::1]" || StartWith(host, "127.");
 }
 
 CURL* CreateCurlHandler(const string& method,

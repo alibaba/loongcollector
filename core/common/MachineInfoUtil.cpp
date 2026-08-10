@@ -529,6 +529,19 @@ bool IsDigitsDotsHostname(const char* hostname) {
     return false;
 }
 
+bool IsLoopbackAddress(const std::string& host) {
+    if (host.empty()) {
+        return false;
+    }
+    // Accept the URL-style bracketed IPv6 form, e.g. "[::1]".
+    std::string normalized = host;
+    if (normalized.size() >= 2 && normalized.front() == '[' && normalized.back() == ']') {
+        normalized = normalized.substr(1, normalized.size() - 2);
+    }
+    normalized = ToLowerCaseString(normalized);
+    return StartWith(normalized, "127.") || normalized == "::1" || normalized == "localhost";
+}
+
 InstanceIdentity::InstanceIdentity() {
     mEntity.getWriteBuffer().SetHostID({STRING_FLAG(agent_host_id), Hostid::Type::CUSTOM});
     mEntity.swap();

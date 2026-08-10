@@ -25,7 +25,7 @@
 
 #include "ScrapeScheduler.h"
 #include "common/JsonUtil.h"
-#include "common/StringTools.h"
+#include "common/MachineInfoUtil.h"
 #include "common/http/HttpResponse.h"
 #include "monitor/Monitor.h"
 #include "prometheus/Constants.h"
@@ -384,13 +384,17 @@ void TargetSubscriberSchedulerUnittest::TestBuildHostOnlyScrapeSchedulerGroupHos
     LoongCollectorMonitor::mIpAddr = "192.168.1.10";
     APSARA_TEST_EQUAL("192.168.1.10", buildAndGetHostIp());
 
-    // case 2: loopback mIpAddr triggers fallback, never reports 127.*
+    // case 2: IPv4 loopback mIpAddr triggers fallback, never reports a loopback address
     LoongCollectorMonitor::mIpAddr = "127.0.0.1";
-    APSARA_TEST_FALSE(StartWith(buildAndGetHostIp(), "127."));
+    APSARA_TEST_FALSE(IsLoopbackAddress(buildAndGetHostIp()));
 
-    // case 3: empty mIpAddr triggers fallback, never reports 127.*
+    // case 3: IPv6 loopback mIpAddr triggers fallback too
+    LoongCollectorMonitor::mIpAddr = "::1";
+    APSARA_TEST_FALSE(IsLoopbackAddress(buildAndGetHostIp()));
+
+    // case 4: empty mIpAddr triggers fallback, never reports a loopback address
     LoongCollectorMonitor::mIpAddr.clear();
-    APSARA_TEST_FALSE(StartWith(buildAndGetHostIp(), "127."));
+    APSARA_TEST_FALSE(IsLoopbackAddress(buildAndGetHostIp()));
 
     LoongCollectorMonitor::mIpAddr = savedIpAddr;
 }

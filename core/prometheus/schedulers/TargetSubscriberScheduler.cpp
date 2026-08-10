@@ -180,10 +180,10 @@ void TargetSubscriberScheduler::BuildHostOnlyScrapeSchedulerGroup(std::vector<Pr
             const auto* entity = InstanceIdentity::Instance()->GetEntity();
             targetInfo.mLabels.Set(prometheus::HOST_HOSTNAME, GetHostName());
             std::string hostIp = LoongCollectorMonitor::mIpAddr;
-            if (hostIp.empty() || StartWith(hostIp, "127.")) {
+            if (hostIp.empty() || IsLoopbackAddress(hostIp)) {
                 hostIp = GetHostIp(AppConfig::GetInstance()->GetBindInterface());
             }
-            if (hostIp.empty() || StartWith(hostIp, "127.")) {
+            if (hostIp.empty() || IsLoopbackAddress(hostIp)) {
                 hostIp = GetAnyAvailableIP();
             }
             targetInfo.mLabels.Set(prometheus::HOST_IP, hostIp);
