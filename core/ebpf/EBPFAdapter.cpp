@@ -257,6 +257,10 @@ bool EBPFAdapter::tryLoadAgentSightDylib() {
         tmpLib->LoadMethod("agentsight_config_set_verbose", symErr));
     sym.config_set_log_path = reinterpret_cast<decltype(sym.config_set_log_path)>(
         tmpLib->LoadMethod("agentsight_config_set_log_path", symErr));
+    sym.config_set_enable_security_audit = reinterpret_cast<decltype(sym.config_set_enable_security_audit)>(
+        tmpLib->LoadMethod("agentsight_config_set_enable_security_audit", symErr));
+    sym.config_set_enforcer_socket = reinterpret_cast<decltype(sym.config_set_enforcer_socket)>(
+        tmpLib->LoadMethod("agentsight_config_set_enforcer_socket", symErr));
     sym.config_add_cmdline_rule = reinterpret_cast<decltype(sym.config_add_cmdline_rule)>(
         tmpLib->LoadMethod("agentsight_config_add_cmdline_rule", symErr));
     sym.config_add_https
@@ -270,6 +274,8 @@ bool EBPFAdapter::tryLoadAgentSightDylib() {
     sym.handle_get_eventfd
         = reinterpret_cast<decltype(sym.handle_get_eventfd)>(tmpLib->LoadMethod("agentsight_get_eventfd", symErr));
     sym.handle_read = reinterpret_cast<decltype(sym.handle_read)>(tmpLib->LoadMethod("agentsight_read", symErr));
+    sym.handle_read_v2
+        = reinterpret_cast<decltype(sym.handle_read_v2)>(tmpLib->LoadMethod("agentsight_read_v2", symErr));
 
     const bool ok = sym.last_error && sym.config_new && sym.config_free && sym.config_set_verbose
         && sym.config_set_log_path && sym.handle_new && sym.handle_free && sym.handle_start && sym.handle_stop
@@ -284,6 +290,11 @@ bool EBPFAdapter::tryLoadAgentSightDylib() {
     mAgentSightLib = std::move(tmpLib);
     mAgentSightSymbols = std::make_unique<AgentSightSymbolTable>(sym);
     LOG_INFO(sLogger, ("[EBPFAdapter] AgentSight symbols loaded", STRING_FLAG(ebpf_agentsight_dylib_base_name)));
+    if (!sym.config_set_enable_security_audit || !sym.config_set_enforcer_socket || !sym.handle_read_v2) {
+        LOG_WARNING(
+            sLogger,
+            ("[EBPFAdapter] AgentSight security audit API unavailable", "continuing with legacy LLM collection"));
+    }
     return true;
 }
 

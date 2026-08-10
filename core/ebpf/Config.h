@@ -71,6 +71,10 @@ public:
     bool mAgentsightEventStreamFormat = true;
     /// When true, omit system instructions, tool definitions, and full input messages (per dedup).
     bool mAgentsightMessageDeltaOnly = true;
+    /// Subscribe to AgentSight's normalized system security audit stream.
+    bool mAgentsightSecurityAuditEnabled = false;
+    /// Local AgentSight enforcer socket used when security audit is enabled.
+    std::string mAgentsightEnforcerSocket = "/run/agentsight/enforcer.sock";
 };
 
 /////////////////////  /////////////////////

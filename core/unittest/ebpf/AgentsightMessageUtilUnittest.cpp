@@ -38,6 +38,8 @@ public:
     void TestFormatFinishReasonsFallback();
     void TestFormatFinishReasonsFromParts();
     void TestFormatFinishReasonsFallbackAlwaysArray();
+    void TestExtractUniqueToolCallId();
+    void TestExtractUniqueToolCallIdRejectsAmbiguousOrInvalidParts();
     void TestComputeDeltaFirstRound();
     void TestComputeDeltaAfterOutputMatch();
     void TestComputeDeltaWhenOutputSliceMismatch();
@@ -132,6 +134,41 @@ void AgentsightMessageUtilUnittest::TestFormatFinishReasonsFallbackAlwaysArray()
     const std::string out = FormatFinishReasonsJson("", "tool_calls");
     APSARA_TEST_EQUAL(R"(["tool_calls"])", out);
     APSARA_TEST_TRUE(!out.empty() && out.front() == '[');
+}
+
+void AgentsightMessageUtilUnittest::TestExtractUniqueToolCallId() {
+    const std::string output = R"([
+      {"role":"assistant","parts":[{"type":"tool_call","id":"call-hermes-1","name":"shell"}]}
+    ])";
+    APSARA_TEST_EQUAL("call-hermes-1", ExtractUniqueToolCallId(output));
+
+    const std::string repeated = R"([
+      {"role":"assistant","parts":[
+        {"type":"tool_call","id":"call-hermes-1"},
+        {"type":"tool_call","id":"call-hermes-1"}
+      ]}
+    ])";
+    APSARA_TEST_EQUAL("call-hermes-1", ExtractUniqueToolCallId(repeated));
+}
+
+void AgentsightMessageUtilUnittest::TestExtractUniqueToolCallIdRejectsAmbiguousOrInvalidParts() {
+    APSARA_TEST_TRUE(ExtractUniqueToolCallId("{not-json").empty());
+    APSARA_TEST_TRUE(ExtractUniqueToolCallId(R"([{"role":"assistant","parts":[]}])").empty());
+    APSARA_TEST_TRUE(ExtractUniqueToolCallId(R"([
+      {"role":"assistant","parts":[
+        {"type":"tool_call","id":"call-1"},
+        {"type":"tool_call","id":"call-2"}
+      ]}
+    ])")
+                         .empty());
+    APSARA_TEST_TRUE(ExtractUniqueToolCallId(R"([
+      {"role":"assistant","parts":[{"type":"tool_call","id":""}]}
+    ])")
+                         .empty());
+    APSARA_TEST_TRUE(ExtractUniqueToolCallId(R"([
+      {"role":"assistant","parts":[{"type":"tool_call"}]}
+    ])")
+                         .empty());
 }
 
 void AgentsightMessageUtilUnittest::TestComputeDeltaFirstRound() {
@@ -412,6 +449,8 @@ UNIT_TEST_CASE(AgentsightMessageUtilUnittest, TestFormatFinishReasonsFromOutputM
 UNIT_TEST_CASE(AgentsightMessageUtilUnittest, TestFormatFinishReasonsFallback)
 UNIT_TEST_CASE(AgentsightMessageUtilUnittest, TestFormatFinishReasonsFromParts)
 UNIT_TEST_CASE(AgentsightMessageUtilUnittest, TestFormatFinishReasonsFallbackAlwaysArray)
+UNIT_TEST_CASE(AgentsightMessageUtilUnittest, TestExtractUniqueToolCallId)
+UNIT_TEST_CASE(AgentsightMessageUtilUnittest, TestExtractUniqueToolCallIdRejectsAmbiguousOrInvalidParts)
 UNIT_TEST_CASE(AgentsightMessageUtilUnittest, TestComputeDeltaFirstRound)
 UNIT_TEST_CASE(AgentsightMessageUtilUnittest, TestComputeDeltaAfterOutputMatch)
 UNIT_TEST_CASE(AgentsightMessageUtilUnittest, TestComputeDeltaWhenOutputSliceMismatch)

@@ -34,6 +34,44 @@ dev
 |  ProbeConfig.Http  |  array  |  否  |  `[]`（关闭）  |  HTTP 明文流量的目标列表（字符串数组）。每项可为 `:端口`、`IP`、`IP:端口` 或域名（如 `model-svc.default.svc`、`*.internal.svc`）。**留空时不采集明文 HTTP 流量**。  |
 |  ProbeConfig.EventStreamFormat  |  bool  |  否  |  `true`  |  为 `true` 时，每次 LLM 调用在同一 `PipelineEventGroup` 内输出两条日志（各有 `event.id`）：`event.name=gen_ai.model.request`（请求开始时间戳）与 `gen_ai.model.response`（请求结束时间戳）。为 `false` 时输出单条合并日志，**无** `event.name` / `event.id`。  |
 |  ProbeConfig.MessageDeltaOnly  |  bool  |  否  |  `true`  |  为 `true` 时**不**输出全量 `gen_ai.input.messages`；仍输出 `gen_ai.input.messages_delta`、`gen_ai.system_instructions_hash` / `gen_ai.tool.definitions_hash`（非空时），以及 hash 相对上一轮变化时的 `gen_ai.system_instructions` / `gen_ai.tool.definitions`。为 `false` 时**每次**输出非空的全量 `gen_ai.input.messages`。**不影响** `gen_ai.output.messages`；`messages_delta` 及 session 状态维护**不受**本开关影响。  |
+|  ProbeConfig.SecurityAudit  |  object  |  否  |  /  |  AgentSight 系统安全审计采集配置。使用同一个 AgentSight handle、eventfd 和 `input_agentsight` 输出链路，不创建独立 input。  |
+|  ProbeConfig.SecurityAudit.Enabled  |  bool  |  否  |  `false`  |  是否订阅 AgentSight enforcer 归一化后的文件、网络、污点传播、策略判定和执行状态事件。  |
+|  ProbeConfig.SecurityAudit.EnforcerSocket  |  string  |  否  |  `/run/agentsight/enforcer.sock`  |  AgentSight enforcer 本地 Unix socket。开启审计后 enforcer 暂时不可用不会中断 LLM 采集，订阅线程会持续重连。  |
+
+### 系统安全审计事件
+
+安全审计显式开启后，`input_agentsight` 除 LLM 日志外还会输出 `event.name=agentsight.security.<event_type>` 的单条日志。事件保留完整 JSON 于 `event.original`，并提取以下公共字段便于检索：
+
+- `event.id`、`event.type`、`time_unix_nano`、`observed_time_unix_nano`
+- `agent.id`（仅系统事件有真实 `identity.agent_id` 时）、`gen_ai.agent.type`、`gen_ai.session.id`、`gen_ai.turn.id`、`process.pid`
+- 跨层关联别名：`agentsight.binding.id`、`gen_ai.conversation.id`、`gen_ai.tool.call.id`、`process.start_time`、`process.parent.pid`、`container.cgroup.id`
+- 事件载荷中的标量字段以 `security.*` 前缀展开，例如 `security.policy_id`、`security.mode`、`security.risk_score`
+
+```yaml
+inputs:
+  - Type: input_agentsight
+    ProbeConfig:
+      SecurityAudit:
+        Enabled: true
+        EnforcerSocket: /run/agentsight/enforcer.sock
+```
+
+该能力只负责采集 enforcer 已生成的安全事实；策略下发、阻断和案件编排不由 LoongCollector 执行。若运行时 AgentSight 动态库尚未提供 `read_v2` 安全审计 ABI，插件会告警并自动退化为原有 LLM 采集。
+
+#### 应用层与系统层关联
+
+上述关联字段是 `identity.*` 的确定性别名，原始 `identity.*` 仍保留在 `agentsight.identity.*` 下，完整事件仍保留在 `event.original`。LoongCollector 不补猜缺失身份，也不在采集端维护跨事件状态。
+
+建议在 SLS 中将应用层的模型输入、工具调用或敏感数据命中事件，与系统层的文件、网络、污点传播和策略事件进行关联。高置信泄漏告警至少同时满足：
+
+1. 应用层存在敏感数据或敏感文件证据；
+2. 系统层存在同一 `agentsight.binding.id` 关联的敏感来源、出站网络去向和 `policy_decision` 证据链；
+3. 两层的非空 `gen_ai.agent.type` 和 `gen_ai.session.id` 相等；工具调用触发的暴露还要求非空 `gen_ai.tool.call.id` 相等；若应用层也提供真实、稳定的 `agent.id`，则额外要求两层 `agent.id` 相等；
+4. 系统层出站事件不早于应用层证据，且不晚于应用层证据 120 秒。
+
+关联键缺失时，事件仍可作为安全证据检索，但不建议直接升级为高置信泄漏告警。`process.pid` 应与 `process.start_time` 组合使用，避免 PID 复用造成误关联；容器场景可再使用 `container.cgroup.id` 收窄范围。
+
+`security.blocked=true` 表示执行侧阻止了本次暴露尝试，`security.blocked=false` 表示观察到高风险出站行为；两者都不能在缺少传输完成证据时表述为“已确认数据外泄”。
 
 ### `AgentType` 取值命名规范
 
