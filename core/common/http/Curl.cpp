@@ -187,6 +187,10 @@ static size_t socket_write_callback(void* socketData, curl_socket_t fd, curlsock
     return 0;
 }
 
+static bool IsLoopbackAddress(const string& host) {
+    return host == "localhost" || host == "::1" || host == "[::1]" || StartWith(host, "127.");
+}
+
 CURL* CreateCurlHandler(const string& method,
                         bool httpsFlag,
                         const string& endpoint,
@@ -251,7 +255,8 @@ CURL* CreateCurlHandler(const string& method,
     }
 
     curl_easy_setopt(curl, CURLOPT_TIMEOUT, timeout);
-    if (!intf.empty()) {
+    // Loopback traffic must egress via lo; binding it to a physical interface makes it unreachable.
+    if (!intf.empty() && !IsLoopbackAddress(endpoint)) {
         curl_easy_setopt(curl, CURLOPT_INTERFACE, intf.c_str());
     }
 
