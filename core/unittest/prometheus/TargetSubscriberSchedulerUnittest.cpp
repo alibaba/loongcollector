@@ -22,6 +22,7 @@
 #include <memory>
 #include <string>
 #include <thread>
+#include <utility>
 
 #include "ScrapeScheduler.h"
 #include "common/JsonUtil.h"
@@ -378,7 +379,12 @@ void TargetSubscriberSchedulerUnittest::TestBuildHostOnlyScrapeSchedulerGroupHos
         return targetGroup[0].mLabels.Get(prometheus::HOST_IP);
     };
 
-    const string savedIpAddr = LoongCollectorMonitor::mIpAddr;
+    // Restore the global on every exit path, including an exception or a future early return.
+    struct IpAddrGuard {
+        explicit IpAddrGuard(string saved) : mSaved(std::move(saved)) {}
+        ~IpAddrGuard() { LoongCollectorMonitor::mIpAddr = mSaved; }
+        string mSaved;
+    } ipAddrGuard(LoongCollectorMonitor::mIpAddr);
 
     // case 1: valid mIpAddr is used directly
     LoongCollectorMonitor::mIpAddr = "192.168.1.10";
@@ -395,8 +401,6 @@ void TargetSubscriberSchedulerUnittest::TestBuildHostOnlyScrapeSchedulerGroupHos
     // case 4: empty mIpAddr triggers fallback, never reports a loopback address
     LoongCollectorMonitor::mIpAddr.clear();
     APSARA_TEST_FALSE(IsLoopbackAddress(buildAndGetHostIp()));
-
-    LoongCollectorMonitor::mIpAddr = savedIpAddr;
 }
 
 
