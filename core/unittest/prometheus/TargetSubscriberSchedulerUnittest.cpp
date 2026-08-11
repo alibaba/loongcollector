@@ -22,10 +22,13 @@
 #include <memory>
 #include <string>
 #include <thread>
+#include <utility>
 
 #include "ScrapeScheduler.h"
 #include "common/JsonUtil.h"
+#include "common/MachineInfoUtil.h"
 #include "common/http/HttpResponse.h"
+#include "monitor/Monitor.h"
 #include "prometheus/Constants.h"
 #include "prometheus/async/PromFuture.h"
 #include "prometheus/labels/Labels.h"
@@ -42,6 +45,7 @@ public:
     void TestProcess();
     void TestParseTargetGroups();
     void TestBuildHostOnlyScrapeSchedulerGroup();
+    void TestBuildHostOnlyScrapeSchedulerGroupHostIPFallback();
     void TestBuildScrapeSchedulerSet();
     void TestTargetLabels();
     void TestTargetsInfoToString();
@@ -343,6 +347,60 @@ void TargetSubscriberSchedulerUnittest::TestBuildHostOnlyScrapeSchedulerGroup() 
     APSARA_TEST_EQUAL(targetGroup[1].mInstance, "localhost:9090");
     APSARA_TEST_EQUAL(targetGroup[1].mLabels.Get("test_label"), "test_value");
     APSARA_TEST_TRUE(targetGroup[0].mHash != targetGroup[1].mHash);
+}
+
+void TargetSubscriberSchedulerUnittest::TestBuildHostOnlyScrapeSchedulerGroupHostIPFallback() {
+    Json::Value config;
+    string errorMsg;
+    string configStr = R"JSON(
+    {
+        "job_name": "test_job",
+        "scheme": "http",
+        "metrics_path": "/metrics",
+        "scrape_interval": "30s",
+        "scrape_timeout": "30s",
+        "host_only_mode": true,
+        "static_configs": [
+            {
+                "targets": ["localhost:9090"],
+                "labels": {}
+            }
+        ]
+    }
+    )JSON";
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, config, errorMsg));
+
+    auto buildAndGetHostIp = [&config]() -> string {
+        std::shared_ptr<TargetSubscriberScheduler> targetSubscriber = std::make_shared<TargetSubscriberScheduler>();
+        APSARA_TEST_TRUE(targetSubscriber->Init(config));
+        std::vector<PromTargetInfo> targetGroup;
+        targetSubscriber->BuildHostOnlyScrapeSchedulerGroup(targetGroup);
+        APSARA_TEST_EQUAL(1UL, targetGroup.size());
+        return targetGroup[0].mLabels.Get(prometheus::HOST_IP);
+    };
+
+    // Restore the global on every exit path, including an exception or a future early return.
+    struct IpAddrGuard {
+        explicit IpAddrGuard(string saved) : mSaved(std::move(saved)) {}
+        ~IpAddrGuard() { LoongCollectorMonitor::mIpAddr = mSaved; }
+        string mSaved;
+    } ipAddrGuard(LoongCollectorMonitor::mIpAddr);
+
+    // case 1: valid mIpAddr is used directly
+    LoongCollectorMonitor::mIpAddr = "192.168.1.10";
+    APSARA_TEST_EQUAL("192.168.1.10", buildAndGetHostIp());
+
+    // case 2: IPv4 loopback mIpAddr triggers fallback, never reports a loopback address
+    LoongCollectorMonitor::mIpAddr = "127.0.0.1";
+    APSARA_TEST_FALSE(IsLoopbackAddress(buildAndGetHostIp()));
+
+    // case 3: IPv6 loopback mIpAddr triggers fallback too
+    LoongCollectorMonitor::mIpAddr = "::1";
+    APSARA_TEST_FALSE(IsLoopbackAddress(buildAndGetHostIp()));
+
+    // case 4: empty mIpAddr triggers fallback, never reports a loopback address
+    LoongCollectorMonitor::mIpAddr.clear();
+    APSARA_TEST_FALSE(IsLoopbackAddress(buildAndGetHostIp()));
 }
 
 
@@ -755,6 +813,7 @@ UNIT_TEST_CASE(TargetSubscriberSchedulerUnittest, TestProcess)
 UNIT_TEST_CASE(TargetSubscriberSchedulerUnittest, TestParseTargetGroups)
 UNIT_TEST_CASE(TargetSubscriberSchedulerUnittest, TestBuildScrapeSchedulerSet)
 UNIT_TEST_CASE(TargetSubscriberSchedulerUnittest, TestBuildHostOnlyScrapeSchedulerGroup)
+UNIT_TEST_CASE(TargetSubscriberSchedulerUnittest, TestBuildHostOnlyScrapeSchedulerGroupHostIPFallback)
 UNIT_TEST_CASE(TargetSubscriberSchedulerUnittest, TestTargetLabels)
 UNIT_TEST_CASE(TargetSubscriberSchedulerUnittest, TestTargetsInfoToString)
 UNIT_TEST_CASE(TargetSubscriberSchedulerUnittest, TestRaceConditionBetweenCancelAndCallback)
