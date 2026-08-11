@@ -134,11 +134,35 @@ private:
     bool mMessageDeltaOnly = true;
     bool mRawHttpsFallback = false;
 
+    /// Runner-level aggregates owned by EBPFServer and shared with the other eBPF plugins, so they
+    /// stay unlabelled here — narrowing them would change a metric four managers report into.
     CounterPtr mLossKernelEventsTotal;
     CounterPtr mPushLogFailedTotal;
-    CounterPtr mPluginInEventsTotal;
-    CounterPtr mPushLogsTotal;
-    CounterPtr mPushLogGroupTotal;
+
+    /// Per-stream counters, one set per `record_type` label value.
+    ///
+    /// AgentSight produces two streams of wildly different volume: once a process is attached, *every*
+    /// non-LLM HTTPS exchange it makes becomes a raw HTTP event, while gen_ai events are one per LLM
+    /// call. Sharing one counter set made it impossible to tell whether a jump came from enabling
+    /// RawHttpsFallback or from real LLM traffic growth, to size capacity for turning the switch on,
+    /// or — when events are dropped — to tell which stream filled the shared mCommonEventQueue.
+    struct StreamMetrics {
+        CounterPtr inEventsTotal;
+        CounterPtr pushLogsTotal;
+        CounterPtr pushLogGroupTotal;
+        /// Plugin-level counterpart of mLossKernelEventsTotal: same increments, but attributable.
+        CounterPtr lossEventsTotal;
+
+        void reset() {
+            inEventsTotal.reset();
+            pushLogsTotal.reset();
+            pushLogGroupTotal.reset();
+            lossEventsTotal.reset();
+        }
+    };
+    StreamMetrics mRawHttpMetrics;
+    StreamMetrics mGenAiMetrics;
+
     std::vector<MetricLabels> mRefAndLabels;
     PluginMetricManagerPtr mMetricMgr;
 };

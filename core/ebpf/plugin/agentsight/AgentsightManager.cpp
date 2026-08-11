@@ -665,8 +665,78 @@ constexpr std::array<const char*, 10> kSensitiveResponseHeaders = {
     "x-amz-security-token",
 };
 
+/// Whether `c` is an RFC 7230 token character — `tchar`, the only bytes a real header name can
+/// contain. Explicit ranges rather than std::isalnum: that one is locale-sensitive, and a locale
+/// where an extra byte counts as alphanumeric would widen what passes as a header name.
+bool IsHttpTokenChar(unsigned char c) {
+    if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')) {
+        return true;
+    }
+    switch (c) {
+        case '!':
+        case '#':
+        case '$':
+        case '%':
+        case '&':
+        case '\'':
+        case '*':
+        case '+':
+        case '-':
+        case '.':
+        case '^':
+        case '_':
+        case '`':
+        case '|':
+        case '~':
+            return true;
+        default:
+            return false;
+    }
+}
+
+/// Whether `name` is a syntactically valid header name.
+///
+/// This is a security control, not input hygiene. HTTP/2 response header names reach us from
+/// `Http2Stream::response_headers_json()` → `decode_headers_stateless()`, which — as the name says —
+/// decodes without HPACK dynamic-table state. When a name is given as a dynamic-table index,
+/// `decode_literal_header` cannot resolve it and substitutes the literal `<unknown:N>`, while the
+/// *value* is decoded normally and is the real value. Only fully-indexed fields degrade to
+/// `<dynamic:N>` with no value and get dropped upstream.
+///
+/// That breaks a denylist in the worst possible way. Of kSensitiveResponseHeaders, only set-cookie,
+/// www-authenticate, proxy-authenticate, authorization and proxy-authorization are in the HPACK
+/// static table; set-cookie2, x-api-key, api-key, x-auth-token and x-amz-security-token are not — and
+/// reusing a custom header via the dynamic table is precisely what HPACK is for. So on a long-lived
+/// h2 connection the second and later `x-api-key: <secret>` would arrive as `<unknown:62>` and sail
+/// past the denylist with its real value. The five names that fail are exactly the five added to
+/// cover vendor tokens.
+///
+/// When the name is untrustworthy there is no way to tell whether the header is sensitive, so under a
+/// denylist the only safe default is to drop the entry, value included: better to lose a diagnostic
+/// field than to leak one credential. This rule also catches Huffman-decode fallout (frame.rs falls
+/// back to `from_utf8_lossy` over the raw compressed bytes, producing garbage names) and pseudo-
+/// headers such as `:status`, whose ':' is not a tchar — the status code is already emitted as
+/// `http.response.status_code`, so `http.response.header.:status` would only duplicate it under a
+/// malformed field name.
+///
+/// The request side needs no equivalent check: it is an allowlist, and no allowlisted name is
+/// unparseable, so an undecodable name simply fails to match and is dropped. Note the same h2
+/// mechanism costs a diagnostic there — `traceparent` is not in the static table either, so it
+/// degrades to `<unknown:N>` and is lost. Failing closed is the point.
+bool IsHttpTokenName(const std::string& name) {
+    return !name.empty() && std::all_of(name.begin(), name.end(), [](unsigned char c) { return IsHttpTokenChar(c); });
+}
+
+/// Cap on emitted response headers, mirroring the bound the HTTP/1 path gets for free from httparse
+/// (`parser/http/parser.rs`: `MAX_HEADERS = 64`). The h2 path has no such bound, and because every
+/// header now becomes its own field name, an unbounded producer would grow field-name cardinality
+/// without limit — a real operational problem for storage that builds a column per field name. This
+/// only became a concern once headers stopped being one JSON blob under one field name.
+constexpr size_t kMaxEmittedResponseHeaders = 64;
+
 /// Emits response headers one attribute per header, as `http.response.header.<name>` (the OTel
-/// semconv attribute template), skipping kSensitiveResponseHeaders.
+/// semconv attribute template), skipping kSensitiveResponseHeaders and anything IsHttpTokenName
+/// rejects, and stopping at kMaxEmittedResponseHeaders.
 ///
 /// Per-header rather than one JSON blob because the denylist has to parse the JSON anyway: emitting
 /// each header separately makes the filtering structural instead of a parse → filter → re-serialize
@@ -684,6 +754,8 @@ void EmitHttpResponseHeaders(logtail::LogEvent* log, const std::string& headersJ
     if (doc.Parse(headersJson.c_str(), headersJson.size()).HasParseError() || !doc.IsObject()) {
         return;
     }
+    size_t emitted = 0;
+    size_t dropped = 0;
     for (auto it = doc.MemberBegin(); it != doc.MemberEnd(); ++it) {
         if (!it->name.IsString() || !it->value.IsString() || it->value.GetStringLength() == 0) {
             continue;
@@ -691,7 +763,10 @@ void EmitHttpResponseHeaders(logtail::LogEvent* log, const std::string& headersJ
         std::string name(it->name.GetString(), it->name.GetStringLength());
         std::transform(
             name.begin(), name.end(), name.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-        if (name.empty()) {
+        // Order matters: the name must be proven trustworthy before the denylist verdict means
+        // anything, so this check comes first.
+        if (!IsHttpTokenName(name)) {
+            ++dropped;
             continue;
         }
         const bool sensitive = std::any_of(kSensitiveResponseHeaders.begin(),
@@ -700,8 +775,20 @@ void EmitHttpResponseHeaders(logtail::LogEvent* log, const std::string& headersJ
         if (sensitive) {
             continue;
         }
+        if (emitted >= kMaxEmittedResponseHeaders) {
+            ++dropped;
+            continue;
+        }
         log->SetContent("http.response.header." + name,
                         std::string(it->value.GetString(), it->value.GetStringLength()));
+        ++emitted;
+    }
+    if (dropped != 0) {
+        // Not silent: an undecodable name or a truncated header set is exactly the situation where a
+        // reader would otherwise conclude the response simply had no such header.
+        LOG_DEBUG(sLogger,
+                  ("Agentsight raw HTTP response headers dropped",
+                   dropped)("emitted", emitted)("reason", "non-token name or per-log cap"));
     }
 }
 
@@ -763,9 +850,8 @@ void AgentsightManager::releaseMetricRefs() {
     }
     mRefAndLabels.clear();
     mMetricMgr.reset();
-    mPluginInEventsTotal.reset();
-    mPushLogsTotal.reset();
-    mPushLogGroupTotal.reset();
+    mRawHttpMetrics.reset();
+    mGenAiMetrics.reset();
 }
 
 void AgentsightManager::StopAgentSightLocked() {
@@ -897,9 +983,10 @@ void AgentsightManager::OnLlmCallback(const AgentsightLLMData* data, void* user_
     const std::string configName = self->mConfigName;
     auto evt = std::make_shared<AgentsightLlmRecord>(configName, *data);
     if (self->mCommonEventQueue.try_enqueue(evt)) {
-        ADD_COUNTER(self->mPluginInEventsTotal, 1);
+        ADD_COUNTER(self->mGenAiMetrics.inEventsTotal, 1);
     } else {
         ADD_COUNTER(self->mLossKernelEventsTotal, 1);
+        ADD_COUNTER(self->mGenAiMetrics.lossEventsTotal, 1);
         LOG_WARNING(sLogger, ("AgentSight LLM event enqueue failed", ""));
     }
 }
@@ -914,9 +1001,10 @@ void AgentsightManager::OnHttpsCallback(const AgentsightHttpsData* data, void* u
     const std::string configName = self->mConfigName;
     auto evt = std::make_shared<AgentsightHttpsRecord>(configName, *data);
     if (self->mCommonEventQueue.try_enqueue(evt)) {
-        ADD_COUNTER(self->mPluginInEventsTotal, 1);
+        ADD_COUNTER(self->mRawHttpMetrics.inEventsTotal, 1);
     } else {
         ADD_COUNTER(self->mLossKernelEventsTotal, 1);
+        ADD_COUNTER(self->mRawHttpMetrics.lossEventsTotal, 1);
         LOG_WARNING(sLogger, ("AgentSight raw HTTP event enqueue failed", ""));
     }
 }
@@ -941,12 +1029,23 @@ int AgentsightManager::AddOrUpdateConfig(const CollectionPipelineContext* ctx,
     }
 
     if (metricMgr && mRefAndLabels.empty()) {
-        MetricLabels eventTypeLabels = {{METRIC_LABEL_KEY_EVENT_TYPE, METRIC_LABEL_VALUE_EVENT_TYPE_LOG}};
-        auto ref = metricMgr->GetOrCreateReentrantMetricsRecordRef(eventTypeLabels);
-        mRefAndLabels.emplace_back(eventTypeLabels);
-        mPluginInEventsTotal = ref->GetCounter(METRIC_PLUGIN_IN_EVENTS_TOTAL);
-        mPushLogsTotal = ref->GetCounter(METRIC_PLUGIN_OUT_EVENTS_TOTAL);
-        mPushLogGroupTotal = ref->GetCounter(METRIC_PLUGIN_OUT_EVENT_GROUPS_TOTAL);
+        // One ref per stream so raw HTTP and gen_ai counters are told apart by `record_type`; see
+        // StreamMetrics. Same shape as network_observer's AppDetail, which keeps several labelled refs
+        // in mRefAndLabels and releases them together.
+        const auto initStreamMetrics = [&metricMgr, this](const std::string& recordType) {
+            MetricLabels labels = {{METRIC_LABEL_KEY_EVENT_TYPE, METRIC_LABEL_VALUE_EVENT_TYPE_LOG},
+                                   {METRIC_LABEL_KEY_RECORD_TYPE, recordType}};
+            auto ref = metricMgr->GetOrCreateReentrantMetricsRecordRef(labels);
+            mRefAndLabels.emplace_back(labels);
+            StreamMetrics metrics;
+            metrics.inEventsTotal = ref->GetCounter(METRIC_PLUGIN_IN_EVENTS_TOTAL);
+            metrics.pushLogsTotal = ref->GetCounter(METRIC_PLUGIN_OUT_EVENTS_TOTAL);
+            metrics.pushLogGroupTotal = ref->GetCounter(METRIC_PLUGIN_OUT_EVENT_GROUPS_TOTAL);
+            metrics.lossEventsTotal = ref->GetCounter(METRIC_PLUGIN_EBPF_LOSS_KERNEL_EVENTS_TOTAL);
+            return metrics;
+        };
+        mRawHttpMetrics = initStreamMetrics(METRIC_LABEL_VALUE_RECORD_TYPE_RAW_HTTP);
+        mGenAiMetrics = initStreamMetrics(METRIC_LABEL_VALUE_RECORD_TYPE_GEN_AI);
     }
 
     if (mRegisteredConfigCount != 0) {
@@ -1105,6 +1204,7 @@ int AgentsightManager::HandleHttpsEvent(const AgentsightHttpsRecord* rec) {
         // B's queue — and this path does no redaction, so that leaks A's raw body to B. Drop instead.
         if (mPipelineCtx == nullptr || rec->GetPipelineConfigName() != mConfigName) {
             ADD_COUNTER(mLossKernelEventsTotal, 1);
+            ADD_COUNTER(mRawHttpMetrics.lossEventsTotal, 1);
             LOG_DEBUG(sLogger,
                       ("Agentsight raw HTTP event dropped", "config no longer registered")(
                           "recordConfig", rec->GetPipelineConfigName())("currentConfig", mConfigName));
@@ -1144,8 +1244,8 @@ int AgentsightManager::HandleHttpsEvent(const AgentsightHttpsRecord* rec) {
 
     std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(eventGroup), pluginIndex);
     if (QueueStatus::OK == ProcessQueueManager::GetInstance()->PushQueue(queueKey, std::move(item))) {
-        ADD_COUNTER(mPushLogsTotal, logCount);
-        ADD_COUNTER(mPushLogGroupTotal, 1);
+        ADD_COUNTER(mRawHttpMetrics.pushLogsTotal, logCount);
+        ADD_COUNTER(mRawHttpMetrics.pushLogGroupTotal, 1);
     } else {
         if (mPushLogFailedTotal) {
             ADD_COUNTER(mPushLogFailedTotal, 1);
@@ -1173,6 +1273,7 @@ int AgentsightManager::HandleLlmEvent(AgentsightLlmRecord* rec) {
         // before the session-cache update below also keeps config A's sessions out of B's delta state.
         if (mPipelineCtx == nullptr || rec->GetPipelineConfigName() != mConfigName) {
             ADD_COUNTER(mLossKernelEventsTotal, 1);
+            ADD_COUNTER(mGenAiMetrics.lossEventsTotal, 1);
             LOG_DEBUG(sLogger,
                       ("Agentsight LLM event dropped", "config no longer registered")(
                           "recordConfig", rec->GetPipelineConfigName())("currentConfig", mConfigName));
@@ -1242,8 +1343,8 @@ int AgentsightManager::HandleLlmEvent(AgentsightLlmRecord* rec) {
 
     std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(eventGroup), pluginIndex);
     if (QueueStatus::OK == ProcessQueueManager::GetInstance()->PushQueue(queueKey, std::move(item))) {
-        ADD_COUNTER(mPushLogsTotal, logCount);
-        ADD_COUNTER(mPushLogGroupTotal, 1);
+        ADD_COUNTER(mGenAiMetrics.pushLogsTotal, logCount);
+        ADD_COUNTER(mGenAiMetrics.pushLogGroupTotal, 1);
     } else {
         if (mPushLogFailedTotal) {
             ADD_COUNTER(mPushLogFailedTotal, 1);

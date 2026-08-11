@@ -480,6 +480,7 @@ public:
     void TestHttpsEventRequestHeaderAllowlist();
     void TestHttpsEventWithoutPipelineContextDrops();
     void TestHttpsEventFiltersSensitiveResponseHeaders();
+    void TestHttpsEventDropsUndecodableHeaderNames();
     void TestHttpsEventUnparsableStatusStillEmitsResponse();
     void TestStaleConfigRecordDroppedNotRerouted();
     void TestHttpsHostExtractionVariants();
@@ -1177,6 +1178,79 @@ void AgentsightManagerUnittest::TestHttpsEventFiltersSensitiveResponseHeaders() 
     mgr->Destroy();
 }
 
+void AgentsightManagerUnittest::TestHttpsEventDropsUndecodableHeaderNames() {
+    // The denylist can only be trusted when the header name is trustworthy, and on HTTP/2 it often is
+    // not: decode_headers_stateless() has no HPACK dynamic-table state, so a name given as a dynamic
+    // index becomes the literal "<unknown:N>" while the value decodes for real. Five of the ten
+    // denylisted names are absent from the HPACK static table (x-api-key among them), so without a
+    // syntax check on the name they would sail straight through with their secrets.
+    const char* kConfig = "p_raw_h2_hdr_names";
+    auto mgr = makeManager();
+    registerConfigWithPoppableQueue(*mgr, kConfig);
+
+    HttpsSpec spec;
+    spec.statusCode = 200;
+    spec.responseHeaders = R"({)"
+                           R"("content-type":"application/grpc",)"
+                           R"("<unknown:62>":"kk-leak",)"
+                           R"("<dynamic:70>":"dyn-leak",)"
+                           R"(":status":"200",)"
+                           R"("��garbage":"huffman-leak")"
+                           R"(})";
+
+    std::unique_ptr<ProcessQueueItem> item;
+    const auto logs = emitHttps(*mgr, kConfig, spec, item);
+    APSARA_TEST_EQUAL(2UL, logs.size());
+    const LogEvent& res = *logs[1];
+
+    // A well-formed name still gets through.
+    APSARA_TEST_EQUAL("application/grpc", contentOf(res, "http.response.header.content-type"));
+
+    // Names that are not RFC 7230 tokens are dropped whole, value included.
+    APSARA_TEST_FALSE(res.HasContent(StringView("http.response.header.<unknown:62>")));
+    APSARA_TEST_FALSE(res.HasContent(StringView("http.response.header.<dynamic:70>")));
+    APSARA_TEST_FALSE(res.HasContent(StringView("http.response.header.:status")));
+
+    // The status code is still reported, just through its own field rather than a pseudo-header echo.
+    APSARA_TEST_EQUAL("200", contentOf(res, "http.response.status_code"));
+
+    // No dropped value survives under any key.
+    for (const auto& kv : res) {
+        const std::string value(kv.second.data(), kv.second.size());
+        APSARA_TEST_TRUE(value.find("kk-leak") == std::string::npos);
+        APSARA_TEST_TRUE(value.find("dyn-leak") == std::string::npos);
+        APSARA_TEST_TRUE(value.find("huffman-leak") == std::string::npos);
+    }
+
+    // Per-log header cap: h2 has no upstream bound, and each header is now its own field name, so an
+    // unbounded producer would grow field-name cardinality without limit.
+    std::string many = "{";
+    for (int i = 0; i < 80; ++i) {
+        if (i != 0) {
+            many += ",";
+        }
+        many += R"("x-h)" + std::to_string(i) + R"(":"v")";
+    }
+    many += "}";
+
+    HttpsSpec manySpec;
+    manySpec.statusCode = 200;
+    manySpec.responseHeaders = many;
+    std::unique_ptr<ProcessQueueItem> manyItem;
+    const auto manyLogs = emitHttps(*mgr, kConfig, manySpec, manyItem);
+    APSARA_TEST_EQUAL(2UL, manyLogs.size());
+    size_t headerFields = 0;
+    for (const auto& kv : *manyLogs[1]) {
+        const std::string key(kv.first.data(), kv.first.size());
+        if (key.rfind("http.response.header.", 0) == 0) {
+            ++headerFields;
+        }
+    }
+    APSARA_TEST_EQUAL(64UL, headerFields);
+
+    mgr->Destroy();
+}
+
 void AgentsightManagerUnittest::TestHttpsEventUnparsableStatusStillEmitsResponse() {
     // HTTP/2 whose `:status` pseudo-header could not be HPACK-decoded: Http2Stream::status_code()
     // yields 0 while response headers and body are fully populated. The response half must still be
@@ -1400,6 +1474,7 @@ UNIT_TEST_CASE(AgentsightManagerUnittest, TestHttpsEventPairCorrelationFields);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestHttpsEventRequestHeaderAllowlist);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestHttpsEventWithoutPipelineContextDrops);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestHttpsEventFiltersSensitiveResponseHeaders);
+UNIT_TEST_CASE(AgentsightManagerUnittest, TestHttpsEventDropsUndecodableHeaderNames);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestHttpsEventUnparsableStatusStillEmitsResponse);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestStaleConfigRecordDroppedNotRerouted);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestHttpsHostExtractionVariants);

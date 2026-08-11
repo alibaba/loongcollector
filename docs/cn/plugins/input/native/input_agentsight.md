@@ -75,15 +75,15 @@ dev
 | `server.address` / `server.port` | 目标主机与端口，从请求头的 `host`（HTTP/2 为 `:authority`）提取而来 |
 | `user_agent.original` | 客户端 UA，从请求头 `user-agent` 提取（OTel Stable 字段名，**不**输出 `http.request.header.user-agent`）|
 | `http.request.header.<小写头名>` | 白名单请求头，仅 `content-type`、`content-length`、`traceparent` 三个，见下方说明 |
-| `http.request.body.content` / `.size` / `.encoding` | 见下方「body 的编码」 |
+| `http.request.body.content` / `.size` | 见下方「body 的保真度」 |
 
 **`http.response` 独有**
 
 | 字段 | 说明 |
 | --- | --- |
 | `http.response.status_code` / `is_sse` | 状态码、是否 SSE |
-| `http.response.header.<小写头名>` | **逐头输出**（OTel semconv 模板名），如 `http.response.header.content-type`。头名统一小写。**敏感头不输出**，见下方说明 |
-| `http.response.body.content` / `.size` / `.encoding` | 见下方「body 的编码」 |
+| `http.response.header.<小写头名>` | **逐头输出**（OTel semconv 模板名），如 `http.response.header.content-type`。头名统一小写。**敏感头、头名不合规的头均不输出，且每条日志上限 64 个**，见下方说明 |
+| `http.response.body.content` / `.size` | 见下方「body 的保真度」 |
 
 #### body 的保真度（重要）
 
@@ -92,8 +92,8 @@ dev
 | 载荷类型 | `.content` | `.size` | 实测证据 |
 | --- | --- | --- | --- |
 | **JSON / 纯文本** | ✅ 线上原文 | ✅ 准确 | DashScope 原生 API 200 响应：`.size = 440`，与响应头 `content-length: 440` 完全一致 |
-| **文本 + gzip 压缩** | ✅ 解压后原文 | ✅ 准确 | 响应头带 `content-encoding: gzip`，采到 112 字节明文，与不压缩时逐字节相同 |
-| **文本 + chunked** | ✅ 去框后原文 | ✅ 准确 | 上述两例均为 `transfer-encoding: chunked`，采到的 body 无 `c3b\r\n` 残框 |
+| **文本 + gzip 压缩** | ✅ 解压后原文（**响应侧**；HTTP/1 请求侧 ❌ 不解压） | ✅ 准确 | 响应头带 `content-encoding: gzip`，采到 112 字节明文，与不压缩时逐字节相同 |
+| **文本 + chunked** | ✅ 去框后原文（**仅响应侧**；HTTP/1 请求侧 ❌ 不去框） | ✅ 准确 | 上述两例均为响应且带 `transfer-encoding: chunked`，采到的 body 无 `c3b\r\n` 残框 |
 | **二进制**（protobuf / 二进制流 / 图片） | ❌ **U+FFFD 污染，静默失真** | ❌ **虚高** | 发送 256 字节 `0x00..0xFF`，采到 `.size = 512`（128 ASCII + 128 × 3 字节替换字符） |
 
 使用者必须知道的两点：
@@ -103,17 +103,41 @@ dev
 
 本插件不做 base64 等编码兜底 —— 拿到的字节已经不是原始数据，编码也无从恢复。根治需在上游（anolisa）把 body 改成 `Vec<u8>` 贯穿 analyzer 与 FFI；`AgentsightHttpsData` 的 ABI 本来就是 `(ptr, len)` 形式，届时本插件侧无需改动。
 
+#### 去框与解压：请求侧和响应侧不对称
+
+上面保真度表格的证据**全部取自响应**。上游对两侧用的是不同的访问器，请求侧既不去框也不解压：
+
+| 场景 | chunked 去框 | gzip 解压 | 上游实现 |
+| --- | --- | --- | --- |
+| HTTP/1 响应（非 SSE） | ✅ | ✅ | `analyzer/unified.rs` 走 `body_str_decompressed()` → `dechunked_body()` |
+| HTTP/1 响应（SSE） | 不适用（按 SSE 事件解析后重组） | — | `analyzer/unified.rs` 走 `resp.json_body()` |
+| **HTTP/1 请求** | ❌ | ❌ | 走 `req.body()` 原始字节；`ParsedRequest` 只有 `body` / `body_str` / `json_body`，**没有**去框或解压访问器 |
+| HTTP/2 双向 | 不适用（h2 分块在帧层，无 `transfer-encoding: chunked`） | ✅ | `aggregator/http2.rs` 的 `request_body_str()` / `response_body_str()` |
+
+因此 **chunked 残框只出现在两种情况**，不要按「一律可能有框」来处理：
+
+1. **HTTP/1 请求体：恒定带框。** `http.request.body.content` 会是 `c3b\r\n...\r\n0\r\n\r\n` 形态的原文。接入方要解析 chunked 请求体**必须自己 dechunk**。
+2. **HTTP/1 响应体的降级情形。** 去框以 `transfer-encoding` 头存在为前提（`is_chunked()`），该头缺失或被改写时不去框；另外 `dechunk_body()` 对非空 body 解出空结果时会回退到原始 body（`parser/http/response.rs`）。
+
+请求侧的根治需要在 AgentSight（Rust）侧给 `ParsedRequest` 补上与响应侧对等的访问器。
+
 > **请求头按白名单过滤。** `Authorization` / `x-api-key` / `cookie` 这类头携带有效凭据，而本路径原样上报、不做任何脱敏，输出即等于把凭据写入磁盘（实测确认过）。因此请求头采用**白名单**：只输出 `content-type`、`content-length`、`traceparent` 三个（键名 `http.request.header.<小写头名>`），另外 `host` 与 `user-agent` 分别提取为 `server.address` / `server.port` 与 `user_agent.original`。**白名单之外的头一律丢弃**，包括未知厂商的自定义头 —— 这一侧宁可少报也不能漏一个凭据。
 >
 > 这三个头之所以值得救回：`content-type` 直接解释「为什么没能解析成 GenAI 语义」；`content-length` 是判定 body 是否被上游 `from_utf8_lossy` 污染/截断的唯一交叉校验基准；`traceparent` 是把 raw 日志与应用侧 trace 关联起来的唯一途径。新增白名单头请修改 `AgentsightManager.cpp` 的 `kAllowedRequestHeaders` 常量。
 >
+> 白名单模型天然 fail-safe：HTTP/2 上头名可能无法解码（见下方响应头说明），解不出的头名匹配不上白名单，自动被丢弃。代价是 `traceparent` 不在 HPACK 静态表内，h2 场景下**可能采不到** —— 丢一个诊断字段，而不是漏一个凭据。
+>
 > **响应头则相反，按黑名单过滤后逐头输出。** 两侧风险画像正好镜像：请求头敏感面大、价值集中在少数几个已知头名，所以白名单更安全；响应头是诊断价值的主要来源、厂商自定义头多，白名单会挡掉大量有用信息，所以用黑名单：以下头名（小写全等匹配）永不落盘 —— `set-cookie`、`set-cookie2`、`www-authenticate`、`proxy-authenticate`、`authorization`、`proxy-authorization`、`x-api-key`、`api-key`、`x-auth-token`、`x-amz-security-token`。`set-cookie` 是可直接重放的会话凭据，`*-authenticate` 带 challenge/nonce。
 >
-> **残余风险：黑名单是开放集合。** 未知厂商在自定义响应头（如某些网关的 `x-*`）里回吐 token 的情况会默认放行。发现新的敏感响应头请补充到 `AgentsightManager.cpp` 的 `kSensitiveResponseHeaders` 常量。
+> **头名不合规的整项丢弃（连值一起）。** 黑名单是按「解码后的头名」匹配的，而 HTTP/2 的头名来自**无状态** HPACK 解码（`decode_headers_stateless`，没有动态表状态）：当头名以动态表索引形式给出时，上游无法还原，会替换成字面量 `<unknown:N>`，**而值是完整真实值**。黑名单 10 项里只有 `set-cookie`、`www-authenticate`、`proxy-authenticate`、`authorization`、`proxy-authorization` 在 HPACK 静态表内；`set-cookie2`、`x-api-key`、`api-key`、`x-auth-token`、`x-amz-security-token` 不在 —— 而把自定义头放进动态表复用正是 HPACK 的用途，所以长连接上第二次出现的 `x-api-key` 会以 `<unknown:62>` 出现。因此凡头名不符合 RFC 7230 token 字符集的项一律整项丢弃：头名不可信时无法判断是否敏感，宁可少报一个诊断字段，不能漏一个凭据。该规则同时挡掉 `<dynamic:N>`、Huffman 解码失败产生的乱码头名，以及 `:status` 这类伪头（`:` 不是 token 字符；状态码本来就有 `http.response.status_code`，不需要重复输出）。
+>
+> **每条日志最多输出 64 个响应头**，与 HTTP/1 侧 `httparse` 的 `MAX_HEADERS = 64` 对齐。HTTP/2 侧上游没有条数上限，而逐头输出意味着每个头名都是一个字段名，不设上限会让字段名基数无限膨胀 —— 对按字段名建动态列的存储侧是运维风险。超限和头名不合规的丢弃条数会打 DEBUG 日志，不静默。
+>
+> **残余风险：黑名单是开放集合。** 未知厂商在自定义响应头（如某些网关的 `x-*`）里回吐 token、且头名能正常解码的情况会默认放行。发现新的敏感响应头请补充到 `AgentsightManager.cpp` 的 `kSensitiveResponseHeaders` 常量。
 >
 > 但请注意 **body 仍是原文**：部分厂商在请求体内传凭据，这类内容依然会落盘 —— 这是原始采集的固有性质。
 >
-> 另外 body 可能仍带 **chunked 传输编码的框**（形如 `c3b\r\n...\r\n0\r\n\r\n`）：raw 路径转发的是未解码的缓冲，去框需要在 AgentSight（Rust）侧修复。
+> body 的去框 / 解压情况见上方「去框与解压：请求侧和响应侧不对称」—— 与脱敏无关，但同样影响接入方要不要自己写解析逻辑。
 
 #### 采集范围：`Https` 域名列表**不限制**上报范围
 
