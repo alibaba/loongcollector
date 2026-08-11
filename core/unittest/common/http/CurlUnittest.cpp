@@ -109,8 +109,7 @@ void CurlUnittest::TestSkipInterfaceBindForLoopback() {
     auto performAndCheckInterfaceApplied = [&](const std::string& endpoint) -> bool {
         HttpResponse res;
         curl_slist* headers = nullptr;
-        CURL* curl = CreateCurlHandler(
-            "GET", false, endpoint, 80, "/", "", emptyHeader, "", res, headers, 1, badIntf);
+        CURL* curl = CreateCurlHandler("GET", false, endpoint, 80, "/", "", emptyHeader, "", res, headers, 1, badIntf);
         APSARA_TEST_NOT_EQUAL(nullptr, curl);
         CURLcode code = curl_easy_perform(curl);
         if (headers != nullptr) {
