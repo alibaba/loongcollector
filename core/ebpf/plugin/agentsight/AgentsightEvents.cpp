@@ -76,4 +76,22 @@ AgentsightLlmRecord::AgentsightLlmRecord(std::string pipelineConfigName, const A
     mToolDefinitionsJson = CopyBuffer(d.tools, d.tools_len);
 }
 
+// Deep-copies from AgentsightHttpsData: headers/body are (ptr, len) buffers that are only valid
+// during the FFI callback; method/path are NUL-terminated C strings.
+AgentsightHttpsRecord::AgentsightHttpsRecord(std::string pipelineConfigName, const AgentsightHttpsData& d)
+    : CommonEvent(KernelEventType::AGENTSIGHT_HTTPS_RECORD), mPipelineConfigName(std::move(pipelineConfigName)) {
+    mPid = d.pid;
+    mTimestampNs = d.timestamp_ns;
+    mDurationNs = d.duration_ns;
+    mStatusCode = d.status_code;
+    mIsSse = d.is_sse;
+    mProcessName = CopyProcessName(d.process_name);
+    mMethod = CopyCStr(d.method);
+    mPath = CopyCStr(d.path);
+    mRequestHeaders = CopyBuffer(d.request_headers, d.request_headers_len);
+    mRequestBody = CopyBuffer(d.request_body, d.request_body_len);
+    mResponseHeaders = CopyBuffer(d.response_headers, d.response_headers_len);
+    mResponseBody = CopyBuffer(d.response_body, d.response_body_len);
+}
+
 } // namespace logtail::ebpf

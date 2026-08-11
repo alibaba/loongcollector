@@ -24,6 +24,7 @@ class AgentsightEventsUnittest : public testing::Test {
 public:
     void TestLlmRecordCopiesNonNullSizedBuffers();
     void TestLlmRecordCopiesProcessNameAndCmdline();
+    void TestHttpsRecordCopiesNonNullSizedBuffers();
 };
 
 void AgentsightEventsUnittest::TestLlmRecordCopiesNonNullSizedBuffers() {
@@ -79,5 +80,47 @@ void AgentsightEventsUnittest::TestLlmRecordCopiesProcessNameAndCmdline() {
 
 UNIT_TEST_CASE(AgentsightEventsUnittest, TestLlmRecordCopiesNonNullSizedBuffers)
 UNIT_TEST_CASE(AgentsightEventsUnittest, TestLlmRecordCopiesProcessNameAndCmdline)
+
+void AgentsightEventsUnittest::TestHttpsRecordCopiesNonNullSizedBuffers() {
+    // (ptr, len) buffers without NUL terminators: must be copied by length
+    static const char kReqHdrs[] = {'{', '"', 'h'};
+    static const char kReqBody[] = {'r', 'e', 'q'};
+    static const char kResHdrs[] = {'{', '"', 's'};
+    static const char kResBody[] = {'r', 'e', 's', 'p'};
+
+    AgentsightHttpsData d{};
+    d.pid = 1234;
+    d.timestamp_ns = 100;
+    d.duration_ns = 50;
+    d.status_code = 200;
+    d.is_sse = 1;
+    d.method = "POST";
+    d.path = "/v1/chat";
+    d.request_headers = kReqHdrs;
+    d.request_headers_len = 3;
+    d.request_body = kReqBody;
+    d.request_body_len = 3;
+    d.response_headers = kResHdrs;
+    d.response_headers_len = 3;
+    d.response_body = kResBody;
+    d.response_body_len = 4;
+
+    AgentsightHttpsRecord r("pipe-b", d);
+    APSARA_TEST_EQUAL(r.GetKernelEventType(), KernelEventType::AGENTSIGHT_HTTPS_RECORD);
+    APSARA_TEST_EQUAL(r.mPid, 1234);
+    APSARA_TEST_EQUAL(r.mTimestampNs, 100UL);
+    APSARA_TEST_EQUAL(r.mDurationNs, 50UL);
+    APSARA_TEST_EQUAL(r.mStatusCode, 200);
+    APSARA_TEST_EQUAL(r.mIsSse, 1);
+    APSARA_TEST_EQUAL(r.mMethod, "POST");
+    APSARA_TEST_EQUAL(r.mPath, "/v1/chat");
+    APSARA_TEST_EQUAL(r.mRequestHeaders, "{\"h");
+    APSARA_TEST_EQUAL(r.mRequestBody, "req");
+    APSARA_TEST_EQUAL(r.mResponseHeaders, "{\"s");
+    APSARA_TEST_EQUAL(r.mResponseBody, "resp");
+    APSARA_TEST_EQUAL(r.GetPipelineConfigName(), "pipe-b");
+}
+
+UNIT_TEST_CASE(AgentsightEventsUnittest, TestHttpsRecordCopiesNonNullSizedBuffers)
 
 UNIT_TEST_MAIN

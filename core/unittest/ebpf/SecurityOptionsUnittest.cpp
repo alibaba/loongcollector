@@ -36,6 +36,7 @@ public:
     void TestAgentsightProbeConfigHttpsHttpInvalidTypes();
     void TestAgentsightEventStreamFormatParse();
     void TestAgentsightMessageDeltaOnlyDefaultAndParse();
+    void TestAgentsightEnableRawHttpsDefaultAndParse();
 };
 
 void SecurityOptionsUnittest::TestAgentsightNoProbeConfigFallsBackToBuiltin() {
@@ -47,6 +48,7 @@ void SecurityOptionsUnittest::TestAgentsightNoProbeConfigFallsBackToBuiltin() {
     APSARA_TEST_TRUE(opt.mAgentsightCmdlineWhitelist.empty());
     APSARA_TEST_TRUE(opt.mAgentsightMessageDeltaOnly);
     APSARA_TEST_TRUE(opt.mAgentsightEventStreamFormat);
+    APSARA_TEST_FALSE(opt.mAgentsightEnableRawHttps);
 }
 
 void SecurityOptionsUnittest::TestAgentsightMessageDeltaOnlyDefaultAndParse() {
@@ -62,6 +64,26 @@ void SecurityOptionsUnittest::TestAgentsightMessageDeltaOnlyDefaultAndParse() {
     APSARA_TEST_TRUE(ParseJsonTable(R"({"ProbeConfig":{"MessageDeltaOnly":true}})", config, err));
     APSARA_TEST_TRUE(opt.Init(SecurityProbeType::AGENTSIGHT_OBSERVE, config, &ctx, "input_agentsight"));
     APSARA_TEST_TRUE(opt.mAgentsightMessageDeltaOnly);
+}
+
+void SecurityOptionsUnittest::TestAgentsightEnableRawHttpsDefaultAndParse() {
+    CollectionPipelineContext ctx;
+    ctx.SetConfigName("cfg1");
+    SecurityOptions opt;
+    std::string err;
+    Json::Value config;
+    // Default when absent: false (LLM-only collection).
+    APSARA_TEST_TRUE(ParseJsonTable(R"({"ProbeConfig":{}})", config, err));
+    APSARA_TEST_TRUE(opt.Init(SecurityProbeType::AGENTSIGHT_OBSERVE, config, &ctx, "input_agentsight"));
+    APSARA_TEST_FALSE(opt.mAgentsightEnableRawHttps);
+
+    APSARA_TEST_TRUE(ParseJsonTable(R"({"ProbeConfig":{"EnableRawHttps":true}})", config, err));
+    APSARA_TEST_TRUE(opt.Init(SecurityProbeType::AGENTSIGHT_OBSERVE, config, &ctx, "input_agentsight"));
+    APSARA_TEST_TRUE(opt.mAgentsightEnableRawHttps);
+
+    APSARA_TEST_TRUE(ParseJsonTable(R"({"ProbeConfig":{"EnableRawHttps":false}})", config, err));
+    APSARA_TEST_TRUE(opt.Init(SecurityProbeType::AGENTSIGHT_OBSERVE, config, &ctx, "input_agentsight"));
+    APSARA_TEST_FALSE(opt.mAgentsightEnableRawHttps);
 }
 
 void SecurityOptionsUnittest::TestAgentsightProbeConfigWrongTypeFallsBackToBuiltin() {
@@ -257,5 +279,6 @@ UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightProbeConfigParsesHttpsAndH
 UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightProbeConfigHttpsHttpInvalidTypes)
 UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightEventStreamFormatParse)
 UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightMessageDeltaOnlyDefaultAndParse)
+UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightEnableRawHttpsDefaultAndParse)
 
 UNIT_TEST_MAIN

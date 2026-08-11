@@ -257,6 +257,8 @@ bool EBPFAdapter::tryLoadAgentSightDylib() {
         tmpLib->LoadMethod("agentsight_config_set_verbose", symErr));
     sym.config_set_log_path = reinterpret_cast<decltype(sym.config_set_log_path)>(
         tmpLib->LoadMethod("agentsight_config_set_log_path", symErr));
+    sym.config_set_enable_raw_https = reinterpret_cast<decltype(sym.config_set_enable_raw_https)>(
+        tmpLib->LoadMethod("agentsight_config_set_enable_raw_https", symErr));
     sym.config_add_cmdline_rule = reinterpret_cast<decltype(sym.config_add_cmdline_rule)>(
         tmpLib->LoadMethod("agentsight_config_add_cmdline_rule", symErr));
     sym.config_add_https
@@ -272,8 +274,9 @@ bool EBPFAdapter::tryLoadAgentSightDylib() {
     sym.handle_read = reinterpret_cast<decltype(sym.handle_read)>(tmpLib->LoadMethod("agentsight_read", symErr));
 
     const bool ok = sym.last_error && sym.config_new && sym.config_free && sym.config_set_verbose
-        && sym.config_set_log_path && sym.handle_new && sym.handle_free && sym.handle_start && sym.handle_stop
-        && sym.handle_get_eventfd && sym.handle_read && sym.config_add_https && sym.config_add_http;
+        && sym.config_set_log_path && sym.config_set_enable_raw_https && sym.handle_new && sym.handle_free
+        && sym.handle_start && sym.handle_stop && sym.handle_get_eventfd && sym.handle_read && sym.config_add_https
+        && sym.config_add_http;
 
     if (!ok) {
         LOG_WARNING(sLogger,

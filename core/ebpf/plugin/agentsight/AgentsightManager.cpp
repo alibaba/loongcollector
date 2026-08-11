@@ -33,12 +33,13 @@
 #include "models/LogEvent.h"
 #include "models/PipelineEventGroup.h"
 #include "monitor/metric_models/ReentrantMetricsRecord.h"
+#include "rapidjson/document.h"
 
 namespace logtail::ebpf {
 
 namespace {
 
-bool ParseHostAndPortFromRequestUrl(const std::string& url, std::string& host, std::string& port) {
+bool ParseHostAndPortFromUrlOrAuthority(const std::string& url, std::string& host, std::string& port) {
     host.clear();
     port.clear();
     const auto schemePos = url.find("://");
@@ -303,7 +304,7 @@ void FillAgentsightServerFromUrl(const AgentsightLlmRecord& rec, SetLogStrFn set
     }
     std::string host;
     std::string port;
-    if (ParseHostAndPortFromRequestUrl(rec.mRequestUrl, host, port)) {
+    if (ParseHostAndPortFromUrlOrAuthority(rec.mRequestUrl, host, port)) {
         setStr(StringView("server.address"), host);
         setStr(StringView("server.port"), port);
     }
@@ -436,6 +437,96 @@ void FillAgentsightModelResponseLog(const AgentsightLlmRecord& rec,
     setStr(StringView("gen_ai.output.messages"), rec.mResponseMessagesJson);
 }
 
+/// Extract the target host from raw HTTPS request headers (JSON object), checking the
+/// HTTP/1.1 `host` and HTTP/2 `:authority` keys. Returns an empty string when headers
+/// are unparseable or no host is present.
+std::string ExtractHostFromHeadersJson(const std::string& headersJson) {
+    if (headersJson.empty()) {
+        return {};
+    }
+    rapidjson::Document doc;
+    doc.Parse(headersJson.c_str(), headersJson.size());
+    if (doc.HasParseError() || !doc.IsObject()) {
+        return {};
+    }
+    static constexpr const char* kHostKeys[] = {"host", ":authority"};
+    for (const char* key : kHostKeys) {
+        const auto it = doc.FindMember(key);
+        if (it != doc.MemberEnd() && it->value.IsString()) {
+            const auto* v = it->value.GetString();
+            if (v != nullptr && v[0] != '\0') {
+                return std::string(v, it->value.GetStringLength());
+            }
+        }
+    }
+    return {};
+}
+
+void FillAgentsightHttpCommon(const AgentsightHttpsRecord& rec,
+                              SetLogStrFn setStr,
+                              logtail::LogEvent* log,
+                              const std::string& eventId,
+                              uint64_t timestampNs) {
+    SetLogTimestampFromNs(log, timestampNs);
+    FillAgentsightOtlpTimeFields(log, timestampNs);
+    log->SetContent(StringView("event.id"), StringView(eventId));
+    if (rec.mPid != 0) {
+        log->SetContent("pid", std::to_string(rec.mPid));
+    }
+    setStr(StringView("comm"), rec.mProcessName);
+    log->SetContent(StringView("url.scheme"), StringView("https"));
+}
+
+void FillAgentsightHttpRequestLog(const AgentsightHttpsRecord& rec,
+                                  logtail::LogEvent* log,
+                                  const std::string& eventId) {
+    auto setStr = [&](StringView k, const std::string& v) {
+        if (!v.empty()) {
+            log->SetContent(k, StringView(v.data(), v.size()));
+        }
+    };
+
+    FillAgentsightHttpCommon(rec, setStr, log, eventId, rec.mTimestampNs);
+    log->SetContent(StringView("event.name"), StringView("http.request"));
+    setStr(StringView("http.request.method"), rec.mMethod);
+    setStr(StringView("url.path"), rec.mPath);
+
+    const std::string authority = ExtractHostFromHeadersJson(rec.mRequestHeaders);
+    std::string host;
+    std::string port;
+    if (ParseHostAndPortFromUrlOrAuthority(authority, host, port)) {
+        setStr(StringView("server.address"), host);
+        setStr(StringView("server.port"), port);
+    }
+
+    setStr(StringView("http.request.header"), rec.mRequestHeaders);
+    setStr(StringView("http.request.body.content"), rec.mRequestBody);
+    if (!rec.mRequestBody.empty()) {
+        log->SetContent("http.request.body.size", std::to_string(rec.mRequestBody.size()));
+    }
+}
+
+void FillAgentsightHttpResponseLog(const AgentsightHttpsRecord& rec,
+                                   logtail::LogEvent* log,
+                                   const std::string& eventId) {
+    auto setStr = [&](StringView k, const std::string& v) {
+        if (!v.empty()) {
+            log->SetContent(k, StringView(v.data(), v.size()));
+        }
+    };
+
+    FillAgentsightHttpCommon(rec, setStr, log, eventId, rec.mTimestampNs + rec.mDurationNs);
+    log->SetContent(StringView("event.name"), StringView("http.response"));
+    log->SetContent("http.response.status_code", std::to_string(rec.mStatusCode));
+    log->SetContent(StringView("is_sse"), StringView(rec.mIsSse ? "1" : "0"));
+
+    setStr(StringView("http.response.header"), rec.mResponseHeaders);
+    setStr(StringView("http.response.body.content"), rec.mResponseBody);
+    if (!rec.mResponseBody.empty()) {
+        log->SetContent("http.response.body.size", std::to_string(rec.mResponseBody.size()));
+    }
+}
+
 } // namespace
 
 AgentsightManager::AgentsightManager(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
@@ -495,8 +586,8 @@ void AgentsightManager::StopAgentSightLocked() {
 
 bool AgentsightManager::RestartAgentSightLocked(const SecurityOptions& opts) {
     const auto* sym = mEBPFAdapter->GetAgentSightSymbols();
-    if (!sym || !sym->config_new || !sym->handle_new || !sym->handle_start || !sym->handle_read
-        || !sym->handle_get_eventfd) {
+    if (!sym || !sym->config_new || !sym->config_set_enable_raw_https || !sym->handle_new || !sym->handle_start
+        || !sym->handle_read || !sym->handle_get_eventfd) {
         StopAgentSightLocked();
         LOG_ERROR(sLogger, ("AgentSight", "symbols not available"));
         return false;
@@ -513,6 +604,7 @@ bool AgentsightManager::RestartAgentSightLocked(const SecurityOptions& opts) {
     if (!opts.mLogPath.empty()) {
         sym->config_set_log_path(cfg, opts.mLogPath.c_str());
     }
+    sym->config_set_enable_raw_https(cfg, opts.mAgentsightEnableRawHttps ? 1 : 0);
 
     ApplyAgentsightRulesToConfig(cfg, sym, opts);
 
@@ -551,7 +643,12 @@ int AgentsightManager::DrainReadsLocked() {
     }
     int total = 0;
     for (;;) {
-        const int r = sym->handle_read(mHandle, nullptr, nullptr, &AgentsightManager::OnLlmCallback, this, 0);
+        const int r = sym->handle_read(mHandle,
+                                      mEnableRawHttps ? &AgentsightManager::OnHttpsCallback : nullptr,
+                                      mEnableRawHttps ? this : nullptr,
+                                      &AgentsightManager::OnLlmCallback,
+                                      this,
+                                      0);
         if (r <= 0) {
             break;
         }
@@ -589,6 +686,22 @@ void AgentsightManager::OnLlmCallback(const AgentsightLLMData* data, void* user_
     } else {
         ADD_COUNTER(self->mLossKernelEventsTotal, 1);
         LOG_WARNING(sLogger, ("AgentSight LLM event enqueue failed", ""));
+    }
+}
+
+void AgentsightManager::OnHttpsCallback(const AgentsightHttpsData* data, void* user_data) {
+    if (!data || !user_data) {
+        return;
+    }
+    auto* self = static_cast<AgentsightManager*>(user_data);
+    // Same locking constraint as OnLlmCallback: runs under handle_read while mLibMutex is held.
+    const std::string configName = self->mConfigName;
+    auto evt = std::make_shared<AgentsightHttpsRecord>(configName, *data);
+    if (self->mCommonEventQueue.try_enqueue(evt)) {
+        ADD_COUNTER(self->mPluginInEventsTotal, 1);
+    } else {
+        ADD_COUNTER(self->mLossKernelEventsTotal, 1);
+        LOG_WARNING(sLogger, ("AgentSight HTTPS event enqueue failed", ""));
     }
 }
 
@@ -652,6 +765,7 @@ int AgentsightManager::AddOrUpdateConfig(const CollectionPipelineContext* ctx,
     mQueueKey = ctx->GetProcessQueueKey();
     mEventStreamFormat = sec->mAgentsightEventStreamFormat;
     mMessageDeltaOnly = sec->mAgentsightMessageDeltaOnly;
+    mEnableRawHttps = sec->mAgentsightEnableRawHttps;
 
     if (!RestartAgentSightLocked(*sec)) {
         releaseMetricRefs();
@@ -714,6 +828,7 @@ int AgentsightManager::update(const PluginOptions& opt) {
     std::lock_guard<std::mutex> lock(mLibMutex);
     mEventStreamFormat = (*secPtr)->mAgentsightEventStreamFormat;
     mMessageDeltaOnly = (*secPtr)->mAgentsightMessageDeltaOnly;
+    mEnableRawHttps = (*secPtr)->mAgentsightEnableRawHttps;
     return 0;
 }
 
@@ -732,6 +847,7 @@ int AgentsightManager::resume(const PluginOptions& opt) {
     }
     mEventStreamFormat = (*secPtr)->mAgentsightEventStreamFormat;
     mMessageDeltaOnly = (*secPtr)->mAgentsightMessageDeltaOnly;
+    mEnableRawHttps = (*secPtr)->mAgentsightEnableRawHttps;
     if (!RestartAgentSightLocked(**secPtr)) {
         return 1;
     }
@@ -746,10 +862,20 @@ std::unique_ptr<PluginConfig> AgentsightManager::GeneratePluginConfig(const Plug
 }
 
 int AgentsightManager::HandleEvent(const std::shared_ptr<CommonEvent>& event) {
-    if (!event || event->GetKernelEventType() != KernelEventType::AGENTSIGHT_LLM_RECORD) {
+    if (!event) {
         return 0;
     }
-    auto* rec = static_cast<AgentsightLlmRecord*>(event.get());
+    switch (event->GetKernelEventType()) {
+        case KernelEventType::AGENTSIGHT_LLM_RECORD:
+            return HandleLlmEvent(static_cast<AgentsightLlmRecord*>(event.get()));
+        case KernelEventType::AGENTSIGHT_HTTPS_RECORD:
+            return HandleHttpsEvent(static_cast<AgentsightHttpsRecord*>(event.get()));
+        default:
+            return 0;
+    }
+}
+
+int AgentsightManager::HandleLlmEvent(AgentsightLlmRecord* rec) {
     if (!rec) {
         return 1;
     }
@@ -823,6 +949,49 @@ int AgentsightManager::HandleEvent(const std::shared_ptr<CommonEvent>& event) {
         } else {
             FillAgentsightCombinedLlmLog(*rec, log, messageDeltaOnly, emitPayload);
         }
+    }
+
+    std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(eventGroup), pluginIndex);
+    if (QueueStatus::OK == ProcessQueueManager::GetInstance()->PushQueue(queueKey, std::move(item))) {
+        ADD_COUNTER(mPushLogsTotal, logCount);
+        ADD_COUNTER(mPushLogGroupTotal, 1);
+    } else {
+        if (mPushLogFailedTotal) {
+            ADD_COUNTER(mPushLogFailedTotal, 1);
+        }
+        LOG_WARNING(
+            sLogger,
+            ("Agentsight push queue failed", "")("config", rec->GetPipelineConfigName())("pluginIdx", pluginIndex));
+    }
+    return 0;
+}
+
+int AgentsightManager::HandleHttpsEvent(AgentsightHttpsRecord* rec) {
+    if (!rec) {
+        return 1;
+    }
+
+    logtail::QueueKey queueKey;
+    uint32_t pluginIndex;
+    {
+        std::lock_guard<std::mutex> lock(mLibMutex);
+        if (mPipelineCtx == nullptr) {
+            return 0;
+        }
+        queueKey = mQueueKey;
+        pluginIndex = mPluginIndex;
+    }
+
+    auto sourceBuffer = std::make_shared<SourceBuffer>();
+    PipelineEventGroup eventGroup(sourceBuffer);
+    // A completed request/response pair shares one event.id for downstream correlation. RequestOnly
+    // records (status_code == 0) emit just the request. Duration is represented by the timestamps,
+    // so no separate duration field is emitted (no matching OTel semconv attribute).
+    const std::string eventId = CalculateRandomUUID();
+    FillAgentsightHttpRequestLog(*rec, eventGroup.AddLogEvent(true, mEventPool), eventId);
+    const size_t logCount = rec->mStatusCode == 0 ? 1U : 2U;
+    if (logCount == 2U) {
+        FillAgentsightHttpResponseLog(*rec, eventGroup.AddLogEvent(true, mEventPool), eventId);
     }
 
     std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(eventGroup), pluginIndex);

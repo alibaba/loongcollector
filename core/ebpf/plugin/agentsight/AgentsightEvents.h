@@ -68,4 +68,30 @@ public:
     std::string mToolDefinitionsJson;
 };
 
+/// Raw HTTPS exchange reported when captured traffic could not be parsed into LLM semantics
+/// (coolbpf fallback path). Deep-copies all fields from AgentsightHttpsData.
+class AgentsightHttpsRecord : public CommonEvent {
+public:
+    AgentsightHttpsRecord(std::string pipelineConfigName, const AgentsightHttpsData& d);
+
+    PluginType GetPluginType() const override { return PluginType::AGENTSIGHT_OBSERVE; }
+
+    const std::string& GetPipelineConfigName() const { return mPipelineConfigName; }
+
+    std::string mPipelineConfigName;
+
+    int32_t mPid = 0;
+    uint64_t mTimestampNs = 0;
+    uint64_t mDurationNs = 0;
+    uint16_t mStatusCode = 0;
+    uint8_t mIsSse = 0;
+    std::string mProcessName;
+    std::string mMethod;
+    std::string mPath;
+    std::string mRequestHeaders;
+    std::string mRequestBody;
+    std::string mResponseHeaders;
+    std::string mResponseBody;
+};
+
 } // namespace logtail::ebpf

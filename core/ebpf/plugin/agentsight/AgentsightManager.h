@@ -30,6 +30,9 @@
 
 namespace logtail::ebpf {
 
+class AgentsightLlmRecord;
+class AgentsightHttpsRecord;
+
 class AgentsightManager : public AbstractManager {
 public:
     AgentsightManager() = delete;
@@ -94,6 +97,10 @@ protected:
 
 private:
     static void OnLlmCallback(const AgentsightLLMData* data, void* user_data);
+    static void OnHttpsCallback(const AgentsightHttpsData* data, void* user_data);
+
+    int HandleLlmEvent(AgentsightLlmRecord* rec);
+    int HandleHttpsEvent(AgentsightHttpsRecord* rec);
 
     void StopAgentSightLocked();
     bool RestartAgentSightLocked(const SecurityOptions& opts);
@@ -122,6 +129,9 @@ private:
     bool mRunning = false;
     bool mEventStreamFormat = true;
     bool mMessageDeltaOnly = true;
+    // When false (default), the HTTPS fallback callback is passed as nullptr to agentsight_read,
+    // so unparsable traffic is consumed and dropped (LLM-only collection).
+    bool mEnableRawHttps = false;
 
     CounterPtr mLossKernelEventsTotal;
     CounterPtr mPushLogFailedTotal;
