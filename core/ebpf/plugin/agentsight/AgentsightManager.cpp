@@ -17,6 +17,7 @@
 #include <cctype>
 
 #include <algorithm>
+#include <array>
 #include <functional>
 #include <utility>
 #include <vector>
@@ -111,27 +112,65 @@ bool ParseHostAndPortFromUrlOrAuthority(const std::string& url, std::string& hos
     return !host.empty();
 }
 
-/// Extracts the target host from a raw HTTP headers JSON object — the flat, lowercase-keyed
-/// string→string map that AgentSight's FFI layer produces for `AgentsightHttpsData`.
+/// Request headers that are safe to emit and worth emitting, as `http.request.header.<name>`.
 ///
-/// Needed because `AgentsightHttpsData` carries no request URL, and the headers themselves are
-/// deliberately never emitted (they carry `Authorization` / `x-api-key`). This salvages the one
-/// field worth keeping. Checks `host`, then the HTTP/2 `:authority` pseudo-header, then falls back
-/// to a case-insensitive scan for producers that preserve original header casing.
-std::string ExtractHostFromHeadersJson(const std::string& headersJson) {
+/// The request side uses an ALLOWLIST, the opposite of the response side's denylist
+/// (kSensitiveResponseHeaders), because the risk profiles are mirror images: request headers are
+/// where credentials live (`authorization`, `x-api-key`, `cookie`, plus whatever a vendor invents),
+/// while their diagnostic value is concentrated in a handful of well-known names. An open set would
+/// be a credential leak waiting for the next vendor header; here an unknown header is simply dropped.
+///
+/// Why each one earns its place — this fallback exists to answer "there were calls, why no logs":
+///   - content-type: says what the body actually was, i.e. directly explains why it could not be
+///     parsed as GenAI semantics.
+///   - content-length: the only cross-check for whether the emitted body was mangled by the upstream
+///     from_utf8_lossy conversion (see EmitHttpBody) — `http.request.body.size` alone proves nothing.
+///   - traceparent: W3C trace context, the only way to join these logs to application-side traces.
+///
+/// `host` / `:authority` and `user-agent` are deliberately NOT here: they are salvaged into the
+/// stable OTel attributes `server.address` / `server.port` and `user_agent.original` instead, the
+/// same way this path already prefers `url.path` over a header echo.
+constexpr std::array<const char*, 3> kAllowedRequestHeaders = {
+    "content-type",
+    "content-length",
+    "traceparent",
+};
+
+/// The subset of a raw request's headers that survives filtering. Everything else — credentials
+/// included — stays in memory and is dropped with the record.
+struct RawRequestHeaderFields {
+    /// `host`, falling back to the HTTP/2 `:authority` pseudo-header. Feeds server.address/.port.
+    std::string host;
+    /// → `user_agent.original` (OTel Stable), not `http.request.header.user-agent`; emitting both
+    /// would duplicate the value under two keys.
+    std::string userAgent;
+    /// Allowlisted headers, lowercased names, in `kAllowedRequestHeaders` order-independent
+    /// iteration order. → `http.request.header.<name>`.
+    std::vector<std::pair<std::string, std::string>> allowed;
+};
+
+/// Pulls everything worth keeping out of a raw HTTP request's headers JSON — the flat,
+/// lowercase-keyed string→string map that AgentSight's FFI layer produces for `AgentsightHttpsData`.
+///
+/// One rapidjson DOM parse for host + user-agent + allowlisted headers, because the host extraction
+/// had to parse anyway. Runs on the poller thread (via FillAgentsightHttpRequestLog), not on the
+/// OnHttpsCallback path, so it is not subject to that callback's non-blocking constraint.
+///
+/// Header names are lowercased here rather than trusting the producer: upstream does lowercase them
+/// (`parser/http/parser.rs` keys its HashMap by `h.name.to_lowercase()`) but the allowlist match is
+/// only sound *because* of this normalization, and a producer change must not silently turn a
+/// dropped header into an emitted one. `host` wins over `:authority` when both are present.
+RawRequestHeaderFields ExtractRequestHeaderFields(const std::string& headersJson) {
+    RawRequestHeaderFields fields;
     if (headersJson.empty()) {
-        return {};
+        return fields;
     }
     rapidjson::Document doc;
     if (doc.Parse(headersJson.c_str(), headersJson.size()).HasParseError() || !doc.IsObject()) {
-        return {};
+        return fields;
     }
-    for (const char* key : {"host", ":authority"}) {
-        const auto it = doc.FindMember(key);
-        if (it != doc.MemberEnd() && it->value.IsString() && it->value.GetStringLength() > 0) {
-            return std::string(it->value.GetString(), it->value.GetStringLength());
-        }
-    }
+
+    std::string authority;
     for (auto it = doc.MemberBegin(); it != doc.MemberEnd(); ++it) {
         if (!it->name.IsString() || !it->value.IsString() || it->value.GetStringLength() == 0) {
             continue;
@@ -139,11 +178,34 @@ std::string ExtractHostFromHeadersJson(const std::string& headersJson) {
         std::string name(it->name.GetString(), it->name.GetStringLength());
         std::transform(
             name.begin(), name.end(), name.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-        if (name == "host" || name == ":authority") {
-            return std::string(it->value.GetString(), it->value.GetStringLength());
+        if (name.empty()) {
+            continue;
+        }
+        std::string value(it->value.GetString(), it->value.GetStringLength());
+
+        if (name == "host") {
+            fields.host = std::move(value);
+            continue;
+        }
+        if (name == ":authority") {
+            authority = std::move(value);
+            continue;
+        }
+        if (name == "user-agent") {
+            fields.userAgent = std::move(value);
+            continue;
+        }
+        const bool allowed = std::any_of(kAllowedRequestHeaders.begin(),
+                                         kAllowedRequestHeaders.end(),
+                                         [&name](const char* candidate) { return name == candidate; });
+        if (allowed) {
+            fields.allowed.emplace_back(std::move(name), std::move(value));
         }
     }
-    return {};
+    if (fields.host.empty()) {
+        fields.host = std::move(authority);
+    }
+    return fields;
 }
 
 /// Emits one captured body under `<prefix>.content` / `<prefix>.size`.
@@ -498,6 +560,10 @@ void FillAgentsightModelResponseLog(const AgentsightLlmRecord& rec,
     setStr(StringView("gen_ai.output.messages"), rec.mResponseMessagesJson);
 }
 
+/// `event.sequence` values ordering the two halves of one raw HTTP exchange.
+constexpr uint32_t kHttpRequestEventSequence = 1;
+constexpr uint32_t kHttpResponseEventSequence = 2;
+
 /// Fields shared by the `http.request` / `http.response` pair of a raw HTTP exchange — the traffic
 /// AgentSight could not map onto GenAI semantics.
 ///
@@ -507,14 +573,25 @@ void FillAgentsightModelResponseLog(const AgentsightLlmRecord& rec,
 /// `comm` / `cmdline` / `container.id` this path already uses. The gen_ai.* path keeps
 /// `gen_ai.agent.type` (see FillAgentsightCommonCorrelation) — the value is identical, only the key
 /// differs, so a downstream query spanning both streams has to coalesce the two names.
+///
+/// Correlation follows the same three-way split the gen_ai.* path uses, only with unprefixed keys:
+/// `event.id` identifies this one log, `http.exchange.id` is the pairing key shared by the two halves
+/// of one exchange (the gen_ai.* counterpart is `gen_ai.step.id`), and `event.sequence` orders them
+/// within the exchange (`gen_ai.event.sequence` there). Sequence matters because mDurationNs can be 0
+/// — request-only records, or a response returned inside the same second — which makes the two
+/// timestamps identical and the order otherwise undecidable.
 void FillAgentsightHttpCommon(const AgentsightHttpsRecord& rec,
                               SetLogStrFn setStr,
                               logtail::LogEvent* log,
                               const std::string& eventId,
+                              const std::string& exchangeId,
+                              uint32_t eventSequence,
                               uint64_t timestampNs) {
     SetLogTimestampFromNs(log, timestampNs);
     FillAgentsightOtlpTimeFields(log, timestampNs);
     log->SetContent(StringView("event.id"), StringView(eventId));
+    log->SetContent(StringView("http.exchange.id"), StringView(exchangeId));
+    log->SetContent("event.sequence", std::to_string(eventSequence));
     if (rec.mPid != 0) {
         log->SetContent("pid", std::to_string(rec.mPid));
     }
@@ -527,51 +604,126 @@ void FillAgentsightHttpCommon(const AgentsightHttpsRecord& rec,
 
 /// Request half of a raw HTTP exchange.
 ///
-/// Request headers are deliberately NOT emitted: they carry `Authorization` / `x-api-key`, and this
-/// path reports verbatim bytes with no redaction, so emitting them writes live credentials to disk
-/// (observed in testing). Only the target host is salvaged from them, as `server.address` /
-/// `server.port` — matching the field names the gen_ai.* logs already use.
+/// Request headers are filtered through an allowlist (kAllowedRequestHeaders), never emitted
+/// wholesale: they carry `Authorization` / `x-api-key` / `cookie`, and this path reports verbatim
+/// bytes with no redaction, so emitting them writes live credentials to disk (observed in testing).
+/// Two of them are salvaged into stable OTel attributes instead of the header namespace — the host as
+/// `server.address` / `server.port` (matching the field names the gen_ai.* logs already use) and the
+/// user agent as `user_agent.original`.
 void FillAgentsightHttpRequestLog(const AgentsightHttpsRecord& rec,
                                   logtail::LogEvent* log,
-                                  const std::string& eventId) {
+                                  const std::string& eventId,
+                                  const std::string& exchangeId) {
     auto setStr = [&](StringView k, const std::string& v) {
         if (!v.empty()) {
             log->SetContent(k, StringView(v.data(), v.size()));
         }
     };
 
-    FillAgentsightHttpCommon(rec, setStr, log, eventId, rec.mTimestampNs);
+    FillAgentsightHttpCommon(rec, setStr, log, eventId, exchangeId, kHttpRequestEventSequence, rec.mTimestampNs);
     log->SetContent(StringView("event.name"), StringView("http.request"));
     setStr(StringView("http.request.method"), rec.mMethod);
     setStr(StringView("url.path"), rec.mPath);
 
+    const RawRequestHeaderFields headerFields = ExtractRequestHeaderFields(rec.mRequestHeaders);
     std::string host;
     std::string port;
-    if (ParseHostAndPortFromUrlOrAuthority(ExtractHostFromHeadersJson(rec.mRequestHeaders), host, port)) {
+    if (ParseHostAndPortFromUrlOrAuthority(headerFields.host, host, port)) {
         setStr(StringView("server.address"), host);
         setStr(StringView("server.port"), port);
     }
+    setStr(StringView("user_agent.original"), headerFields.userAgent);
+    for (const auto& header : headerFields.allowed) {
+        log->SetContent("http.request.header." + header.first, header.second);
+    }
 
     EmitHttpBody(log, "http.request.body", rec.mRequestBody);
+}
+
+/// Response headers that carry credentials or credential challenges. Never emitted.
+///
+/// This applies to the response side the same reasoning that already removed *request* headers
+/// wholesale (see FillAgentsightHttpRequestLog): this path reports verbatim bytes with no redaction,
+/// so emitting a credential-bearing header writes a live credential to disk. `set-cookie` is a
+/// directly replayable session credential, the `*-authenticate` headers carry challenges/nonces, and
+/// some gateways echo tokens back in `x-*` headers.
+///
+/// Deliberately a denylist, not an allowlist: response headers are high-value for diagnosis and
+/// vendors invent their own, so an allowlist would hide most of what this fallback exists to surface.
+/// The trade-off is that this is an OPEN set — an unknown vendor's token-bearing response header is
+/// emitted by default. Add newly discovered ones here.
+constexpr std::array<const char*, 10> kSensitiveResponseHeaders = {
+    "set-cookie",
+    "set-cookie2",
+    "www-authenticate",
+    "proxy-authenticate",
+    "authorization",
+    "proxy-authorization",
+    "x-api-key",
+    "api-key",
+    "x-auth-token",
+    "x-amz-security-token",
+};
+
+/// Emits response headers one attribute per header, as `http.response.header.<name>` (the OTel
+/// semconv attribute template), skipping kSensitiveResponseHeaders.
+///
+/// Per-header rather than one JSON blob because the denylist has to parse the JSON anyway: emitting
+/// each header separately makes the filtering structural instead of a parse → filter → re-serialize
+/// round trip, and the result is directly queryable.
+///
+/// Names are lowercased here even though both upstream producers already lowercase them
+/// (`parser/http/parser.rs` collects into a HashMap keyed by `h.name.to_lowercase()`, and HPACK
+/// header names are lowercase by spec) — the normalization is what makes the denylist match sound,
+/// so it must not depend on the producer getting it right.
+void EmitHttpResponseHeaders(logtail::LogEvent* log, const std::string& headersJson) {
+    if (headersJson.empty()) {
+        return;
+    }
+    rapidjson::Document doc;
+    if (doc.Parse(headersJson.c_str(), headersJson.size()).HasParseError() || !doc.IsObject()) {
+        return;
+    }
+    for (auto it = doc.MemberBegin(); it != doc.MemberEnd(); ++it) {
+        if (!it->name.IsString() || !it->value.IsString() || it->value.GetStringLength() == 0) {
+            continue;
+        }
+        std::string name(it->name.GetString(), it->name.GetStringLength());
+        std::transform(
+            name.begin(), name.end(), name.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        if (name.empty()) {
+            continue;
+        }
+        const bool sensitive = std::any_of(kSensitiveResponseHeaders.begin(),
+                                           kSensitiveResponseHeaders.end(),
+                                           [&name](const char* denied) { return name == denied; });
+        if (sensitive) {
+            continue;
+        }
+        log->SetContent("http.response.header." + name,
+                        std::string(it->value.GetString(), it->value.GetStringLength()));
+    }
 }
 
 /// Response half of a raw HTTP exchange. Duration is carried by the gap between this event's
 /// timestamp and the request event's, so no separate duration field is emitted.
 void FillAgentsightHttpResponseLog(const AgentsightHttpsRecord& rec,
                                    logtail::LogEvent* log,
-                                   const std::string& eventId) {
+                                   const std::string& eventId,
+                                   const std::string& exchangeId) {
     auto setStr = [&](StringView k, const std::string& v) {
         if (!v.empty()) {
             log->SetContent(k, StringView(v.data(), v.size()));
         }
     };
 
-    FillAgentsightHttpCommon(rec, setStr, log, eventId, rec.mTimestampNs + rec.mDurationNs);
+    FillAgentsightHttpCommon(
+        rec, setStr, log, eventId, exchangeId, kHttpResponseEventSequence, rec.mTimestampNs + rec.mDurationNs);
     log->SetContent(StringView("event.name"), StringView("http.response"));
     log->SetContent("http.response.status_code", std::to_string(rec.mStatusCode));
     log->SetContent(StringView("is_sse"), StringView(rec.mIsSse ? "1" : "0"));
 
-    setStr(StringView("http.response.header"), rec.mResponseHeaders);
+    EmitHttpResponseHeaders(log, rec.mResponseHeaders);
     EmitHttpBody(log, "http.response.body", rec.mResponseBody);
 }
 
@@ -947,7 +1099,15 @@ int AgentsightManager::HandleHttpsEvent(const AgentsightHttpsRecord* rec) {
     uint32_t pluginIndex;
     {
         std::lock_guard<std::mutex> lock(mLibMutex);
-        if (mPipelineCtx == nullptr) {
+        // mPipelineCtx != nullptr only proves *some* config is live, not that it is the one this record
+        // was stamped under. mConfigName/mQueueKey are rebound on config switch, so a record enqueued
+        // under config A that is still pending when A is removed and B registers would be pushed into
+        // B's queue — and this path does no redaction, so that leaks A's raw body to B. Drop instead.
+        if (mPipelineCtx == nullptr || rec->GetPipelineConfigName() != mConfigName) {
+            ADD_COUNTER(mLossKernelEventsTotal, 1);
+            LOG_DEBUG(sLogger,
+                      ("Agentsight raw HTTP event dropped", "config no longer registered")(
+                          "recordConfig", rec->GetPipelineConfigName())("currentConfig", mConfigName));
             return 0;
         }
         queueKey = mQueueKey;
@@ -956,14 +1116,30 @@ int AgentsightManager::HandleHttpsEvent(const AgentsightHttpsRecord* rec) {
 
     auto sourceBuffer = std::make_shared<SourceBuffer>();
     PipelineEventGroup eventGroup(sourceBuffer);
-    // A completed request/response pair shares one event.id for downstream correlation. Records with
-    // status_code == 0 never got a response (request-only), so they emit just the request event.
+    // Correlation mirrors the gen_ai.* path's split of responsibilities (see FillAgentsightHttpCommon):
+    // one shared http.exchange.id pairs the two halves, each log gets its own event.id, and
+    // event.sequence fixes their order. event.id must stay unique per log — downstream treats it as the
+    // log's identity key, so sharing it across the pair would make dedup/join/idempotent-write drop one
+    // half as a duplicate.
+    //
     // Duration is represented by the two timestamps — there is no matching OTel semconv attribute.
-    const std::string eventId = CalculateRandomUUID();
-    FillAgentsightHttpRequestLog(*rec, eventGroup.AddLogEvent(true, mEventPool), eventId);
-    const size_t logCount = rec->mStatusCode == 0 ? 1U : 2U;
+    //
+    // "Had a response" is decided by the response payload being present, NOT by status_code != 0.
+    // Only agentsight's RequestOnly path deliberately means "no response" by status_code 0, and it
+    // also clears response_headers/response_body. Http2StreamComplete reports whatever
+    // Http2Stream::status_code() yields, which is 0 whenever the `:status` pseudo-header is missing
+    // or its HPACK decode failed — with headers and body still fully populated. Keying off the
+    // status code there would silently drop an entire http.response (headers *and* body) for h2
+    // traffic, i.e. reintroduce on this path exactly the silent-drop this fallback exists to avoid.
+    // status_code 0 is then emitted as-is, so downstream can tell "response present, status
+    // unparseable" from "no response at all".
+    const std::string exchangeId = CalculateRandomUUID();
+    FillAgentsightHttpRequestLog(*rec, eventGroup.AddLogEvent(true, mEventPool), CalculateRandomUUID(), exchangeId);
+    const bool hasResponse = rec->mStatusCode != 0 || !rec->mResponseBody.empty() || !rec->mResponseHeaders.empty();
+    const size_t logCount = hasResponse ? 2U : 1U;
     if (logCount == 2U) {
-        FillAgentsightHttpResponseLog(*rec, eventGroup.AddLogEvent(true, mEventPool), eventId);
+        FillAgentsightHttpResponseLog(
+            *rec, eventGroup.AddLogEvent(true, mEventPool), CalculateRandomUUID(), exchangeId);
     }
 
     std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(eventGroup), pluginIndex);
@@ -992,7 +1168,14 @@ int AgentsightManager::HandleLlmEvent(AgentsightLlmRecord* rec) {
     bool messageDeltaOnly = true;
     {
         std::lock_guard<std::mutex> lock(mLibMutex);
-        if (mPipelineCtx == nullptr) {
+        // Same stale-record guard as HandleHttpsEvent: drop what was stamped under a config that is no
+        // longer the registered one rather than routing it to whichever config is live now. Dropping
+        // before the session-cache update below also keeps config A's sessions out of B's delta state.
+        if (mPipelineCtx == nullptr || rec->GetPipelineConfigName() != mConfigName) {
+            ADD_COUNTER(mLossKernelEventsTotal, 1);
+            LOG_DEBUG(sLogger,
+                      ("Agentsight LLM event dropped", "config no longer registered")(
+                          "recordConfig", rec->GetPipelineConfigName())("currentConfig", mConfigName));
             return 0;
         }
         queueKey = mQueueKey;

@@ -72,8 +72,11 @@ public:
 /// (unknown API path or unrecognised body shape). Requires `RawHttpsFallback: true` plus
 /// libagentsight >= 0.9.0; see AgentsightManager::OnHttpsCallback.
 ///
-/// Emitted as an `http.request` / `http.response` pair sharing one `event.id` (request only when no
-/// response arrived, i.e. mStatusCode == 0).
+/// Emitted as an `http.request` / `http.response` pair sharing one `http.exchange.id` (the pairing
+/// key; each log keeps its own unique `event.id`, and `event.sequence` orders the two). The response
+/// half is omitted only when the response side is genuinely empty (no body and no headers) — not
+/// merely when mStatusCode == 0, which HTTP/2 also reports for a fully-populated response whose
+/// `:status` pseudo-header could not be HPACK-decoded. See HandleHttpsEvent.
 ///
 /// Narrower than AgentsightLlmRecord, but not by as much as it used to be: process attribution
 /// (cmdline / agent type / container id) is now carried too, resolved on the agentsight side from
@@ -114,11 +117,17 @@ public:
     // contain embedded NULs (compressed or binary bodies), so they are copied by length, not by
     // NUL scan, and may not be valid UTF-8.
     //
-    // mRequestHeaders is captured but **never emitted** — it carries Authorization / x-api-key and
-    // this path does no redaction. It is kept in memory only so the host can be salvaged into
-    // `server.address` (see FillAgentsightHttpRequestLog / ExtractHostFromHeadersJson).
+    // Filtered through an ALLOWLIST (kAllowedRequestHeaders) before anything is emitted, because this
+    // is where credentials live — Authorization / x-api-key / cookie — and this path does no
+    // redaction. Survivors go out as `http.request.header.<name>`; host and user-agent are salvaged
+    // into `server.address` / `server.port` / `user_agent.original` instead. Anything unrecognised is
+    // dropped. See ExtractRequestHeaderFields / FillAgentsightHttpRequestLog.
     std::string mRequestHeaders;
     std::string mRequestBody;
+    // Mirror image: filtered through a DENYLIST (kSensitiveResponseHeaders — set-cookie,
+    // www-authenticate, ...) and otherwise emitted as `http.response.header.<name>`. An allowlist here
+    // would hide most of what makes this fallback diagnostically useful, and the credential-bearing
+    // response header names are a short, known set. See EmitHttpResponseHeaders.
     std::string mResponseHeaders;
     std::string mResponseBody;
 };

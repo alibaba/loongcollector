@@ -40,14 +40,20 @@ dev
 
 仅在 AgentSight 无法把流量解析成 GenAI 语义时产生，与 `gen_ai.*` 日志**互斥**（一次流量最多产生一种）。
 
-一次完整交换在同一个 `PipelineEventGroup` 内输出**两条**日志，共享同一个 `event.id` 供下游关联：`event.name=http.request`（请求开始时间戳）与 `http.response`（请求结束时间戳）。**未收到响应**的记录（`status_code == 0`）只输出请求那一条。耗时由两条日志的时间戳之差表示，不单独输出 duration 字段。不受 `EventStreamFormat` 影响。
+一次完整交换在同一个 `PipelineEventGroup` 内输出**两条**日志，共享同一个 `http.exchange.id` 供下游配对：`event.name=http.request`（请求开始时间戳）与 `http.response`（请求结束时间戳）。两条日志各有**自己的** `event.id`，先后顺序由 `event.sequence`（request=1、response=2）确定 —— 与 `gen_ai.*` 日志的 `event.id` / `gen_ai.step.id` / `gen_ai.event.sequence` 三者职责划分一致。
+
+**响应侧确实为空**（无响应体且无响应头）的记录只输出请求那一条。注意判据不是 `status_code == 0`：HTTP/2 在 `:status` 伪头 HPACK 解码失败时也会上报 `status_code = 0`，但此时响应头和响应体是完整的，这类记录仍输出两条日志，`http.response.status_code` 为 `0`（下游据此区分「响应存在但状态码不可解」与「完全没有响应」，后者根本没有 `http.response` 那条日志）。
+
+耗时由两条日志的时间戳之差表示，不单独输出 duration 字段。不受 `EventStreamFormat` 影响。
 
 **公共字段**
 
 | 字段 | 说明 |
 | --- | --- |
 | `event.name` | `http.request` 或 `http.response`，用于与 `gen_ai.*` 数据流区分 |
-| `event.id` | 同一次交换的两条日志取相同值（UUID），用于配对 |
+| `event.id` | **本条日志**的唯一标识（UUID），request / response 各 1 个，互不相同 —— 下游可安全用作去重、join、幂等写入的唯一键 |
+| `http.exchange.id` | 配对键（UUID）：同一次交换的两条日志取相同值。对应 `gen_ai.*` 数据流的 `gen_ai.step.id`；raw 事件不写 `gen_ai.` 前缀，跨两条数据流查询时需 `COALESCE` 两个键名 |
+| `event.sequence` | 交换内排序：request 为 `1`、response 为 `2`。`duration_ns == 0` 时两条日志时间戳相同，只能靠该字段定序 |
 | `pid` / `comm` | 进程 ID 与进程名 |
 | `cmdline` | 进程完整命令行（argv 以空格连接，截断到 127 字节）。进程已退出时为空，此时该字段不输出 |
 | `agent.type` | 命中 `CmdlineWhitelist` 的 agent 类型（小写）。未命中任何规则时回退为进程名 —— 与 `gen_ai.*` 日志同一套解析口径，**但键名不带 `gen_ai.` 前缀**，见下方说明 |
@@ -67,6 +73,8 @@ dev
 | --- | --- |
 | `http.request.method` / `url.path` | 请求方法与路径。**无完整 URL** |
 | `server.address` / `server.port` | 目标主机与端口，从请求头的 `host`（HTTP/2 为 `:authority`）提取而来 |
+| `user_agent.original` | 客户端 UA，从请求头 `user-agent` 提取（OTel Stable 字段名，**不**输出 `http.request.header.user-agent`）|
+| `http.request.header.<小写头名>` | 白名单请求头，仅 `content-type`、`content-length`、`traceparent` 三个，见下方说明 |
 | `http.request.body.content` / `.size` / `.encoding` | 见下方「body 的编码」 |
 
 **`http.response` 独有**
@@ -74,7 +82,7 @@ dev
 | 字段 | 说明 |
 | --- | --- |
 | `http.response.status_code` / `is_sse` | 状态码、是否 SSE |
-| `http.response.header` | 响应头 JSON |
+| `http.response.header.<小写头名>` | **逐头输出**（OTel semconv 模板名），如 `http.response.header.content-type`。头名统一小写。**敏感头不输出**，见下方说明 |
 | `http.response.body.content` / `.size` / `.encoding` | 见下方「body 的编码」 |
 
 #### body 的保真度（重要）
@@ -95,9 +103,15 @@ dev
 
 本插件不做 base64 等编码兜底 —— 拿到的字节已经不是原始数据，编码也无从恢复。根治需在上游（anolisa）把 body 改成 `Vec<u8>` 贯穿 analyzer 与 FFI；`AgentsightHttpsData` 的 ABI 本来就是 `(ptr, len)` 形式，届时本插件侧无需改动。
 
-> **不输出请求头。** `http.request.header` 携带 `Authorization` / `x-api-key`，而本路径原样上报、不做任何脱敏，输出即等于把有效凭据写入磁盘（实测确认过）。因此请求头只在内存中用于提取 host，不落盘。
+> **请求头按白名单过滤。** `Authorization` / `x-api-key` / `cookie` 这类头携带有效凭据，而本路径原样上报、不做任何脱敏，输出即等于把凭据写入磁盘（实测确认过）。因此请求头采用**白名单**：只输出 `content-type`、`content-length`、`traceparent` 三个（键名 `http.request.header.<小写头名>`），另外 `host` 与 `user-agent` 分别提取为 `server.address` / `server.port` 与 `user_agent.original`。**白名单之外的头一律丢弃**，包括未知厂商的自定义头 —— 这一侧宁可少报也不能漏一个凭据。
 >
-> 但请注意 **body 仍是原文**：部分厂商在请求体内传凭据，这类内容依然会落盘 —— 这是原始采集的固有性质。`http.response.header` 目前保留输出（含 `set-cookie` 时同样敏感），如需一并去掉可自行调整 `FillAgentsightHttpResponseLog`。
+> 这三个头之所以值得救回：`content-type` 直接解释「为什么没能解析成 GenAI 语义」；`content-length` 是判定 body 是否被上游 `from_utf8_lossy` 污染/截断的唯一交叉校验基准；`traceparent` 是把 raw 日志与应用侧 trace 关联起来的唯一途径。新增白名单头请修改 `AgentsightManager.cpp` 的 `kAllowedRequestHeaders` 常量。
+>
+> **响应头则相反，按黑名单过滤后逐头输出。** 两侧风险画像正好镜像：请求头敏感面大、价值集中在少数几个已知头名，所以白名单更安全；响应头是诊断价值的主要来源、厂商自定义头多，白名单会挡掉大量有用信息，所以用黑名单：以下头名（小写全等匹配）永不落盘 —— `set-cookie`、`set-cookie2`、`www-authenticate`、`proxy-authenticate`、`authorization`、`proxy-authorization`、`x-api-key`、`api-key`、`x-auth-token`、`x-amz-security-token`。`set-cookie` 是可直接重放的会话凭据，`*-authenticate` 带 challenge/nonce。
+>
+> **残余风险：黑名单是开放集合。** 未知厂商在自定义响应头（如某些网关的 `x-*`）里回吐 token 的情况会默认放行。发现新的敏感响应头请补充到 `AgentsightManager.cpp` 的 `kSensitiveResponseHeaders` 常量。
+>
+> 但请注意 **body 仍是原文**：部分厂商在请求体内传凭据，这类内容依然会落盘 —— 这是原始采集的固有性质。
 >
 > 另外 body 可能仍带 **chunked 传输编码的框**（形如 `c3b\r\n...\r\n0\r\n\r\n`）：raw 路径转发的是未解码的缓冲，去框需要在 AgentSight（Rust）侧修复。
 

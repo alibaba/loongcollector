@@ -476,9 +476,12 @@ public:
     void TestRawHttpsFallbackMissingSymbolDisablesReporting();
     void TestRawHttpsFallbackResetOnRemoveAndDestroy();
     void TestHttpsEventRequestOnlyEmitsOneLog();
-    void TestHttpsEventPairSharesEventId();
-    void TestHttpsEventNeverEmitsRequestHeaders();
+    void TestHttpsEventPairCorrelationFields();
+    void TestHttpsEventRequestHeaderAllowlist();
     void TestHttpsEventWithoutPipelineContextDrops();
+    void TestHttpsEventFiltersSensitiveResponseHeaders();
+    void TestHttpsEventUnparsableStatusStillEmitsResponse();
+    void TestStaleConfigRecordDroppedNotRerouted();
     void TestHttpsHostExtractionVariants();
     void TestHttpsEventOmitsEmptyOptionalFields();
     void TestLlmServerAddressFromRequestUrl();
@@ -916,7 +919,9 @@ void AgentsightManagerUnittest::TestHttpsEventRequestOnlyEmitsOneLog() {
     spec.timestampNs = 1'700'000'000'000'000'000ULL;
     spec.requestHeaders = R"({"host":"api.example.com:8443","authorization":"Bearer sk-secret"})";
     spec.requestBody = R"({"prompt":"hi"})";
-    // status_code 0 means no response ever arrived, so only the request half is emitted.
+    // status_code 0 *and* an empty response side (no headers, no body) means no response ever
+    // arrived — agentsight's RequestOnly path — so only the request half is emitted. status_code 0
+    // on its own is not enough; see TestHttpsEventUnparsableStatusStillEmitsResponse.
     spec.statusCode = 0;
 
     std::unique_ptr<ProcessQueueItem> item;
@@ -951,7 +956,7 @@ void AgentsightManagerUnittest::TestHttpsEventRequestOnlyEmitsOneLog() {
     mgr->Destroy();
 }
 
-void AgentsightManagerUnittest::TestHttpsEventPairSharesEventId() {
+void AgentsightManagerUnittest::TestHttpsEventPairCorrelationFields() {
     const char* kConfig = "p_raw_pair";
     auto mgr = makeManager();
     registerConfigWithPoppableQueue(*mgr, kConfig);
@@ -977,14 +982,31 @@ void AgentsightManagerUnittest::TestHttpsEventPairSharesEventId() {
     APSARA_TEST_EQUAL("http.request", contentOf(req, "event.name"));
     APSARA_TEST_EQUAL("http.response", contentOf(res, "event.name"));
 
-    // One event.id correlates the pair downstream.
-    const std::string eventId = contentOf(req, "event.id");
-    APSARA_TEST_TRUE(!eventId.empty());
-    APSARA_TEST_EQUAL(eventId, contentOf(res, "event.id"));
+    // Correlation is split three ways, matching the gen_ai.* path: http.exchange.id pairs the two
+    // halves, event.id stays unique per log, event.sequence orders them.
+    const std::string exchangeId = contentOf(req, "http.exchange.id");
+    APSARA_TEST_TRUE(!exchangeId.empty());
+    APSARA_TEST_EQUAL(exchangeId, contentOf(res, "http.exchange.id"));
+
+    // event.id is the per-log identity key: sharing it across the pair would let downstream dedup or
+    // idempotent writes discard one half as a duplicate.
+    const std::string reqEventId = contentOf(req, "event.id");
+    const std::string resEventId = contentOf(res, "event.id");
+    APSARA_TEST_TRUE(!reqEventId.empty());
+    APSARA_TEST_TRUE(!resEventId.empty());
+    APSARA_TEST_NOT_EQUAL(reqEventId, resEventId);
+    APSARA_TEST_NOT_EQUAL(exchangeId, reqEventId);
+    APSARA_TEST_NOT_EQUAL(exchangeId, resEventId);
+
+    // Order is explicit, not inferred from timestamps — those collide when mDurationNs is 0.
+    APSARA_TEST_EQUAL("1", contentOf(req, "event.sequence"));
+    APSARA_TEST_EQUAL("2", contentOf(res, "event.sequence"));
 
     APSARA_TEST_EQUAL("503", contentOf(res, "http.response.status_code"));
     APSARA_TEST_EQUAL("1", contentOf(res, "is_sse"));
-    APSARA_TEST_EQUAL(spec.responseHeaders, contentOf(res, "http.response.header"));
+    // Headers are emitted one attribute per header, not as the raw JSON blob.
+    APSARA_TEST_EQUAL("text/event-stream", contentOf(res, "http.response.header.content-type"));
+    APSARA_TEST_FALSE(res.HasContent(StringView("http.response.header")));
     APSARA_TEST_EQUAL(spec.responseBody, contentOf(res, "http.response.body.content"));
     APSARA_TEST_EQUAL(std::to_string(spec.responseBody.size()), contentOf(res, "http.response.body.size"));
 
@@ -999,33 +1021,69 @@ void AgentsightManagerUnittest::TestHttpsEventPairSharesEventId() {
     mgr->Destroy();
 }
 
-void AgentsightManagerUnittest::TestHttpsEventNeverEmitsRequestHeaders() {
-    // Regression guard for a credential leak: this path reports verbatim bytes with no redaction, so
-    // emitting request headers would write live Authorization / x-api-key values to disk.
-    const char* kConfig = "p_raw_no_req_headers";
+void AgentsightManagerUnittest::TestHttpsEventRequestHeaderAllowlist() {
+    // Request headers go through an allowlist, the mirror image of the response side's denylist. Two
+    // properties to hold at once: credentials never reach the log (this path reports verbatim bytes
+    // with no redaction), and the handful of headers that explain "why was this unparsable" do.
+    const char* kConfig = "p_raw_req_hdr_allowlist";
     auto mgr = makeManager();
     registerConfigWithPoppableQueue(*mgr, kConfig);
 
     HttpsSpec spec;
     spec.statusCode = 200;
-    spec.requestHeaders = R"({"host":"api.example.com","authorization":"Bearer sk-leak-me","x-api-key":"kk-leak"})";
+    spec.requestBody = "req-payload";
+    spec.requestHeaders = R"({)"
+                          R"("host":"api.example.com",)"
+                          R"("content-type":"application/octet-stream",)"
+                          R"("content-length":"11",)"
+                          R"("traceparent":"00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",)"
+                          R"("User-Agent":"anthropic-sdk-python/0.39.0",)"
+                          R"("authorization":"Bearer sk-leak-me",)"
+                          R"("x-api-key":"kk-leak",)"
+                          R"("cookie":"session=cookie-leak",)"
+                          R"("x-vendor-secret":"unknown-vendor-leak")"
+                          R"(})";
     spec.responseHeaders = R"({"content-type":"application/json"})";
 
     std::unique_ptr<ProcessQueueItem> item;
     const auto logs = emitHttps(*mgr, kConfig, spec, item);
     APSARA_TEST_EQUAL(2UL, logs.size());
+    const LogEvent& req = *logs[0];
+
+    // Allowlisted headers are emitted, one attribute each, name lowercased.
+    APSARA_TEST_EQUAL("application/octet-stream", contentOf(req, "http.request.header.content-type"));
+    APSARA_TEST_EQUAL("11", contentOf(req, "http.request.header.content-length"));
+    APSARA_TEST_EQUAL("00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+                      contentOf(req, "http.request.header.traceparent"));
+    // content-length is the cross-check for body fidelity, so it must be comparable to the body size.
+    APSARA_TEST_EQUAL(contentOf(req, "http.request.header.content-length"), contentOf(req, "http.request.body.size"));
+
+    // Host and user-agent are salvaged into stable OTel attributes rather than the header namespace,
+    // and must not also appear under http.request.header.* — that would duplicate the value.
+    APSARA_TEST_EQUAL("api.example.com", contentOf(req, "server.address"));
+    APSARA_TEST_EQUAL("anthropic-sdk-python/0.39.0", contentOf(req, "user_agent.original"));
+    APSARA_TEST_FALSE(req.HasContent(StringView("http.request.header.host")));
+    APSARA_TEST_FALSE(req.HasContent(StringView("http.request.header.user-agent")));
+
+    // Credential-bearing headers are absent, including a vendor header the allowlist has never heard
+    // of — an unknown name is dropped, which is the whole point of allowlisting this side.
+    for (const char* denied : {"authorization", "x-api-key", "cookie", "x-vendor-secret"}) {
+        const std::string key = std::string("http.request.header.") + denied;
+        APSARA_TEST_FALSE(req.HasContent(StringView(key.data(), key.size())));
+    }
 
     for (const LogEvent* log : logs) {
+        // The old whole-blob field names must never come back.
         APSARA_TEST_FALSE(log->HasContent(StringView("http.request.header")));
         APSARA_TEST_FALSE(log->HasContent(StringView("http.request.headers")));
         for (const auto& kv : *log) {
             const std::string value(kv.second.data(), kv.second.size());
             APSARA_TEST_TRUE(value.find("sk-leak-me") == std::string::npos);
             APSARA_TEST_TRUE(value.find("kk-leak") == std::string::npos);
+            APSARA_TEST_TRUE(value.find("cookie-leak") == std::string::npos);
+            APSARA_TEST_TRUE(value.find("unknown-vendor-leak") == std::string::npos);
         }
     }
-    // The one thing salvaged from those headers is the host.
-    APSARA_TEST_EQUAL("api.example.com", contentOf(*logs[0], "server.address"));
     mgr->Destroy();
 }
 
@@ -1038,6 +1096,170 @@ void AgentsightManagerUnittest::TestHttpsEventWithoutPipelineContextDrops() {
 
     std::unique_ptr<ProcessQueueItem> item;
     APSARA_TEST_TRUE(popLogEvents(item).empty());
+    mgr->Destroy();
+}
+
+void AgentsightManagerUnittest::TestHttpsEventFiltersSensitiveResponseHeaders() {
+    // Response headers go through a denylist, unlike request headers which are dropped wholesale.
+    // Credential-bearing names must never reach the log; everything else is kept, because response
+    // headers are what makes this diagnostic fallback useful.
+    const char* kConfig = "p_raw_resp_hdrs";
+    auto mgr = makeManager();
+    registerConfigWithPoppableQueue(*mgr, kConfig);
+
+    HttpsSpec spec;
+    spec.statusCode = 200;
+    spec.responseHeaders = R"({)"
+                           R"("content-type":"application/json",)"
+                           R"("content-length":"42",)"
+                           R"("x-request-id":"req-abc",)"
+                           R"("set-cookie":"session=REPLAYABLE; HttpOnly",)"
+                           R"("set-cookie2":"legacy=REPLAYABLE",)"
+                           R"("www-authenticate":"Bearer realm=\"x\", error=\"invalid_token\"",)"
+                           R"("proxy-authenticate":"Basic realm=\"proxy\"",)"
+                           R"("authorization":"Bearer LEAK",)"
+                           R"("proxy-authorization":"Basic LEAK",)"
+                           R"("x-api-key":"LEAK",)"
+                           R"("api-key":"LEAK",)"
+                           R"("x-auth-token":"LEAK",)"
+                           R"("x-amz-security-token":"LEAK",)"
+                           R"("X-Auth-Token":"LEAK-UPPERCASE")"
+                           R"(})";
+
+    std::unique_ptr<ProcessQueueItem> item;
+    const auto logs = emitHttps(*mgr, kConfig, spec, item);
+    APSARA_TEST_EQUAL(2UL, logs.size());
+    const LogEvent& res = *logs[1];
+
+    // Non-sensitive headers survive, one attribute each, name lowercased.
+    APSARA_TEST_EQUAL("application/json", contentOf(res, "http.response.header.content-type"));
+    APSARA_TEST_EQUAL("42", contentOf(res, "http.response.header.content-length"));
+    APSARA_TEST_EQUAL("req-abc", contentOf(res, "http.response.header.x-request-id"));
+
+    // Every denylisted name is absent...
+    for (const char* denied : {"set-cookie",
+                               "set-cookie2",
+                               "www-authenticate",
+                               "proxy-authenticate",
+                               "authorization",
+                               "proxy-authorization",
+                               "x-api-key",
+                               "api-key",
+                               "x-auth-token",
+                               "x-amz-security-token"}) {
+        const std::string key = std::string("http.response.header.") + denied;
+        APSARA_TEST_FALSE(res.HasContent(StringView(key.data(), key.size())));
+    }
+
+    // ...and no credential value leaked under any other key, including via a header whose name
+    // arrived with original casing (the denylist matches on the lowercased name).
+    for (const auto& kv : res) {
+        const std::string value(kv.second.data(), kv.second.size());
+        APSARA_TEST_TRUE(value.find("LEAK") == std::string::npos);
+        APSARA_TEST_TRUE(value.find("REPLAYABLE") == std::string::npos);
+        APSARA_TEST_TRUE(value.find("invalid_token") == std::string::npos);
+    }
+
+    // The whole-blob field is gone entirely — it would have carried everything past the filter.
+    APSARA_TEST_FALSE(res.HasContent(StringView("http.response.header")));
+
+    // Malformed or non-object header JSON yields no header attributes rather than a bogus one.
+    for (const char* bad : {"not json", R"(["content-type","application/json"])", R"({"content-type":123})"}) {
+        HttpsSpec badSpec;
+        badSpec.statusCode = 200;
+        badSpec.responseHeaders = bad;
+        std::unique_ptr<ProcessQueueItem> badItem;
+        const auto badLogs = emitHttps(*mgr, kConfig, badSpec, badItem);
+        APSARA_TEST_EQUAL(2UL, badLogs.size());
+        APSARA_TEST_FALSE(badLogs[1]->HasContent(StringView("http.response.header.content-type")));
+    }
+
+    mgr->Destroy();
+}
+
+void AgentsightManagerUnittest::TestHttpsEventUnparsableStatusStillEmitsResponse() {
+    // HTTP/2 whose `:status` pseudo-header could not be HPACK-decoded: Http2Stream::status_code()
+    // yields 0 while response headers and body are fully populated. The response half must still be
+    // emitted — suppressing it would silently lose an entire gRPC/h2 response, the exact failure mode
+    // this raw fallback exists to prevent.
+    const char* kConfig = "p_raw_h2_no_status";
+    auto mgr = makeManager();
+    registerConfigWithPoppableQueue(*mgr, kConfig);
+
+    HttpsSpec spec;
+    spec.method = "POST";
+    spec.path = "/grpc.Service/Call";
+    spec.statusCode = 0;
+    spec.requestBody = "req-payload";
+    spec.responseHeaders = R"({"content-type":"application/grpc"})";
+    spec.responseBody = "h2-response-that-must-not-be-dropped";
+
+    std::unique_ptr<ProcessQueueItem> item;
+    const auto logs = emitHttps(*mgr, kConfig, spec, item);
+    APSARA_TEST_EQUAL(2UL, logs.size());
+
+    const LogEvent& res = *logs[1];
+    APSARA_TEST_EQUAL("http.response", contentOf(res, "event.name"));
+    APSARA_TEST_EQUAL(spec.responseBody, contentOf(res, "http.response.body.content"));
+    APSARA_TEST_EQUAL("application/grpc", contentOf(res, "http.response.header.content-type"));
+    // Reported as 0 rather than suppressed, so downstream can separate "response present, status
+    // unparseable" from "no response at all" — the latter has no http.response log at all.
+    APSARA_TEST_EQUAL("0", contentOf(res, "http.response.status_code"));
+
+    // durationNs is 0 here, so both halves carry the same timestamp and event.sequence is the only
+    // thing that can order them.
+    const LogEvent& req = *logs[0];
+    APSARA_TEST_EQUAL(req.GetTimestamp(), res.GetTimestamp());
+    APSARA_TEST_EQUAL("1", contentOf(req, "event.sequence"));
+    APSARA_TEST_EQUAL("2", contentOf(res, "event.sequence"));
+    APSARA_TEST_EQUAL(contentOf(req, "http.exchange.id"), contentOf(res, "http.exchange.id"));
+    APSARA_TEST_NOT_EQUAL(contentOf(req, "event.id"), contentOf(res, "event.id"));
+
+    // Either half of the response side alone is enough: headers survived but body was empty...
+    HttpsSpec headersOnly;
+    headersOnly.statusCode = 0;
+    headersOnly.responseHeaders = R"({"content-type":"application/grpc"})";
+    std::unique_ptr<ProcessQueueItem> headersItem;
+    APSARA_TEST_EQUAL(2UL, emitHttps(*mgr, kConfig, headersOnly, headersItem).size());
+
+    // ...and body survived but the header block was lost to a failed HPACK decode.
+    HttpsSpec bodyOnly;
+    bodyOnly.statusCode = 0;
+    bodyOnly.responseBody = "body-without-headers";
+    std::unique_ptr<ProcessQueueItem> bodyItem;
+    APSARA_TEST_EQUAL(2UL, emitHttps(*mgr, kConfig, bodyOnly, bodyItem).size());
+
+    mgr->Destroy();
+}
+
+void AgentsightManagerUnittest::TestStaleConfigRecordDroppedNotRerouted() {
+    // Config A is removed and B registered while records stamped under A are still pending. Those must
+    // be dropped rather than pushed into B's queue: the raw path does no redaction, so re-routing would
+    // hand A's un-redacted body to a different config's pipeline.
+    auto mgr = makeManager();
+    registerConfigWithPoppableQueue(*mgr, "p_stale_a");
+    APSARA_TEST_EQUAL(0, mgr->RemoveConfig("p_stale_a"));
+    registerConfigWithPoppableQueue(*mgr, "p_stale_b");
+
+    HttpsSpec spec;
+    spec.requestBody = "body-belonging-to-a";
+    APSARA_TEST_EQUAL(0, mgr->HandleEvent(makeHttpsRecord("p_stale_a", spec)));
+    std::unique_ptr<ProcessQueueItem> staleItem;
+    APSARA_TEST_TRUE(popLogEvents(staleItem).empty());
+
+    // A record stamped under the live config still flows, so the guard is not a blanket drop.
+    std::unique_ptr<ProcessQueueItem> liveItem;
+    APSARA_TEST_EQUAL(1U, emitHttps(*mgr, "p_stale_b", spec, liveItem).size());
+
+    // Same guard on the LLM path. Checked through the session cache too: dropping happens before the
+    // cache update, so config A's session must not become part of B's delta state.
+    const size_t cacheSizeBefore = mgr->GetSessionInputCacheSizeForTest();
+    APSARA_TEST_EQUAL(0, mgr->HandleEvent(makeMinimalLlmRecord("p_stale_a", "sess-stale")));
+    APSARA_TEST_EQUAL(cacheSizeBefore, mgr->GetSessionInputCacheSizeForTest());
+    APSARA_TEST_FALSE(mgr->SessionInputCacheContainsForTest("sess-stale"));
+    std::unique_ptr<ProcessQueueItem> staleLlmItem;
+    APSARA_TEST_TRUE(popLogEvents(staleLlmItem).empty());
+
     mgr->Destroy();
 }
 
@@ -1099,6 +1321,8 @@ void AgentsightManagerUnittest::TestHttpsEventOmitsEmptyOptionalFields() {
     APSARA_TEST_FALSE(req.HasContent(StringView("agent.type")));
     APSARA_TEST_FALSE(req.HasContent(StringView("server.address")));
     APSARA_TEST_FALSE(req.HasContent(StringView("server.port")));
+    APSARA_TEST_FALSE(req.HasContent(StringView("user_agent.original")));
+    APSARA_TEST_FALSE(req.HasContent(StringView("http.request.header.content-type")));
     APSARA_TEST_FALSE(req.HasContent(StringView("http.request.body.content")));
     APSARA_TEST_FALSE(req.HasContent(StringView("http.request.body.size")));
     // Method / path / scheme are always present.
@@ -1107,6 +1331,7 @@ void AgentsightManagerUnittest::TestHttpsEventOmitsEmptyOptionalFields() {
 
     const LogEvent& res = *logs[1];
     APSARA_TEST_FALSE(res.HasContent(StringView("http.response.header")));
+    APSARA_TEST_FALSE(res.HasContent(StringView("http.response.header.content-type")));
     APSARA_TEST_FALSE(res.HasContent(StringView("http.response.body.content")));
     // status_code and is_sse are unconditional, even at their zero values.
     APSARA_TEST_EQUAL("204", contentOf(res, "http.response.status_code"));
@@ -1171,9 +1396,12 @@ UNIT_TEST_CASE(AgentsightManagerUnittest, TestRawHttpsFallbackEnabledRegistersCa
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestRawHttpsFallbackMissingSymbolDisablesReporting);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestRawHttpsFallbackResetOnRemoveAndDestroy);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestHttpsEventRequestOnlyEmitsOneLog);
-UNIT_TEST_CASE(AgentsightManagerUnittest, TestHttpsEventPairSharesEventId);
-UNIT_TEST_CASE(AgentsightManagerUnittest, TestHttpsEventNeverEmitsRequestHeaders);
+UNIT_TEST_CASE(AgentsightManagerUnittest, TestHttpsEventPairCorrelationFields);
+UNIT_TEST_CASE(AgentsightManagerUnittest, TestHttpsEventRequestHeaderAllowlist);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestHttpsEventWithoutPipelineContextDrops);
+UNIT_TEST_CASE(AgentsightManagerUnittest, TestHttpsEventFiltersSensitiveResponseHeaders);
+UNIT_TEST_CASE(AgentsightManagerUnittest, TestHttpsEventUnparsableStatusStillEmitsResponse);
+UNIT_TEST_CASE(AgentsightManagerUnittest, TestStaleConfigRecordDroppedNotRerouted);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestHttpsHostExtractionVariants);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestHttpsEventOmitsEmptyOptionalFields);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestLlmServerAddressFromRequestUrl);
