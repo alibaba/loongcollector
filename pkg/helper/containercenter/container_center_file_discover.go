@@ -299,7 +299,13 @@ func tryReadStaticContainerInfo() ([]container.InspectResponse, []string, bool, 
 		return staticDockerContainers, nil, statusChanged, nil
 	}
 
-	newStaticDockerContainer, removedIDs, changed, staticDockerContainerError := innerReadStatisContainerInfo(staticDockerContainerFile, staticDockerContainers, stat)
+	// Assign the package-level staticDockerContainerError (not `:=`, which would
+	// shadow it and leave the global stale), so the IsChange gate above can force a
+	// re-read after a previous read error.
+	var newStaticDockerContainer []container.InspectResponse
+	var removedIDs []string
+	var changed bool
+	newStaticDockerContainer, removedIDs, changed, staticDockerContainerError = innerReadStatisContainerInfo(staticDockerContainerFile, staticDockerContainers, stat)
 	changed = changed || statusChanged
 	if staticDockerContainerError == nil {
 		staticDockerContainers = newStaticDockerContainer

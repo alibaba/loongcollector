@@ -188,20 +188,48 @@ func (info *K8SInfo) ExtractK8sLabels(containerInfo container.InspectResponse) {
 }
 
 func (info *K8SInfo) Merge(o *K8SInfo) {
+	// Guard against nil and self-merge: locking the same mutex twice would deadlock,
+	// and merging an object with itself is a no-op anyway.
+	if info == nil || o == nil || info == o {
+		return
+	}
+	// Both call sites (mergeK8sInfo / updateContainer) run under ContainerCenter.lock,
+	// so two Merge calls never race; a simple fixed lock order is enough here.
 	info.mu.Lock()
 	o.mu.Lock()
-	defer info.mu.Unlock()
 	defer o.mu.Unlock()
+	defer info.mu.Unlock()
 
-	// only pause container has k8s labels, so we can only check len(labels)
-	if len(o.Labels) > len(info.Labels) {
-		info.Labels = o.Labels
-		info.matchedCache = nil
+	inLen := len(info.Labels)
+	outLen := len(o.Labels)
+	if inLen == 0 && outLen == 0 {
+		return
 	}
-	if len(o.Labels) < len(info.Labels) {
-		o.Labels = info.Labels
-		o.matchedCache = nil
+
+	// Union by keys so we never drop labels that exist only on the smaller map.
+	// Picking solely by len(Labels) (the previous behavior) loses keys unique to
+	// one side, e.g. per-container labels added by wrapperK8sInfoByLabels /
+	// ExtractK8sLabels. info's values win on overlap.
+	merged := make(map[string]string, inLen+outLen)
+	for k, v := range o.Labels {
+		merged[k] = v
 	}
+	for k, v := range info.Labels {
+		merged[k] = v
+	}
+
+	// Give each side its own copy. Sharing one map would alias the two K8SInfo
+	// objects, so a later Labels[k]=v write on one container would leak into the
+	// other (see cri_adapter.go wrapperK8sInfoByLabels).
+	infoLabels := merged
+	oLabels := make(map[string]string, len(merged))
+	for k, v := range merged {
+		oLabels[k] = v
+	}
+	info.Labels = infoLabels
+	o.Labels = oLabels
+	info.matchedCache = nil
+	o.matchedCache = nil
 }
 
 // IsMatch ...
@@ -901,6 +929,18 @@ func (dc *ContainerCenter) readStaticConfig(forceFlush bool) {
 		forceFlush = true
 	}
 
+	// Mark removed containers before rebuilding the map so their deleteFlag is set
+	// prior to mergeK8sInfo. On an in-place pod rebuild the old business container
+	// (its id changed) is carried over by updateContainers until it times out; if it
+	// is still unflagged during the merge, its stale, already-enriched labels get
+	// pulled into the same namespace@pod group and leak back onto the fresh
+	// containers. Flagging first lets mergeK8sInfo skip it.
+	if len(removedIDs) > 0 {
+		for _, id := range removedIDs {
+			containerCenterInstance.markRemove(id)
+		}
+	}
+
 	// 静态文件读取容器信息的时候，只能全量读取，因此使用updateContainers全量更新
 	if forceFlush || changed {
 		containerMap := make(map[string]*DockerInfoDetail)
@@ -909,12 +949,6 @@ func (dc *ContainerCenter) readStaticConfig(forceFlush bool) {
 			containerMap[info.ID] = dockerInfoDetail
 		}
 		containerCenterInstance.updateContainers(containerMap)
-	}
-
-	if len(removedIDs) > 0 {
-		for _, id := range removedIDs {
-			containerCenterInstance.markRemove(id)
-		}
 	}
 }
 
@@ -1224,6 +1258,13 @@ func (dc *ContainerCenter) mergeK8sInfo() {
 	k8sInfoMap := make(map[string][]*K8SInfo)
 	for _, container := range dc.containerMap {
 		if container.K8SInfo == nil {
+			continue
+		}
+		// Skip containers marked for removal: on an in-place pod rebuild the old
+		// container lingers here until it times out, and its already-enriched
+		// (now stale) labels would otherwise pollute the merge group for the same
+		// namespace@pod and leak back onto the freshly created containers.
+		if container.deleteFlag {
 			continue
 		}
 		key := container.K8SInfo.Namespace + "@" + container.K8SInfo.Pod
