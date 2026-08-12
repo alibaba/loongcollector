@@ -221,7 +221,6 @@ When distributed in a binary form, iLogtail may contain portions of the followin
 - [go.uber.org/multierr](https://pkg.go.dev/go.uber.org/multierr?tab=licenses)
 - [go.uber.org/zap](https://pkg.go.dev/go.uber.org/zap?tab=licenses)
 - [gopkg.in/natefinch/lumberjack.v2](https://pkg.go.dev/gopkg.in/natefinch/lumberjack.v2?tab=licenses)
-- [github.com/go-ping/ping](https://pkg.go.dev/github.com/go-ping/ping?tab=licenses)
 - [github.com/dlclark/regexp2](https://pkg.go.dev/github.com/dlclark/regexp2?tab=licenses)
 - [github.com/pelletier/go-toml](https://pkg.go.dev/github.com/pelletier/go-toml?tab=licenses)
 - [gopkg.in/yaml.v3](https://pkg.go.dev/gopkg.in/yaml.v3?tab=licenses)
@@ -277,6 +276,7 @@ When distributed in a binary form, iLogtail may contain portions of the followin
 
 ## iLogtail used or modified source code from these projects
 
+- [github.com/iLogtail/ping fork from github.com/go-ping/ping](https://github.com/iLogtail/ping) based on MIT
 - [github.com/iLogtail/jfr-parser fork from github.com/pyroscope-io/jfr-parser](http://github.com/iLogtail/jfr-parser) based on Apache-2.0
 - [github.com/iLogtail/pyroscope-lib fork from github.com/pyroscope-io/pyroscope](http://github.com/iLogtail/pyroscope-lib) based on Apache-2.0
 - [github.com/iLogtail/gonvml fork from github.com/mindprince/gonvml](https://github.com/iLogtail/gonvml) based on Apache-2.0

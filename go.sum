@@ -98,8 +98,6 @@ github.com/ClickHouse/clickhouse-go/v2 v2.6.0/go.mod h1:SvXuWqDsiHJE3VAn2+3+nz9W
 github.com/DataDog/datadog-go v3.2.0+incompatible/go.mod h1:LButxg5PwREeZtORoXG3tL4fMGNddJ+vMq1mwgfaqoQ=
 github.com/DataDog/zstd v1.5.0 h1:+K/VEwIAaPcHiMtQvpLD4lqW7f0Gk3xdYZmI1hD+CXo=
 github.com/DataDog/zstd v1.5.0/go.mod h1:g4AWEaM3yOg3HYfnJ3YIawPnVdXJh9QME85blwSAmyw=
-github.com/EvanLjp/ping v1.2.2 h1:tkdGddUDao9Wr4kwfBG7NKQFXVi8YLiaze1+l9Pys8E=
-github.com/EvanLjp/ping v1.2.2/go.mod h1:KtEzKdvHQJvKV0rMU5JIwoeNkKAPKJGa4rZXaZpWLo0=
 github.com/IBM/sarama v1.42.2 h1:VoY4hVIZ+WQJ8G9KNY/SQlWguBQXQ9uvFPOnrcu8hEw=
 github.com/IBM/sarama v1.42.2/go.mod h1:FLPGUGwYqEs62hq2bVG6Io2+5n+pS6s/WOXVKWSLFtE=
 github.com/Knetic/govaluate v3.0.1-0.20171022003610-9aa49832a739+incompatible/go.mod h1:r7JcOSlj0wfOMncg0iLm8Leh48TZaKVeNIfJntJ2wa0=
@@ -915,6 +913,8 @@ github.com/iLogtail/jfr-parser v0.6.0 h1:dNaQ0Ng2BLE5uxrhUQwtx1q7O9LIQFpMthl3SV3
 github.com/iLogtail/jfr-parser v0.6.0/go.mod h1:ZMcbJjfDkOwElEK8CvUJbpetztRWRXszCmf5WU0erV8=
 github.com/iLogtail/metrics v1.23.0-ilogtail h1:WHhiXtMy5+HWiPpDwO7a0zkMjPd7IPa5euF07LH5h6g=
 github.com/iLogtail/metrics v1.23.0-ilogtail/go.mod h1:rAr/llLpEnAdTehiNlUxKgnjcOuROSzpw0GvjpEbvFc=
+github.com/iLogtail/ping v1.2.2 h1:r42n1/6Q56/pwB1vBpBlVsvscdScjfFsZ+oVd1hRc1o=
+github.com/iLogtail/ping v1.2.2/go.mod h1:KtEzKdvHQJvKV0rMU5JIwoeNkKAPKJGa4rZXaZpWLo0=
 github.com/iLogtail/pyroscope-lib v0.35.2-ilogtail h1:n+om7Idv1ftoVOiqmL4CRWGeoj1v8TTQa7V809XiHT4=
 github.com/iLogtail/pyroscope-lib v0.35.2-ilogtail/go.mod h1:IpElNUA9ousagl2w05BZbzGxmd8cOERYA2vZ+DoznlQ=
 github.com/iancoleman/strcase v0.2.0/go.mod h1:iwCmte+B7n89clKwxIoIXy/HfoL7AsD47ZCWhYzw7ho=
