@@ -49,6 +49,7 @@ constexpr StringView kTcpStateListen("LISTEN");
 constexpr StringView kTcpStateEstablished("ESTABLISHED");
 constexpr StringView kTcpStateNonEstablished("NON_ESTABLISHED");
 constexpr StringView kTcpStateTotal("TCP_TOTAL");
+constexpr StringView kTcpStateMem("TCP_MEM");
 
 // Metric value keys - TCP
 constexpr StringView kNetTcpConnectionMin("net_tcpconnection_min");

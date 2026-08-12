@@ -305,6 +305,26 @@ bool NetCollector::Collect(HostMonitorContext& collectContext, PipelineEventGrou
         kNetTcpConnectionAvg,
         UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, static_cast<double>(avgTCP.tcpTotal)});
 
+    MetricEvent* memEvent = groupPtr->AddMetricEvent(true);
+    if (!memEvent) {
+        mLastTime = start;
+        return false;
+    }
+    memEvent->SetTimestamp(resTCPStat.collectTime, 0);
+    memEvent->SetTagNoCopy(kTagKeyState, kTcpStateMem);
+    memEvent->SetTagNoCopy(kTagKeyM, kMetricSystemTcp);
+    memEvent->SetValue<UntypedMultiDoubleValues>(memEvent);
+    auto* memMultiDoubleValues = memEvent->MutableValue<UntypedMultiDoubleValues>();
+    memMultiDoubleValues->SetValue(
+        kNetTcpConnectionMin,
+        UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, static_cast<double>(minTCP.tcpMem)});
+    memMultiDoubleValues->SetValue(
+        kNetTcpConnectionMax,
+        UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, static_cast<double>(maxTCP.tcpMem)});
+    memMultiDoubleValues->SetValue(
+        kNetTcpConnectionAvg,
+        UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, static_cast<double>(avgTCP.tcpMem)});
+
     mLastTime = start;
 
     // 清理掉mLastInterfaceMetrics中，curDevNames中不存在的设备名

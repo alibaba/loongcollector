@@ -114,7 +114,7 @@ void NetCollectorUnittest::TestCollect() const {
     APSARA_TEST_TRUE(collector.Collect(collectconfig, nullptr));
     APSARA_TEST_TRUE(collector.Collect(collectconfig, &group));
 
-    APSARA_TEST_EQUAL_FATAL(5UL, group.GetEvents().size());
+    APSARA_TEST_EQUAL_FATAL(6UL, group.GetEvents().size());
 
     vector<string> device_names = {
         // "eth0",
@@ -149,6 +149,7 @@ void NetCollectorUnittest::TestCollect() const {
         "ESTABLISHED",
         "NON_ESTABLISHED",
         "TCP_TOTAL",
+        "TCP_MEM",
     };
     vector<string> tcp_cnt_names = {
         "net_tcpconnection_avg",
@@ -181,8 +182,9 @@ void NetCollectorUnittest::TestIpv6FileNoExist() const {
         std::cerr << "Failed to delete file: " << ec.message() << std::endl;
     }
 
-    uint64_t tcp;
-    APSARA_TEST_FALSE(LinuxSystemInterface::GetInstance()->ReadSocketStat(PROCESS_DIR / PROCESS_NET_SOCKSTAT6, tcp));
+    NetState netState;
+    APSARA_TEST_FALSE(
+        LinuxSystemInterface::GetInstance()->ReadSocketStat(PROCESS_DIR / PROCESS_NET_SOCKSTAT6, netState));
 
     auto hostname = LoongCollectorMonitor::GetInstance()->mHostname;
     NetCollector collector = NetCollector();
@@ -200,7 +202,7 @@ void NetCollectorUnittest::TestIpv6FileNoExist() const {
     APSARA_TEST_TRUE(collector.Collect(collectconfig, nullptr));
     APSARA_TEST_TRUE(collector.Collect(collectconfig, &group));
 
-    APSARA_TEST_EQUAL_FATAL(5UL, group.GetEvents().size());
+    APSARA_TEST_EQUAL_FATAL(6UL, group.GetEvents().size());
 
     vector<string> device_names = {
         // "eth0",
@@ -235,6 +237,7 @@ void NetCollectorUnittest::TestIpv6FileNoExist() const {
         "ESTABLISHED",
         "NON_ESTABLISHED",
         "TCP_TOTAL",
+        "TCP_MEM",
     };
     vector<string> tcp_cnt_names = {
         "net_tcpconnection_avg",
