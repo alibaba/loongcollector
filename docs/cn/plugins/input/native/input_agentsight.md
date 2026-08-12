@@ -30,10 +30,127 @@ dev
 |  ProbeConfig.LogPath  |  string  |  否  |  `""`  |  ebpf 日志的输出位置  |
 |  ProbeConfig.CmdlineWhitelist  |  array  |  否（**推荐填写**）  |  内置 9 条  |  进程 **agent 筛选白名单**。每一项为对象：`AgentType`（上报字段 `gen_ai.agent.type`）+ `Args`（字符串数组，与进程 cmdline 各参数（即 `argv`）按位置 glob 匹配）。**未配置**且 `CmdlineBlacklist` 也为空时注入「默认 `CmdlineWhitelist`」（见下文）；**填写后只使用用户规则**，不再叠加内置。空数组 `[]` 视为非法配置。  |
 |  ProbeConfig.CmdlineBlacklist  |  array  |  否  |  /  |  进程 **agent 筛选黑名单**，每项为 glob 字符串数组（无 `AgentType`）；**命中则排除**，不采集。**优先级高于白名单**。  |
-|  ProbeConfig.Https  |  array  |  否  |  内置 6 条  |  HTTPS 加密流量的域名白名单（字符串数组，glob 通配符 `*`，不区分大小写）。访问白名单内域名的进程可被识别为采集目标。未配置时注入默认列表，见下文。  |
+|  ProbeConfig.Https  |  array  |  否  |  内置 7 条  |  HTTPS 加密流量的域名白名单（字符串数组，glob 通配符 `*`，不区分大小写）。访问白名单内域名的进程可被识别为采集目标。未配置时注入默认列表，见下文。**注意本项只决定「哪些进程被纳入采集」，不限制已纳入进程的上报范围** —— 详见下文「采集范围」。  |
 |  ProbeConfig.Http  |  array  |  否  |  `[]`（关闭）  |  HTTP 明文流量的目标列表（字符串数组）。每项可为 `:端口`、`IP`、`IP:端口` 或域名（如 `model-svc.default.svc`、`*.internal.svc`）。**留空时不采集明文 HTTP 流量**。  |
 |  ProbeConfig.EventStreamFormat  |  bool  |  否  |  `true`  |  为 `true` 时，每次 LLM 调用在同一 `PipelineEventGroup` 内输出两条日志（各有 `event.id`）：`event.name=gen_ai.model.request`（请求开始时间戳）与 `gen_ai.model.response`（请求结束时间戳）。为 `false` 时输出单条合并日志，**无** `event.name` / `event.id`。  |
 |  ProbeConfig.MessageDeltaOnly  |  bool  |  否  |  `true`  |  为 `true` 时**不**输出全量 `gen_ai.input.messages`；仍输出 `gen_ai.input.messages_delta`、`gen_ai.system_instructions_hash` / `gen_ai.tool.definitions_hash`（非空时），以及 hash 相对上一轮变化时的 `gen_ai.system_instructions` / `gen_ai.tool.definitions`。为 `false` 时**每次**输出非空的全量 `gen_ai.input.messages`。**不影响** `gen_ai.output.messages`；`messages_delta` 及 session 状态维护**不受**本开关影响。  |
+|  ProbeConfig.RawHttpsFallback  |  bool  |  否  |  `false`  |  为 `true` 时，**无法解析为 LLM 语义**的流量（未知 API path、非标准 body）不再被丢弃，而是以原始 HTTP 形式上报（`event.name=http.request` / `http.response`，见下文）。需要 `libagentsight >= 0.9.0`；旧版动态库上该开关无效（日志告警后自动降级为关闭）。**默认关闭**：原始 body 未做任何脱敏。  |
+
+### `RawHttpsFallback: true` 输出的原始 HTTP 日志
+
+仅在 AgentSight 无法把流量解析成 GenAI 语义时产生，与 `gen_ai.*` 日志**互斥**（一次流量最多产生一种）。
+
+一次完整交换在同一个 `PipelineEventGroup` 内输出**两条**日志，共享同一个 `http.exchange.id` 供下游配对：`event.name=http.request`（请求开始时间戳）与 `http.response`（请求结束时间戳）。两条日志各有**自己的** `event.id`，先后顺序由 `event.sequence`（request=1、response=2）确定 —— 与 `gen_ai.*` 日志的 `event.id` / `gen_ai.step.id` / `gen_ai.event.sequence` 三者职责划分一致。
+
+**响应侧确实为空**（无响应体且无响应头）的记录只输出请求那一条。注意判据不是 `status_code == 0`：HTTP/2 在 `:status` 伪头 HPACK 解码失败时也会上报 `status_code = 0`，但此时响应头和响应体是完整的，这类记录仍输出两条日志，`http.response.status_code` 为 `0`（下游据此区分「响应存在但状态码不可解」与「完全没有响应」，后者根本没有 `http.response` 那条日志）。
+
+耗时由两条日志的时间戳之差表示，不单独输出 duration 字段。不受 `EventStreamFormat` 影响。
+
+**公共字段**
+
+| 字段 | 说明 |
+| --- | --- |
+| `event.name` | `http.request` 或 `http.response`，用于与 `gen_ai.*` 数据流区分 |
+| `event.id` | **本条日志**的唯一标识（UUID），request / response 各 1 个，互不相同 —— 下游可安全用作去重、join、幂等写入的唯一键 |
+| `http.exchange.id` | 配对键（UUID）：同一次交换的两条日志取相同值。对应 `gen_ai.*` 数据流的 `gen_ai.step.id`；raw 事件不写 `gen_ai.` 前缀，跨两条数据流查询时需 `COALESCE` 两个键名 |
+| `event.sequence` | 交换内排序：request 为 `1`、response 为 `2`。`duration_ns == 0` 时两条日志时间戳相同，只能靠该字段定序 |
+| `pid` / `comm` | 进程 ID 与进程名 |
+| `cmdline` | 进程完整命令行（argv 以空格连接，截断到 127 字节）。进程已退出时为空，此时该字段不输出 |
+| `agent.type` | 命中 `CmdlineWhitelist` 的 agent 类型（小写）。未命中任何规则时回退为进程名 —— 与 `gen_ai.*` 日志同一套解析口径，**但键名不带 `gen_ai.` 前缀**，见下方说明 |
+| `container.id` | 从 `/proc/<pid>/cgroup` 解析的容器 ID；非容器进程为空，此时该字段不输出 |
+| `url.scheme` | 固定 `https` |
+| `time_unix_nano` / `observed_time_unix_nano` | 同 `gen_ai.*` 日志 |
+
+> **raw 日志不输出任何 `gen_ai.*` 字段。** 这类事件存在的前提就是「流量没能解析成 GenAI 语义」，往 `gen_ai.*` 命名空间里写东西会误导下游。因此 agent 类型用裸键名 `agent.type`，与本路径已有的 `pid` / `comm` / `cmdline` / `container.id` 保持一致。
+>
+> `gen_ai.*` 日志仍用 `gen_ai.agent.type`，**取值完全相同、仅键名不同**。所以跨两条数据流做聚合时，需要把 `agent.type` 和 `gen_ai.agent.type` 归并处理（例如 `agent.type` 为空则取 `gen_ai.agent.type`）。
+>
+> 也**没有** `gen_ai.session.id` / `gen_ai.turn.id` —— raw 事件本身不存在 session 归属，只能靠 `(pid, comm)` 与同进程的 LLM 事件关联。
+
+**`http.request` 独有**
+
+| 字段 | 说明 |
+| --- | --- |
+| `http.request.method` / `url.path` | 请求方法与路径。**无完整 URL** |
+| `server.address` / `server.port` | 目标主机与端口，从请求头的 `host`（HTTP/2 为 `:authority`）提取而来 |
+| `user_agent.original` | 客户端 UA，从请求头 `user-agent` 提取（OTel Stable 字段名，**不**输出 `http.request.header.user-agent`）|
+| `http.request.header.<小写头名>` | 白名单请求头，仅 `content-type`、`content-length`、`traceparent` 三个，见下方说明 |
+| `http.request.body.content` / `.size` | 见下方「body 的保真度」 |
+
+**`http.response` 独有**
+
+| 字段 | 说明 |
+| --- | --- |
+| `http.response.status_code` / `is_sse` | 状态码、是否 SSE |
+| `http.response.header.<小写头名>` | **逐头输出**（OTel semconv 模板名），如 `http.response.header.content-type`。头名统一小写。**敏感头、头名不合规的头均不输出，且每条日志上限 64 个**，见下方说明 |
+| `http.response.body.content` / `.size` | 见下方「body 的保真度」 |
+
+#### body 的保真度（重要）
+
+**一句话原因**：AgentSight 的 analyzer 把 body 存成 Rust `String`（`analyzer/result.rs`），经 `String::from_utf8_lossy` 转换 —— 每个非法字节变成 U+FFFD（占 3 字节），原始字节在交给本插件之前就已丢失，不可恢复。
+
+| 载荷类型 | `.content` | `.size` | 实测证据 |
+| --- | --- | --- | --- |
+| **JSON / 纯文本** | ✅ 线上原文 | ✅ 准确 | DashScope 原生 API 200 响应：`.size = 440`，与响应头 `content-length: 440` 完全一致 |
+| **文本 + gzip 压缩** | ✅ 解压后原文（**响应侧**；HTTP/1 请求侧 ❌ 不解压） | ✅ 准确 | 响应头带 `content-encoding: gzip`，采到 112 字节明文，与不压缩时逐字节相同 |
+| **文本 + chunked** | ✅ 去框后原文（**仅响应侧**；HTTP/1 请求侧 ❌ 不去框） | ✅ 准确 | 上述两例均为响应且带 `transfer-encoding: chunked`，采到的 body 无 `c3b\r\n` 残框 |
+| **二进制**（protobuf / 二进制流 / 图片） | ❌ **U+FFFD 污染，静默失真** | ❌ **虚高** | 发送 256 字节 `0x00..0xFF`，采到 `.size = 512`（128 ASCII + 128 × 3 字节替换字符） |
+
+使用者必须知道的两点：
+
+1. **没有任何字段标记失真。** 二进制载荷的 `.content` 看起来"有内容"，但已不是原始数据，无法从日志本身判断是否可信。
+2. **`.size` 不能当线上长度用。** 文本场景下它等于 `content-length`，可用于交叉校验；二进制场景下是转换后的长度，每个非法字节膨胀 3 倍。
+
+本插件不做 base64 等编码兜底 —— 拿到的字节已经不是原始数据，编码也无从恢复。根治需在上游（anolisa）把 body 改成 `Vec<u8>` 贯穿 analyzer 与 FFI；`AgentsightHttpsData` 的 ABI 本来就是 `(ptr, len)` 形式，届时本插件侧无需改动。
+
+#### 去框与解压：请求侧和响应侧不对称
+
+上面保真度表格的证据**全部取自响应**。上游对两侧用的是不同的访问器，请求侧既不去框也不解压：
+
+| 场景 | chunked 去框 | gzip 解压 | 上游实现 |
+| --- | --- | --- | --- |
+| HTTP/1 响应（非 SSE） | ✅ | ✅ | `analyzer/unified.rs` 走 `body_str_decompressed()` → `dechunked_body()` |
+| HTTP/1 响应（SSE） | 不适用（按 SSE 事件解析后重组） | — | `analyzer/unified.rs` 走 `resp.json_body()` |
+| **HTTP/1 请求** | ❌ | ❌ | 走 `req.body()` 原始字节；`ParsedRequest` 只有 `body` / `body_str` / `json_body`，**没有**去框或解压访问器 |
+| HTTP/2 双向 | 不适用（h2 分块在帧层，无 `transfer-encoding: chunked`） | ✅ | `aggregator/http2.rs` 的 `request_body_str()` / `response_body_str()` |
+
+因此 **chunked 残框只出现在两种情况**，不要按「一律可能有框」来处理：
+
+1. **HTTP/1 请求体：恒定带框。** `http.request.body.content` 会是 `c3b\r\n...\r\n0\r\n\r\n` 形态的原文。接入方要解析 chunked 请求体**必须自己 dechunk**。
+2. **HTTP/1 响应体的降级情形。** 去框以 `transfer-encoding` 头存在为前提（`is_chunked()`），该头缺失或被改写时不去框；另外 `dechunk_body()` 对非空 body 解出空结果时会回退到原始 body（`parser/http/response.rs`）。
+
+请求侧的根治需要在 AgentSight（Rust）侧给 `ParsedRequest` 补上与响应侧对等的访问器。
+
+> **请求头按白名单过滤。** `Authorization` / `x-api-key` / `cookie` 这类头携带有效凭据，而本路径原样上报、不做任何脱敏，输出即等于把凭据写入磁盘（实测确认过）。因此请求头采用**白名单**：只输出 `content-type`、`content-length`、`traceparent` 三个（键名 `http.request.header.<小写头名>`），另外 `host` 与 `user-agent` 分别提取为 `server.address` / `server.port` 与 `user_agent.original`。**白名单之外的头一律丢弃**，包括未知厂商的自定义头 —— 这一侧宁可少报也不能漏一个凭据。
+>
+> 这三个头之所以值得救回：`content-type` 直接解释「为什么没能解析成 GenAI 语义」；`content-length` 是判定 body 是否被上游 `from_utf8_lossy` 污染/截断的唯一交叉校验基准；`traceparent` 是把 raw 日志与应用侧 trace 关联起来的唯一途径。新增白名单头请修改 `AgentsightManager.cpp` 的 `kAllowedRequestHeaders` 常量。
+>
+> 白名单模型天然 fail-safe：HTTP/2 上头名可能无法解码（见下方响应头说明），解不出的头名匹配不上白名单，自动被丢弃。代价是 `traceparent` 不在 HPACK 静态表内，h2 场景下**可能采不到** —— 丢一个诊断字段，而不是漏一个凭据。
+>
+> **响应头则相反，按黑名单过滤后逐头输出。** 两侧风险画像正好镜像：请求头敏感面大、价值集中在少数几个已知头名，所以白名单更安全；响应头是诊断价值的主要来源、厂商自定义头多，白名单会挡掉大量有用信息，所以用黑名单：以下头名（小写全等匹配）永不落盘 —— `set-cookie`、`set-cookie2`、`www-authenticate`、`proxy-authenticate`、`authorization`、`proxy-authorization`、`x-api-key`、`api-key`、`x-auth-token`、`x-amz-security-token`。`set-cookie` 是可直接重放的会话凭据，`*-authenticate` 带 challenge/nonce。
+>
+> **头名不合规的整项丢弃（连值一起）。** 黑名单是按「解码后的头名」匹配的，而 HTTP/2 的头名来自**无状态** HPACK 解码（`decode_headers_stateless`，没有动态表状态）：当头名以动态表索引形式给出时，上游无法还原，会替换成字面量 `<unknown:N>`，**而值是完整真实值**。黑名单 10 项里只有 `set-cookie`、`www-authenticate`、`proxy-authenticate`、`authorization`、`proxy-authorization` 在 HPACK 静态表内；`set-cookie2`、`x-api-key`、`api-key`、`x-auth-token`、`x-amz-security-token` 不在 —— 而把自定义头放进动态表复用正是 HPACK 的用途，所以长连接上第二次出现的 `x-api-key` 会以 `<unknown:62>` 出现。因此凡头名不符合 RFC 7230 token 字符集的项一律整项丢弃：头名不可信时无法判断是否敏感，宁可少报一个诊断字段，不能漏一个凭据。该规则同时挡掉 `<dynamic:N>`、Huffman 解码失败产生的乱码头名，以及 `:status` 这类伪头（`:` 不是 token 字符；状态码本来就有 `http.response.status_code`，不需要重复输出）。
+>
+> **每条日志最多输出 64 个响应头**，与 HTTP/1 侧 `httparse` 的 `MAX_HEADERS = 64` 对齐。HTTP/2 侧上游没有条数上限，而逐头输出意味着每个头名都是一个字段名，不设上限会让字段名基数无限膨胀 —— 对按字段名建动态列的存储侧是运维风险。超限和头名不合规的丢弃条数会打 DEBUG 日志，不静默。
+>
+> **残余风险：黑名单是开放集合。** 未知厂商在自定义响应头（如某些网关的 `x-*`）里回吐 token、且头名能正常解码的情况会默认放行。发现新的敏感响应头请补充到 `AgentsightManager.cpp` 的 `kSensitiveResponseHeaders` 常量。
+>
+> 但请注意 **body 仍是原文**：部分厂商在请求体内传凭据，这类内容依然会落盘 —— 这是原始采集的固有性质。
+>
+> body 的去框 / 解压情况见上方「去框与解压：请求侧和响应侧不对称」—— 与脱敏无关，但同样影响接入方要不要自己写解析逻辑。
+
+#### 采集范围：`Https` 域名列表**不限制**上报范围
+
+容易误解的一点：`Https` 只决定**给哪些进程挂 SSL 探针**，不过滤上报内容。一旦某进程被纳入采集（无论是命中 `CmdlineWhitelist`、还是命中 `Https` 域名规则），它的**全部**无法解析为 LLM 语义的 HTTPS 流量都会产生 raw 事件，**与 `Https` 列表无关**。
+
+这是上游刻意的设计（`alibaba/anolisa#1665` 为此移除了按域名过滤上报的 `HttpReportFilter`）。实际后果：一个被纳入采集的进程，其遥测上报、健康检查、对象存储下载等全部非 LLM 流量都会被原文写出。
+
+因此收窄 `Https` 只减少「被 attach 的进程数」，**不减少已 attach 进程的上报范围**。真正能控制范围的是：
+
+- **`CmdlineBlacklist`** —— 排除不希望被采集的进程（优先级高于白名单）
+- **不开 `RawHttpsFallback`** —— LLM 调用本身走 `gen_ai.*`，raw 主要捞的是非 LLM 噪音
+
+在多用户共享的机器上尤其要注意：`Https` 里的域名一旦被别人的进程访问，那个进程也会被 attach，其全部流量随之落盘。
 
 ### `AgentType` 取值命名规范
 

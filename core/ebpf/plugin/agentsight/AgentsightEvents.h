@@ -68,4 +68,68 @@ public:
     std::string mToolDefinitionsJson;
 };
 
+/// Raw HTTP exchange reported when AgentSight could not parse the traffic into LLM semantics
+/// (unknown API path or unrecognised body shape). Requires `RawHttpsFallback: true` plus
+/// libagentsight >= 0.9.0; see AgentsightManager::OnHttpsCallback.
+///
+/// Emitted as an `http.request` / `http.response` pair sharing one `http.exchange.id` (the pairing
+/// key; each log keeps its own unique `event.id`, and `event.sequence` orders the two). The response
+/// half is omitted only when the response side is genuinely empty (no body and no headers) — not
+/// merely when mStatusCode == 0, which HTTP/2 also reports for a fully-populated response whose
+/// `:status` pseudo-header could not be HPACK-decoded. See HandleHttpsEvent.
+///
+/// Narrower than AgentsightLlmRecord, but not by as much as it used to be: process attribution
+/// (cmdline / agent type / container id) is now carried too, resolved on the agentsight side from
+/// the pid with the same ladder the LLM path uses. Still absent are session id and conversation id —
+/// a raw event is by definition traffic that could not be mapped onto LLM semantics, so it has no
+/// session to belong to. There is no request_url either — only method + path; the target host is
+/// inside mRequestHeaders.
+class AgentsightHttpsRecord : public CommonEvent {
+public:
+    AgentsightHttpsRecord(std::string pipelineConfigName, const AgentsightHttpsData& d);
+
+    PluginType GetPluginType() const override { return PluginType::AGENTSIGHT_OBSERVE; }
+
+    const std::string& GetPipelineConfigName() const { return mPipelineConfigName; }
+
+    std::string mPipelineConfigName;
+
+    int32_t mPid = 0;
+    std::string mProcessName;
+    // Same semantics as the identically-named AgentsightLlmRecord members: cmdline is space-joined
+    // argv truncated to 127 bytes (empty once the process exits), mContainerId is empty outside a
+    // container, mAgentType is the config-matched agent name (lowercased by agentsight) and falls
+    // back to the process comm when no rule matches.
+    //
+    // mAgentType is emitted as `agent.type`, NOT `gen_ai.agent.type` — a raw event has no GenAI
+    // semantics, so it emits nothing in that namespace. Same value, different key; see
+    // FillAgentsightHttpCommon.
+    std::string mCmdline;
+    std::string mAgentType;
+    std::string mContainerId;
+    uint64_t mTimestampNs = 0;
+    uint64_t mDurationNs = 0;
+    std::string mMethod;
+    std::string mPath;
+    uint16_t mStatusCode = 0;
+    uint8_t mIsSse = 0;
+    // Length-delimited payloads: AgentsightHttpsData reports these as (ptr, len) pairs and they may
+    // contain embedded NULs (compressed or binary bodies), so they are copied by length, not by
+    // NUL scan, and may not be valid UTF-8.
+    //
+    // Filtered through an ALLOWLIST (kAllowedRequestHeaders) before anything is emitted, because this
+    // is where credentials live — Authorization / x-api-key / cookie — and this path does no
+    // redaction. Survivors go out as `http.request.header.<name>`; host and user-agent are salvaged
+    // into `server.address` / `server.port` / `user_agent.original` instead. Anything unrecognised is
+    // dropped. See ExtractRequestHeaderFields / FillAgentsightHttpRequestLog.
+    std::string mRequestHeaders;
+    std::string mRequestBody;
+    // Mirror image: filtered through a DENYLIST (kSensitiveResponseHeaders — set-cookie,
+    // www-authenticate, ...) and otherwise emitted as `http.response.header.<name>`. An allowlist here
+    // would hide most of what makes this fallback diagnostically useful, and the credential-bearing
+    // response header names are a short, known set. See EmitHttpResponseHeaders.
+    std::string mResponseHeaders;
+    std::string mResponseBody;
+};
+
 } // namespace logtail::ebpf

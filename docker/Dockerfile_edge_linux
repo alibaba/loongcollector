@@ -1,8 +1,8 @@
 #########################################################################################################################
 # Step 1: Build
 #########################################################################################################################
-# AgentSight deps: perl + openssl-devel preinstalled in loongcollector-build-linux 2.1.17+ (see docker/Dockerfile_build).
-FROM sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.17 AS builder
+# AgentSight deps: perl + openssl-devel preinstalled in loongcollector-build-linux 2.1.18+ (see docker/Dockerfile_build).
+FROM sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.18 AS builder
 
 # Build arguments
 ARG VERSION=edge

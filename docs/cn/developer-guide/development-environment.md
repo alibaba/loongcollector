@@ -84,7 +84,7 @@ go install ...
 
 ```json
 {
-  "image": "sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.17",
+  "image": "sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.18",
   "customizations": {
     "vscode": {
       "extensions": [
@@ -233,7 +233,7 @@ cp -a ./core/build/_thirdparty/coolbpf/src/agentsight/release/libagentsight.so .
 ```bash
 docker run --name loongcollector-build -d \
   -v `pwd`:/src -w /src \
-  sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.17 \
+  sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.18 \
   bash -c "sleep infinity"
 ```
 

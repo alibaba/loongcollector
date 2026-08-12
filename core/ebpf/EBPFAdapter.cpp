@@ -257,6 +257,12 @@ bool EBPFAdapter::tryLoadAgentSightDylib() {
         tmpLib->LoadMethod("agentsight_config_set_verbose", symErr));
     sym.config_set_log_path = reinterpret_cast<decltype(sym.config_set_log_path)>(
         tmpLib->LoadMethod("agentsight_config_set_log_path", symErr));
+    // Optional symbol (libagentsight >= 0.9.0). Resolved with its own error string so a miss on an
+    // older library never leaks into the required-symbol diagnostic below, and deliberately kept out
+    // of the `ok` check so older libraries keep working with raw HTTPS fallback simply unavailable.
+    std::string optSymErr;
+    sym.config_set_enable_raw_https = reinterpret_cast<decltype(sym.config_set_enable_raw_https)>(
+        tmpLib->LoadMethod("agentsight_config_set_enable_raw_https", optSymErr));
     sym.config_add_cmdline_rule = reinterpret_cast<decltype(sym.config_add_cmdline_rule)>(
         tmpLib->LoadMethod("agentsight_config_add_cmdline_rule", symErr));
     sym.config_add_https
@@ -283,7 +289,9 @@ bool EBPFAdapter::tryLoadAgentSightDylib() {
 
     mAgentSightLib = std::move(tmpLib);
     mAgentSightSymbols = std::make_unique<AgentSightSymbolTable>(sym);
-    LOG_INFO(sLogger, ("[EBPFAdapter] AgentSight symbols loaded", STRING_FLAG(ebpf_agentsight_dylib_base_name)));
+    LOG_INFO(sLogger,
+             ("[EBPFAdapter] AgentSight symbols loaded", STRING_FLAG(ebpf_agentsight_dylib_base_name))(
+                 "raw_https_api", sym.config_set_enable_raw_https != nullptr));
     return true;
 }
 

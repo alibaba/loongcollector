@@ -47,9 +47,9 @@ RUN if [ "$HOST_OS" = "Linux" ]; then \
     fi
 
 # Provide CentOS-compiled SASL libraries for librdkafka (expects libsasl2.so.3)
-COPY --from=sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.17 /usr/lib64/libsasl2.so.3 /tmp/sasl-compat/libsasl2.so.3
-COPY --from=sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.17 /usr/lib64/libsasl2.so.3.0.0 /tmp/sasl-compat/libsasl2.so.3.0.0
-COPY --from=sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.17 /usr/lib64/sasl2 /tmp/sasl-compat/sasl2
+COPY --from=sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.18 /usr/lib64/libsasl2.so.3 /tmp/sasl-compat/libsasl2.so.3
+COPY --from=sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.18 /usr/lib64/libsasl2.so.3.0.0 /tmp/sasl-compat/libsasl2.so.3.0.0
+COPY --from=sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.18 /usr/lib64/sasl2 /tmp/sasl-compat/sasl2
 RUN set -eux; \
     case "${TARGETARCH}" in \
         amd64) LIB_DIR="/usr/lib/x86_64-linux-gnu" ;; \

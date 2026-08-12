@@ -24,7 +24,7 @@ set -o pipefail
 # e2e: Build plugin dynamic lib and build the CPP part.
 #
 # ENABLE_AGENTSIGHT=ON (non-plugin): generated gen_build.sh verifies Perl modules for openssl-sys
-# in the Docker build (docker/Dockerfile_build uses loongcollector-build-linux 2.1.17+ for packages).
+# in the Docker build (docker/Dockerfile_build uses loongcollector-build-linux 2.1.18+ for packages).
 CATEGORY=$1
 GENERATED_HOME=$2
 VERSION=${3:-0.0.1}
@@ -88,12 +88,14 @@ EOF
 
   chmod 755 $BUILD_SCRIPT_FILE
   # Appended to gen_build.sh: runs inside "docker build" when Dockerfile_build does RUN gen_build.sh.
-  # Perl/OpenSSL build deps come from loongcollector-build-linux 2.1.17+; only verify here.
+  # Perl/OpenSSL build deps come from loongcollector-build-linux 2.1.18+; only verify here.
   if [ "${ENABLE_AGENTSIGHT}" = "ON" ] && [ "${CATEGORY}" != "plugin" ]; then
     cat >>"$BUILD_SCRIPT_FILE" <<'AGENTSIGHT_BUILD_DEPS_EOF'
 
 # --- AgentSight / vendored openssl-sys (Docker build container only) ---
-perl -MIPC::Cmd -e1 && perl -MData::Dumper -e1 || { echo "ERROR: perl IPC::Cmd or Data::Dumper missing (use loongcollector-build-linux 2.1.17+ or install AgentSight build deps)." >&2; exit 1; }
+# Time::Piece is checked here because OpenSSL 3.6's Makefile.in uses it: without this guard the build
+# fails ~10 minutes in, at the openssl-src configure step, instead of immediately.
+perl -MIPC::Cmd -e1 && perl -MData::Dumper -e1 && perl -MTime::Piece -e1 || { echo "ERROR: perl IPC::Cmd, Data::Dumper or Time::Piece missing (use loongcollector-build-linux 2.1.18+ or install AgentSight build deps)." >&2; exit 1; }
 # --- end AgentSight build deps ---
 AGENTSIGHT_BUILD_DEPS_EOF
   fi
