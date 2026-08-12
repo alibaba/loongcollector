@@ -623,8 +623,6 @@ github.com/go-openapi/swag v0.22.3/go.mod h1:UzaqsxGiab7freDnrUUra0MwWfN/q7tE4j+
 github.com/go-openapi/swag v0.23.0 h1:vsEVJDUo2hPJ2tu0/Xc+4noaxyEffXNIs3cOULZ+GrE=
 github.com/go-openapi/swag v0.23.0/go.mod h1:esZ8ITTYEsH1V2trKHjAN8Ai7xHb8RV+YSZ577vPjgQ=
 github.com/go-openapi/validate v0.21.0/go.mod h1:rjnrwK57VJ7A8xqfpAOEKRH8yQSGUriMu5/zuPSQ1hg=
-github.com/go-ping/ping v0.0.0-20211130115550-779d1e919534 h1:dhy9OQKGBh4zVXbjwbxxHjRxMJtLXj3zfgpBYQaR4Q4=
-github.com/go-ping/ping v0.0.0-20211130115550-779d1e919534/go.mod h1:xIFjORFzTxqIV/tDVGO4eDy/bLuSyawEeojSm3GfRGk=
 github.com/go-playground/assert/v2 v2.0.1/go.mod h1:VDjEfimB/XKnb+ZQfWdccd7VUvScMdVu0Titje2rxJ4=
 github.com/go-playground/assert/v2 v2.2.0 h1:JvknZsQTYeFEAhQwI4qEt9cyV5ONwRHC+lYKSsYSR8s=
 github.com/go-playground/assert/v2 v2.2.0/go.mod h1:VDjEfimB/XKnb+ZQfWdccd7VUvScMdVu0Titje2rxJ4=
@@ -915,6 +913,8 @@ github.com/iLogtail/jfr-parser v0.6.0 h1:dNaQ0Ng2BLE5uxrhUQwtx1q7O9LIQFpMthl3SV3
 github.com/iLogtail/jfr-parser v0.6.0/go.mod h1:ZMcbJjfDkOwElEK8CvUJbpetztRWRXszCmf5WU0erV8=
 github.com/iLogtail/metrics v1.23.0-ilogtail h1:WHhiXtMy5+HWiPpDwO7a0zkMjPd7IPa5euF07LH5h6g=
 github.com/iLogtail/metrics v1.23.0-ilogtail/go.mod h1:rAr/llLpEnAdTehiNlUxKgnjcOuROSzpw0GvjpEbvFc=
+github.com/iLogtail/ping v1.2.2 h1:r42n1/6Q56/pwB1vBpBlVsvscdScjfFsZ+oVd1hRc1o=
+github.com/iLogtail/ping v1.2.2/go.mod h1:KtEzKdvHQJvKV0rMU5JIwoeNkKAPKJGa4rZXaZpWLo0=
 github.com/iLogtail/pyroscope-lib v0.35.2-ilogtail h1:n+om7Idv1ftoVOiqmL4CRWGeoj1v8TTQa7V809XiHT4=
 github.com/iLogtail/pyroscope-lib v0.35.2-ilogtail/go.mod h1:IpElNUA9ousagl2w05BZbzGxmd8cOERYA2vZ+DoznlQ=
 github.com/iancoleman/strcase v0.2.0/go.mod h1:iwCmte+B7n89clKwxIoIXy/HfoL7AsD47ZCWhYzw7ho=
