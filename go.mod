@@ -298,7 +298,7 @@ replace (
 	github.com/alibaba/ilogtail/pkg => ./pkg
 	github.com/aliyun/alibaba-cloud-sdk-go/services/sls_inner => ./external/github.com/aliyun/alibaba-cloud-sdk-go/services/sls_inner
 	github.com/elastic/beats/v7 => ./external/github.com/elastic/beats/v7
-	github.com/go-ping/ping => github.com/EvanLjp/ping v1.2.2
+	github.com/go-ping/ping => github.com/iLogtail/ping v1.2.2
 	github.com/jeromer/syslogparser => ./external/github.com/jeromer/syslogparser
 	github.com/mindprince/gonvml => github.com/iLogtail/gonvml v1.0.0
 	github.com/opencontainers/runc => github.com/opencontainers/runc v1.1.12
