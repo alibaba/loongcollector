@@ -20,6 +20,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/alibaba/ilogtail/pkg/helper"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
 )
@@ -77,4 +79,55 @@ func TestParameterCheck(t *testing.T) {
 	processor := &ProcessorAddFields{}
 	err := processor.Init(ctx)
 	assert.Error(t, err)
+}
+
+// ---- v2 (PipelineEvent / SendPb) Process path tests ----
+
+func TestProcessorAddFields_ProcessV2AddsFields(t *testing.T) {
+	processor := &ProcessorAddFields{Fields: map[string]string{"new_key": "new_value"}}
+	require.NoError(t, processor.Init(mock.NewEmptyContext("p", "l", "c")))
+
+	log := models.NewLog("", nil, "", "", "", models.NewTags(), 0)
+	log.GetIndices().Add("existing", "v")
+
+	context := helper.NewObservePipelineContext(10)
+	processor.Process(&models.PipelineGroupEvents{Events: []models.PipelineEvent{log}}, context)
+
+	assert.True(t, log.GetIndices().Contains("new_key"))
+	assert.Equal(t, "new_value", log.GetIndices().Get("new_key"))
+	assert.Equal(t, "v", log.GetIndices().Get("existing"))
+}
+
+func TestProcessorAddFields_ProcessV2IgnoreIfExist(t *testing.T) {
+	processor := &ProcessorAddFields{Fields: map[string]string{"a": "override"}, IgnoreIfExist: true}
+	require.NoError(t, processor.Init(mock.NewEmptyContext("p", "l", "c")))
+
+	log := models.NewLog("", nil, "", "", "", models.NewTags(), 0)
+	log.GetIndices().Add("a", "original")
+
+	context := helper.NewObservePipelineContext(10)
+	processor.Process(&models.PipelineGroupEvents{Events: []models.PipelineEvent{log}}, context)
+
+	assert.Equal(t, "original", log.GetIndices().Get("a"), "IgnoreIfExist must keep the original value")
+}
+
+// TestProcessorAddFields_ProcessV2PassesThroughMetric verifies Metric events are
+// not modified and not dropped by the log-only processor.
+func TestProcessorAddFields_ProcessV2PassesThroughMetric(t *testing.T) {
+	processor := &ProcessorAddFields{Fields: map[string]string{"new_key": "new_value"}}
+	require.NoError(t, processor.Init(mock.NewEmptyContext("p", "l", "c")))
+
+	metric := models.NewSingleValueMetric("m", models.MetricTypeGauge, models.NewTags(), 0, 1.0)
+	group := &models.PipelineGroupEvents{Events: []models.PipelineEvent{metric}}
+
+	context := helper.NewObservePipelineContext(10)
+	processor.Process(group, context)
+
+	results := context.Collector().ToArray()
+	require.Len(t, results, 1)
+	require.Len(t, results[0].Events, 1)
+	m, ok := results[0].Events[0].(*models.Metric)
+	require.True(t, ok, "metric event must pass through unchanged")
+	assert.Equal(t, "m", m.GetName())
+	assert.False(t, m.GetTags().Contains("new_key"), "log-only processor must not touch metric tags")
 }

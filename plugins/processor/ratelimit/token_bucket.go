@@ -164,8 +164,11 @@ func (t *tokenBucket) runGC() {
 			t.buckets.Delete(key)
 		}
 
-		// Reset GC metrics
-		t.gc.metrics.numCalls = atomic.Int32{}
+		// Reset GC metrics. Use the atomic Store rather than reassigning the
+		// whole atomic.Int32 value: this goroutine runs concurrently with
+		// IsAllowed, which atomically Add/Load numCalls, and a plain struct
+		// overwrite of the atomic's storage is itself a data race.
+		t.gc.metrics.numCalls.Store(0)
 
 		gcDuration := time.Since(gcStartTime)
 		numBucketsDeleted := len(toDelete)

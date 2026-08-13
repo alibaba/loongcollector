@@ -80,7 +80,10 @@ func (r *InputDebugFile) Read(context pipeline.PipelineContext) error {
 	if r.FieldName != models.BodyKey {
 		log.Contents.Add(r.FieldName, body)
 	}
-	context.Collector().Collect(&models.GroupInfo{}, log)
+	// Emit a group with initialized Tags. A bare &models.GroupInfo{} leaves
+	// Tags nil, which panics ProcessorTag.ProcessV2 (Group.Tags.Add) and kills
+	// the v2 processor goroutine, so no events reach the flusher.
+	context.Collector().Collect(models.NewGroup(nil, models.NewTags()), log)
 	return nil
 }
 

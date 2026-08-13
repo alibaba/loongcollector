@@ -23,6 +23,7 @@ import (
 	"github.com/dlclark/regexp2"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
@@ -140,6 +141,20 @@ func (p *ProcessorDesensitize) ProcessLogs(logArray []*protocol.Log) []*protocol
 		}
 	}
 	return logArray
+}
+
+// Process implements the v2 ProcessorV2 interface: it desensitizes the SourceKey
+// value of each Log event in place; Metric/Span events pass through unchanged.
+func (p *ProcessorDesensitize) Process(in *models.PipelineGroupEvents, context pipeline.PipelineContext) {
+	pipeline.ProcessLogEventsOnly(in, context, p.processLogEvent)
+}
+
+func (p *ProcessorDesensitize) processLogEvent(log *models.Log) {
+	contents := log.GetIndices()
+	if !contents.Contains(p.SourceKey) {
+		return
+	}
+	contents.Add(p.SourceKey, p.desensitize(pipeline.GetStringValue(contents.Get(p.SourceKey))))
 }
 
 type runes []rune

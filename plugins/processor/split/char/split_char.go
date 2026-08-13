@@ -19,6 +19,7 @@ import (
 	"strings"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
@@ -188,5 +189,48 @@ func init() {
 			PreserveOthers:         true,
 			KeepSourceIfParseError: true,
 		}
+	}
+}
+
+// Process implements the v2 ProcessorV2 interface: it splits the SourceKey value
+// of each Log event into SplitKeys on the same log. Metric/Span events pass
+// through unchanged.
+func (p *ProcessorSplitChar) Process(in *models.PipelineGroupEvents, context pipeline.PipelineContext) {
+	pipeline.ProcessLogEventsOnly(in, context, p.processLogEvent)
+}
+
+func (p *ProcessorSplitChar) processLogEvent(log *models.Log) {
+	contents := log.GetIndices()
+	sourceKey := p.SourceKey
+	if sourceKey == "" {
+		// v1 splits the first content when SourceKey is empty. The v2 index map
+		// iteration order is unspecified, so this picks the first key best-effort.
+		for k := range contents.Iterator() {
+			sourceKey = k
+			break
+		}
+		if sourceKey == "" {
+			if p.NoKeyError {
+				logger.Warning(p.context.GetRuntimeContext(), selfmonitor.SplitFindAlarm, "cannot find key", p.SourceKey)
+			}
+			return
+		}
+	} else if !contents.Contains(sourceKey) {
+		if p.NoKeyError {
+			logger.Warning(p.context.GetRuntimeContext(), selfmonitor.SplitFindAlarm, "cannot find key", p.SourceKey)
+		}
+		return
+	}
+
+	value := pipeline.GetStringValue(contents.Get(sourceKey))
+	// Reuse the tested v1 quote/escape parsing on a temporary protocol.Log.
+	tmp := &protocol.Log{}
+	splitResult := p.splitValue(tmp, value)
+	for _, c := range tmp.Contents {
+		contents.Add(c.Key, c.Value)
+	}
+	// v1 char removes the source key AFTER splitting (see ProcessLogs).
+	if !p.shouldKeepSource(splitResult) {
+		contents.Delete(sourceKey)
 	}
 }

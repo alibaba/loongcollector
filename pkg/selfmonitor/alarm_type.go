@@ -197,6 +197,7 @@ const (
 	ProcessorJSONParserAlarm            AlarmType = "PROCESSOR_JSON_PARSER_ALARM"
 	ProcessorOTELMetricDataFormat       AlarmType = "PROCESSOR_OTEL_METRIC_DATA_FORMAT"
 	ProcessorOTELMetricFindAlarm        AlarmType = "PROCESSOR_OTEL_METRIC_FIND_ALARM"
+	ProcessorOTELMetricParserAlarm      AlarmType = "PROCESSOR_OTEL_METRIC_PARSER_ALARM"
 	ProcessorOTELTraceDataFormat        AlarmType = "PROCESSOR_OTEL_TRACE_DATA_FORMAT"
 	ProcessorOTELTraceFindAlarm         AlarmType = "PROCESSOR_OTEL_TRACE_FIND_ALARM"
 	ProcessorOTELTraceParserAlarm       AlarmType = "PROCESSOR_OTEL_TRACE_PARSER_ALARM"
