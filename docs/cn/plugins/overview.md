@@ -175,6 +175,7 @@
 | `flusher_kafka_v2`<br>[Kafka V2](flusher/extended/flusher-kafka-v2.md) | 社区<br>[shalousun](https://github.com/shalousun) | ✓ | ✓ | v1&v2 | 透传未知 | 透传未知 | 将采集到的数据输出到 Kafka。 |
 | `flusher_loki`<br>[Loki](flusher/extended/flusher-loki.md) | 社区<br>[abingcbc](https://github.com/abingcbc) | ✓ | ✓ | v1&v2 | 透传未知 | 透传未知 | 将采集到的数据输出到 Loki。 |
 | `flusher_otlp_log`<br>[OTLP 日志](flusher/extended/flusher-otlp.md) | 社区<br>[liuhaoyang](https://github.com/liuhaoyang) | ✓ | ✓ | v1&v2 | 透传未知 | 透传未知 | 将采集到的数据支持`OpenTelemetry log protocol`的后端。 |
+| `flusher_otlp_http`<br>[OTLP/HTTP](flusher/extended/flusher-otlp-http.md) | 社区<br>[shalk](https://github.com/shalk) | ✓ | ✓ | v1&v2 | v2 | v2 | 将采集到的数据通过 OTLP/HTTP 协议输出到 OpenTelemetry 兼容后端，支持 Logs、Metrics、Traces。 |
 | `flusher_prometheus`<br>[Prometheus](flusher/extended/flusher-prometheus.md) | 社区<br> | — | ✓ | — | v2 | — | 将采集到的数据，经过处理后，通过 http 格式发送到指定的 Prometheus RemoteWrite 地址。 |
 | `flusher_pulsar`<br>[Pulsar](flusher/extended/flusher-pulsar.md) | 社区<br>[shalousun](https://github.com/shalousun) | ✓ | ✓ | v1&v2 | 透传未知 | 透传未知 | 将采集到的数据输出到 Pulsar。 |
 | `flusher_stdout`<br>[标准输出/文件](flusher/extended/flusher-stdout.md) | SLS 官方 | ✓ | ✓ | v1&v2 | v2 | v2 | 将采集到的数据输出到标准输出或文件。 |
