@@ -73,7 +73,7 @@ private:
     void ResetContainerdTextLog(
         StringView time, StringView source, StringView content, bool isPartialLog, LogEvent& sourceEvent);
     bool ParseContainerdTextLogLine(LogEvent& sourceEvent, std::string& errorMsg, PipelineEventGroup& logGroup);
-    bool ParseDockerJsonLogLine(LogEvent& sourceEvent, std::string& errorMsg);
+    bool ParseDockerJsonLogLine(LogEvent& sourceEvent, std::string& errorMsg, PipelineEventGroup& logGroup);
 
     CounterPtr mOutFailedEventsTotal; // 解析失败条数
     CounterPtr mParseStdoutTotal;
