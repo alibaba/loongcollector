@@ -528,6 +528,10 @@ void SLSEventGroupSerializer::SerializeRawEvent(LogGroupSerializer& serializer,
 }
 
 bool SLSEventGroupListSerializer::Serialize(vector<CompressedLogGroup>&& v, string& res, string& errorMsg) {
+    if (v.empty()) {
+        errorMsg = "empty log package list";
+        return false;
+    }
     sls_logs::SlsLogPackageList logPackageList;
     for (const auto& item : v) {
         auto package = logPackageList.add_packages();
