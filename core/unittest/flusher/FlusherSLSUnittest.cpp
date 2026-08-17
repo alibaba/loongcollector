@@ -65,6 +65,7 @@ public:
     void TestFlush();
     void TestFlushAll();
     void TestAddPackId();
+    void TestSerializeAndPushAllEmptyGroups();
     void OnGoPipelineSend();
 
 protected:
@@ -1955,6 +1956,49 @@ void FlusherSLSUnittest::TestAddPackId() {
     APSARA_TEST_STREQ("34451096883514E2-0", batch.mTags.mInner["__pack_id__"].data());
 }
 
+void FlusherSLSUnittest::TestSerializeAndPushAllEmptyGroups() {
+    // package list is enabled when there are more than 1 group in the batch. if all of them fail to be serialized
+    // (e.g. logs with empty content only), nothing should be pushed to the sender queue, otherwise a request with
+    // an empty package list would be sent, which can never succeed and would be retried repeatedly
+    Json::Value configJson, optionalGoPipeline;
+    string configStr, errorMsg;
+    configStr = R"(
+        {
+            "Type": "flusher_sls",
+            "Project": "test_project",
+            "Logstore": "test_logstore",
+            "Region": "test_region",
+            "Endpoint": "test_region.log.aliyuncs.com",
+            "Aliuid": "123456789"
+        }
+    )";
+    ParseJsonTable(configStr, configJson, errorMsg);
+    FlusherSLS flusher;
+    flusher.SetContext(ctx);
+    flusher.CreateMetricsRecordRef(FlusherSLS::sName, "1");
+    flusher.Init(configJson, optionalGoPipeline);
+    flusher.CommitMetricsRecordRef();
+
+    BatchedEventsList batchedEventsList;
+    for (size_t i = 0; i < 2; ++i) {
+        PipelineEventGroup group(make_shared<SourceBuffer>());
+        group.SetMetadata(EventGroupMetaKey::SOURCE_ID, string("source-id"));
+        auto e = group.AddLogEvent();
+        e->SetTimestamp(1234567890); // no content at all, so the serialized log group is empty
+        batchedEventsList.emplace_back(std::move(group.MutableEvents()),
+                                       std::move(group.GetSizedTags()),
+                                       std::move(group.GetSourceBuffer()),
+                                       group.GetMetadata(EventGroupMetaKey::SOURCE_ID),
+                                       std::move(group.GetExactlyOnceCheckpoint()));
+    }
+
+    APSARA_TEST_FALSE(flusher.SerializeAndPush(std::move(batchedEventsList)));
+
+    vector<SenderQueueItem*> res;
+    SenderQueueManager::GetInstance()->GetAvailableItems(res, 80);
+    APSARA_TEST_TRUE(res.empty());
+}
+
 void FlusherSLSUnittest::OnGoPipelineSend() {
     {
         Json::Value configJson, optionalGoPipeline;
@@ -2051,6 +2095,7 @@ UNIT_TEST_CASE(FlusherSLSUnittest, TestSend)
 UNIT_TEST_CASE(FlusherSLSUnittest, TestFlush)
 UNIT_TEST_CASE(FlusherSLSUnittest, TestFlushAll)
 UNIT_TEST_CASE(FlusherSLSUnittest, TestAddPackId)
+UNIT_TEST_CASE(FlusherSLSUnittest, TestSerializeAndPushAllEmptyGroups)
 UNIT_TEST_CASE(FlusherSLSUnittest, OnGoPipelineSend)
 
 } // namespace logtail
