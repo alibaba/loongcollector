@@ -369,10 +369,12 @@ public:
     PluginOptions asVariant() { return &agentsightOptions(); }
 
     std::shared_ptr<AgentsightManager> makeManager(const size_t sessionInputCacheMaxSize = 4096) {
+        // "/" is the host-mode root: the procfs-root setter path is skipped for it.
         auto m = std::make_shared<AgentsightManager>(mProcessCacheManager,
                                                      std::static_pointer_cast<EBPFAdapter>(mAgentSightAdapter),
                                                      *mEventQueue,
                                                      mEventPool.get(),
+                                                     "/",
                                                      sessionInputCacheMaxSize);
         APSARA_TEST_EQUAL(0, m->Init());
         return m;
@@ -649,7 +651,8 @@ void AgentsightManagerUnittest::TestResumeInvalidOptions() {
     auto p = new TestableAgentsightManager(mProcessCacheManager,
                                            std::static_pointer_cast<EBPFAdapter>(mAgentSightAdapter),
                                            *mEventQueue,
-                                           mEventPool.get());
+                                           mEventPool.get(),
+                                           "/");
     std::shared_ptr<TestableAgentsightManager> mgr(p);
     APSARA_TEST_EQUAL(0, mgr->Init());
     PluginOptions nullSec{static_cast<SecurityOptions*>(nullptr)};
@@ -661,7 +664,8 @@ void AgentsightManagerUnittest::TestResumeWithNoRegistration() {
     auto p = new TestableAgentsightManager(mProcessCacheManager,
                                            std::static_pointer_cast<EBPFAdapter>(mAgentSightAdapter),
                                            *mEventQueue,
-                                           mEventPool.get());
+                                           mEventPool.get(),
+                                           "/");
     std::shared_ptr<TestableAgentsightManager> mgr(p);
     APSARA_TEST_EQUAL(0, mgr->Init());
     APSARA_TEST_EQUAL(0, mgr->resume(asVariant()));

@@ -26,6 +26,7 @@
 
 #include "collection_pipeline/queue/ProcessQueueItem.h"
 #include "collection_pipeline/queue/ProcessQueueManager.h"
+#include "common/FileSystemUtil.h"
 #include "common/StringView.h"
 #include "common/UUIDUtil.h"
 #include "common/magic_enum.hpp"
@@ -820,8 +821,11 @@ AgentsightManager::AgentsightManager(const std::shared_ptr<ProcessCacheManager>&
                                      const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
                                      moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
                                      EventPool* pool,
+                                     std::string hostRootPath,
                                      const size_t sessionInputCacheMaxSize)
-    : AbstractManager(processCacheManager, eBPFAdapter, queue, pool), mSessionInputCache(sessionInputCacheMaxSize, 0) {
+    : AbstractManager(processCacheManager, eBPFAdapter, queue, pool),
+      mHostRootPath(std::move(hostRootPath)),
+      mSessionInputCache(sessionInputCacheMaxSize, 0) {
 }
 
 int AgentsightManager::Init() {
@@ -889,6 +893,25 @@ bool AgentsightManager::RestartAgentSightLocked(const SecurityOptions& opts) {
     sym->config_set_verbose(cfg, static_cast<int>(opts.mVerbose));
     if (!opts.mLogPath.empty()) {
         sym->config_set_log_path(cfg, opts.mLogPath.c_str());
+    }
+
+    // In container mode, point the library's pid lookups at the host procfs. Left alone it reads its
+    // own /proc, which lists only processes sharing our pid namespace — agents in other pods stay
+    // invisible unless the pod runs with hostPID. This mirrors what ProcessCacheManager already does
+    // for the driver-based plugins (mHostPathPrefix / "proc"); no user configuration is involved.
+    // Skipped on a host install, where mHostRootPath is "/" and the library's own default is /proc.
+    if (!mHostRootPath.empty() && mHostRootPath != "/") {
+        const std::string procfsRoot = PathJoin(mHostRootPath, "proc");
+        if (sym->config_set_procfs_root) {
+            sym->config_set_procfs_root(cfg, procfsRoot.c_str());
+            LOG_INFO(sLogger, ("AgentSight", "pid lookups resolve through")("procfs_root", procfsRoot));
+        } else {
+            LOG_WARNING(sLogger,
+                        ("AgentSight",
+                         "running in container mode but agentsight_config_set_procfs_root symbol not found; pid "
+                         "lookups keep using our own /proc and require hostPID to discover processes in other pid "
+                         "namespaces (requires libagentsight >= 0.11.0)")("procfs_root", procfsRoot));
+        }
     }
 
     // Raw HTTPS fallback is opt-in on both sides: the Rust FfiEventSender drops these events unless
