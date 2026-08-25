@@ -108,10 +108,16 @@ public:
         if (!mAliuid.empty()) {
             logGroup.SetTag("aliuid", mAliuid);
         }
-        string path(logGroup.GetTag(DEFAULT_LOG_TAG_FILE_PATH).data(), logGroup.GetTag(DEFAULT_LOG_TAG_FILE_PATH).size());
+        string path;
+        const auto filePathTag = logGroup.GetTag(DEFAULT_LOG_TAG_FILE_PATH);
+        if (!filePathTag.empty()) {
+            path.assign(filePathTag.data(), filePathTag.size());
+        }
         if (path.empty()) {
-            path = string(logGroup.GetMetadata(EventGroupMetaKey::LOG_FILE_PATH_RESOLVED).data(),
-                          logGroup.GetMetadata(EventGroupMetaKey::LOG_FILE_PATH_RESOLVED).size());
+            const auto resolved = logGroup.GetMetadata(EventGroupMetaKey::LOG_FILE_PATH_RESOLVED);
+            if (!resolved.empty()) {
+                path.assign(resolved.data(), resolved.size());
+            }
         }
         logGroup.SetTag("artifact", InputInternalAgentLogs::InferArtifact(path));
     }

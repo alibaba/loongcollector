@@ -137,6 +137,7 @@ private:
     friend class InputNetworkObserverUnittest;
     friend class InputHostMetaUnittest;
     friend class InputInternalAlarmsUnittest;
+    friend class InputInternalAgentLogsUnittest;
     friend class InputInternalMetricsUnittest;
     friend class ProcessorTagNativeUnittest;
     friend class FlusherSLSUnittest;

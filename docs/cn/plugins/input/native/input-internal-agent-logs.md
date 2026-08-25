@@ -30,7 +30,7 @@
 | Aliuid | string | 否 | 空 | 写入 `__tag__:aliuid`，便于检索。开源场景一般不填。 |
 | IPList | []string | 否 | 空 | 本机 IP 精确匹配（与心跳 IP 同源）才采集。缺省或空表示不过滤。未命中时 Init 成功但不读文件。 |
 | StartTime | int | 否 | / | Unix 秒。与 EndTime 同时有效且 `StartTime < EndTime` 时，只过滤**运行日志行**。 |
-| EndTime | int | 否 | / | Unix 秒。闭区间上界。配置 / checkpoint 等整文件**不过时间滤**。 |
+| EndTime | int | 否 | / | Unix 秒。闭区间上界。配置 / checkpoint 等整文件**不过时间过滤**。 |
 
 该插件必须配合 `global.ExcutionTimeout` 使用（一次性配置）。建议同时设置 `ForceRerunWhenUpdate: true`。不要填写 `FilePaths`、`processors`。
 

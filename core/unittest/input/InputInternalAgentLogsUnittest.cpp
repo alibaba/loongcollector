@@ -62,7 +62,7 @@ protected:
 
     void SetUp() override {
         LoongCollectorMonitor::mIpAddr = "10.0.1.11";
-        AppConfig::GetInstance()->mLoongcollectorConfDir = GetProcessExecutionDir();
+        AppConfig::GetInstance()->SetLoongcollectorConfDir(GetProcessExecutionDir());
         p.mName = "onetime-al-test";
         ctx.SetConfigName("onetime-al-test");
         p.mPluginID.store(0);
@@ -193,7 +193,7 @@ void InputInternalAgentLogsUnittest::TestExpandGroupsAndProcessors() {
     }
 
     const auto& runtimeProcessors = pipeline->GetInputs()[1]->GetInnerProcessors();
-    APSARA_TEST_TRUE(runtimeProcessors.size() >= 5U);
+    APSARA_TEST_TRUE(runtimeProcessors.size() >= 6U);
     APSARA_TEST_EQUAL(ProcessorSplitMultilineLogStringNative::sName, runtimeProcessors[0]->Name());
     APSARA_TEST_EQUAL("processor_agent_log_tag", runtimeProcessors[1]->Name());
     APSARA_TEST_EQUAL(ProcessorParseApsaraNative::sName, runtimeProcessors[2]->Name());
