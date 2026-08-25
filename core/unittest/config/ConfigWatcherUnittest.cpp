@@ -469,20 +469,24 @@ void ConfigWatcherUnittest::ConfigDirMutatedDuringScanDoesNotThrow() const {
         }
     };
 
+    thread pipelineMutator(mutate, configDir, string("p"));
+    thread instanceMutator(mutate, instanceConfigDir, string("i"));
     bool threw = false;
     try {
-        thread pipelineMutator(mutate, configDir, string("p"));
-        thread instanceMutator(mutate, instanceConfigDir, string("i"));
         for (int i = 0; i < 30; ++i) {
             (void)PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
             (void)InstanceConfigWatcher::GetInstance()->CheckConfigDiff();
         }
-        pipelineMutator.join();
-        instanceMutator.join();
     } catch (const exception&) {
         threw = true;
     } catch (...) {
         threw = true;
+    }
+    if (pipelineMutator.joinable()) {
+        pipelineMutator.join();
+    }
+    if (instanceMutator.joinable()) {
+        instanceMutator.join();
     }
     APSARA_TEST_FALSE(threw);
 
