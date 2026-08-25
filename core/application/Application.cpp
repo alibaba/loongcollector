@@ -356,7 +356,7 @@ void Application::Start() { // GCOVR_EXCL_START
             } catch (const filesystem::filesystem_error& e) {
                 LOG_ERROR(sLogger,
                           ("config dir scan threw", e.what())("error code", e.code().value())("error msg",
-                                                                                             e.code().message()));
+                                                                                              e.code().message()));
             } catch (const exception& e) {
                 LOG_ERROR(sLogger, ("config dir scan threw", e.what()));
             }

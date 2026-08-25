@@ -217,8 +217,7 @@ void PipelineConfigWatcher::InsertPipelines(CollectionConfigDiff& pDiff,
         }
 
         error_code itEc;
-        for (auto it = filesystem::directory_iterator(dir, itEc);
-             !itEc && it != filesystem::directory_iterator();
+        for (auto it = filesystem::directory_iterator(dir, itEc); !itEc && it != filesystem::directory_iterator();
              it.increment(itEc)) {
             const auto& entry = *it;
             const filesystem::path& path = entry.path();
