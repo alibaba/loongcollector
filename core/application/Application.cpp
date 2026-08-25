@@ -323,8 +323,6 @@ void Application::Start() { // GCOVR_EXCL_START
             lastOnetimeConfigTimeoutCheckTime = curTime;
         }
         if (curTime - lastConfigCheckTime >= INT32_FLAG(config_scan_interval)) {
-            const bool firstConfigCheck = (lastConfigCheckTime == 0);
-            lastConfigCheckTime = curTime;
             try {
                 auto configDiff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
                 if (configDiff.first.HasDiff()) {
@@ -347,13 +345,14 @@ void Application::Start() { // GCOVR_EXCL_START
                     - PipelineConfigWatcher::GetInstance()->GetBuiltInPipelineCount());
 
                 // after every config loaded, set the flag to true
-                if (firstConfigCheck) {
+                if (lastConfigCheckTime == 0) {
                     TaskPipelineManager::GetInstance()->SetFirstCheckConfigExecuted(true);
                 }
                 InstanceConfigDiff instanceConfigDiff = InstanceConfigWatcher::GetInstance()->CheckConfigDiff();
                 if (instanceConfigDiff.HasDiff()) {
                     InstanceConfigManager::GetInstance()->UpdateInstanceConfigs(instanceConfigDiff);
                 }
+                lastConfigCheckTime = curTime;
             } catch (const filesystem::filesystem_error& e) {
                 LOG_ERROR(sLogger,
                           ("config dir scan threw", e.what())("error code", e.code().value())("error msg",
