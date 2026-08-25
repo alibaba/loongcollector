@@ -13,8 +13,10 @@
 // limitations under the License.
 
 #include <algorithm>
+#include <exception>
 #include <filesystem>
 #include <fstream>
+#include <thread>
 
 #include "collection_pipeline/CollectionPipelineManager.h"
 #include "config/ConfigDiff.h"
@@ -38,6 +40,7 @@ public:
     void IgnoreNewLowerPrioritySingletonConfig() const;
     void IgnoreModifiedLowerPrioritySingletonConfig() const;
     void HigherPriorityOverrideLowerPrioritySingletonConfig() const;
+    void ConfigDirMutatedDuringScanDoesNotThrow() const;
 
 protected:
     static void SetUpTestCase() {
@@ -428,12 +431,73 @@ void ConfigWatcherUnittest::HigherPriorityOverrideLowerPrioritySingletonConfig()
     filesystem::remove_all("continuous_pipeline_config");
 }
 
+void ConfigWatcherUnittest::ConfigDirMutatedDuringScanDoesNotThrow() const {
+    filesystem::create_directories(configDir);
+    filesystem::create_directories(instanceConfigDir);
+
+    const string validPipeline = R"(
+        {
+            "inputs": [{"Type": "input_file"}],
+            "flushers": [{"Type": "flusher_sls"}]
+        }
+    )";
+    const string validInstance = R"(
+        {
+            "enable": true,
+            "max_bytes_per_sec": 1234
+        }
+    )";
+    for (int i = 0; i < 16; ++i) {
+        ofstream fout(configDir / ("p" + to_string(i) + ".json"));
+        fout << validPipeline;
+        ofstream fout2(instanceConfigDir / ("i" + to_string(i) + ".json"));
+        fout2 << validInstance;
+    }
+
+    auto mutate = [](const filesystem::path& dir, const string& prefix) {
+        for (int i = 0; i < 80; ++i) {
+            error_code ec;
+            auto path = dir / (prefix + "0.json");
+            auto tmp = dir / (prefix + "0.json.new");
+            filesystem::remove(path, ec);
+            {
+                ofstream fout(tmp);
+                fout << "{}";
+            }
+            filesystem::rename(tmp, path, ec);
+            filesystem::remove(dir / (prefix + "1.json"), ec);
+        }
+    };
+
+    bool threw = false;
+    try {
+        thread pipelineMutator(mutate, configDir, string("p"));
+        thread instanceMutator(mutate, instanceConfigDir, string("i"));
+        for (int i = 0; i < 30; ++i) {
+            (void)PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
+            (void)InstanceConfigWatcher::GetInstance()->CheckConfigDiff();
+        }
+        pipelineMutator.join();
+        instanceMutator.join();
+    } catch (const exception&) {
+        threw = true;
+    } catch (...) {
+        threw = true;
+    }
+    APSARA_TEST_FALSE(threw);
+
+    filesystem::remove_all(configDir);
+    filesystem::remove_all(instanceConfigDir);
+    InstanceConfigWatcher::GetInstance()->ClearEnvironment();
+}
+
 UNIT_TEST_CASE(ConfigWatcherUnittest, InvalidConfigDirFound)
 UNIT_TEST_CASE(ConfigWatcherUnittest, InvalidConfigFileFound)
 UNIT_TEST_CASE(ConfigWatcherUnittest, DuplicateConfigs)
 UNIT_TEST_CASE(ConfigWatcherUnittest, IgnoreNewLowerPrioritySingletonConfig)
 UNIT_TEST_CASE(ConfigWatcherUnittest, IgnoreModifiedLowerPrioritySingletonConfig)
 UNIT_TEST_CASE(ConfigWatcherUnittest, HigherPriorityOverrideLowerPrioritySingletonConfig)
+UNIT_TEST_CASE(ConfigWatcherUnittest, ConfigDirMutatedDuringScanDoesNotThrow)
 
 } // namespace logtail
 

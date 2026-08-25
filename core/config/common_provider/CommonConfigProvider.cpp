@@ -134,8 +134,11 @@ void CommonConfigProvider::Stop() {
 }
 
 void CommonConfigProvider::LoadConfigFile() {
-    error_code ec;
-    for (auto const& entry : filesystem::directory_iterator(mContinuousPipelineConfigDir, ec)) {
+    error_code itEc;
+    for (auto it = filesystem::directory_iterator(mContinuousPipelineConfigDir, itEc);
+         !itEc && it != filesystem::directory_iterator();
+         it.increment(itEc)) {
+        const auto& entry = *it;
         Json::Value detail;
         if (LoadConfigDetailFromFile(entry, detail)) {
             ConfigInfo info;
@@ -152,7 +155,16 @@ void CommonConfigProvider::LoadConfigFile() {
             ConfigFeedbackReceiver::GetInstance().RegisterContinuousPipelineConfig(info.name, this);
         }
     }
-    for (auto const& entry : filesystem::directory_iterator(mInstanceSourceDir, ec)) {
+    if (itEc) {
+        LOG_WARNING(sLogger,
+                    ("failed to iterate config dir", mContinuousPipelineConfigDir.string())("error code", itEc.value())(
+                        "error msg", itEc.message()));
+    }
+    itEc.clear();
+    for (auto it = filesystem::directory_iterator(mInstanceSourceDir, itEc);
+         !itEc && it != filesystem::directory_iterator();
+         it.increment(itEc)) {
+        const auto& entry = *it;
         Json::Value detail;
         if (LoadConfigDetailFromFile(entry, detail)) {
             ConfigInfo info;
@@ -168,6 +180,11 @@ void CommonConfigProvider::LoadConfigFile() {
             }
             ConfigFeedbackReceiver::GetInstance().RegisterInstanceConfig(info.name, this);
         }
+    }
+    if (itEc) {
+        LOG_WARNING(sLogger,
+                    ("failed to iterate config dir", mInstanceSourceDir.string())("error code", itEc.value())(
+                        "error msg", itEc.message()));
     }
 }
 
