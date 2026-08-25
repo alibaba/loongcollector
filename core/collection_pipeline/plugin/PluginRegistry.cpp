@@ -34,6 +34,7 @@
 #include "plugin/input/InputContainerStdio.h"
 #include "plugin/input/InputFile.h"
 #include "plugin/input/InputForward.h"
+#include "plugin/input/InputInternalAgentLogs.h"
 #include "plugin/input/InputInternalAlarms.h"
 #include "plugin/input/InputInternalMatchedContainerInfo.h"
 #include "plugin/input/InputInternalMetrics.h"
@@ -194,6 +195,7 @@ void PluginRegistry::LoadStaticPlugins() {
     RegisterContinuousInputCreator(new StaticInputCreator<InputForward>());
 #endif
     RegisterOnetimeInputCreator(new StaticInputCreator<InputStaticFile>());
+    RegisterOnetimeInputCreator(new StaticInputCreator<InputInternalAgentLogs>(), true);
 
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorSplitLogStringNative>());
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorSplitMultilineLogStringNative>());
