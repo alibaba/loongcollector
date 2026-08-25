@@ -128,11 +128,12 @@ void InputInternalAgentLogsUnittest::TestInferArtifact() {
     APSARA_TEST_EQUAL("go_log", InputInternalAgentLogs::InferArtifact("/opt/loongcollector/log/go_plugin.LOG"));
     APSARA_TEST_EQUAL("go_log", InputInternalAgentLogs::InferArtifact("/home/logtail_plugin.LOG.1"));
     APSARA_TEST_EQUAL("app_info", InputInternalAgentLogs::InferArtifact("/opt/loongcollector/run/app_info.json"));
-    APSARA_TEST_EQUAL("file_checkpoint", InputInternalAgentLogs::InferArtifact("/opt/loongcollector/data/file_check_point"));
+    APSARA_TEST_EQUAL("file_checkpoint",
+                      InputInternalAgentLogs::InferArtifact("/opt/loongcollector/data/file_check_point"));
     APSARA_TEST_EQUAL("file_checkpoint", InputInternalAgentLogs::InferArtifact("/home/checkpoint/logtail_check_point"));
-    APSARA_TEST_EQUAL("pipeline_config",
-                      InputInternalAgentLogs::InferArtifact(
-                          "/opt/loongcollector/conf/continuous_pipeline_config/local/a.json"));
+    APSARA_TEST_EQUAL(
+        "pipeline_config",
+        InputInternalAgentLogs::InferArtifact("/opt/loongcollector/conf/continuous_pipeline_config/local/a.json"));
     APSARA_TEST_EQUAL("agent_file", InputInternalAgentLogs::InferArtifact("/tmp/unknown.bin"));
 }
 

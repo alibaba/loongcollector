@@ -16,10 +16,10 @@
 
 #include "plugin/input/InputInternalAgentLogs.h"
 
-#include <sys/stat.h>
-
 #include <cstdlib>
 #include <ctime>
+#include <sys/stat.h>
+
 #include <filesystem>
 
 #include "app_config/AppConfig.h"
@@ -53,8 +53,7 @@ namespace logtail {
 namespace {
 
 const char* kRuntimeStartPattern = R"(^(\[\d{4}-\d{2}-\d{2}|\d{4}-\d{2}-\d{2} ))";
-const char* kGoLogRegex
-    = R"(^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) \[(\w+)\] \[([^:]+):(\d+)\] \[([^\]]+)\] (.*)$)";
+const char* kGoLogRegex = R"(^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) \[(\w+)\] \[([^:]+):(\d+)\] \[([^\]]+)\] (.*)$)";
 
 string JoinFile(const string& dir, const string& name) {
     return (filesystem::path(dir) / name).lexically_normal().string();
@@ -186,8 +185,8 @@ string InputInternalAgentLogs::InferArtifact(const string& path) {
     if (name == "user_log_config.json") {
         return "legacy_config";
     }
-    if (norm.find("continuous_pipeline_config") != string::npos
-        || norm.find("/config/local/") != string::npos || norm.find("/config/remote/") != string::npos) {
+    if (norm.find("continuous_pipeline_config") != string::npos || norm.find("/config/local/") != string::npos
+        || norm.find("/config/remote/") != string::npos) {
         return "pipeline_config";
     }
     if (norm.find("onetime_pipeline_config") != string::npos) {
@@ -272,8 +271,8 @@ bool InputInternalAgentLogs::Init(const Json::Value& config, Json::Value& option
         if (!matched) {
             mSkipCollect = true;
             LOG_INFO(sLogger,
-                     ("input_internal_agent_logs_onetime skip collect", "local ip not in IPList")("local_ip", localIP)(
-                         "config", mContext->GetConfigName()));
+                     ("input_internal_agent_logs_onetime skip collect",
+                      "local ip not in IPList")("local_ip", localIP)("config", mContext->GetConfigName()));
         }
     }
     return true;
@@ -361,8 +360,8 @@ bool InputInternalAgentLogs::createStaticFileInput(size_t inputIdx,
 }
 
 bool InputInternalAgentLogs::appendAgentLogTagProcessor(vector<unique_ptr<ProcessorInstance>>& processors) {
-    auto instance = make_unique<ProcessorInstance>(new ProcessorAgentLogTag(),
-                                                   mContext->GetPipeline().GenNextPluginMeta(false));
+    auto instance
+        = make_unique<ProcessorInstance>(new ProcessorAgentLogTag(), mContext->GetPipeline().GenNextPluginMeta(false));
     Json::Value detail;
     if (!mAliuid.empty()) {
         detail["Aliuid"] = mAliuid;
@@ -543,7 +542,7 @@ void InputInternalAgentLogs::alarmCompressedRuntimeLogs() const {
             continue;
         }
         time_t mtime = st.st_mtime;
-        tm tmBuf {};
+        tm tmBuf{};
 #if defined(_MSC_VER)
         localtime_s(&tmBuf, &mtime);
 #else
