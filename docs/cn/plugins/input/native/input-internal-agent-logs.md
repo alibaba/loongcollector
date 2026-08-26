@@ -44,6 +44,8 @@
 - Go：`{log}/go_plugin.LOG*` 或 `{log}/logtail_plugin.LOG*`
 - 包含未压缩轮转本 `.LOG.1`、`.LOG.2` 等
 - 已压成 `.gz` 的**不采**，对每个文件发 `SKIP_READ_LOG_ALARM`，文案含绝对路径和最后修改时间
+- C++ / Go 运行日志拆成两组 `input_static_file_onetime`，各自一套解析链。
+- 只抽 header：`time`（原文时间）、`level`、`__THREAD__`（C++）、`__FILE__`、`function`（Go），其余整段留在 `content`。`microtime` 是从 `time` 解析出的 unix 微秒（C++ 带小数部分，Go 只有秒则补 0）；时间过滤按秒做，毫秒精度不影响筛选。不按 Apsara 展开全部 KV。解析失败则保留原文 `content`。
 
 ### 整文件（一条事件 = 一份文件，默认上限 10MB）
 
@@ -55,7 +57,7 @@
 
 不采集 LevelDB checkpoint、发送缓存、eBPF `.so`、Windows dmp。
 
-每条事件打 tag `artifact`（如 `cpp_log` / `app_info` / `file_checkpoint` / `pipeline_config`），可选 `aliuid`。
+每条事件打 tag `artifact`（如 `cpp_log` / `app_info` / `file_checkpoint` / `pipeline_config`），可选 `aliuid`。`pipeline_config` / `onetime_pipeline_config` 整文件会多一个正文字段 `pipeline_name`（文件名去掉后缀）。
 
 ## 样例
 

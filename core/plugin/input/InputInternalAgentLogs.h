@@ -39,16 +39,20 @@ public:
     static std::string InferArtifact(const std::string& path);
 
 private:
+    enum class RuntimeLogKind { None, Cpp, Go };
+
     bool createStaticFileInput(size_t inputIdx,
                                const Json::Value& groupConfig,
-                               bool runtimeLogs,
+                               RuntimeLogKind runtimeKind,
                                std::unique_ptr<InputInstance>& extra);
     bool appendAgentLogTagProcessor(std::vector<std::unique_ptr<ProcessorInstance>>& processors);
-    bool appendRuntimeLogProcessors(std::vector<std::unique_ptr<ProcessorInstance>>& processors);
+    bool appendAgentLogMicrotimeProcessor(std::vector<std::unique_ptr<ProcessorInstance>>& processors);
+    bool appendRuntimeLogProcessors(std::vector<std::unique_ptr<ProcessorInstance>>& processors,
+                                    RuntimeLogKind runtimeKind);
     bool appendProcessor(std::vector<std::unique_ptr<ProcessorInstance>>& processors,
                          const std::string& type,
                          const Json::Value& detail);
-    Json::Value buildRuntimeLogsConfig() const;
+    Json::Value buildRuntimeLogsConfig(RuntimeLogKind runtimeKind) const;
     Json::Value buildWholeSmallConfig() const;
     Json::Value buildWholeDirsConfig() const;
     Json::Value buildFileCheckpointConfig() const;

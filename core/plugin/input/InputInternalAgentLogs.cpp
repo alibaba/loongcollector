@@ -37,9 +37,9 @@
 #include "logger/Logger.h"
 #include "monitor/AlarmManager.h"
 #include "monitor/Monitor.h"
+#include "models/LogEvent.h"
 #include "monitor/SelfMonitorServer.h"
 #include "plugin/input/InputStaticFile.h"
-#include "plugin/processor/ProcessorParseApsaraNative.h"
 #include "plugin/processor/ProcessorParseRegexNative.h"
 #include "plugin/processor/ProcessorParseTimestampNative.h"
 #include "plugin/processor/ProcessorTimestampFilterNative.h"
@@ -53,7 +53,12 @@ namespace logtail {
 namespace {
 
 const char* kRuntimeStartPattern = R"(^(\[\d{4}-\d{2}-\d{2}|\d{4}-\d{2}-\d{2} ))";
-const char* kGoLogRegex = R"(^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) \[(\w+)\] \[([^:]+):(\d+)\] \[([^\]]+)\] (.*)$)";
+// C++: [2026-08-26 08:52:00.890493] [info] [3396] /path/File.cpp:607<tab>rest
+const char* kCppLogRegex
+    = R"(^\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(?:\.\d+)?)\][ \t]+\[(\w+)\][ \t]+\[([^\]]+)\][ \t]+(\S+)[ \t]+([\s\S]*)$)";
+// Go: 2026-08-26 08:52:00 [info] [file.go:123] [Start] rest
+const char* kGoLogRegex
+    = R"(^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(?:\.\d+)?)[ \t]+\[(\w+)\][ \t]+\[([^\]]+)\][ \t]+\[([^\]]+)\][ \t]+([\s\S]*)$)";
 
 string JoinFile(const string& dir, const string& name) {
     return (filesystem::path(dir) / name).lexically_normal().string();
@@ -118,7 +123,18 @@ public:
                 path.assign(resolved.data(), resolved.size());
             }
         }
-        logGroup.SetTag("artifact", InputInternalAgentLogs::InferArtifact(path));
+        const string artifact = InputInternalAgentLogs::InferArtifact(path);
+        logGroup.SetTag("artifact", artifact);
+        if (artifact == "pipeline_config" || artifact == "onetime_pipeline_config") {
+            const string pipelineName = filesystem::path(path).stem().string();
+            if (!pipelineName.empty()) {
+                for (auto& e : logGroup.MutableEvents()) {
+                    if (e.Is<LogEvent>()) {
+                        e.Cast<LogEvent>().SetContent(string("pipeline_name"), pipelineName);
+                    }
+                }
+            }
+        }
     }
 
 protected:
@@ -129,6 +145,60 @@ private:
 };
 
 const string ProcessorAgentLogTag::sName = "processor_agent_log_tag";
+
+class ProcessorAgentLogMicrotime : public Processor {
+public:
+    static const string sName;
+
+    const string& Name() const override { return sName; }
+
+    bool Init(const Json::Value&) override { return true; }
+
+    void Process(PipelineEventGroup& logGroup) override {
+        for (auto& e : logGroup.MutableEvents()) {
+            if (!e.Is<LogEvent>()) {
+                continue;
+            }
+            auto& ev = e.Cast<LogEvent>();
+            const StringView timeStr = ev.GetContent("time");
+            if (timeStr.empty()) {
+                continue;
+            }
+            int64_t fracUs = 0;
+            const char* begin = timeStr.data();
+            const char* end = begin + timeStr.size();
+            const char* dot = nullptr;
+            for (const char* p = begin; p < end; ++p) {
+                if (*p == '.') {
+                    dot = p;
+                    break;
+                }
+            }
+            if (dot != nullptr && dot + 1 < end) {
+                string digits;
+                for (const char* p = dot + 1; p < end && *p >= '0' && *p <= '9'; ++p) {
+                    digits.push_back(*p);
+                }
+                if (!digits.empty()) {
+                    while (digits.size() < 6) {
+                        digits.push_back('0');
+                    }
+                    if (digits.size() > 6) {
+                        digits.resize(6);
+                    }
+                    fracUs = stoll(digits);
+                }
+            }
+            const int64_t us = static_cast<int64_t>(ev.GetTimestamp()) * 1000000 + fracUs;
+            ev.SetContent(string("microtime"), to_string(us));
+        }
+    }
+
+protected:
+    bool IsSupportedEvent(const PipelineEventPtr& e) const override { return e.Is<LogEvent>(); }
+};
+
+const string ProcessorAgentLogMicrotime::sName = "processor_agent_log_microtime";
 
 } // namespace
 
@@ -299,11 +369,11 @@ bool InputInternalAgentLogs::ExpandAdditionalInputs(size_t startIdx, vector<uniq
 
     struct Group {
         Json::Value config;
-        bool runtimeLogs;
+        RuntimeLogKind runtimeKind;
     };
     vector<Group> groups;
     const size_t kMaxFilePaths = 10;
-    auto appendSplit = [&](Json::Value cfg, bool runtimeLogs) {
+    auto appendSplit = [&](Json::Value cfg, RuntimeLogKind runtimeKind) {
         const Json::Value paths = cfg["FilePaths"];
         if (paths.size() == 0) {
             return;
@@ -315,18 +385,19 @@ bool InputInternalAgentLogs::ExpandAdditionalInputs(size_t startIdx, vector<uniq
                 slice.append(paths[j]);
             }
             part["FilePaths"] = slice;
-            groups.push_back({std::move(part), runtimeLogs});
+            groups.push_back({std::move(part), runtimeKind});
         }
     };
-    appendSplit(buildRuntimeLogsConfig(), true);
-    appendSplit(buildWholeSmallConfig(), false);
-    appendSplit(buildWholeDirsConfig(), false);
-    appendSplit(buildFileCheckpointConfig(), false);
+    appendSplit(buildRuntimeLogsConfig(RuntimeLogKind::Cpp), RuntimeLogKind::Cpp);
+    appendSplit(buildRuntimeLogsConfig(RuntimeLogKind::Go), RuntimeLogKind::Go);
+    appendSplit(buildWholeSmallConfig(), RuntimeLogKind::None);
+    appendSplit(buildWholeDirsConfig(), RuntimeLogKind::None);
+    appendSplit(buildFileCheckpointConfig(), RuntimeLogKind::None);
 
     size_t idx = startIdx;
     for (auto& group : groups) {
         unique_ptr<InputInstance> extra;
-        if (!createStaticFileInput(idx, group.config, group.runtimeLogs, extra)) {
+        if (!createStaticFileInput(idx, group.config, group.runtimeKind, extra)) {
             return false;
         }
         extras.emplace_back(std::move(extra));
@@ -337,7 +408,7 @@ bool InputInternalAgentLogs::ExpandAdditionalInputs(size_t startIdx, vector<uniq
 
 bool InputInternalAgentLogs::createStaticFileInput(size_t inputIdx,
                                                    const Json::Value& groupConfig,
-                                                   bool runtimeLogs,
+                                                   RuntimeLogKind runtimeKind,
                                                    unique_ptr<InputInstance>& extra) {
     extra = PluginRegistry::GetInstance()->CreateInput(
         InputStaticFile::sName, true, mContext->GetPipeline().GenNextPluginMeta(false));
@@ -353,7 +424,7 @@ bool InputInternalAgentLogs::createStaticFileInput(size_t inputIdx,
     if (!appendAgentLogTagProcessor(processors)) {
         return false;
     }
-    if (runtimeLogs && !appendRuntimeLogProcessors(processors)) {
+    if (runtimeKind != RuntimeLogKind::None && !appendRuntimeLogProcessors(processors, runtimeKind)) {
         return false;
     }
     return true;
@@ -373,32 +444,41 @@ bool InputInternalAgentLogs::appendAgentLogTagProcessor(vector<unique_ptr<Proces
     return true;
 }
 
-bool InputInternalAgentLogs::appendRuntimeLogProcessors(vector<unique_ptr<ProcessorInstance>>& processors) {
-    Json::Value apsara;
-    apsara["SourceKey"] = "content";
-    apsara["KeepingSourceWhenParseFail"] = true;
-    if (!appendProcessor(processors, ProcessorParseApsaraNative::sName, apsara)) {
+bool InputInternalAgentLogs::appendAgentLogMicrotimeProcessor(vector<unique_ptr<ProcessorInstance>>& processors) {
+    auto instance = make_unique<ProcessorInstance>(new ProcessorAgentLogMicrotime(),
+                                                   mContext->GetPipeline().GenNextPluginMeta(false));
+    Json::Value detail;
+    if (!instance->Init(detail, *mContext)) {
         return false;
     }
+    processors.emplace_back(std::move(instance));
+    return true;
+}
 
+bool InputInternalAgentLogs::appendRuntimeLogProcessors(vector<unique_ptr<ProcessorInstance>>& processors,
+                                                        RuntimeLogKind runtimeKind) {
     Json::Value regex;
     regex["SourceKey"] = "content";
-    regex["Regex"] = kGoLogRegex;
     regex["KeepingSourceWhenParseFail"] = true;
     Json::Value keys(Json::arrayValue);
-    keys.append("time");
-    keys.append("level");
-    keys.append("file");
-    keys.append("line");
-    keys.append("func");
-    keys.append("msg");
+    if (runtimeKind == RuntimeLogKind::Cpp) {
+        regex["Regex"] = kCppLogRegex;
+        keys.append("time");
+        keys.append("level");
+        keys.append("__THREAD__");
+        keys.append("__FILE__");
+        keys.append("content");
+    } else {
+        regex["Regex"] = kGoLogRegex;
+        keys.append("time");
+        keys.append("level");
+        keys.append("__FILE__");
+        keys.append("function");
+        keys.append("content");
+    }
     regex["Keys"] = keys;
     if (!appendProcessor(processors, ProcessorParseRegexNative::sName, regex)) {
         return false;
-    }
-
-    if (!mHasTimeWindow) {
-        return true;
     }
 
     Json::Value ts;
@@ -406,6 +486,13 @@ bool InputInternalAgentLogs::appendRuntimeLogProcessors(vector<unique_ptr<Proces
     ts["SourceFormat"] = "%Y-%m-%d %H:%M:%S";
     if (!appendProcessor(processors, ProcessorParseTimestampNative::sName, ts)) {
         return false;
+    }
+    if (!appendAgentLogMicrotimeProcessor(processors)) {
+        return false;
+    }
+
+    if (!mHasTimeWindow) {
+        return true;
     }
 
     Json::Value filter;
@@ -431,14 +518,17 @@ bool InputInternalAgentLogs::appendProcessor(vector<unique_ptr<ProcessorInstance
     return true;
 }
 
-Json::Value InputInternalAgentLogs::buildRuntimeLogsConfig() const {
+Json::Value InputInternalAgentLogs::buildRuntimeLogsConfig(RuntimeLogKind runtimeKind) const {
     Json::Value cfg;
     cfg["Type"] = InputStaticFile::sName;
     Json::Value filePaths(Json::arrayValue);
     const string logDir = GetAgentLogDir();
     if (ExistsDir(logDir)) {
-        filePaths.append(JoinFile(logDir, GetAgentLogName() + "*"));
-        filePaths.append(JoinFile(logDir, GetPluginLogName() + "*"));
+        if (runtimeKind == RuntimeLogKind::Cpp) {
+            filePaths.append(JoinFile(logDir, GetAgentLogName() + "*"));
+        } else if (runtimeKind == RuntimeLogKind::Go) {
+            filePaths.append(JoinFile(logDir, GetPluginLogName() + "*"));
+        }
     }
     cfg["FilePaths"] = filePaths;
     Json::Value exclude(Json::arrayValue);
