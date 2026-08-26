@@ -4,7 +4,7 @@
 
 `input_internal_agent_logs_onetime` 采集 LoongCollector 本机运行日志以及文本态运行文件 / 配置，并以 [LogEvent](../../../developer-guide/data-model-cpp.md) 的格式暴露出去。路径由本机运行目录决定，配置里不填 `FilePaths`。
 
-本插件是 **singleton + onetime** 输入：一条 pipeline 只能有这一个 input。加载时会在内部展开多组 `input_static_file_onetime`（运行日志解析、整文件配置、checkpoint）。EventGroup 会带 metadata `INTERNAL_DATA_TYPE=__agent_log__`，普通 flusher 可忽略该字段。
+本插件是 **onetime** 输入，**不是**全局 singleton：不同时间窗口的诊断任务可以同时下发、并行采集。加载时会在内部展开多组 `input_static_file_onetime`（运行日志解析、整文件配置、checkpoint）。EventGroup 会带 metadata `INTERNAL_DATA_TYPE=__agent_log__`，普通 flusher 可忽略该字段。一条 pipeline 的 JSON 里只写这一个 input，不要再并列其他 input。
 
 ## 事件能力
 

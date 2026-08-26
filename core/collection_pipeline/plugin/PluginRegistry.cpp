@@ -195,7 +195,7 @@ void PluginRegistry::LoadStaticPlugins() {
     RegisterContinuousInputCreator(new StaticInputCreator<InputForward>());
 #endif
     RegisterOnetimeInputCreator(new StaticInputCreator<InputStaticFile>());
-    RegisterOnetimeInputCreator(new StaticInputCreator<InputInternalAgentLogs>(), true);
+    RegisterOnetimeInputCreator(new StaticInputCreator<InputInternalAgentLogs>());
 
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorSplitLogStringNative>());
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorSplitMultilineLogStringNative>());
