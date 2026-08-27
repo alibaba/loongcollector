@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <ctime>
+
 #include <filesystem>
 #include <fstream>
 #include <memory>
@@ -21,17 +22,17 @@
 #include "json/json.h"
 
 #include "app_config/AppConfig.h"
-#include "models/LogEvent.h"
-#include "models/PipelineEventGroup.h"
 #include "collection_pipeline/CollectionPipeline.h"
 #include "collection_pipeline/CollectionPipelineContext.h"
 #include "collection_pipeline/plugin/PluginRegistry.h"
 #include "collection_pipeline/plugin/instance/ProcessorInstance.h"
 #include "common/JsonUtil.h"
 #include "common/RuntimeUtil.h"
-#include "constants/TagConstants.h"
 #include "config/CollectionConfig.h"
+#include "constants/TagConstants.h"
 #include "file_server/StaticFileServer.h"
+#include "models/LogEvent.h"
+#include "models/PipelineEventGroup.h"
 #include "monitor/Monitor.h"
 #include "plugin/input/InputInternalAgentLogs.h"
 #include "plugin/input/InputStaticFile.h"
@@ -303,7 +304,7 @@ void InputInternalAgentLogsUnittest::TestRuntimeLogHeaderParse() {
         vector<PipelineEventGroup> groups;
         groups.emplace_back(make_shared<SourceBuffer>());
         groups[0].AddLogEvent()->SetContent(string("content"),
-                                           string("2026-08-26 08:52:00 [info] [plugin.go:88] [Start] listen :18689"));
+                                            string("2026-08-26 08:52:00 [info] [plugin.go:88] [Start] listen :18689"));
         runThrough(goProcessors, groups);
         APSARA_TEST_EQUAL(1U, groups[0].GetEvents().size());
         const auto& ev = groups[0].GetEvents()[0].Cast<LogEvent>();
@@ -339,7 +340,7 @@ void InputInternalAgentLogsUnittest::TestGoMockPipelineAndTimeFilter() {
     APSARA_TEST_TRUE(goPaths.find(GetPluginLogName()) != string::npos);
     APSARA_TEST_TRUE(goPaths.find("loongcollector.LOG") == string::npos);
 
-    tm t {};
+    tm t{};
     t.tm_year = 2026 - 1900;
     t.tm_mon = 7;
     t.tm_mday = 26;
@@ -351,14 +352,10 @@ void InputInternalAgentLogsUnittest::TestGoMockPipelineAndTimeFilter() {
     APSARA_TEST_TRUE(goSec > 0);
 
     auto makePipeline = [&](int64_t start, int64_t end) {
-        return initPipeline(string("{\n") + "  \"global\": {\"ExcutionTimeout\": 3600},\n"
-                            + "  \"inputs\": [{\n"
+        return initPipeline(string("{\n") + "  \"global\": {\"ExcutionTimeout\": 3600},\n" + "  \"inputs\": [{\n"
                             + "    \"Type\": \"input_internal_agent_logs_onetime\",\n"
-                            + "    \"StartTime\": " + to_string(start) + ",\n"
-                            + "    \"EndTime\": " + to_string(end) + "\n"
-                            + "  }],\n"
-                            + "  \"flushers\": [{\"Type\": \"flusher_blackhole\"}]\n"
-                            + "}");
+                            + "    \"StartTime\": " + to_string(start) + ",\n" + "    \"EndTime\": " + to_string(end)
+                            + "\n" + "  }],\n" + "  \"flushers\": [{\"Type\": \"flusher_blackhole\"}]\n" + "}");
     };
 
     const string goLine = "2026-08-26 08:52:00 [info] [metric_mock.go:42] [Start] mock go pipeline started";
@@ -444,9 +441,9 @@ void InputInternalAgentLogsUnittest::TestPipelineNameOnConfigFiles() {
     };
 
     {
-        auto group = runTag(
-            "/src/.vscode/lc-agent-logs-sls/conf/onetime_pipeline_config/local/onetime-al-sls-verify.yaml",
-            "enable: true\n");
+        auto group
+            = runTag("/src/.vscode/lc-agent-logs-sls/conf/onetime_pipeline_config/local/onetime-al-sls-verify.yaml",
+                     "enable: true\n");
         APSARA_TEST_EQUAL("onetime_pipeline_config", group.GetTag("artifact").to_string());
         APSARA_TEST_EQUAL("onetime-al-sls-verify",
                           group.GetEvents()[0].Cast<LogEvent>().GetContent("pipeline_name").to_string());
