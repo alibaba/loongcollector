@@ -43,29 +43,70 @@ DEFINE_FLAG_INT32(checkpoint_find_max_file_count, "", 1000);
 
 namespace logtail {
 
+namespace {
+
+void upsertFileCheckPoint(CheckPointManager::DevInodeCheckPointHashMap& table,
+                          const CheckPointManager::CheckPointKey& key,
+                          const CheckPointPtr& checkPoint) {
+    auto it = table.find(key);
+    if (it != table.end()) {
+        it->second = checkPoint;
+        return;
+    }
+    table.insert(std::make_pair(key, checkPoint));
+}
+
+void eraseFileCheckPoint(CheckPointManager::DevInodeCheckPointHashMap& table,
+                         const CheckPointManager::CheckPointKey& key) {
+    auto it = table.find(key);
+    if (it != table.end()) {
+        table.erase(it);
+    }
+}
+
+} // namespace
+
 bool CheckPointManager::CheckVersion() {
     return (mLoadVersion == NO_CHECKPOINT_VERSION) || (mLoadVersion / 10000 == INT32_FLAG(check_point_version) / 10000);
 }
 
+bool CheckPointManager::CheckPointFileStillExists(const CheckPoint& checkPoint) {
+    if (checkPoint.mDevInode == GetFileDevInode(checkPoint.mFileName)) {
+        return true;
+    }
+    if (!checkPoint.mRealFileName.empty() && checkPoint.mDevInode == GetFileDevInode(checkPoint.mRealFileName)) {
+        return true;
+    }
+    return false;
+}
+
+void CheckPointManager::overwriteBackupFromPrimary() {
+    mBackupDevInodeCheckPointPtrMap = mDevInodeCheckPointPtrMap;
+}
+
 void CheckPointManager::AddCheckPoint(CheckPoint* checkPointPtr) {
-    DevInodeCheckPointHashMap::iterator it
-        = mDevInodeCheckPointPtrMap.find(CheckPointKey(checkPointPtr->mDevInode, checkPointPtr->mConfigName));
-    if (it != mDevInodeCheckPointPtrMap.end())
-        mDevInodeCheckPointPtrMap.erase(it);
-    mDevInodeCheckPointPtrMap.insert(std::make_pair<CheckPointKey, CheckPointPtr>(
-        CheckPointKey(checkPointPtr->mDevInode, checkPointPtr->mConfigName), CheckPointPtr(checkPointPtr)));
+    CheckPointPtr newCheckPoint(checkPointPtr);
+    CheckPointKey key(newCheckPoint->mDevInode, newCheckPoint->mConfigName);
+    upsertFileCheckPoint(mDevInodeCheckPointPtrMap, key, newCheckPoint);
+    upsertFileCheckPoint(mBackupDevInodeCheckPointPtrMap, key, newCheckPoint);
 }
 
 void CheckPointManager::DeleteCheckPoint(DevInode devInode, const std::string& configName) {
-    DevInodeCheckPointHashMap::iterator it = mDevInodeCheckPointPtrMap.find(CheckPointKey(devInode, configName));
-    if (it != mDevInodeCheckPointPtrMap.end())
-        mDevInodeCheckPointPtrMap.erase(it);
+    CheckPointKey key(devInode, configName);
+    eraseFileCheckPoint(mDevInodeCheckPointPtrMap, key);
+    eraseFileCheckPoint(mBackupDevInodeCheckPointPtrMap, key);
 }
 
 bool CheckPointManager::GetCheckPoint(DevInode devInode, const std::string& configName, CheckPointPtr& checkPointPtr) {
-    DevInodeCheckPointHashMap::iterator it = mDevInodeCheckPointPtrMap.find(CheckPointKey(devInode, configName));
+    CheckPointKey key(devInode, configName);
+    auto it = mDevInodeCheckPointPtrMap.find(key);
     if (it != mDevInodeCheckPointPtrMap.end()) {
         checkPointPtr = it->second;
+        return true;
+    }
+    auto backupIt = mBackupDevInodeCheckPointPtrMap.find(key);
+    if (backupIt != mBackupDevInodeCheckPointPtrMap.end() && CheckPointFileStillExists(*backupIt->second)) {
+        checkPointPtr = backupIt->second;
         return true;
     }
     return false;
@@ -107,6 +148,10 @@ void CheckPointManager::ResetLastDumpTime() {
 
 CheckPointManager::DevInodeCheckPointHashMap& CheckPointManager::GetAllFileCheckPoint() {
     return mDevInodeCheckPointPtrMap;
+}
+
+size_t CheckPointManager::GetBackupFileCheckPointCount() const {
+    return mBackupDevInodeCheckPointPtrMap.size();
 }
 
 
@@ -154,9 +199,11 @@ void CheckPointManager::LoadCheckPoint() {
 
     LoadDirCheckPoint(root);
     LoadFileCheckPoint(root);
-    LOG_INFO(sLogger,
-             ("load checkpoint, version", mLoadVersion)("file check point", mDevInodeCheckPointPtrMap.size())(
-                 "dir check point", mDirNameMap.size()));
+    overwriteBackupFromPrimary();
+    LOG_INFO(
+        sLogger,
+        ("load checkpoint, version", mLoadVersion)("file check point", mDevInodeCheckPointPtrMap.size())(
+            "dir check point", mDirNameMap.size())("backup file check point", mBackupDevInodeCheckPointPtrMap.size()));
 }
 
 void CheckPointManager::LoadDirCheckPoint(const Json::Value& root) {
@@ -569,6 +616,15 @@ boost::optional<std::string> SearchFilePathByDevInodeInDirectory(const std::stri
 }
 
 #ifdef APSARA_UNIT_TEST_MAIN
+void CheckPointManager::ResetAllCheckPoint() {
+    RemoveAllCheckPoint();
+    mBackupDevInodeCheckPointPtrMap.clear();
+}
+
+void CheckPointManager::OverwriteBackupFromPrimaryForTest() {
+    overwriteBackupFromPrimary();
+}
+
 void CheckPointManager::RemoveLocalCheckPoint() {
     std::string checkPointFile = AppConfig::GetInstance()->GetCheckPointFilePath();
     if (remove(checkPointFile.c_str()) == -1) {

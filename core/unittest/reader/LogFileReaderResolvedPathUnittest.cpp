@@ -48,12 +48,12 @@ public:
     void SetUp() override {
         readerOpts.mInputType = FileReaderOptions::InputType::InputFile;
         FileServer::GetInstance()->AddFileDiscoveryConfig("", &discoveryOpts, &ctx);
-        CheckPointManager::Instance()->RemoveAllCheckPoint();
+        CheckPointManager::Instance()->ResetAllCheckPoint();
     }
 
     void TearDown() override {
         FileServer::GetInstance()->RemoveFileDiscoveryConfig("");
-        CheckPointManager::Instance()->RemoveAllCheckPoint();
+        CheckPointManager::Instance()->ResetAllCheckPoint();
     }
 
     void TestResolveHostLogPathNormalFile();
@@ -275,7 +275,7 @@ void LogFileReaderResolvedPathUnittest::TestCopyTruncateUpgradeIssue() {
     APSARA_TEST_EQUAL_FATAL(reader.mResolvedHostLogPath, realFilePath);
 
     // 清理
-    CheckPointManager::Instance()->RemoveAllCheckPoint();
+    CheckPointManager::Instance()->ResetAllCheckPoint();
     std::filesystem::remove(linkFilePath);
     std::filesystem::remove(realFilePath);
     std::filesystem::remove(linkDir);

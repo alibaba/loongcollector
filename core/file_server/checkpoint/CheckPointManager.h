@@ -120,6 +120,9 @@ public:
 
 private:
     DevInodeCheckPointHashMap mDevInodeCheckPointPtrMap;
+    // Shadow copy of file checkpoints. Point updates stay in sync; RemoveAllCheckPoint
+    // clears the primary table only so in-flight reader rebuild can still recover.
+    DevInodeCheckPointHashMap mBackupDevInodeCheckPointPtrMap;
     std::unordered_map<std::string, DirCheckPointPtr> mDirNameMap;
     int32_t mLastCheckTime;
     int32_t mLastDumpTime;
@@ -127,6 +130,9 @@ private:
     int32_t mReaderCount;
     CheckPointManager()
         : mLastCheckTime(time(NULL)), mLastDumpTime(time(NULL)), mLoadVersion(NO_CHECKPOINT_VERSION), mReaderCount(0) {}
+
+    static bool CheckPointFileStillExists(const CheckPoint& checkPoint);
+    void overwriteBackupFromPrimary();
 
 public:
     bool CheckVersion();
@@ -146,6 +152,7 @@ public:
     bool NeedDump(int32_t curTime);
     void ResetLastDumpTime();
     DevInodeCheckPointHashMap& GetAllFileCheckPoint();
+    size_t GetBackupFileCheckPointCount() const;
 
     static CheckPointManager* Instance() {
         static CheckPointManager checkPointManager;
@@ -160,6 +167,8 @@ public:
     friend class ConfigUpdatorUnittest;
     void RemoveLocalCheckPoint();
     void PrintStatus();
+    void ResetAllCheckPoint();
+    void OverwriteBackupFromPrimaryForTest();
 #endif
 };
 

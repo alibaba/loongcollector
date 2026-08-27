@@ -643,7 +643,7 @@ void EventDispatcher::AddExistedCheckPointFileEvents() {
         }
     }
     for (size_t i = 0; i < deleteKeyVec.size(); ++i) {
-        checkPointMap.erase(deleteKeyVec[i]);
+        CheckPointManager::Instance()->DeleteCheckPoint(deleteKeyVec[i].mDevInode, deleteKeyVec[i].mConfigName);
     }
     LOG_INFO(sLogger,
              ("checkpoint verification ends, generated event count", eventVec.size())("checkpoint deletion count",
@@ -1033,7 +1033,9 @@ void EventDispatcher::DumpCheckPoint() {
     // after save checkpoint, we should clear all checkpoint
     CheckPointManager::Instance()->RemoveAllCheckPoint();
     FileServer::GetInstance()->Resume(false, false);
-    LOG_INFO(sLogger, ("checkpoint dump", "succeeded"));
+    LOG_INFO(sLogger,
+             ("checkpoint dump", "succeeded")("backup file checkpoint",
+                                              CheckPointManager::Instance()->GetBackupFileCheckPointCount()));
 }
 
 bool EventDispatcher::IsAllFileRead() {
@@ -1065,7 +1067,7 @@ void EventDispatcher::CleanEnviroments() {
     PollingDirFile::GetInstance()->Stop();
     PollingModify::GetInstance()->Stop();
     PollingEventQueue::GetInstance()->Clear();
-    CheckPointManager::Instance()->RemoveAllCheckPoint();
+    CheckPointManager::Instance()->ResetAllCheckPoint();
 }
 
 int32_t EventDispatcher::GetInotifyWatcherCount() {
