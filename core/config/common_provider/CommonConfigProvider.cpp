@@ -156,9 +156,10 @@ void CommonConfigProvider::LoadConfigFile() {
         }
     }
     if (itEc) {
-        LOG_WARNING(sLogger,
-                    ("failed to iterate config dir",
-                     mContinuousPipelineConfigDir.string())("error code", itEc.value())("error msg", itEc.message()));
+        LOG_WARNING(
+            sLogger,
+            ("action", "iterate config dir")("status", "failed")("dir path", mContinuousPipelineConfigDir.string())(
+                "error code", itEc.value())("error msg", itEc.message()));
     }
     itEc.clear();
     for (auto it = filesystem::directory_iterator(mInstanceSourceDir, itEc);
@@ -183,8 +184,8 @@ void CommonConfigProvider::LoadConfigFile() {
     }
     if (itEc) {
         LOG_WARNING(sLogger,
-                    ("failed to iterate config dir",
-                     mInstanceSourceDir.string())("error code", itEc.value())("error msg", itEc.message()));
+                    ("action", "iterate config dir")("status", "failed")("dir path", mInstanceSourceDir.string())(
+                        "error code", itEc.value())("error msg", itEc.message()));
     }
 }
 

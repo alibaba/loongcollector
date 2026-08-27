@@ -355,10 +355,10 @@ void Application::Start() { // GCOVR_EXCL_START
                 lastConfigCheckTime = curTime;
             } catch (const filesystem::filesystem_error& e) {
                 LOG_ERROR(sLogger,
-                          ("config dir scan threw", e.what())("error code", e.code().value())("error msg",
-                                                                                              e.code().message()));
+                          ("action", "scan config dir")("status", "failed")("error", e.what())(
+                              "error code", e.code().value())("error msg", e.code().message()));
             } catch (const exception& e) {
-                LOG_ERROR(sLogger, ("config dir scan threw", e.what()));
+                LOG_ERROR(sLogger, ("action", "scan config dir")("status", "failed")("error", e.what()));
             }
         }
 #ifndef LOGTAIL_NO_TC_MALLOC

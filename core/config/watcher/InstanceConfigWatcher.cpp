@@ -142,7 +142,7 @@ InstanceConfigDiff InstanceConfigWatcher::CheckConfigDiff() {
         }
         if (itEc) {
             LOG_WARNING(sLogger,
-                        ("failed to iterate config dir", "skip remaining objects")("dir path", dir.string())(
+                        ("action", "iterate config dir")("status", "failed")("dir path", dir.string())(
                             "error code", itEc.value())("error msg", itEc.message()));
         }
     }
