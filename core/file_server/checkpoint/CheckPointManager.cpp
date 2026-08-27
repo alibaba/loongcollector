@@ -71,10 +71,13 @@ bool CheckPointManager::CheckVersion() {
 }
 
 bool CheckPointManager::CheckPointFileStillExists(const CheckPoint& checkPoint) {
-    if (checkPoint.mDevInode == GetFileDevInode(checkPoint.mFileName)) {
+    // PathStat::stat is silent; GetFileDevInode logs INFO on Linux when stat fails.
+    fsutil::PathStat ps;
+    if (fsutil::PathStat::stat(checkPoint.mFileName, ps) && checkPoint.mDevInode == ps.GetDevInode()) {
         return true;
     }
-    if (!checkPoint.mRealFileName.empty() && checkPoint.mDevInode == GetFileDevInode(checkPoint.mRealFileName)) {
+    if (!checkPoint.mRealFileName.empty() && fsutil::PathStat::stat(checkPoint.mRealFileName, ps)
+        && checkPoint.mDevInode == ps.GetDevInode()) {
         return true;
     }
     return false;
