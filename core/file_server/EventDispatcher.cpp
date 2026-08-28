@@ -1030,12 +1030,13 @@ void EventDispatcher::DumpCheckPoint() {
         LOG_WARNING(sLogger, ("dump checkpoint to local", "failed"));
     else
         LOG_DEBUG(sLogger, ("dump checkpoint to local", "succeeded"));
-    // after save checkpoint, we should clear all checkpoint
+    // Keep backup across dump: a later dump mid-rebuild only has already-rebuilt
+    // readers in primary. Overwriting backup from primary would drop pending keys.
+    CheckPointManager::Instance()->PruneInvalidBackupCheckPoints();
+    const size_t backupCount = CheckPointManager::Instance()->GetBackupFileCheckPointCount();
     CheckPointManager::Instance()->RemoveAllCheckPoint();
     FileServer::GetInstance()->Resume(false, false);
-    LOG_INFO(sLogger,
-             ("checkpoint dump", "succeeded")("backup file checkpoint",
-                                              CheckPointManager::Instance()->GetBackupFileCheckPointCount()));
+    LOG_INFO(sLogger, ("checkpoint dump", "succeeded")("backup file checkpoint", backupCount));
 }
 
 bool EventDispatcher::IsAllFileRead() {

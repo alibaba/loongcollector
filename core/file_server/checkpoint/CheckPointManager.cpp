@@ -19,6 +19,7 @@
 #include <fstream>
 #include <string>
 #include <thread>
+#include <vector>
 
 #include "app_config/AppConfig.h"
 #include "common/FileSystemUtil.h"
@@ -70,17 +71,61 @@ bool CheckPointManager::CheckVersion() {
     return (mLoadVersion == NO_CHECKPOINT_VERSION) || (mLoadVersion / 10000 == INT32_FLAG(check_point_version) / 10000);
 }
 
-bool CheckPointManager::CheckPointFileStillExists(const CheckPoint& checkPoint) {
-    // PathStat::stat is silent; GetFileDevInode logs INFO on Linux when stat fails.
+namespace {
+
+bool pathMatchesDevInode(const std::string& path, const DevInode& expected) {
+    if (path.empty()) {
+        return false;
+    }
     fsutil::PathStat ps;
-    if (fsutil::PathStat::stat(checkPoint.mFileName, ps) && checkPoint.mDevInode == ps.GetDevInode()) {
+    return fsutil::PathStat::stat(path, ps) && expected == ps.GetDevInode();
+}
+
+bool resolveKnownCheckPointPath(const CheckPoint& checkPoint, std::string& matchedPath) {
+    if (pathMatchesDevInode(checkPoint.mFileName, checkPoint.mDevInode)) {
+        matchedPath = checkPoint.mFileName;
         return true;
     }
-    if (!checkPoint.mRealFileName.empty() && fsutil::PathStat::stat(checkPoint.mRealFileName, ps)
-        && checkPoint.mDevInode == ps.GetDevInode()) {
+    if (pathMatchesDevInode(checkPoint.mRealFileName, checkPoint.mDevInode)) {
+        matchedPath = checkPoint.mRealFileName;
+        return true;
+    }
+    if (pathMatchesDevInode(checkPoint.mResolvedFileName, checkPoint.mDevInode)) {
+        matchedPath = checkPoint.mResolvedFileName;
         return true;
     }
     return false;
+}
+
+} // namespace
+
+bool CheckPointManager::isBackupCheckPointValid(const CheckPoint& checkPoint,
+                                                bool searchByInode,
+                                                std::string* matchedPath) {
+    std::string path;
+    if (!resolveKnownCheckPointPath(checkPoint, path)) {
+        if (!searchByInode) {
+            return false;
+        }
+        const size_t sep = checkPoint.mFileName.find_last_of(PATH_SEPARATOR);
+        if (sep == std::string::npos || sep == 0) {
+            return false;
+        }
+        auto found = SearchFilePathByDevInodeInDirectory(
+            checkPoint.mFileName.substr(0, sep), 0, checkPoint.mDevInode, nullptr);
+        if (!found) {
+            return false;
+        }
+        path = found.value();
+    }
+    if (checkPoint.mSignatureSize > 0
+        && !CheckFileSignature(path, checkPoint.mSignatureHash, checkPoint.mSignatureSize)) {
+        return false;
+    }
+    if (matchedPath != nullptr) {
+        *matchedPath = path;
+    }
+    return true;
 }
 
 void CheckPointManager::overwriteBackupFromPrimary() {
@@ -108,11 +153,20 @@ bool CheckPointManager::GetCheckPoint(DevInode devInode, const std::string& conf
         return true;
     }
     auto backupIt = mBackupDevInodeCheckPointPtrMap.find(key);
-    if (backupIt != mBackupDevInodeCheckPointPtrMap.end() && CheckPointFileStillExists(*backupIt->second)) {
-        checkPointPtr = backupIt->second;
-        return true;
+    if (backupIt == mBackupDevInodeCheckPointPtrMap.end()) {
+        return false;
     }
-    return false;
+    std::string matchedPath;
+    if (!isBackupCheckPointValid(*backupIt->second, true, &matchedPath)) {
+        eraseFileCheckPoint(mBackupDevInodeCheckPointPtrMap, key);
+        return false;
+    }
+    if (!matchedPath.empty() && backupIt->second->mFileName != matchedPath
+        && backupIt->second->mRealFileName != matchedPath) {
+        backupIt->second->mRealFileName = matchedPath;
+    }
+    checkPointPtr = backupIt->second;
+    return true;
 }
 
 void CheckPointManager::DeleteDirCheckPoint(const std::string& dirname) {
@@ -552,6 +606,18 @@ void CheckPointManager::CheckTimeoutCheckPoint() {
 void CheckPointManager::RemoveAllCheckPoint() {
     mDirNameMap.clear();
     mDevInodeCheckPointPtrMap.clear();
+}
+
+void CheckPointManager::PruneInvalidBackupCheckPoints() {
+    std::vector<CheckPointKey> staleKeys;
+    for (const auto& entry : mBackupDevInodeCheckPointPtrMap) {
+        if (!isBackupCheckPointValid(*entry.second, false, nullptr)) {
+            staleKeys.push_back(entry.first);
+        }
+    }
+    for (const auto& key : staleKeys) {
+        eraseFileCheckPoint(mBackupDevInodeCheckPointPtrMap, key);
+    }
 }
 
 boost::optional<std::string> SearchFilePathByDevInodeInDirectory(const std::string& baseDirPath,

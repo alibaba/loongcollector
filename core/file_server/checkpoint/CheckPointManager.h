@@ -131,7 +131,7 @@ private:
     CheckPointManager()
         : mLastCheckTime(time(NULL)), mLastDumpTime(time(NULL)), mLoadVersion(NO_CHECKPOINT_VERSION), mReaderCount(0) {}
 
-    static bool CheckPointFileStillExists(const CheckPoint& checkPoint);
+    static bool isBackupCheckPointValid(const CheckPoint& checkPoint, bool searchByInode, std::string* matchedPath);
     void overwriteBackupFromPrimary();
 
 public:
@@ -148,6 +148,7 @@ public:
     bool GetCheckPoint(DevInode devInode, const std::string& configName, CheckPointPtr& checkPointPtr);
     bool GetDirCheckPoint(const std::string& filename, DirCheckPointPtr& checkPointPtr);
     void RemoveAllCheckPoint();
+    void PruneInvalidBackupCheckPoints();
     void CheckTimeoutCheckPoint();
     bool NeedDump(int32_t curTime);
     void ResetLastDumpTime();
