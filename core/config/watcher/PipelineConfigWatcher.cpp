@@ -210,15 +210,16 @@ void PipelineConfigWatcher::InsertPipelines(CollectionConfigDiff& pDiff,
                         ("config dir path is not a directory", "skip current object")("dir path", dir.string()));
             continue;
         }
-        for (auto const& entry : filesystem::directory_iterator(dir, ec)) {
-            // lock the dir if it is provided by config provider
-            unique_lock<mutex> lock;
-            auto itr = mDirMutexMap.find(dir.string());
-            if (itr != mDirMutexMap.end()) {
-                lock = unique_lock<mutex>(*itr->second, defer_lock);
-                lock.lock();
-            }
+        unique_lock<mutex> lock;
+        auto muxItr = mDirMutexMap.find(dir.string());
+        if (muxItr != mDirMutexMap.end()) {
+            lock = unique_lock<mutex>(*muxItr->second);
+        }
 
+        error_code itEc;
+        for (auto it = filesystem::directory_iterator(dir, itEc); !itEc && it != filesystem::directory_iterator();
+             it.increment(itEc)) {
+            const auto& entry = *it;
             const filesystem::path& path = entry.path();
             const string& configName = path.stem().string();
             const string& filepath = path.string();
@@ -293,6 +294,11 @@ void PipelineConfigWatcher::InsertPipelines(CollectionConfigDiff& pDiff,
                 // check unchanged config just for singleton input
                 CheckUnchangedConfig(configName, path, pDiff, singletonCache);
             }
+        }
+        if (itEc) {
+            LOG_WARNING(sLogger,
+                        ("action", "iterate config dir")("status", "failed")("dir path", dir.string())(
+                            "error code", itEc.value())("error msg", itEc.message()));
         }
     }
 }
