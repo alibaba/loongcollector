@@ -214,6 +214,23 @@ bool FileDiscoveryOptions::Init(const Json::Value& config,
         mBasePathInfos.push_back(std::move(pathInfo));
     }
 
+    bool isNas = false;
+    if (!GetOptionalBoolParam(config, "IsNas", isNas, errorMsg)) {
+        PARAM_WARNING_DEFAULT(ctx.GetLogger(),
+                              ctx.GetAlarm(),
+                              errorMsg,
+                              isNas,
+                              pluginType,
+                              ctx.GetConfigName(),
+                              ctx.GetProjectName(),
+                              ctx.GetLogstoreName(),
+                              ctx.GetRegion());
+    }
+    mIsNas = isNas;
+    if (isNas) {
+        mMaxDirSearchDepth = 0;
+    }
+
     // PreservedDirDepth
     if (!GetOptionalIntParam(config, "PreservedDirDepth", mPreservedDirDepth, errorMsg)) {
         PARAM_WARNING_DEFAULT(ctx.GetLogger(),
