@@ -29,11 +29,14 @@
 #include "common/StringView.h"
 #include "common/UUIDUtil.h"
 #include "common/magic_enum.hpp"
+#include "constants/TagConstants.h"
+#include "container_manager/ContainerManager.h"
 #include "ebpf/Config.h"
 #include "ebpf/EBPFServer.h"
 #include "ebpf/plugin/agentsight/AgentsightEvents.h"
 #include "ebpf/plugin/agentsight/AgentsightMessageUtil.h"
 #include "ebpf/type/table/BaseElements.h"
+#include "file_server/ContainerInfo.h"
 #include "logger/Logger.h"
 #include "models/LogEvent.h"
 #include "models/PipelineEventGroup.h"
@@ -814,7 +817,39 @@ void FillAgentsightHttpResponseLog(const AgentsightHttpsRecord& rec,
     EmitHttpBody(log, "http.response.body", rec.mResponseBody);
 }
 
+/// Resolves @containerId against the process-wide container inventory maintained by
+/// ContainerManager (its polling loop is started by InputAgentSight in containerized deployments)
+/// and attaches the standard container metadata tags to @group — the same channel and keys
+/// input_file / input_container_stdio use, so downstream can join agentsight data with
+/// file/stdio data on identical tag names.
+///
+/// Silently no-ops when the id is empty (host process) or unknown (container already removed from
+/// the snapshot, or the event raced the first snapshot after startup): the record keeps its
+/// `container.id` content field and nothing else changes. Deliberately no IsPurageContainerMode
+/// gate here — the inventory is simply empty when the manager was never started, and the mode flag
+/// is fixed at AppConfig construction, which would keep this path out of unit tests.
+void AttachAgentsightContainerTags(PipelineEventGroup& group, const std::string& containerId) {
+    if (containerId.empty()) {
+        return;
+    }
+    const auto info = ContainerManager::GetInstance()->GetContainerInfoById(containerId);
+    if (!info) {
+        LOG_DEBUG(sLogger, ("Agentsight container meta not found", "")("containerId", containerId));
+        return;
+    }
+    AttachAgentsightContainerTagsFromInfo(group, *info);
+}
+
 } // namespace
+
+void AttachAgentsightContainerTagsFromInfo(PipelineEventGroup& group, const RawContainerInfo& info) {
+    for (const auto& md : info.mMetadatas) {
+        group.SetTag(GetDefaultTagKeyString(md.first), md.second);
+    }
+    for (const auto& md : info.mCustomMetadatas) {
+        group.SetTag(md.first, md.second);
+    }
+}
 
 AgentsightManager::AgentsightManager(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
                                      const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
@@ -1242,6 +1277,8 @@ int AgentsightManager::HandleHttpsEvent(const AgentsightHttpsRecord* rec) {
             *rec, eventGroup.AddLogEvent(true, mEventPool), CalculateRandomUUID(), exchangeId);
     }
 
+    AttachAgentsightContainerTags(eventGroup, rec->mContainerId);
+
     std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(eventGroup), pluginIndex);
     if (QueueStatus::OK == ProcessQueueManager::GetInstance()->PushQueue(queueKey, std::move(item))) {
         ADD_COUNTER(mRawHttpMetrics.pushLogsTotal, logCount);
@@ -1340,6 +1377,8 @@ int AgentsightManager::HandleLlmEvent(AgentsightLlmRecord* rec) {
             FillAgentsightCombinedLlmLog(*rec, log, messageDeltaOnly, emitPayload);
         }
     }
+
+    AttachAgentsightContainerTags(eventGroup, rec->mContainerId);
 
     std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(eventGroup), pluginIndex);
     if (QueueStatus::OK == ProcessQueueManager::GetInstance()->PushQueue(queueKey, std::move(item))) {

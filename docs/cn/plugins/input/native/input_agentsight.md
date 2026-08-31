@@ -36,6 +36,28 @@ dev
 |  ProbeConfig.MessageDeltaOnly  |  bool  |  否  |  `true`  |  为 `true` 时**不**输出全量 `gen_ai.input.messages`；仍输出 `gen_ai.input.messages_delta`、`gen_ai.system_instructions_hash` / `gen_ai.tool.definitions_hash`（非空时），以及 hash 相对上一轮变化时的 `gen_ai.system_instructions` / `gen_ai.tool.definitions`。为 `false` 时**每次**输出非空的全量 `gen_ai.input.messages`。**不影响** `gen_ai.output.messages`；`messages_delta` 及 session 状态维护**不受**本开关影响。  |
 |  ProbeConfig.RawHttpsFallback  |  bool  |  否  |  `false`  |  为 `true` 时，**无法解析为 LLM 语义**的流量（未知 API path、非标准 body）不再被丢弃，而是以原始 HTTP 形式上报（`event.name=http.request` / `http.response`，见下文）。需要 `libagentsight >= 0.9.0`；旧版动态库上该开关无效（日志告警后自动降级为关闭）。**默认关闭**：原始 body 未做任何脱敏。  |
 
+### 容器元信息标签（自动附加）
+
+当采集器运行在**容器化部署**（K8s DaemonSet、或挂载了 `/:/logtail_host` 的 docker 容器；判定依据为 `/logtail_host` 路径存在）时，本插件会自动把事件所属容器的元信息以**组级 Tag** 形式附加到每条事件组上——与 `input_file` / `input_container_stdio` 的容器元信息透传**同一渠道、同一套键名**，下游可用相同的键跨插件聚合。无需任何配置开关。
+
+| Tag 键 | 说明 |
+| --- | --- |
+| `_container_name_` | 容器名 |
+| `_image_name_` | 镜像名 |
+| `_container_ip_` | 容器 IP |
+| `_pod_name_` | Pod 名（K8s 场景） |
+| `_namespace_` | 命名空间（K8s 场景） |
+| `_pod_uid_` | Pod UID（K8s 场景） |
+
+容器自定义元信息（如环境配置产生的附加标签）按原键名透传。在 SLS 中这些键呈现为 `__tag__:` 前缀；日志内容里的 `container.id` 字段（见字段表）保持不变。
+
+**自动降级**（事件照常输出，仅缺少容器 Tag）：
+
+- 采集器为宿主机直装等非容器化部署；
+- 进程不在容器内（`container.id` 为空）；
+- 容器刚退出、已移出容器快照，或事件早于启动后首轮容器快照完成（秒级窗口）；
+- `container.id` 非完整 64 位容器 ID 的变体形态。
+
 ### `RawHttpsFallback: true` 输出的原始 HTTP 日志
 
 仅在 AgentSight 无法把流量解析成 GenAI 语义时产生，与 `gen_ai.*` 日志**互斥**（一次流量最多产生一种）。
@@ -57,7 +79,7 @@ dev
 | `pid` / `comm` | 进程 ID 与进程名 |
 | `cmdline` | 进程完整命令行（argv 以空格连接，截断到 127 字节）。进程已退出时为空，此时该字段不输出 |
 | `agent.type` | 命中 `CmdlineWhitelist` 的 agent 类型（小写）。未命中任何规则时回退为进程名 —— 与 `gen_ai.*` 日志同一套解析口径，**但键名不带 `gen_ai.` 前缀**，见下方说明 |
-| `container.id` | 从 `/proc/<pid>/cgroup` 解析的容器 ID；非容器进程为空，此时该字段不输出 |
+| `container.id` | 从 `/proc/<pid>/cgroup` 解析的容器 ID；非容器进程为空，此时该字段不输出。容器化部署下容器元信息另以组级 Tag 附加，见上文「容器元信息标签（自动附加）」 |
 | `url.scheme` | 固定 `https` |
 | `time_unix_nano` / `observed_time_unix_nano` | 同 `gen_ai.*` 日志 |
 
@@ -385,7 +407,7 @@ Http:
 | `pid` | string | 进程号（十进制字符串） |
 | `comm` | string | 进程名称 |
 | `cmdline` | string | 进程完整命令行（`argv` 空格拼接，截断到 127 字节），来自 `/proc/<PID>/cmdline`；进程已退出时为空则不输出 |
-| `container.id` | string | 进程所属容器 id，由 agentsight 侧按 pid 解析；非容器进程或解析失败时为空则不输出 |
+| `container.id` | string | 进程所属容器 id，由 agentsight 侧按 pid 解析；非容器进程或解析失败时为空则不输出。容器化部署下容器元信息另以组级 Tag 附加，见「容器元信息标签（自动附加）」 |
 | `gen_ai.agent.type` | string | Agent **类型**（如 `openclaw`、`claude-code`），来自 cmdline 白名单 |
 | `time_unix_nano` | string | 本条日志事件时刻，Unix 纪元纳秒（十进制字符串）；与 `SetLogTimestampFromNs` 所用时间戳一致 |
 | `observed_time_unix_nano` | string | 观测时刻，与 `time_unix_nano` **相同**（十进制字符串） |
