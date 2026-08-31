@@ -141,7 +141,7 @@ public:
         // ConfigManager::GetInstance()->CleanEnviroments();
         PollingDirFile::GetInstance()->ClearCache();
         PollingModify::GetInstance()->ClearCache();
-        CheckPointManager::Instance()->ResetAllCheckPoint();
+        CheckPointManager::Instance()->RemoveAllCheckPoint();
         // PollingEventQueue::GetInstance()->Clear();
         filesystem::remove_all(gRootDir);
         if (bfs::exists(AppConfig::GetInstance()->mCheckPointFilePath)) {

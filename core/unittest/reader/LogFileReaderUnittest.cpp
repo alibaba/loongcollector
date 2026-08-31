@@ -1318,7 +1318,7 @@ public:
     void SetUp() override { FileServer::GetInstance()->AddFileDiscoveryConfig("", &discoveryOpts, &ctx); }
 
     void TearDown() override {
-        CheckPointManager::Instance()->ResetAllCheckPoint();
+        CheckPointManager::Instance()->RemoveAllCheckPoint();
         LogFileReader::BUFFER_SIZE = 1024 * 512;
         FileServer::GetInstance()->RemoveFileDiscoveryConfig("");
     }

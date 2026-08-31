@@ -35,7 +35,10 @@ using namespace std;
 DECLARE_FLAG_STRING(check_point_filename);
 
 DEFINE_FLAG_INT32(file_check_point_time_out, "seconds", 300);
-DEFINE_FLAG_INT32(mem_check_point_time_out, "seconds", 7200);
+// Aligned with the most aggressive reader idle-deletion tier (1 day, see
+// DeleteTimeoutReader): a pending checkpoint should live at least as long as the
+// reader state the system is already willing to drop.
+DEFINE_FLAG_INT32(mem_check_point_time_out, "seconds", 86400);
 DEFINE_FLAG_INT32(check_point_check_interval, "default 15 min", 14 * 60);
 DEFINE_FLAG_INT32(check_point_version, "now check point version xx.xx.xx such as 0.1.0 is 100", 200);
 DEFINE_FLAG_INT32(check_point_dump_interval, "default 15 min", 15 * 60);
@@ -46,23 +49,13 @@ namespace logtail {
 
 namespace {
 
-void upsertFileCheckPoint(CheckPointManager::DevInodeCheckPointHashMap& table,
-                          const CheckPointManager::CheckPointKey& key,
-                          const CheckPointPtr& checkPoint) {
-    auto it = table.find(key);
-    if (it != table.end()) {
-        it->second = checkPoint;
-        return;
+bool pathMatchesDevInode(const std::string& path, const DevInode& expected) {
+    if (path.empty()) {
+        return false;
     }
-    table.insert(std::make_pair(key, checkPoint));
-}
-
-void eraseFileCheckPoint(CheckPointManager::DevInodeCheckPointHashMap& table,
-                         const CheckPointManager::CheckPointKey& key) {
-    auto it = table.find(key);
-    if (it != table.end()) {
-        table.erase(it);
-    }
+    // PathStat::stat is silent; GetFileDevInode logs INFO on Linux when stat fails.
+    fsutil::PathStat ps;
+    return fsutil::PathStat::stat(path, ps) && expected == ps.GetDevInode();
 }
 
 } // namespace
@@ -71,102 +64,60 @@ bool CheckPointManager::CheckVersion() {
     return (mLoadVersion == NO_CHECKPOINT_VERSION) || (mLoadVersion / 10000 == INT32_FLAG(check_point_version) / 10000);
 }
 
-namespace {
-
-bool pathMatchesDevInode(const std::string& path, const DevInode& expected) {
-    if (path.empty()) {
+// Same check as the front half of EventDispatcher::validateCheckpoint: the config
+// still exists and still matches the checkpoint's file path.
+bool CheckPointManager::isCheckPointStillMatched(const CheckPoint& checkPoint) {
+    const std::string& filePath = checkPoint.mFileName;
+    size_t lastSeparator = filePath.find_last_of(PATH_SEPARATOR);
+    if (lastSeparator == std::string::npos || lastSeparator == 0 || lastSeparator == filePath.size() - 1) {
         return false;
     }
-    fsutil::PathStat ps;
-    return fsutil::PathStat::stat(path, ps) && expected == ps.GetDevInode();
-}
-
-bool resolveKnownCheckPointPath(const CheckPoint& checkPoint, std::string& matchedPath) {
-    if (pathMatchesDevInode(checkPoint.mFileName, checkPoint.mDevInode)) {
-        matchedPath = checkPoint.mFileName;
-        return true;
+    std::string path = filePath.substr(0, lastSeparator);
+    std::string fileName = filePath.substr(lastSeparator + 1);
+    std::vector<FileDiscoveryConfig> matchedConfigs;
+    if (AppConfig::GetInstance()->IsAcceptMultiConfig()) {
+        ConfigManager::GetInstance()->FindAllMatch(matchedConfigs, path, fileName);
+    } else {
+        ConfigManager::GetInstance()->FindMatchWithForceFlag(matchedConfigs, path, fileName);
     }
-    if (pathMatchesDevInode(checkPoint.mRealFileName, checkPoint.mDevInode)) {
-        matchedPath = checkPoint.mRealFileName;
-        return true;
-    }
-    if (pathMatchesDevInode(checkPoint.mResolvedFileName, checkPoint.mDevInode)) {
-        matchedPath = checkPoint.mResolvedFileName;
-        return true;
+    for (size_t idx = 0; idx < matchedConfigs.size(); ++idx) {
+        if (matchedConfigs[idx].second->GetConfigName() == checkPoint.mConfigName) {
+            return true;
+        }
     }
     return false;
 }
 
-} // namespace
-
-bool CheckPointManager::isBackupCheckPointValid(const CheckPoint& checkPoint,
-                                                bool searchByInode,
-                                                std::string* matchedPath) {
-    std::string path;
-    if (!resolveKnownCheckPointPath(checkPoint, path)) {
-        if (!searchByInode) {
-            return false;
-        }
-        const size_t sep = checkPoint.mFileName.find_last_of(PATH_SEPARATOR);
-        if (sep == std::string::npos || sep == 0) {
-            return false;
-        }
-        auto found = SearchFilePathByDevInodeInDirectory(
-            checkPoint.mFileName.substr(0, sep), 0, checkPoint.mDevInode, nullptr);
-        if (!found) {
-            return false;
-        }
-        path = found.value();
-    }
-    if (checkPoint.mSignatureSize > 0
-        && !CheckFileSignature(path, checkPoint.mSignatureHash, checkPoint.mSignatureSize)) {
-        return false;
-    }
-    if (matchedPath != nullptr) {
-        *matchedPath = path;
-    }
-    return true;
-}
-
-void CheckPointManager::overwriteBackupFromPrimary() {
-    mBackupDevInodeCheckPointPtrMap = mDevInodeCheckPointPtrMap;
+bool CheckPointManager::checkPointFileExists(const CheckPoint& checkPoint) {
+    return pathMatchesDevInode(checkPoint.mFileName, checkPoint.mDevInode)
+        || pathMatchesDevInode(checkPoint.mRealFileName, checkPoint.mDevInode)
+        || pathMatchesDevInode(checkPoint.mResolvedFileName, checkPoint.mDevInode);
 }
 
 void CheckPointManager::AddCheckPoint(CheckPoint* checkPointPtr) {
     CheckPointPtr newCheckPoint(checkPointPtr);
+    newCheckPoint->mMemInsertTime = (int32_t)time(NULL);
     CheckPointKey key(newCheckPoint->mDevInode, newCheckPoint->mConfigName);
-    upsertFileCheckPoint(mDevInodeCheckPointPtrMap, key, newCheckPoint);
-    upsertFileCheckPoint(mBackupDevInodeCheckPointPtrMap, key, newCheckPoint);
+    mDevInodeCheckPointPtrMap[key] = newCheckPoint;
+    if (mCollectingDumpRound) {
+        mDumpRoundKeys.push_back(key);
+    }
 }
 
 void CheckPointManager::DeleteCheckPoint(DevInode devInode, const std::string& configName) {
-    CheckPointKey key(devInode, configName);
-    eraseFileCheckPoint(mDevInodeCheckPointPtrMap, key);
-    eraseFileCheckPoint(mBackupDevInodeCheckPointPtrMap, key);
+    DevInodeCheckPointHashMap::iterator it = mDevInodeCheckPointPtrMap.find(CheckPointKey(devInode, configName));
+    if (it != mDevInodeCheckPointPtrMap.end()) {
+        mDevInodeCheckPointPtrMap.erase(it);
+    }
 }
 
 bool CheckPointManager::GetCheckPoint(DevInode devInode, const std::string& configName, CheckPointPtr& checkPointPtr) {
-    CheckPointKey key(devInode, configName);
-    auto it = mDevInodeCheckPointPtrMap.find(key);
+    DevInodeCheckPointHashMap::iterator it = mDevInodeCheckPointPtrMap.find(CheckPointKey(devInode, configName));
     if (it != mDevInodeCheckPointPtrMap.end()) {
         checkPointPtr = it->second;
         return true;
     }
-    auto backupIt = mBackupDevInodeCheckPointPtrMap.find(key);
-    if (backupIt == mBackupDevInodeCheckPointPtrMap.end()) {
-        return false;
-    }
-    std::string matchedPath;
-    if (!isBackupCheckPointValid(*backupIt->second, true, &matchedPath)) {
-        eraseFileCheckPoint(mBackupDevInodeCheckPointPtrMap, key);
-        return false;
-    }
-    if (!matchedPath.empty() && backupIt->second->mFileName != matchedPath
-        && backupIt->second->mRealFileName != matchedPath) {
-        backupIt->second->mRealFileName = matchedPath;
-    }
-    checkPointPtr = backupIt->second;
-    return true;
+    return false;
 }
 
 void CheckPointManager::DeleteDirCheckPoint(const std::string& dirname) {
@@ -205,10 +156,6 @@ void CheckPointManager::ResetLastDumpTime() {
 
 CheckPointManager::DevInodeCheckPointHashMap& CheckPointManager::GetAllFileCheckPoint() {
     return mDevInodeCheckPointPtrMap;
-}
-
-size_t CheckPointManager::GetBackupFileCheckPointCount() const {
-    return mBackupDevInodeCheckPointPtrMap.size();
 }
 
 
@@ -256,11 +203,9 @@ void CheckPointManager::LoadCheckPoint() {
 
     LoadDirCheckPoint(root);
     LoadFileCheckPoint(root);
-    overwriteBackupFromPrimary();
-    LOG_INFO(
-        sLogger,
-        ("load checkpoint, version", mLoadVersion)("file check point", mDevInodeCheckPointPtrMap.size())(
-            "dir check point", mDirNameMap.size())("backup file check point", mBackupDevInodeCheckPointPtrMap.size()));
+    LOG_INFO(sLogger,
+             ("load checkpoint, version", mLoadVersion)("file check point", mDevInodeCheckPointPtrMap.size())(
+                 "dir check point", mDirNameMap.size()));
 }
 
 void CheckPointManager::LoadDirCheckPoint(const Json::Value& root) {
@@ -568,39 +513,46 @@ int32_t CheckPointManager::GetReaderCount() {
     return mReaderCount;
 }
 
+// GC for pending handoff entries. Called in the periodic dump path before
+// BeginDumpRound, when the table only holds pending entries and LogInput is held, so
+// stat here cannot race with event handling. An entry is evicted if its config is gone
+// or no longer matches, its file is gone, or it has stayed in memory beyond
+// mem_check_point_time_out without being consumed (its rebuild event was dropped).
 void CheckPointManager::CheckTimeoutCheckPoint() {
-    // do not need to clear file checkpoint, we will clear all checkpoint after DumpCheckPointToLocal
-    /*
-    if((time(NULL) - mLastCheckTime) > INT32_FLAG(check_point_check_interval))
-    {
-
-
-        CheckPointManager::DevInodeCheckPointHashMap::iterator it ;
-        int now = time(NULL);
-        vector<CheckPointKey> deleteVec;
-        for(it = mDevInodeCheckPointPtrMap.begin();it != mDevInodeCheckPointPtrMap.end(); ++it)
-        {
-            if ((now - it->second.get()->mLastUpdateTime) > INT32_FLAG(mem_check_point_time_out))
-                deleteVec.push_back(it->first);
-        }
-
-        for (size_t i = 0; i > deleteVec.size(); ++i)
-        {
-            mDevInodeCheckPointPtrMap.erase(deleteVec[i]);
-        }
-
-        std::unordered_map<std::string,DirCheckPointPtr>::iterator dirIt;
-        for(dirIt = mDirNameMap.begin(); dirIt != mDirNameMap.end();)
-        {
-            if((now - dirIt -> second.get() -> mUpdateTime) > INT32_FLAG(mem_check_point_time_out))
-                dirIt = mDirNameMap.erase(dirIt);
-            else
-                ++dirIt;
-        }
-        mLastCheckTime = time(NULL);
+    int32_t now = (int32_t)time(NULL);
+    if (now - mLastCheckTime <= INT32_FLAG(check_point_check_interval)) {
+        return;
     }
-
-    */
+    mLastCheckTime = now;
+    std::vector<CheckPointKey> deleteKeyVec;
+    for (auto it = mDevInodeCheckPointPtrMap.begin(); it != mDevInodeCheckPointPtrMap.end(); ++it) {
+        const CheckPoint& checkPoint = *it->second;
+        const char* reason = nullptr;
+        if (!isCheckPointStillMatched(checkPoint)) {
+            reason = "config is deleted or no longer matches the file";
+        } else if (!checkPointFileExists(checkPoint)) {
+            reason = "file no longer exists";
+        } else if (now - checkPoint.mMemInsertTime > INT32_FLAG(mem_check_point_time_out)) {
+            reason = "pending too long without being consumed";
+        }
+        if (reason == nullptr) {
+            continue;
+        }
+        LOG_INFO(sLogger,
+                 ("delete pending checkpoint", reason)("config", checkPoint.mConfigName)("log reader queue name",
+                                                                                         checkPoint.mFileName)(
+                     "real file path", checkPoint.mRealFileName)("file device", checkPoint.mDevInode.dev)(
+                     "file inode", checkPoint.mDevInode.inode)("residency seconds", now - checkPoint.mMemInsertTime));
+        deleteKeyVec.push_back(it->first);
+    }
+    for (size_t i = 0; i < deleteKeyVec.size(); ++i) {
+        mDevInodeCheckPointPtrMap.erase(deleteKeyVec[i]);
+    }
+    if (!deleteKeyVec.empty()) {
+        LOG_INFO(sLogger,
+                 ("pending checkpoint gc", "done")("deleted", deleteKeyVec.size())("left",
+                                                                                   mDevInodeCheckPointPtrMap.size()));
+    }
 }
 
 void CheckPointManager::RemoveAllCheckPoint() {
@@ -608,16 +560,23 @@ void CheckPointManager::RemoveAllCheckPoint() {
     mDevInodeCheckPointPtrMap.clear();
 }
 
-void CheckPointManager::PruneInvalidBackupCheckPoints() {
-    std::vector<CheckPointKey> staleKeys;
-    for (const auto& entry : mBackupDevInodeCheckPointPtrMap) {
-        if (!isBackupCheckPointValid(*entry.second, false, nullptr)) {
-            staleKeys.push_back(entry.first);
-        }
+void CheckPointManager::BeginDumpRound() {
+    mCollectingDumpRound = true;
+    mDumpRoundKeys.clear();
+}
+
+void CheckPointManager::EndDumpRound() {
+    mCollectingDumpRound = false;
+    // Only erase what this round's DumpAllHandlersMeta wrote: live readers still hold
+    // their state and will be dumped again next round. Pending handoff entries stay
+    // for the in-flight reader rebuild.
+    for (size_t i = 0; i < mDumpRoundKeys.size(); ++i) {
+        mDevInodeCheckPointPtrMap.erase(mDumpRoundKeys[i]);
     }
-    for (const auto& key : staleKeys) {
-        eraseFileCheckPoint(mBackupDevInodeCheckPointPtrMap, key);
-    }
+    mDumpRoundKeys.clear();
+    // Dir checkpoints are staging-only and refilled from watched dirs every round;
+    // clearing them entirely keeps the old RemoveAllCheckPoint semantics.
+    mDirNameMap.clear();
 }
 
 boost::optional<std::string> SearchFilePathByDevInodeInDirectory(const std::string& baseDirPath,
@@ -685,15 +644,6 @@ boost::optional<std::string> SearchFilePathByDevInodeInDirectory(const std::stri
 }
 
 #ifdef APSARA_UNIT_TEST_MAIN
-void CheckPointManager::ResetAllCheckPoint() {
-    RemoveAllCheckPoint();
-    mBackupDevInodeCheckPointPtrMap.clear();
-}
-
-void CheckPointManager::OverwriteBackupFromPrimaryForTest() {
-    overwriteBackupFromPrimary();
-}
-
 void CheckPointManager::RemoveLocalCheckPoint() {
     std::string checkPointFile = AppConfig::GetInstance()->GetCheckPointFilePath();
     if (remove(checkPointFile.c_str()) == -1) {

@@ -46,7 +46,7 @@ public:
 
 protected:
     void SetUp() override {
-        CheckPointManager::Instance()->ResetAllCheckPoint();
+        CheckPointManager::Instance()->RemoveAllCheckPoint();
         ConfigManager::GetInstance()->ClearFilePipelineMatchCache();
 
         mTestRootDir = GetProcessExecutionDir();
@@ -59,7 +59,7 @@ protected:
     }
 
     void TearDown() override {
-        CheckPointManager::Instance()->ResetAllCheckPoint();
+        CheckPointManager::Instance()->RemoveAllCheckPoint();
         ConfigManager::GetInstance()->ClearFilePipelineMatchCache();
         std::filesystem::remove_all(mTestRootDir);
     }

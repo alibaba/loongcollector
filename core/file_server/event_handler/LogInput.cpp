@@ -427,8 +427,6 @@ void LogInput::ProcessLoop() {
         }
 
         if (curTime - lastCheckDir >= mCheckBaseDirInterval) {
-            // do not need to clear file checkpoint, we will clear all checkpoint after DumpCheckPointToLocal
-            // CheckPointManager::Instance()->CheckTimeoutCheckPoint();
             // check root watch dir
             ConfigManager::GetInstance()->RegisterHandlers();
             lastCheckDir = curTime;

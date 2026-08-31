@@ -21,6 +21,7 @@
 #include <set>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 #include "boost/optional.hpp"
 #include "json/json.h"
@@ -54,6 +55,10 @@ public:
     std::string mResolvedFileName;
     std::string mRealFileName;
     int32_t mIdxInReaderArray = LogFileReader::CHECKPOINT_IDX_UNDEFINED;
+    // In-memory residency start. Set on AddCheckPoint (reset on overwrite and on rescue
+    // in AddExistedCheckPointFileEvents), never serialized. Only used by
+    // CheckTimeoutCheckPoint to evict pending entries that nobody consumes.
+    int32_t mMemInsertTime = 0;
 
     CheckPoint() {}
 
@@ -120,10 +125,12 @@ public:
 
 private:
     DevInodeCheckPointHashMap mDevInodeCheckPointPtrMap;
-    // Shadow copy of file checkpoints. Point updates stay in sync; RemoveAllCheckPoint
-    // clears the primary table only so in-flight reader rebuild can still recover.
-    DevInodeCheckPointHashMap mBackupDevInodeCheckPointPtrMap;
     std::unordered_map<std::string, DirCheckPointPtr> mDirNameMap;
+    // Keys written by AddCheckPoint during the current dump round (i.e. snapshots of
+    // live readers from DumpAllHandlersMeta). EndDumpRound erases exactly these, so
+    // pending handoff entries survive periodic dumps.
+    std::vector<CheckPointKey> mDumpRoundKeys;
+    bool mCollectingDumpRound = false;
     int32_t mLastCheckTime;
     int32_t mLastDumpTime;
     int32_t mLoadVersion;
@@ -131,8 +138,8 @@ private:
     CheckPointManager()
         : mLastCheckTime(time(NULL)), mLastDumpTime(time(NULL)), mLoadVersion(NO_CHECKPOINT_VERSION), mReaderCount(0) {}
 
-    static bool isBackupCheckPointValid(const CheckPoint& checkPoint, bool searchByInode, std::string* matchedPath);
-    void overwriteBackupFromPrimary();
+    static bool isCheckPointStillMatched(const CheckPoint& checkPoint);
+    static bool checkPointFileExists(const CheckPoint& checkPoint);
 
 public:
     bool CheckVersion();
@@ -148,12 +155,14 @@ public:
     bool GetCheckPoint(DevInode devInode, const std::string& configName, CheckPointPtr& checkPointPtr);
     bool GetDirCheckPoint(const std::string& filename, DirCheckPointPtr& checkPointPtr);
     void RemoveAllCheckPoint();
-    void PruneInvalidBackupCheckPoints();
+    // Dump-round bracket for periodic dump: keys added between Begin and End (live
+    // reader snapshots) are erased by EndDumpRound; other entries stay pending.
+    void BeginDumpRound();
+    void EndDumpRound();
     void CheckTimeoutCheckPoint();
     bool NeedDump(int32_t curTime);
     void ResetLastDumpTime();
     DevInodeCheckPointHashMap& GetAllFileCheckPoint();
-    size_t GetBackupFileCheckPointCount() const;
 
     static CheckPointManager* Instance() {
         static CheckPointManager checkPointManager;
@@ -168,8 +177,6 @@ public:
     friend class ConfigUpdatorUnittest;
     void RemoveLocalCheckPoint();
     void PrintStatus();
-    void ResetAllCheckPoint();
-    void OverwriteBackupFromPrimaryForTest();
 #endif
 };
 
