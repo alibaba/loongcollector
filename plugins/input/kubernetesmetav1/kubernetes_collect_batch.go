@@ -18,7 +18,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	batch "k8s.io/client-go/listers/batch/v1"
-	batchbeta "k8s.io/client-go/listers/batch/v1beta1"
 
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
@@ -63,7 +62,7 @@ func (in *InputKubernetesMeta) collectJobs(lister interface{}, selector labels.S
 
 // collectCronJobs collect the core metadata from the kubernetes cron jobs.
 func (in *InputKubernetesMeta) collectCronJobs(lister interface{}, selector labels.Selector) (nodes []*helper.MetaNode, err error) {
-	cronJobs, err := lister.(batchbeta.CronJobLister).List(selector)
+	cronJobs, err := lister.(batch.CronJobLister).List(selector)
 	if err != nil {
 		logger.Warning(in.context.GetRuntimeContext(), selfmonitor.KubernetesMetaAlarm, "err", err)
 		return

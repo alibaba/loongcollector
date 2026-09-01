@@ -23,8 +23,6 @@ import (
 	"os/exec"
 	"strings"
 
-	composeModule "github.com/testcontainers/testcontainers-go/modules/compose"
-
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/test/config"
@@ -53,6 +51,10 @@ func ComposeProjectName(caseHome string) string {
 
 // ComposeDown stops and removes containers for the given case compose file.
 func ComposeDown(caseHome string) error {
+	return composeDown(caseHome, ComposeProjectName(caseHome))
+}
+
+func composeDown(caseHome, projectName string) error {
 	ensureComposeBuildEnv()
 	if caseHome == "" {
 		return nil
@@ -64,11 +66,18 @@ func ComposeDown(caseHome string) error {
 		}
 		return err
 	}
-	projectName := ComposeProjectName(caseHome)
-	execError := composeModule.NewLocalDockerCompose([]string{composeFile}, projectName).Down()
-	if execError.Error != nil {
-		logger.Error(context.Background(), selfmonitor.DownDockerComposeError, "stdout", execError.Error.Error())
-		return execError.Error
+	ctx, cancel := context.WithTimeout(context.Background(), dockerCommandTimeout)
+	defer cancel()
+	if _, err := runComposeCommand(
+		ctx,
+		composeFile,
+		projectName,
+		"down",
+		"--volumes",
+		"--remove-orphans",
+	); err != nil {
+		logger.Error(context.Background(), selfmonitor.DownDockerComposeError, "stdout", err.Error())
+		return err
 	}
 	_ = os.Remove(composeFile)
 	return nil

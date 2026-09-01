@@ -26,7 +26,7 @@ import (
 	"time"
 
 	"github.com/golang/snappy"
-	"github.com/grafana/loki-client-go/pkg/logproto"
+	logproto "github.com/grafana/loki/pkg/push"
 	"github.com/prometheus/common/model"
 	"github.com/stretchr/testify/require"
 

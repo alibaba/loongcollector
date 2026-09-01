@@ -1,15 +1,15 @@
-FROM sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/common/golang:1.23.12
+FROM sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.19
+
+USER root
 
 RUN mkdir -p /tmp/loongcollector
 
 WORKDIR /root
 COPY . ./loongcollector
 
-RUN apt-get update
-RUN apt-get -y install python3-setuptools
-RUN apt-get -y install python3-pip
+RUN python3 -m ensurepip
 
 WORKDIR /root/loongcollector/test
-RUN pip3 install -r requirements.txt --break-system-packages
+RUN python3 -m pip install -r requirements.txt
 
 CMD ["sh", "-c", "while true; do sleep 3600; done"]

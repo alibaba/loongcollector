@@ -19,7 +19,7 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/labels"
-	networking "k8s.io/client-go/listers/networking/v1beta1"
+	networking "k8s.io/client-go/listers/networking/v1"
 
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
@@ -41,8 +41,13 @@ func (in *InputKubernetesMeta) collectIngresses(lister interface{}, selector lab
 		if !in.DisableReportParents && len(i.Spec.Rules) > 0 {
 			refs := make(map[string]struct{}, 16)
 			for _, rule := range i.Spec.Rules {
+				if rule.HTTP == nil {
+					continue
+				}
 				for _, path := range rule.HTTP.Paths {
-					refs[path.Backend.ServiceName] = struct{}{}
+					if path.Backend.Service != nil {
+						refs[path.Backend.Service.Name] = struct{}{}
+					}
 				}
 			}
 			in.addIngressMapping(i.Namespace, id, i.Name, refs)
@@ -62,7 +67,14 @@ func (in *InputKubernetesMeta) collectIngresses(lister interface{}, selector lab
 					if rule.HTTP != nil {
 						paths := make([]string, 0, len(rule.HTTP.Paths))
 						for _, path := range rule.HTTP.Paths {
-							paths = append(paths, path.Backend.ServiceName+":"+strconv.Itoa(int(path.Backend.ServicePort.IntVal))+":"+path.Path)
+							if path.Backend.Service == nil {
+								continue
+							}
+							port := path.Backend.Service.Port.Name
+							if port == "" {
+								port = strconv.Itoa(int(path.Backend.Service.Port.Number))
+							}
+							paths = append(paths, path.Backend.Service.Name+":"+port+":"+path.Path)
 						}
 						rules = append(rules, map[string]interface{}{
 							"host":  rule.Host,

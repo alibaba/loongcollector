@@ -190,16 +190,9 @@ func NewRuntimeServiceClient(contextTimeout time.Duration, grpcMaxCallRecvMsgSiz
 		return client, nil
 	}
 
-	// Fallback to v1alpha2
-	client.service = newCRIRuntimeServiceV1Alpha2Adapter(conn)
-	if client.getVersion(ctx) == nil {
-		logger.Info(ctx, "Init cri client v1alpha2 success, cri info", client.info)
-		return client, nil
-	}
-
 	// if create client failed, close the connection
 	_ = conn.Close()
-	return nil, fmt.Errorf("failed to initialize RuntimeServiceClient")
+	return nil, fmt.Errorf("failed to initialize CRI v1 RuntimeServiceClient")
 }
 
 func (c *RuntimeServiceClient) Version(ctx context.Context) (*CriVersionResponse, error) {

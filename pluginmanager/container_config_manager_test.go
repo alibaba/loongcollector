@@ -22,7 +22,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docker/docker/api/types/container"
+	"github.com/moby/moby/api/types/container"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/alibaba/ilogtail/pkg/flags"
@@ -111,14 +111,12 @@ func (s *containerConfigTestSuite) AfterTest(suiteName, testName string) {
 
 func mockDockerInfoDetail(containerName string, envList []string) *containercenter.DockerInfoDetail {
 	dockerInfo := container.InspectResponse{
-		ContainerJSONBase: &container.ContainerJSONBase{
-			Name:    containerName,
-			ID:      "test",
-			LogPath: "/var/lib/docker/containers/test/test-json.log",
-			HostConfig: &container.HostConfig{
-				LogConfig: container.LogConfig{
-					Type: "json-file",
-				},
+		Name:    containerName,
+		ID:      "test",
+		LogPath: "/var/lib/docker/containers/test/test-json.log",
+		HostConfig: &container.HostConfig{
+			LogConfig: container.LogConfig{
+				Type: "json-file",
 			},
 		},
 	}

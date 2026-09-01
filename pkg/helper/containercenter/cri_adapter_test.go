@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docker/docker/api/types/container"
+	"github.com/moby/moby/api/types/container"
 
 	"github.com/stretchr/testify/require"
 )
@@ -37,9 +37,7 @@ func TestLookupContainerRootfsAbsDir(t *testing.T) {
 	}
 
 	container := container.InspectResponse{
-		ContainerJSONBase: &container.ContainerJSONBase{
-			ID: "1234567890abcde",
-		},
+		ID: "1234567890abcde",
 	}
 	dir := crirt.lookupContainerRootfsAbsDir(container)
 	require.Equal(t, dir, "")

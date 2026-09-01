@@ -62,7 +62,7 @@ func convertDockerInfos(info *containercenter.DockerInfoDetail, cmds *[]Containe
 		cmd.MetaDatas[key] = val
 	}
 	cmd.Name = info.ContainerInfo.Name
-	cmd.Status = info.ContainerInfo.State.Status
+	cmd.Status = string(info.ContainerInfo.State.Status)
 	cmd.MetadataHash = info.MetadataHash()
 	// K8s info
 	if info.K8SInfo != nil {

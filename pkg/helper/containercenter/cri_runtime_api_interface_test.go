@@ -30,8 +30,6 @@ func (s *testRuntimeServiceServer) Version(ctx context.Context) (*CriVersionResp
 	defer s.mu.Unlock()
 	if s.versionResp.RuntimeAPIVersion == "v1" {
 		return s.versionResp, nil
-	} else if s.versionResp.RuntimeAPIVersion == "v1alpha2" {
-		return s.versionResp, nil
 	}
 	return nil, fmt.Errorf("failed to initialize RuntimeServiceClient")
 }
@@ -150,13 +148,6 @@ func TestNewRuntimeServiceClient(t *testing.T) {
 		RuntimeAPIVersion: "v1",
 	}
 
-	v1alpha2Resp := &CriVersionResponse{
-		Version:           "0.1.0",
-		RuntimeName:       "containerd",
-		RuntimeVersion:    "v1.6.0",
-		RuntimeAPIVersion: "v1alpha2",
-	}
-
 	invalidResp := &CriVersionResponse{
 		Version:           "0.1.0",
 		RuntimeName:       "containerd",
@@ -181,16 +172,7 @@ func TestNewRuntimeServiceClient(t *testing.T) {
 			},
 		},
 		{
-			name:            "V1Alpha2_Success",
-			serviceName:     "runtime.v1alpha2.RuntimeService",
-			expectError:     false,
-			expectedVersion: "v1alpha2",
-			setupServer: func(s *testRuntimeServiceServer) {
-				s.versionResp = v1alpha2Resp
-			},
-		},
-		{
-			name:            "Both_Failed",
+			name:            "V1_Failed",
 			serviceName:     "invalid.service.name",
 			expectError:     true,
 			expectedVersion: "invalid",

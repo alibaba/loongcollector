@@ -20,7 +20,7 @@ import (
 	"strconv"
 	"strings"
 
-	_ "github.com/jackc/pgx/v4/stdlib" //
+	_ "github.com/jackc/pgx/v5/stdlib" //
 
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/util"
