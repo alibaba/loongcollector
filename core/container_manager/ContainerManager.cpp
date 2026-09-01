@@ -66,6 +66,12 @@ void ContainerManager::Stop() {
     }
 }
 
+std::shared_ptr<RawContainerInfo> ContainerManager::GetContainerInfoById(const std::string& containerID) const {
+    ReadLock lock(mContainerMapRWLock);
+    auto it = mContainerMap.find(containerID);
+    return it == mContainerMap.end() ? nullptr : it->second;
+}
+
 void ContainerManager::pollingLoop() {
     time_t lastUpdateAllTime = 0;
     time_t lastUpdateDiffTime = 0;

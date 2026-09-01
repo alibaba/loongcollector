@@ -28,11 +28,23 @@
 #include "ebpf/plugin/agentsight/AgentsightMessageUtil.h"
 #include "monitor/metric_models/ReentrantMetricsRecord.h"
 
+namespace logtail {
+class PipelineEventGroup;
+struct RawContainerInfo;
+} // namespace logtail
+
 namespace logtail::ebpf {
 
 // Defined in AgentsightEvents.h; only used through pointers here.
 class AgentsightLlmRecord;
 class AgentsightHttpsRecord;
+
+/// Sets the standard container metadata tags on @group from @info — the same keys
+/// input_file / input_container_stdio emit (`_container_name_`, `_image_name_`, `_container_ip_`,
+/// `_pod_name_`, `_namespace_`, `_pod_uid_` via GetDefaultTagKeyString, plus custom metadatas
+/// verbatim). Pure function with no singleton access, so it is unit-testable on its own; the
+/// ContainerManager lookup wrapper lives in AgentsightManager.cpp.
+void AttachAgentsightContainerTagsFromInfo(PipelineEventGroup& group, const RawContainerInfo& info);
 
 class AgentsightManager : public AbstractManager {
 public:
