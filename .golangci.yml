@@ -29,8 +29,10 @@ linters:
     - copyloopvar
     - gocritic
     - gosec
+    - govet
     - misspell
     - revive
+    - staticcheck
     - unconvert
     - unparam
   disable:

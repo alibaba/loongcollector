@@ -124,10 +124,10 @@ jobs:
           submodules: false
 
       - name: UnitTest
-        run: sudo make unittest_plugin
+        run: sudo env "PATH=$PATH" GOTOOLCHAIN=go1.25.9+auto make unittest_plugin
 
       - name: UnitTest PluginManager
-        run: sudo make unittest_pluginmanager
+        run: sudo env "PATH=$PATH" GOTOOLCHAIN=go1.25.9+auto make unittest_pluginmanager
 
   actions-timeline:
     needs: 
