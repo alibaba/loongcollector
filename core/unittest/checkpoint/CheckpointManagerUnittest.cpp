@@ -20,6 +20,7 @@
 #include "common/DevInode.h"
 #include "common/FileSystemUtil.h"
 #include "common/Flags.h"
+#include "common/HashUtil.h"
 #include "file_server/FileServer.h"
 #include "file_server/checkpoint/CheckPointManager.h"
 #include "unittest/Unittest.h"
@@ -81,6 +82,7 @@ public:
     void TestLoadParseFailureKeepsTable();
     void TestGcEvictsWhenConfigNotMatched();
     void TestGcEvictsWhenFileGone();
+    void TestGcFindsRotatedFileAndUpdatesRealPath();
     void TestGcEvictsWhenResidencyTimeout();
     void TestGcKeepsFreshEntryDespiteOldEventTime();
     void TestGcRespectsCheckInterval();
@@ -128,6 +130,7 @@ UNIT_TEST_CASE(CheckpointManagerUnittest, TestDumpPersistsPendingAndActiveThenLo
 UNIT_TEST_CASE(CheckpointManagerUnittest, TestLoadParseFailureKeepsTable);
 UNIT_TEST_CASE(CheckpointManagerUnittest, TestGcEvictsWhenConfigNotMatched);
 UNIT_TEST_CASE(CheckpointManagerUnittest, TestGcEvictsWhenFileGone);
+UNIT_TEST_CASE(CheckpointManagerUnittest, TestGcFindsRotatedFileAndUpdatesRealPath);
 UNIT_TEST_CASE(CheckpointManagerUnittest, TestGcEvictsWhenResidencyTimeout);
 UNIT_TEST_CASE(CheckpointManagerUnittest, TestGcKeepsFreshEntryDespiteOldEventTime);
 UNIT_TEST_CASE(CheckpointManagerUnittest, TestGcRespectsCheckInterval);
@@ -390,6 +393,29 @@ void CheckpointManagerUnittest::TestGcEvictsWhenFileGone() {
 
     CheckPointPtr cpt;
     EXPECT_FALSE(manager->GetCheckPoint(devInode, kMatchedConfig, cpt));
+}
+
+void CheckpointManagerUnittest::TestGcFindsRotatedFileAndUpdatesRealPath() {
+    const std::string fileName = "gc_rotated.log";
+    const std::string path = CreateFile(fileName);
+    const std::string rotatedPath = path + ".1";
+    const DevInode devInode = GetFileDevInode(path);
+    auto* manager = CheckPointManager::Instance();
+
+    auto checkPoint = MakeCheckPoint(path, devInode, 1, kMatchedConfig);
+    checkPoint->mSignatureSize = static_cast<uint32_t>(fileName.size());
+    checkPoint->mSignatureHash = static_cast<uint64_t>(HashSignatureString(fileName.data(), fileName.size()));
+    manager->AddCheckPoint(checkPoint.release());
+    bfs::rename(path, rotatedPath);
+
+    auto bakInterval = INT32_FLAG(check_point_check_interval);
+    INT32_FLAG(check_point_check_interval) = -1;
+    manager->CheckTimeoutCheckPoint();
+    INT32_FLAG(check_point_check_interval) = bakInterval;
+
+    CheckPointPtr cpt;
+    EXPECT_TRUE(manager->GetCheckPoint(devInode, kMatchedConfig, cpt));
+    EXPECT_EQ(cpt->mRealFileName, rotatedPath);
 }
 
 void CheckpointManagerUnittest::TestGcEvictsWhenResidencyTimeout() {

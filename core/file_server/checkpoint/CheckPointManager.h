@@ -139,7 +139,7 @@ private:
         : mLastCheckTime(time(NULL)), mLastDumpTime(time(NULL)), mLoadVersion(NO_CHECKPOINT_VERSION), mReaderCount(0) {}
 
     static bool isCheckPointStillMatched(const CheckPoint& checkPoint);
-    static bool checkPointFileExists(const CheckPoint& checkPoint);
+    static bool checkPointFileExists(CheckPoint& checkPoint);
 
 public:
     bool CheckVersion();

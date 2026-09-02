@@ -87,6 +87,23 @@ DEFINE_FLAG_INT32(default_max_inotify_watch_num, "the max allowed inotify watch 
 
 namespace logtail {
 
+namespace {
+
+class CheckPointDumpRoundGuard {
+public:
+    explicit CheckPointDumpRoundGuard(CheckPointManager& manager) : mManager(manager) { mManager.BeginDumpRound(); }
+
+    ~CheckPointDumpRoundGuard() { mManager.EndDumpRound(); }
+
+    CheckPointDumpRoundGuard(const CheckPointDumpRoundGuard&) = delete;
+    CheckPointDumpRoundGuard& operator=(const CheckPointDumpRoundGuard&) = delete;
+
+private:
+    CheckPointManager& mManager;
+};
+
+} // namespace
+
 EventDispatcher::EventDispatcher() : mWatchNum(0), mInotifyWatchNum(0), mEventListener(EventListener::GetInstance()) {
     /*
      * May add multiple inotify fd instances in the future,
@@ -1029,21 +1046,22 @@ void EventDispatcher::DumpCheckPointPeriod(int32_t curTime) {
 void EventDispatcher::DumpCheckPoint() {
     LOG_INFO(sLogger, ("checkpoint dump", "starts"));
     FileServer::GetInstance()->Pause(false);
+    auto* checkPointManager = CheckPointManager::Instance();
     // Only pending handoff entries are in the table at this point; evict dead ones
     // before they get persisted below.
-    CheckPointManager::Instance()->CheckTimeoutCheckPoint();
-    CheckPointManager::Instance()->BeginDumpRound();
-    DumpAllHandlersMeta(false);
+    checkPointManager->CheckTimeoutCheckPoint();
+    {
+        CheckPointDumpRoundGuard dumpRoundGuard(*checkPointManager);
+        DumpAllHandlersMeta(false);
 
-    if (!(CheckPointManager::Instance()->DumpCheckPointToLocal()))
-        LOG_WARNING(sLogger, ("dump checkpoint to local", "failed"));
-    else
-        LOG_DEBUG(sLogger, ("dump checkpoint to local", "succeeded"));
-    // Erase only this round's live reader snapshots instead of clearing the whole
-    // table: a dump landing mid reader-rebuild must not drop pending entries that the
-    // in-flight InitReader will still consume.
-    CheckPointManager::Instance()->EndDumpRound();
-    const size_t pendingCount = CheckPointManager::Instance()->GetAllFileCheckPoint().size();
+        if (!(checkPointManager->DumpCheckPointToLocal()))
+            LOG_WARNING(sLogger, ("dump checkpoint to local", "failed"));
+        else
+            LOG_DEBUG(sLogger, ("dump checkpoint to local", "succeeded"));
+        // The guard erases only this round's live reader snapshots: a dump landing
+        // mid reader-rebuild must not drop pending entries that InitReader will consume.
+    }
+    const size_t pendingCount = checkPointManager->GetAllFileCheckPoint().size();
     FileServer::GetInstance()->Resume(false, false);
     LOG_INFO(sLogger, ("checkpoint dump", "succeeded")("pending file checkpoint", pendingCount));
 }

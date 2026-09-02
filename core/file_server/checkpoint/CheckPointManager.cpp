@@ -88,10 +88,31 @@ bool CheckPointManager::isCheckPointStillMatched(const CheckPoint& checkPoint) {
     return false;
 }
 
-bool CheckPointManager::checkPointFileExists(const CheckPoint& checkPoint) {
-    return pathMatchesDevInode(checkPoint.mFileName, checkPoint.mDevInode)
+bool CheckPointManager::checkPointFileExists(CheckPoint& checkPoint) {
+    if (pathMatchesDevInode(checkPoint.mFileName, checkPoint.mDevInode)
         || pathMatchesDevInode(checkPoint.mRealFileName, checkPoint.mDevInode)
-        || pathMatchesDevInode(checkPoint.mResolvedFileName, checkPoint.mDevInode);
+        || pathMatchesDevInode(checkPoint.mResolvedFileName, checkPoint.mDevInode)) {
+        return true;
+    }
+
+    // A pending checkpoint can outlive its reader. If the file is renamed during
+    // that window, all remembered paths become stale even though the inode still
+    // exists. Search the original directory and update the path that InitReader
+    // will use; otherwise it would consume the checkpoint before failing to reopen
+    // the rotated file.
+    const size_t separator = checkPoint.mFileName.find_last_of(PATH_SEPARATOR);
+    if (separator == std::string::npos || separator == 0) {
+        return false;
+    }
+    auto found = SearchFilePathByDevInodeInDirectory(
+        checkPoint.mFileName.substr(0, separator), 0, checkPoint.mDevInode, nullptr);
+    if (!found
+        || (checkPoint.mSignatureSize > 0
+            && !CheckFileSignature(found.value(), checkPoint.mSignatureHash, checkPoint.mSignatureSize))) {
+        return false;
+    }
+    checkPoint.mRealFileName = found.value();
+    return true;
 }
 
 void CheckPointManager::AddCheckPoint(CheckPoint* checkPointPtr) {
@@ -525,24 +546,20 @@ void CheckPointManager::CheckTimeoutCheckPoint() {
     }
     mLastCheckTime = now;
     std::vector<CheckPointKey> deleteKeyVec;
+    size_t configNotMatchedCount = 0;
+    size_t fileGoneCount = 0;
+    size_t residencyTimeoutCount = 0;
     for (auto it = mDevInodeCheckPointPtrMap.begin(); it != mDevInodeCheckPointPtrMap.end(); ++it) {
-        const CheckPoint& checkPoint = *it->second;
-        const char* reason = nullptr;
+        CheckPoint& checkPoint = *it->second;
         if (!isCheckPointStillMatched(checkPoint)) {
-            reason = "config is deleted or no longer matches the file";
+            ++configNotMatchedCount;
         } else if (!checkPointFileExists(checkPoint)) {
-            reason = "file no longer exists";
+            ++fileGoneCount;
         } else if (now - checkPoint.mMemInsertTime > INT32_FLAG(mem_check_point_time_out)) {
-            reason = "pending too long without being consumed";
-        }
-        if (reason == nullptr) {
+            ++residencyTimeoutCount;
+        } else {
             continue;
         }
-        LOG_INFO(sLogger,
-                 ("delete pending checkpoint", reason)("config", checkPoint.mConfigName)("log reader queue name",
-                                                                                         checkPoint.mFileName)(
-                     "real file path", checkPoint.mRealFileName)("file device", checkPoint.mDevInode.dev)(
-                     "file inode", checkPoint.mDevInode.inode)("residency seconds", now - checkPoint.mMemInsertTime));
         deleteKeyVec.push_back(it->first);
     }
     for (size_t i = 0; i < deleteKeyVec.size(); ++i) {
@@ -550,8 +567,9 @@ void CheckPointManager::CheckTimeoutCheckPoint() {
     }
     if (!deleteKeyVec.empty()) {
         LOG_INFO(sLogger,
-                 ("pending checkpoint gc", "done")("deleted", deleteKeyVec.size())("left",
-                                                                                   mDevInodeCheckPointPtrMap.size()));
+                 ("pending checkpoint gc", "done")("config not matched", configNotMatchedCount)(
+                     "file gone", fileGoneCount)("residency timeout", residencyTimeoutCount)(
+                     "deleted", deleteKeyVec.size())("left", mDevInodeCheckPointPtrMap.size()));
     }
 }
 
