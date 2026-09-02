@@ -142,6 +142,7 @@ bool InputFile::Init(const Json::Value& config, Json::Value& optionalGoPipeline)
                               mContext->GetLogstoreName(),
                               mContext->GetRegion());
     }
+    mFileDiscovery.SetMaxCheckpointDirSearchDepth(mMaxCheckpointDirSearchDepth);
 
     // ExactlyOnceConcurrency (param is unintentionally named as EnableExactlyOnce, which should be deprecated in the
     // future)
