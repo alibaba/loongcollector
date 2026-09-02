@@ -21,17 +21,19 @@ import (
 type testRuntimeServiceServer struct {
 	mu sync.Mutex
 
-	// 控制返回值
-	versionResp *CriVersionResponse
+	versionResp  *CriVersionResponse
+	versionErr   error
+	versionCalls int
 }
 
 func (s *testRuntimeServiceServer) Version(ctx context.Context) (*CriVersionResponse, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.versionResp.RuntimeAPIVersion == "v1" {
-		return s.versionResp, nil
+	s.versionCalls++
+	if s.versionErr != nil {
+		return nil, s.versionErr
 	}
-	return nil, fmt.Errorf("failed to initialize RuntimeServiceClient")
+	return s.versionResp, nil
 }
 
 func (s *testRuntimeServiceServer) ListContainers(ctx context.Context) (*CriListContainersResponse, error) {
@@ -157,14 +159,12 @@ func TestNewRuntimeServiceClient(t *testing.T) {
 
 	tests := []struct {
 		name            string
-		serviceName     string
 		expectError     bool
 		expectedVersion string
 		setupServer     func(*testRuntimeServiceServer) // 自定义服务端配置
 	}{
 		{
 			name:            "V1_Success",
-			serviceName:     "runtime.v1.RuntimeService",
 			expectError:     false,
 			expectedVersion: "v1",
 			setupServer: func(s *testRuntimeServiceServer) {
@@ -172,20 +172,26 @@ func TestNewRuntimeServiceClient(t *testing.T) {
 			},
 		},
 		{
-			name:            "V1_Failed",
-			serviceName:     "invalid.service.name",
-			expectError:     true,
-			expectedVersion: "invalid",
+			name:        "V1_Failed_Does_Not_Fallback",
+			expectError: true,
 			setupServer: func(s *testRuntimeServiceServer) {
 				s.versionResp = invalidResp
+				s.versionErr = fmt.Errorf("v1 version failed")
 			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			originalGetAddressAndDialer := getAddressAndDialer
+			originalGRPCDialContext := grpcDialContext
+			t.Cleanup(func() {
+				getAddressAndDialer = originalGetAddressAndDialer
+				grpcDialContext = originalGRPCDialContext
+			})
+
 			// 创建测试服务端
-			testServer, listener := createTestServer(t, tt.serviceName)
+			testServer, listener := createTestServer(t, "runtime.v1.RuntimeService")
 
 			// 应用自定义配置
 			if tt.setupServer != nil {
@@ -216,6 +222,9 @@ func TestNewRuntimeServiceClient(t *testing.T) {
 				assert.NotNil(t, client)
 				assert.Equal(t, tt.expectedVersion, client.info.RuntimeAPIVersion)
 			}
+			testServer.mu.Lock()
+			assert.Equal(t, 1, testServer.versionCalls, "v1 failure must not trigger a fallback Version call")
+			testServer.mu.Unlock()
 
 			// 清理
 			if client != nil {

@@ -1532,25 +1532,7 @@ func (dc *ContainerCenter) eventListener() {
 				}
 				logger.Debug(context.Background(), "docker event captured", event)
 				errorCount = 0
-				switch event.Action {
-				case "start", "restart":
-					_ = dc.fetchOne(event.Actor.ID, false)
-				case "rename":
-					_ = dc.fetchOne(event.Actor.ID, false)
-				case "die":
-					dc.markRemove(event.Actor.ID)
-				default:
-				}
-				dc.eventChanLock.Lock()
-				if dc.eventChan != nil {
-					// no block insert
-					select {
-					case dc.eventChan <- event:
-					default:
-						logger.Error(context.Background(), selfmonitor.DockerEventAlarm, "event queue is full, miss event", event)
-					}
-				}
-				dc.eventChanLock.Unlock()
+				dc.handleDockerEvent(event)
 			case err = <-errors:
 				logger.Warning(context.Background(), selfmonitor.DockerEventAlarm, "docker event listener error", err)
 				breakFlag = true
@@ -1572,4 +1554,24 @@ func (dc *ContainerCenter) eventListener() {
 		}
 	}
 	dc.setLastError(err, "docker event stream closed")
+}
+
+func (dc *ContainerCenter) handleDockerEvent(event events.Message) {
+	switch event.Action {
+	case "start", "restart", "rename":
+		_ = dc.fetchOne(event.Actor.ID, false)
+	case "die":
+		dc.markRemove(event.Actor.ID)
+	default:
+	}
+	dc.eventChanLock.Lock()
+	defer dc.eventChanLock.Unlock()
+	if dc.eventChan == nil {
+		return
+	}
+	select {
+	case dc.eventChan <- event:
+	default:
+		logger.Error(context.Background(), selfmonitor.DockerEventAlarm, "event queue is full, miss event", event)
+	}
 }

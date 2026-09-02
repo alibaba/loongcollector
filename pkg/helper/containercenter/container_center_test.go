@@ -23,7 +23,6 @@ import (
 	"os"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/events"
@@ -70,6 +69,12 @@ func newTestContainerCenter() *ContainerCenter {
 }
 
 func TestPreferredNetworkIPAddress(t *testing.T) {
+	require.Empty(t, preferredNetworkIPAddress(nil))
+	require.Empty(t, preferredNetworkIPAddress(map[string]*network.EndpointSettings{
+		"nil-endpoint": nil,
+		"invalid-ip":   {},
+	}))
+
 	networks := map[string]*network.EndpointSettings{
 		"lower-priority": {
 			GwPriority: 0,
@@ -479,57 +484,55 @@ func (m *ContainerHelperMock) ContainerProcessAlive(pid int) bool {
 }
 
 func TestContainerCenterEvents(t *testing.T) {
-	containerCenterInstance = &ContainerCenter{}
-	containerCenterInstance.imageCache = make(map[string]string)
-	containerCenterInstance.containerMap = make(map[string]*DockerInfoDetail)
-
+	center := newTestContainerCenter()
 	mockClient := DockerClientMock{}
-	containerCenterInstance.client = &mockClient
-
+	center.client = &mockClient
 	containerHelper := ContainerHelperMock{}
-	containerCenterInstance.containerHelper = &containerHelper
+	center.containerHelper = &containerHelper
 
-	// 创建一个模拟的事件通道
-	eventChan := make(chan events.Message, 1)
-	errChan := make(chan error, 1)
+	center.eventChan = make(chan events.Message, 3)
 
-	mockClient.On("Events", mock.Anything).Return(eventChan, errChan)
-
-	go containerCenterInstance.eventListener()
-
-	containerHelper.On("ContainerProcessAlive", mock.Anything).Return(false).Once()
+	containerHelper.On("ContainerProcessAlive", mock.Anything).Return(true).Twice()
 	mockClient.On("ContainerInspect", mock.Anything, "event1").Return(container.InspectResponse{
 		ID:    "event1",
 		Name:  "name1",
-		State: &container.State{},
+		State: &container.State{Status: ContainerStatusRunning},
 		Config: &container.Config{
 			Env: make([]string, 0),
 		},
 	}, nil).Once()
-
-	eventChan <- events.Message{Actor: events.Actor{ID: "event1"}, Action: "rename"}
-
-	time.Sleep(5 * time.Second)
-	containerLen := len(containerCenterInstance.containerMap)
-	assert.Equal(t, 1, containerLen)
-
-	containerHelper.On("ContainerProcessAlive", mock.Anything).Return(true).Once()
 	mockClient.On("ContainerInspect", mock.Anything, "event1").Return(container.InspectResponse{
 		ID:    "event1",
 		Name:  "start",
-		State: &container.State{},
+		State: &container.State{Status: ContainerStatusRunning},
 		Config: &container.Config{
 			Env: make([]string, 0),
 		},
 	}, nil).Once()
-	eventChan <- events.Message{Actor: events.Actor{ID: "event1"}, Action: "start"}
 
-	time.Sleep(5 * time.Second)
-	// 设置期望
-	close(eventChan)
+	eventMessages := []events.Message{
+		{Actor: events.Actor{ID: "event1"}, Action: events.ActionRename},
+		{Actor: events.Actor{ID: "event1"}, Action: events.ActionStart},
+		{Actor: events.Actor{ID: "event1"}, Action: events.ActionDie},
+	}
+	for _, event := range eventMessages {
+		center.handleDockerEvent(event)
+	}
+	for _, expected := range eventMessages {
+		actual := <-center.eventChan
+		assert.Equal(t, expected.Action, actual.Action)
+	}
 
-	containerLen = len(containerCenterInstance.containerMap)
-	assert.Equal(t, 1, containerLen)
+	center.lock.RLock()
+	detail := center.containerMap["event1"]
+	containerLen := len(center.containerMap)
+	center.lock.RUnlock()
+	require.Equal(t, 1, containerLen)
+	require.NotNil(t, detail)
+	assert.Equal(t, "start", detail.ContainerInfo.Name)
+	assert.True(t, detail.deleteFlag)
+	mockClient.AssertExpectations(t)
+	containerHelper.AssertExpectations(t)
 }
 
 func TestContainerCenterFetchAll(t *testing.T) {

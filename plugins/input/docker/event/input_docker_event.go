@@ -59,7 +59,11 @@ func (p *ServiceDockerEvents) Collect(pipeline.Collector) error {
 }
 
 func (p *ServiceDockerEvents) fire(c pipeline.Collector, event events.Message) {
-	key := make([]string, len(event.Actor.Attributes)+4)
+	fieldCount := 4
+	if !p.IgnoreAttributes {
+		fieldCount += len(event.Actor.Attributes)
+	}
+	key := make([]string, fieldCount)
 	value := make([]string, len(key))
 	value[0] = strconv.FormatInt(event.TimeNano, 10)
 	value[1] = string(event.Action)

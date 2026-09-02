@@ -24,3 +24,13 @@ services:
       - STDOUT_SWITCH=true
     depends_on:
       - loongcollectorC
+  decoy:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    hostname: decoy
+    environment:
+      - STDOUT_SWITCH=false
+    command: ["sh", "-c", "echo \"decoy-marker\" && echo \"decoy-marker\" >&2 && sleep 90"]
+    depends_on:
+      - loongcollectorC

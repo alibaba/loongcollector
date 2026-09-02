@@ -79,6 +79,37 @@ func TestParseComposePort(t *testing.T) {
 	}
 }
 
+func TestParseComposePortRejectsInvalidPorts(t *testing.T) {
+	tests := []struct {
+		name    string
+		rawPort interface{}
+	}{
+		{name: "unsupported syntax type", rawPort: true},
+		{name: "empty short syntax", rawPort: ""},
+		{name: "non-numeric target", rawPort: "host:not-a-port"},
+		{name: "zero target", rawPort: 0},
+		{name: "target above maximum", rawPort: 65536},
+		{name: "too many protocol separators", rawPort: "8080/tcp/extra"},
+		{name: "unsupported protocol", rawPort: "8080/sctp"},
+		{name: "long syntax missing target", rawPort: map[string]interface{}{"published": 18080}},
+		{name: "long syntax invalid target type", rawPort: map[string]interface{}{"target": true}},
+		{
+			name: "long syntax invalid protocol type",
+			rawPort: map[string]interface{}{
+				"target":   8080,
+				"protocol": true,
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if _, err := parseComposePort("server", test.rawPort); err == nil {
+				t.Fatalf("parseComposePort(%#v) error = nil, want error", test.rawPort)
+			}
+		})
+	}
+}
+
 func TestParseComposePortOutput(t *testing.T) {
 	tests := []struct {
 		name   string
@@ -88,6 +119,11 @@ func TestParseComposePortOutput(t *testing.T) {
 		{name: "all IPv4 interfaces", output: "0.0.0.0:18080", want: "127.0.0.1:18080"},
 		{name: "all IPv6 interfaces", output: "[::]:18080", want: "127.0.0.1:18080"},
 		{name: "specific host", output: "192.0.2.1:18080", want: "192.0.2.1:18080"},
+		{
+			name:   "multiple addresses use first non-empty",
+			output: "\n0.0.0.0:18080\n[::]:18080\n",
+			want:   "127.0.0.1:18080",
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -97,6 +133,25 @@ func TestParseComposePortOutput(t *testing.T) {
 			}
 			if got != test.want {
 				t.Fatalf("parseComposePortOutput() = %q, want %q", got, test.want)
+			}
+		})
+	}
+}
+
+func TestParseComposePortOutputRejectsMissingAddress(t *testing.T) {
+	tests := []struct {
+		name   string
+		output string
+	}{
+		{name: "empty", output: ""},
+		{name: "whitespace only", output: " \n\t"},
+		{name: "missing port", output: "127.0.0.1"},
+		{name: "invalid address", output: "not-an-address"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if _, err := parseComposePortOutput(test.output); err == nil {
+				t.Fatalf("parseComposePortOutput(%q) error = nil, want error", test.output)
 			}
 		})
 	}
@@ -116,6 +171,16 @@ func TestComposePortCommand(t *testing.T) {
 	}
 }
 
+func TestComposePortCommandRejectsInvalidPrivatePort(t *testing.T) {
+	_, err := composePortCommand(composePort{
+		service:     "server",
+		privatePort: "8080",
+	})
+	if err == nil {
+		t.Fatal("composePortCommand() error = nil, want error")
+	}
+}
+
 func TestRunComposeCommandUsesStandalone(t *testing.T) {
 	tempDir := t.TempDir()
 	executable := filepath.Join(tempDir, "docker-compose")
@@ -131,6 +196,44 @@ func TestRunComposeCommandUsesStandalone(t *testing.T) {
 	}
 	if output != "-f compose.yaml -p project config" {
 		t.Fatalf("runComposeCommand() = %q", output)
+	}
+}
+
+func TestRunComposeCommandReturnsEmptyOutput(t *testing.T) {
+	tempDir := t.TempDir()
+	executable := filepath.Join(tempDir, "docker-compose")
+	if err := os.WriteFile(executable, []byte("#!/bin/sh\nexit 0\n"), 0750); err != nil {
+		t.Fatalf("write fake docker-compose: %v", err)
+	}
+	t.Setenv("PATH", tempDir)
+
+	output, err := runComposeCommand(context.Background(), "compose.yaml", "project", "config")
+	if err != nil {
+		t.Fatalf("runComposeCommand() error = %v", err)
+	}
+	if output != "" {
+		t.Fatalf("runComposeCommand() = %q, want empty output", output)
+	}
+}
+
+func TestRunComposeCommandReturnsCommandFailure(t *testing.T) {
+	tempDir := t.TempDir()
+	executable := filepath.Join(tempDir, "docker-compose")
+	script := "#!/bin/sh\nprintf 'partial stdout'\nprintf 'failure detail' >&2\nexit 7\n"
+	if err := os.WriteFile(executable, []byte(script), 0750); err != nil {
+		t.Fatalf("write fake docker-compose: %v", err)
+	}
+	t.Setenv("PATH", tempDir)
+
+	output, err := runComposeCommand(context.Background(), "compose.yaml", "project", "config")
+	if err == nil {
+		t.Fatal("runComposeCommand() error = nil, want error")
+	}
+	if output != "partial stdout" {
+		t.Fatalf("runComposeCommand() output = %q, want partial stdout", output)
+	}
+	if !strings.Contains(err.Error(), "failure detail") {
+		t.Fatalf("runComposeCommand() error = %q, want stderr detail", err)
 	}
 }
 

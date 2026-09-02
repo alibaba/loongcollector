@@ -27,6 +27,8 @@ import (
 	"github.com/alibaba/ilogtail/test/engine/setup/subscriber"
 )
 
+const zeroLogObservationWindow = 3 * time.Second
+
 func LogCount(ctx context.Context, expect int) (context.Context, error) {
 	var from int32
 	value := ctx.Value(config.StartTimeContextKey)
@@ -261,7 +263,7 @@ func LogCountAtLeast(ctx context.Context, expect int) (context.Context, error) {
 	return ctx, nil
 }
 
-func LogCountAtLeastWithFilter(ctx context.Context, sql string, expect int, filterKey string, filterValue string) (context.Context, error) {
+func LogCountAtLeastWithFilter(ctx context.Context, expect int, filterKey string, filterValue string) (context.Context, error) {
 	var from int32
 	value := ctx.Value(config.StartTimeContextKey)
 	if value != nil {
@@ -274,41 +276,65 @@ func LogCountAtLeastWithFilter(ctx context.Context, sql string, expect int, filt
 	var groups []*protocol.LogGroup
 	var err error
 	var count int
+	startTime := time.Now()
+	retryDelay := 5 * time.Second
+	if expect == 0 {
+		retryDelay = 200 * time.Millisecond
+	}
+	retryOptions := []retry.Option{
+		retry.Context(timeoutCtx),
+		retry.Delay(retryDelay),
+		retry.DelayType(retry.FixedDelay),
+	}
+	if expect == 0 {
+		retryOptions = append(retryOptions, retry.Attempts(0))
+	}
 	err = retry.Do(
 		func() error {
-			count = 0
 			groups, err = subscriber.TestSubscriber.GetData(control.GetQuery(ctx), from)
 			if err != nil {
 				return err
 			}
-			count = 0
-			for _, group := range groups {
-				for _, log := range group.Logs {
-					for _, content := range log.Contents {
-						if content.Key == filterKey && content.Value == filterValue {
-							count++
-							break
-						}
-					}
+			count = countLogsWithFilter(groups, filterKey, filterValue)
+			if expect == 0 {
+				if count != 0 {
+					return fmt.Errorf("log count not match, expect 0, got %d", count)
 				}
+				if time.Since(startTime) < zeroLogObservationWindow {
+					return fmt.Errorf("observing zero matching logs")
+				}
+				return nil
 			}
 			if count < expect {
 				return fmt.Errorf("log count not match, expect at least %d, got %d", expect, count)
 			}
-			if expect == 0 {
-				return fmt.Errorf("log count is 0")
-			}
 			return nil
 		},
-		retry.Context(timeoutCtx),
-		retry.Delay(5*time.Second),
-		retry.DelayType(retry.FixedDelay),
+		retryOptions...,
 	)
-	if expect == 0 && count == expect {
-		return ctx, nil
-	}
 	if err != nil {
 		return ctx, err
 	}
 	return ctx, nil
+}
+
+func countLogsWithFilter(groups []*protocol.LogGroup, filterKey, filterValue string) int {
+	count := 0
+	for _, group := range groups {
+		if group == nil {
+			continue
+		}
+		for _, log := range group.Logs {
+			if log == nil {
+				continue
+			}
+			for _, content := range log.Contents {
+				if content.Key == filterKey && content.Value == filterValue {
+					count++
+					break
+				}
+			}
+		}
+	}
+	return count
 }
