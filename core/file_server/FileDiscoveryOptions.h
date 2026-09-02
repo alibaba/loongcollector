@@ -112,6 +112,8 @@ public:
     int64_t GetLastContainerUpdateTime() const { return mLastContainerUpdateTime; }
     void SetLastContainerUpdateTime(int64_t time) { mLastContainerUpdateTime = time; }
 
+    uint32_t GetMaxCheckpointDirSearchDepth() const { return mMaxCheckpointDirSearchDepth; }
+    void SetMaxCheckpointDirSearchDepth(uint32_t depth) { mMaxCheckpointDirSearchDepth = depth; }
 
     std::vector<std::string> mFilePaths;
     int32_t mMaxDirSearchDepth = 0;
@@ -167,6 +169,7 @@ private:
     bool mTailingAllMatchedFiles = false;
 
     int64_t mLastContainerUpdateTime = 0;
+    uint32_t mMaxCheckpointDirSearchDepth = 0;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class FileDiscoveryOptionsUnittest;

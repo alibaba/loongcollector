@@ -87,6 +87,23 @@ DEFINE_FLAG_INT32(default_max_inotify_watch_num, "the max allowed inotify watch 
 
 namespace logtail {
 
+namespace {
+
+class CheckPointDumpRoundGuard {
+public:
+    explicit CheckPointDumpRoundGuard(CheckPointManager& manager) : mManager(manager) { mManager.BeginDumpRound(); }
+
+    ~CheckPointDumpRoundGuard() { mManager.EndDumpRound(); }
+
+    CheckPointDumpRoundGuard(const CheckPointDumpRoundGuard&) = delete;
+    CheckPointDumpRoundGuard& operator=(const CheckPointDumpRoundGuard&) = delete;
+
+private:
+    CheckPointManager& mManager;
+};
+
+} // namespace
+
 EventDispatcher::EventDispatcher() : mWatchNum(0), mInotifyWatchNum(0), mEventListener(EventListener::GetInstance()) {
     /*
      * May add multiple inotify fd instances in the future,
@@ -640,10 +657,15 @@ void EventDispatcher::AddExistedCheckPointFileEvents() {
         auto const result = validateCheckpoint(iter->second, cachePathDevInodeMap, eventVec);
         if (!(result == ValidateCheckpointResult::kNormal || result == ValidateCheckpointResult::kRotate)) {
             deleteKeyVec.push_back(iter->first);
+        } else {
+            // A new event was just generated for this entry: restart its in-memory
+            // residency clock so CheckTimeoutCheckPoint will not evict a rescued
+            // handoff by its first enqueue time.
+            iter->second->mMemInsertTime = (int32_t)time(NULL);
         }
     }
     for (size_t i = 0; i < deleteKeyVec.size(); ++i) {
-        checkPointMap.erase(deleteKeyVec[i]);
+        CheckPointManager::Instance()->DeleteCheckPoint(deleteKeyVec[i].mDevInode, deleteKeyVec[i].mConfigName);
     }
     LOG_INFO(sLogger,
              ("checkpoint verification ends, generated event count", eventVec.size())("checkpoint deletion count",
@@ -1024,16 +1046,24 @@ void EventDispatcher::DumpCheckPointPeriod(int32_t curTime) {
 void EventDispatcher::DumpCheckPoint() {
     LOG_INFO(sLogger, ("checkpoint dump", "starts"));
     FileServer::GetInstance()->Pause(false);
-    DumpAllHandlersMeta(false);
+    auto* checkPointManager = CheckPointManager::Instance();
+    // Only pending handoff entries are in the table at this point; evict dead ones
+    // before they get persisted below.
+    checkPointManager->CheckTimeoutCheckPoint();
+    {
+        CheckPointDumpRoundGuard dumpRoundGuard(*checkPointManager);
+        DumpAllHandlersMeta(false);
 
-    if (!(CheckPointManager::Instance()->DumpCheckPointToLocal()))
-        LOG_WARNING(sLogger, ("dump checkpoint to local", "failed"));
-    else
-        LOG_DEBUG(sLogger, ("dump checkpoint to local", "succeeded"));
-    // after save checkpoint, we should clear all checkpoint
-    CheckPointManager::Instance()->RemoveAllCheckPoint();
+        if (!(checkPointManager->DumpCheckPointToLocal()))
+            LOG_WARNING(sLogger, ("dump checkpoint to local", "failed"));
+        else
+            LOG_DEBUG(sLogger, ("dump checkpoint to local", "succeeded"));
+        // The guard erases only this round's live reader snapshots: a dump landing
+        // mid reader-rebuild must not drop pending entries that InitReader will consume.
+    }
+    const size_t pendingCount = checkPointManager->GetAllFileCheckPoint().size();
     FileServer::GetInstance()->Resume(false, false);
-    LOG_INFO(sLogger, ("checkpoint dump", "succeeded"));
+    LOG_INFO(sLogger, ("checkpoint dump", "succeeded")("pending file checkpoint", pendingCount));
 }
 
 bool EventDispatcher::IsAllFileRead() {
