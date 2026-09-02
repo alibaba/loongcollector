@@ -49,6 +49,14 @@ namespace logtail {
 
 namespace {
 
+enum class CheckPointFileStatus {
+    kFound,
+    kNotFound,
+    kSignatureChanged,
+};
+
+using DirectoryInodeCache = std::map<std::string, std::map<DevInode, SplitedFilePath>>;
+
 bool pathMatchesDevInode(const std::string& path, const DevInode& expected) {
     if (path.empty()) {
         return false;
@@ -56,6 +64,42 @@ bool pathMatchesDevInode(const std::string& path, const DevInode& expected) {
     // PathStat::stat is silent; GetFileDevInode logs INFO on Linux when stat fails.
     fsutil::PathStat ps;
     return fsutil::PathStat::stat(path, ps) && expected == ps.GetDevInode();
+}
+
+CheckPointFileStatus resolveCheckPointFile(CheckPoint& checkPoint, DirectoryInodeCache& directoryInodeCache) {
+    if (pathMatchesDevInode(checkPoint.mFileName, checkPoint.mDevInode)
+        || pathMatchesDevInode(checkPoint.mRealFileName, checkPoint.mDevInode)
+        || pathMatchesDevInode(checkPoint.mResolvedFileName, checkPoint.mDevInode)) {
+        return CheckPointFileStatus::kFound;
+    }
+
+    // A pending checkpoint can outlive its reader. If the file is renamed during
+    // that window, all remembered paths become stale even though the inode still
+    // exists. Scan each original directory at most once in this GC round and
+    // update the path that InitReader will use.
+    const size_t separator = checkPoint.mFileName.find_last_of(PATH_SEPARATOR);
+    if (separator == std::string::npos || separator == 0) {
+        return CheckPointFileStatus::kNotFound;
+    }
+    const std::string parentDir = checkPoint.mFileName.substr(0, separator);
+    auto cacheIter = directoryInodeCache.find(parentDir);
+    if (cacheIter == directoryInodeCache.end()) {
+        std::map<DevInode, SplitedFilePath> inodeCache;
+        // An invalid target forces one bounded scan that populates the directory cache.
+        SearchFilePathByDevInodeInDirectory(parentDir, 0, DevInode(), &inodeCache);
+        cacheIter = directoryInodeCache.emplace(parentDir, std::move(inodeCache)).first;
+    }
+    const auto found = cacheIter->second.find(checkPoint.mDevInode);
+    if (found == cacheIter->second.end()) {
+        return CheckPointFileStatus::kNotFound;
+    }
+    const std::string realFilePath = PathJoin(found->second.mFileDir, found->second.mFileName);
+    if (checkPoint.mSignatureSize > 0
+        && !CheckFileSignature(realFilePath, checkPoint.mSignatureHash, checkPoint.mSignatureSize)) {
+        return CheckPointFileStatus::kSignatureChanged;
+    }
+    checkPoint.mRealFileName = realFilePath;
+    return CheckPointFileStatus::kFound;
 }
 
 } // namespace
@@ -86,33 +130,6 @@ bool CheckPointManager::isCheckPointStillMatched(const CheckPoint& checkPoint) {
         }
     }
     return false;
-}
-
-bool CheckPointManager::checkPointFileExists(CheckPoint& checkPoint) {
-    if (pathMatchesDevInode(checkPoint.mFileName, checkPoint.mDevInode)
-        || pathMatchesDevInode(checkPoint.mRealFileName, checkPoint.mDevInode)
-        || pathMatchesDevInode(checkPoint.mResolvedFileName, checkPoint.mDevInode)) {
-        return true;
-    }
-
-    // A pending checkpoint can outlive its reader. If the file is renamed during
-    // that window, all remembered paths become stale even though the inode still
-    // exists. Search the original directory and update the path that InitReader
-    // will use; otherwise it would consume the checkpoint before failing to reopen
-    // the rotated file.
-    const size_t separator = checkPoint.mFileName.find_last_of(PATH_SEPARATOR);
-    if (separator == std::string::npos || separator == 0) {
-        return false;
-    }
-    auto found = SearchFilePathByDevInodeInDirectory(
-        checkPoint.mFileName.substr(0, separator), 0, checkPoint.mDevInode, nullptr);
-    if (!found
-        || (checkPoint.mSignatureSize > 0
-            && !CheckFileSignature(found.value(), checkPoint.mSignatureHash, checkPoint.mSignatureSize))) {
-        return false;
-    }
-    checkPoint.mRealFileName = found.value();
-    return true;
 }
 
 void CheckPointManager::AddCheckPoint(CheckPoint* checkPointPtr) {
@@ -548,17 +565,24 @@ void CheckPointManager::CheckTimeoutCheckPoint() {
     std::vector<CheckPointKey> deleteKeyVec;
     size_t configNotMatchedCount = 0;
     size_t fileGoneCount = 0;
+    size_t signatureChangedCount = 0;
     size_t residencyTimeoutCount = 0;
+    DirectoryInodeCache directoryInodeCache;
     for (auto it = mDevInodeCheckPointPtrMap.begin(); it != mDevInodeCheckPointPtrMap.end(); ++it) {
         CheckPoint& checkPoint = *it->second;
         if (!isCheckPointStillMatched(checkPoint)) {
             ++configNotMatchedCount;
-        } else if (!checkPointFileExists(checkPoint)) {
-            ++fileGoneCount;
-        } else if (now - checkPoint.mMemInsertTime > INT32_FLAG(mem_check_point_time_out)) {
-            ++residencyTimeoutCount;
         } else {
-            continue;
+            const auto fileStatus = resolveCheckPointFile(checkPoint, directoryInodeCache);
+            if (fileStatus == CheckPointFileStatus::kNotFound) {
+                ++fileGoneCount;
+            } else if (fileStatus == CheckPointFileStatus::kSignatureChanged) {
+                ++signatureChangedCount;
+            } else if (now - checkPoint.mMemInsertTime > INT32_FLAG(mem_check_point_time_out)) {
+                ++residencyTimeoutCount;
+            } else {
+                continue;
+            }
         }
         deleteKeyVec.push_back(it->first);
     }
@@ -566,10 +590,11 @@ void CheckPointManager::CheckTimeoutCheckPoint() {
         mDevInodeCheckPointPtrMap.erase(deleteKeyVec[i]);
     }
     if (!deleteKeyVec.empty()) {
-        LOG_INFO(sLogger,
-                 ("pending checkpoint gc", "done")("config not matched", configNotMatchedCount)(
-                     "file gone", fileGoneCount)("residency timeout", residencyTimeoutCount)(
-                     "deleted", deleteKeyVec.size())("left", mDevInodeCheckPointPtrMap.size()));
+        LOG_INFO(
+            sLogger,
+            ("pending checkpoint gc", "done")("config not matched", configNotMatchedCount)("file gone", fileGoneCount)(
+                "signature changed", signatureChangedCount)("residency timeout", residencyTimeoutCount)(
+                "deleted", deleteKeyVec.size())("left", mDevInodeCheckPointPtrMap.size()));
     }
 }
 
