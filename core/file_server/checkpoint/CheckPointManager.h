@@ -138,7 +138,7 @@ private:
     CheckPointManager()
         : mLastCheckTime(time(NULL)), mLastDumpTime(time(NULL)), mLoadVersion(NO_CHECKPOINT_VERSION), mReaderCount(0) {}
 
-    static bool isCheckPointStillMatched(const CheckPoint& checkPoint);
+    static bool getCheckPointSearchDepth(const CheckPoint& checkPoint, uint16_t& searchDepth);
 
 public:
     bool CheckVersion();
@@ -185,11 +185,17 @@ public:
 //  checkpoint_find_max_file_count.
 //
 // @cache [out]: cache iterated files if not nullptr.
+// @searchTruncated [out]: set to true if the file-count limit stops the scan.
 //
 // @return the path of the file with devInode if find.
 boost::optional<std::string> SearchFilePathByDevInodeInDirectory(const std::string& dirPath,
                                                                  const uint16_t searchDepth,
                                                                  const DevInode& devInode,
                                                                  std::map<DevInode, SplitedFilePath>* cache);
+boost::optional<std::string> SearchFilePathByDevInodeInDirectory(const std::string& dirPath,
+                                                                 const uint16_t searchDepth,
+                                                                 const DevInode& devInode,
+                                                                 std::map<DevInode, SplitedFilePath>* cache,
+                                                                 bool* searchTruncated);
 
 } // namespace logtail

@@ -60,6 +60,7 @@ public:
 
     void SetUp() override {
         CheckPointManager::Instance()->RemoveAllCheckPoint();
+        sDiscoveryOpts.SetMaxCheckpointDirSearchDepth(0);
         AppConfig::GetInstance()->mCheckPointFilePath = (bfs::path(kTestRootDir) / "file_check_point").string();
         bfs::remove(AppConfig::GetInstance()->mCheckPointFilePath);
         bfs::remove(AppConfig::GetInstance()->mCheckPointFilePath + ".bak");
@@ -83,6 +84,8 @@ public:
     void TestGcEvictsWhenConfigNotMatched();
     void TestGcEvictsWhenFileGone();
     void TestGcFindsRotatedFileAndUpdatesRealPath();
+    void TestGcUsesResidencyTimeoutWhenSearchTruncated();
+    void TestGcFindsRotatedFileInSubdirectory();
     void TestGcEvictsRotatedFileWhenSignatureChanged();
     void TestGcEvictsWhenResidencyTimeout();
     void TestGcKeepsFreshEntryDespiteOldEventTime();
@@ -132,6 +135,8 @@ UNIT_TEST_CASE(CheckpointManagerUnittest, TestLoadParseFailureKeepsTable);
 UNIT_TEST_CASE(CheckpointManagerUnittest, TestGcEvictsWhenConfigNotMatched);
 UNIT_TEST_CASE(CheckpointManagerUnittest, TestGcEvictsWhenFileGone);
 UNIT_TEST_CASE(CheckpointManagerUnittest, TestGcFindsRotatedFileAndUpdatesRealPath);
+UNIT_TEST_CASE(CheckpointManagerUnittest, TestGcUsesResidencyTimeoutWhenSearchTruncated);
+UNIT_TEST_CASE(CheckpointManagerUnittest, TestGcFindsRotatedFileInSubdirectory);
 UNIT_TEST_CASE(CheckpointManagerUnittest, TestGcEvictsRotatedFileWhenSignatureChanged);
 UNIT_TEST_CASE(CheckpointManagerUnittest, TestGcEvictsWhenResidencyTimeout);
 UNIT_TEST_CASE(CheckpointManagerUnittest, TestGcKeepsFreshEntryDespiteOldEventTime);
@@ -169,8 +174,10 @@ void CheckpointManagerUnittest::TestSearchFilePathByDevInodeInDirectory() {
             std::ofstream(kFilePath + "." + std::to_string(idx)) << "";
         }
         std::map<DevInode, SplitedFilePath> cache;
-        auto const filePath = SearchFilePathByDevInodeInDirectory(kTestRootDir, 0, devInode, &cache);
+        bool searchTruncated = false;
+        auto const filePath = SearchFilePathByDevInodeInDirectory(kTestRootDir, 0, devInode, &cache, &searchTruncated);
         EXPECT_FALSE(filePath);
+        EXPECT_TRUE(searchTruncated);
         EXPECT_EQ(cache.size(), INT32_FLAG(checkpoint_find_max_file_count) + 1);
 
         INT32_FLAG(checkpoint_find_max_file_count) = bakLimit;
@@ -188,9 +195,13 @@ void CheckpointManagerUnittest::TestSearchFilePathByDevInodeInDirectory() {
         auto filePath = SearchFilePathByDevInodeInDirectory(kTestRootDir, 0, devInode, nullptr);
         EXPECT_FALSE(filePath);
 
-        filePath = SearchFilePathByDevInodeInDirectory(kTestRootDir, 2, devInode, nullptr);
+        std::map<DevInode, SplitedFilePath> cache;
+        filePath = SearchFilePathByDevInodeInDirectory(kTestRootDir, 2, devInode, &cache);
         EXPECT_TRUE(filePath);
         EXPECT_EQ(filePath.value(), kSubDirFilePath);
+        ASSERT_EQ(cache.count(devInode), 1U);
+        EXPECT_EQ(cache.at(devInode).mFileDir, kSubDir.string());
+        EXPECT_EQ(cache.at(devInode).mFileName, kRotateFileName);
     }
 }
 
@@ -443,6 +454,66 @@ void CheckpointManagerUnittest::TestGcEvictsRotatedFileWhenSignatureChanged() {
 
     CheckPointPtr cpt;
     EXPECT_FALSE(manager->GetCheckPoint(devInode, kMatchedConfig, cpt));
+}
+
+void CheckpointManagerUnittest::TestGcUsesResidencyTimeoutWhenSearchTruncated() {
+    const std::string fileName = "gc_truncated.log";
+    const std::string path = CreateFile(fileName);
+    const std::string rotatedPath = path + ".1";
+    const DevInode devInode = GetFileDevInode(path);
+    auto* manager = CheckPointManager::Instance();
+
+    auto checkPoint = MakeCheckPoint(path, devInode, 1, kMatchedConfig);
+    checkPoint->mSignatureSize = static_cast<uint32_t>(fileName.size());
+    checkPoint->mSignatureHash = static_cast<uint64_t>(HashSignatureString(fileName.data(), fileName.size()));
+    manager->AddCheckPoint(checkPoint.release());
+    bfs::rename(path, rotatedPath);
+
+    auto bakInterval = INT32_FLAG(check_point_check_interval);
+    auto bakLimit = INT32_FLAG(checkpoint_find_max_file_count);
+    auto bakTimeout = INT32_FLAG(mem_check_point_time_out);
+    INT32_FLAG(check_point_check_interval) = -1;
+    INT32_FLAG(checkpoint_find_max_file_count) = -1;
+    INT32_FLAG(mem_check_point_time_out) = 10;
+    manager->CheckTimeoutCheckPoint();
+
+    CheckPointPtr cpt;
+    EXPECT_TRUE(manager->GetCheckPoint(devInode, kMatchedConfig, cpt));
+    EXPECT_TRUE(cpt->mRealFileName.empty());
+
+    cpt->mMemInsertTime = static_cast<int32_t>(time(nullptr)) - INT32_FLAG(mem_check_point_time_out) - 1;
+    manager->CheckTimeoutCheckPoint();
+
+    INT32_FLAG(mem_check_point_time_out) = bakTimeout;
+    INT32_FLAG(checkpoint_find_max_file_count) = bakLimit;
+    INT32_FLAG(check_point_check_interval) = bakInterval;
+    EXPECT_FALSE(manager->GetCheckPoint(devInode, kMatchedConfig, cpt));
+}
+
+void CheckpointManagerUnittest::TestGcFindsRotatedFileInSubdirectory() {
+    const std::string fileName = "gc_nested.log";
+    const std::string path = CreateFile(fileName);
+    const bfs::path rotatedDir = bfs::path(kTestRootDir) / "gc_nested" / "archive";
+    bfs::create_directories(rotatedDir);
+    const std::string rotatedPath = (rotatedDir / (fileName + ".1")).string();
+    const DevInode devInode = GetFileDevInode(path);
+    auto* manager = CheckPointManager::Instance();
+
+    auto checkPoint = MakeCheckPoint(path, devInode, 1, kMatchedConfig);
+    checkPoint->mSignatureSize = static_cast<uint32_t>(fileName.size());
+    checkPoint->mSignatureHash = static_cast<uint64_t>(HashSignatureString(fileName.data(), fileName.size()));
+    manager->AddCheckPoint(checkPoint.release());
+    bfs::rename(path, rotatedPath);
+    sDiscoveryOpts.SetMaxCheckpointDirSearchDepth(2);
+
+    auto bakInterval = INT32_FLAG(check_point_check_interval);
+    INT32_FLAG(check_point_check_interval) = -1;
+    manager->CheckTimeoutCheckPoint();
+    INT32_FLAG(check_point_check_interval) = bakInterval;
+
+    CheckPointPtr cpt;
+    EXPECT_TRUE(manager->GetCheckPoint(devInode, kMatchedConfig, cpt));
+    EXPECT_EQ(cpt->mRealFileName, rotatedPath);
 }
 
 void CheckpointManagerUnittest::TestGcEvictsWhenResidencyTimeout() {

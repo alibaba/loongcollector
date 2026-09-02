@@ -52,10 +52,16 @@ namespace {
 enum class CheckPointFileStatus {
     kFound,
     kNotFound,
+    kSearchIncomplete,
     kSignatureChanged,
 };
 
-using DirectoryInodeCache = std::map<std::string, std::map<DevInode, SplitedFilePath>>;
+struct DirectoryScanCache {
+    std::map<DevInode, SplitedFilePath> mInodePaths;
+    bool mSearchTruncated = false;
+};
+
+using DirectoryInodeCache = std::map<std::pair<std::string, uint16_t>, DirectoryScanCache>;
 
 bool pathMatchesDevInode(const std::string& path, const DevInode& expected) {
     if (path.empty()) {
@@ -66,7 +72,8 @@ bool pathMatchesDevInode(const std::string& path, const DevInode& expected) {
     return fsutil::PathStat::stat(path, ps) && expected == ps.GetDevInode();
 }
 
-CheckPointFileStatus resolveCheckPointFile(CheckPoint& checkPoint, DirectoryInodeCache& directoryInodeCache) {
+CheckPointFileStatus
+resolveCheckPointFile(CheckPoint& checkPoint, uint16_t searchDepth, DirectoryInodeCache& directoryInodeCache) {
     if (pathMatchesDevInode(checkPoint.mFileName, checkPoint.mDevInode)
         || pathMatchesDevInode(checkPoint.mRealFileName, checkPoint.mDevInode)
         || pathMatchesDevInode(checkPoint.mResolvedFileName, checkPoint.mDevInode)) {
@@ -82,16 +89,19 @@ CheckPointFileStatus resolveCheckPointFile(CheckPoint& checkPoint, DirectoryInod
         return CheckPointFileStatus::kNotFound;
     }
     const std::string parentDir = checkPoint.mFileName.substr(0, separator);
-    auto cacheIter = directoryInodeCache.find(parentDir);
+    const auto cacheKey = std::make_pair(parentDir, searchDepth);
+    auto cacheIter = directoryInodeCache.find(cacheKey);
     if (cacheIter == directoryInodeCache.end()) {
-        std::map<DevInode, SplitedFilePath> inodeCache;
+        DirectoryScanCache scanCache;
         // An invalid target forces one bounded scan that populates the directory cache.
-        SearchFilePathByDevInodeInDirectory(parentDir, 0, DevInode(), &inodeCache);
-        cacheIter = directoryInodeCache.emplace(parentDir, std::move(inodeCache)).first;
+        SearchFilePathByDevInodeInDirectory(
+            parentDir, searchDepth, DevInode(), &scanCache.mInodePaths, &scanCache.mSearchTruncated);
+        cacheIter = directoryInodeCache.emplace(cacheKey, std::move(scanCache)).first;
     }
-    const auto found = cacheIter->second.find(checkPoint.mDevInode);
-    if (found == cacheIter->second.end()) {
-        return CheckPointFileStatus::kNotFound;
+    const auto found = cacheIter->second.mInodePaths.find(checkPoint.mDevInode);
+    if (found == cacheIter->second.mInodePaths.end()) {
+        return cacheIter->second.mSearchTruncated ? CheckPointFileStatus::kSearchIncomplete
+                                                  : CheckPointFileStatus::kNotFound;
     }
     const std::string realFilePath = PathJoin(found->second.mFileDir, found->second.mFileName);
     if (checkPoint.mSignatureSize > 0
@@ -108,9 +118,10 @@ bool CheckPointManager::CheckVersion() {
     return (mLoadVersion == NO_CHECKPOINT_VERSION) || (mLoadVersion / 10000 == INT32_FLAG(check_point_version) / 10000);
 }
 
-// Same check as the front half of EventDispatcher::validateCheckpoint: the config
-// still exists and still matches the checkpoint's file path.
-bool CheckPointManager::isCheckPointStillMatched(const CheckPoint& checkPoint) {
+// Same check as the front half of EventDispatcher::validateCheckpoint. It also
+// returns the matched input's configured inode-search depth so GC cannot weaken
+// MaxCheckpointDirSearchDepth before validateCheckpoint gets a chance to run.
+bool CheckPointManager::getCheckPointSearchDepth(const CheckPoint& checkPoint, uint16_t& searchDepth) {
     const std::string& filePath = checkPoint.mFileName;
     size_t lastSeparator = filePath.find_last_of(PATH_SEPARATOR);
     if (lastSeparator == std::string::npos || lastSeparator == 0 || lastSeparator == filePath.size() - 1) {
@@ -126,6 +137,7 @@ bool CheckPointManager::isCheckPointStillMatched(const CheckPoint& checkPoint) {
     }
     for (size_t idx = 0; idx < matchedConfigs.size(); ++idx) {
         if (matchedConfigs[idx].second->GetConfigName() == checkPoint.mConfigName) {
+            searchDepth = static_cast<uint16_t>(matchedConfigs[idx].first->GetMaxCheckpointDirSearchDepth());
             return true;
         }
     }
@@ -565,17 +577,25 @@ void CheckPointManager::CheckTimeoutCheckPoint() {
     std::vector<CheckPointKey> deleteKeyVec;
     size_t configNotMatchedCount = 0;
     size_t fileGoneCount = 0;
+    size_t searchIncompleteCount = 0;
     size_t signatureChangedCount = 0;
     size_t residencyTimeoutCount = 0;
     DirectoryInodeCache directoryInodeCache;
     for (auto it = mDevInodeCheckPointPtrMap.begin(); it != mDevInodeCheckPointPtrMap.end(); ++it) {
         CheckPoint& checkPoint = *it->second;
-        if (!isCheckPointStillMatched(checkPoint)) {
+        uint16_t searchDepth = 0;
+        if (!getCheckPointSearchDepth(checkPoint, searchDepth)) {
             ++configNotMatchedCount;
         } else {
-            const auto fileStatus = resolveCheckPointFile(checkPoint, directoryInodeCache);
+            const auto fileStatus = resolveCheckPointFile(checkPoint, searchDepth, directoryInodeCache);
             if (fileStatus == CheckPointFileStatus::kNotFound) {
                 ++fileGoneCount;
+            } else if (fileStatus == CheckPointFileStatus::kSearchIncomplete) {
+                ++searchIncompleteCount;
+                if (now - checkPoint.mMemInsertTime <= INT32_FLAG(mem_check_point_time_out)) {
+                    continue;
+                }
+                ++residencyTimeoutCount;
             } else if (fileStatus == CheckPointFileStatus::kSignatureChanged) {
                 ++signatureChangedCount;
             } else if (now - checkPoint.mMemInsertTime > INT32_FLAG(mem_check_point_time_out)) {
@@ -590,11 +610,11 @@ void CheckPointManager::CheckTimeoutCheckPoint() {
         mDevInodeCheckPointPtrMap.erase(deleteKeyVec[i]);
     }
     if (!deleteKeyVec.empty()) {
-        LOG_INFO(
-            sLogger,
-            ("pending checkpoint gc", "done")("config not matched", configNotMatchedCount)("file gone", fileGoneCount)(
-                "signature changed", signatureChangedCount)("residency timeout", residencyTimeoutCount)(
-                "deleted", deleteKeyVec.size())("left", mDevInodeCheckPointPtrMap.size()));
+        LOG_INFO(sLogger,
+                 ("pending checkpoint gc", "done")("config not matched", configNotMatchedCount)(
+                     "file gone", fileGoneCount)("search incomplete", searchIncompleteCount)(
+                     "signature changed", signatureChangedCount)("residency timeout", residencyTimeoutCount)(
+                     "deleted", deleteKeyVec.size())("left", mDevInodeCheckPointPtrMap.size()));
     }
 }
 
@@ -626,7 +646,18 @@ boost::optional<std::string> SearchFilePathByDevInodeInDirectory(const std::stri
                                                                  const uint16_t searchDepth,
                                                                  const DevInode& devInode,
                                                                  std::map<DevInode, SplitedFilePath>* cache) {
+    return SearchFilePathByDevInodeInDirectory(baseDirPath, searchDepth, devInode, cache, nullptr);
+}
+
+boost::optional<std::string> SearchFilePathByDevInodeInDirectory(const std::string& baseDirPath,
+                                                                 const uint16_t searchDepth,
+                                                                 const DevInode& devInode,
+                                                                 std::map<DevInode, SplitedFilePath>* cache,
+                                                                 bool* searchTruncated) {
 #define METHOD_LOG_PATTERN ("method", "SearchFilePathByDevInodeInDirectory")("inode", devInode.inode)
+    if (searchTruncated) {
+        *searchTruncated = false;
+    }
     std::deque<std::pair<std::string /* path */, uint16_t /* depth */>> dirs;
     dirs.emplace_back(std::make_pair(baseDirPath, 0));
 
@@ -653,8 +684,12 @@ boost::optional<std::string> SearchFilePathByDevInodeInDirectory(const std::stri
         std::string entPath = entPathPrefix;
         while ((ent = dir.ReadNext(false))) {
             if (findCount++ > INT32_FLAG(checkpoint_find_max_file_count)) {
+                if (searchTruncated) {
+                    *searchTruncated = true;
+                }
                 LOG_WARNING(sLogger,
-                            METHOD_LOG_PATTERN("exceed max search count", INT32_FLAG(checkpoint_find_max_file_count)));
+                            METHOD_LOG_PATTERN("exceed max search count", INT32_FLAG(checkpoint_find_max_file_count))(
+                                "base dir", baseDirPath)("search depth", searchDepth));
                 return result;
             }
 
@@ -674,7 +709,7 @@ boost::optional<std::string> SearchFilePathByDevInodeInDirectory(const std::stri
             }
             entDevInode = buf.GetDevInode();
             if (cache) {
-                cache->insert(std::make_pair(entDevInode, SplitedFilePath(baseDirPath, entName)));
+                cache->insert(std::make_pair(entDevInode, SplitedFilePath(dirPath, entName)));
             }
             if (devInode == entDevInode) {
                 result = entPath;
