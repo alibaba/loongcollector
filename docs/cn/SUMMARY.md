@@ -138,6 +138,7 @@
     * [KafkaV2](plugins/flusher/extended/flusher-kafka-v2.md)
     * [Loki](plugins/flusher/extended/flusher-loki.md)
     * [OTLP日志](plugins/flusher/extended/flusher-otlp.md)
+    * [OTLP/HTTP](plugins/flusher/extended/flusher-otlp-http.md)
     * [Prometheus](plugins/flusher/extended/flusher-prometheus.md)
     * [Pulsar](plugins/flusher/extended/flusher-pulsar.md)
     * [标准输出/文件](plugins/flusher/extended/flusher-stdout.md)
