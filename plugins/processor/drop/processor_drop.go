@@ -17,6 +17,7 @@ package drop
 import (
 	"fmt"
 
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 )
@@ -59,6 +60,21 @@ func (p *ProcessorDrop) processLog(log *protocol.Log) {
 	for idx := len(log.Contents) - 1; idx >= 0; idx-- {
 		if _, exists := p.keyDictionary[log.Contents[idx].Key]; exists {
 			log.Contents = append(log.Contents[:idx], log.Contents[idx+1:]...)
+		}
+	}
+}
+
+// Process implements the v2 ProcessorV2 interface: it drops the configured keys
+// from each Log event and passes Metric/Span events through unchanged.
+func (p *ProcessorDrop) Process(in *models.PipelineGroupEvents, context pipeline.PipelineContext) {
+	pipeline.ProcessLogEventsOnly(in, context, p.processLogEvent)
+}
+
+func (p *ProcessorDrop) processLogEvent(log *models.Log) {
+	contents := log.GetIndices()
+	for dropKey := range p.keyDictionary {
+		if contents.Contains(dropKey) {
+			contents.Delete(dropKey)
 		}
 	}
 }

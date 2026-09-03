@@ -18,6 +18,7 @@ import (
 	"regexp"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
@@ -117,4 +118,57 @@ func init() {
 	pipeline.Processors[pluginType] = func() pipeline.Processor {
 		return &ProcessorKeyFilter{}
 	}
+}
+
+// isLogMatchV2 mirrors IsLogMatch for the v2 models.Log representation, matching
+// against content keys held in log.GetIndices().
+func (p *ProcessorKeyFilter) isLogMatchV2(log *models.Log) bool {
+	contents := log.GetIndices()
+	if p.includeRegex != nil {
+	ForBlock:
+		for _, reg := range p.includeRegex {
+			for key := range contents.Iterator() {
+				if reg.MatchString(key) {
+					continue ForBlock
+				}
+			}
+			return false
+		}
+	}
+
+	if p.excludeRegex != nil {
+		for key := range contents.Iterator() {
+			for _, reg := range p.excludeRegex {
+				// if match, return false
+				if reg.MatchString(key) {
+					return false
+				}
+			}
+		}
+	}
+	return true
+}
+
+// Process implements the v2 ProcessorV2 interface. Log events are filtered by
+// key regex (dropping logs that do not match, mirroring the v1 semantics), while
+// Metric/Span and any other non-Log events always pass through unchanged. The
+// original event order is preserved.
+func (p *ProcessorKeyFilter) Process(in *models.PipelineGroupEvents, context pipeline.PipelineContext) {
+	if in == nil {
+		return
+	}
+	survivors := make([]models.PipelineEvent, 0, len(in.Events))
+	for _, event := range in.Events {
+		if event.GetType() == models.EventTypeLogging {
+			if p.isLogMatchV2(event.(*models.Log)) {
+				survivors = append(survivors, event)
+			} else {
+				p.filterMetric.Add(1)
+			}
+			continue
+		}
+		// Metric/Span/other events are never dropped.
+		survivors = append(survivors, event)
+	}
+	context.Collector().Collect(in.Group, survivors...)
 }

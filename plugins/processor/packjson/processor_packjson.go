@@ -19,6 +19,7 @@ import (
 	"fmt"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
@@ -91,6 +92,42 @@ func (p *ProcessorPackjson) processLog(log *protocol.Log) {
 		Value: string(newValue),
 	}
 	log.Contents = append(log.Contents, newContent)
+}
+
+// Process implements the v2 ProcessorV2 interface: it packs the SourceKeys of
+// each Log event into a single JSON DestKey field; Metric/Span events pass
+// through unchanged.
+func (p *ProcessorPackjson) Process(in *models.PipelineGroupEvents, context pipeline.PipelineContext) {
+	pipeline.ProcessLogEventsOnly(in, context, p.processLogEvent)
+}
+
+func (p *ProcessorPackjson) processLogEvent(log *models.Log) {
+	contents := log.GetIndices()
+	packMap := make(map[string]string)
+	for _, key := range p.SourceKeys {
+		if !contents.Contains(key) {
+			continue
+		}
+		packMap[key] = pipeline.GetStringValue(contents.Get(key))
+		if !p.KeepSource {
+			contents.Delete(key)
+		}
+	}
+	if p.AlarmIfIncomplete && len(p.SourceKeys) != len(packMap) {
+		var emptyKeys []string
+		for _, key := range p.SourceKeys {
+			if _, exists := packMap[key]; !exists {
+				emptyKeys = append(emptyKeys, key)
+			}
+		}
+		logger.Warningf(p.context.GetRuntimeContext(), selfmonitor.PackJSONAlarm, "SourceKeys not found %v", emptyKeys)
+	}
+	newValue, err := json.Marshal(packMap)
+	if err != nil {
+		logger.Warningf(p.context.GetRuntimeContext(), selfmonitor.PackJSONAlarm, "package json error %v packMap: %v", err, packMap)
+		return
+	}
+	contents.Add(p.DestKey, string(newValue))
 }
 
 func init() {

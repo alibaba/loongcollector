@@ -15,6 +15,7 @@
 package pickkey
 
 import (
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
@@ -114,4 +115,49 @@ func init() {
 	pipeline.Processors[pluginType] = func() pipeline.Processor {
 		return &ProcessorPickKey{}
 	}
+}
+
+// Process implements the v2 ProcessorV2 interface: it filters the fields of
+// each Log event, keeping only Include keys and dropping Exclude keys (same
+// field-level semantics as the v1 path). A Log whose fields are all removed is
+// dropped, matching v1 process's return value. Metric/Span events pass through
+// unchanged.
+func (p *ProcessorPickKey) Process(in *models.PipelineGroupEvents, context pipeline.PipelineContext) {
+	if in == nil {
+		return
+	}
+	events := make([]models.PipelineEvent, 0, len(in.Events))
+	for _, event := range in.Events {
+		if event.GetType() != models.EventTypeLogging {
+			// Metric/Span events pass through unchanged.
+			events = append(events, event)
+			continue
+		}
+		if p.processLogEvent(event.(*models.Log)) {
+			events = append(events, event)
+		}
+	}
+	context.Collector().Collect(in.Group, events...)
+}
+
+// processLogEvent filters the log contents per Include/Exclude and reports
+// whether the log should be kept (still has at least one field), matching the
+// v1 process return value.
+func (p *ProcessorPickKey) processLogEvent(log *models.Log) bool {
+	contents := log.GetIndices()
+	beginLen := contents.Len()
+	if p.includeLen > 0 {
+		for key := range contents.Iterator() {
+			if _, ok := p.includeMap[key]; !ok {
+				contents.Delete(key)
+			}
+		}
+	}
+	if p.excludeLen > 0 {
+		for _, key := range p.Exclude {
+			contents.Delete(key)
+		}
+	}
+	p.filterMetric.Add(int64(beginLen - contents.Len()))
+	return contents.Len() != 0
 }
