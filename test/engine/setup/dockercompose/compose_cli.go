@@ -70,6 +70,16 @@ func runDockerCommand(ctx context.Context, args ...string) (string, error) {
 	return runCommand(ctx, "docker", args...)
 }
 
+func runDockerCommandWithTimeout(
+	ctx context.Context,
+	timeout time.Duration,
+	args ...string,
+) (string, error) {
+	commandCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	return runDockerCommand(commandCtx, args...)
+}
+
 func runCommand(ctx context.Context, executable string, args ...string) (string, error) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer

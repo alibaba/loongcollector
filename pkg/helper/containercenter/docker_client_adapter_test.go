@@ -149,6 +149,18 @@ func TestDockerClientAdapterImageInspectWithRaw(t *testing.T) {
 		assert.Empty(t, info.ID)
 		assert.Nil(t, raw)
 	})
+
+	t.Run("daemon error", func(t *testing.T) {
+		adapter := newTestDockerClientAdapter(t, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			writeDockerAPIError(w, http.StatusInternalServerError, "image inspect failed")
+		}))
+
+		info, raw, err := adapter.ImageInspectWithRaw(context.Background(), "sha256:missing")
+
+		assert.ErrorContains(t, err, "image inspect failed")
+		assert.Empty(t, info.ID)
+		assert.Nil(t, raw)
+	})
 }
 
 func TestDockerClientAdapterEvents(t *testing.T) {

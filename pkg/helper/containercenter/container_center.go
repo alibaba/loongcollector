@@ -572,17 +572,26 @@ type dockerClientAdapter struct {
 
 func (a *dockerClientAdapter) ContainerList(ctx context.Context, all bool) ([]container.Summary, error) {
 	result, err := a.client.ContainerList(ctx, docker.ContainerListOptions{All: all})
-	return result.Items, err
+	if err != nil {
+		return nil, err
+	}
+	return result.Items, nil
 }
 
 func (a *dockerClientAdapter) ImageInspectWithRaw(ctx context.Context, imageID string) (image.InspectResponse, []byte, error) {
 	result, err := a.client.ImageInspect(ctx, imageID)
-	return result.InspectResponse, nil, err
+	if err != nil {
+		return image.InspectResponse{}, nil, err
+	}
+	return result.InspectResponse, nil, nil
 }
 
 func (a *dockerClientAdapter) ContainerInspect(ctx context.Context, containerID string) (container.InspectResponse, error) {
 	result, err := a.client.ContainerInspect(ctx, containerID, docker.ContainerInspectOptions{})
-	return result.Container, err
+	if err != nil {
+		return container.InspectResponse{}, err
+	}
+	return result.Container, nil
 }
 
 func (a *dockerClientAdapter) Events(ctx context.Context) (<-chan events.Message, <-chan error) {

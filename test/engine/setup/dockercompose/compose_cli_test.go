@@ -275,3 +275,18 @@ func TestRunComposeCommandWithTimeout(t *testing.T) {
 		t.Fatalf("runComposeCommandWithTimeout() error = %v, want deadline exceeded", err)
 	}
 }
+
+func TestRunDockerCommandWithTimeout(t *testing.T) {
+	tempDir := t.TempDir()
+	executable := filepath.Join(tempDir, "docker")
+	script := "#!/bin/sh\nexec /bin/sleep 1\n"
+	if err := os.WriteFile(executable, []byte(script), 0750); err != nil {
+		t.Fatalf("write fake docker: %v", err)
+	}
+	t.Setenv("PATH", tempDir)
+
+	_, err := runDockerCommandWithTimeout(context.Background(), 10*time.Millisecond, "ps")
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("runDockerCommandWithTimeout() error = %v, want deadline exceeded", err)
+	}
+}

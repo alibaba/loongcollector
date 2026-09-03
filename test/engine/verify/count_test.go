@@ -16,6 +16,7 @@ package verify
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -43,4 +44,26 @@ func TestCountLogsWithFilter(t *testing.T) {
 	require.Equal(t, 2, countLogsWithFilter(groups, "_source_", "stdout"))
 	require.Equal(t, 1, countLogsWithFilter(groups, "_source_", "stderr"))
 	require.Zero(t, countLogsWithFilter(groups, "content", "missing"))
+}
+
+func TestObserveZeroLogCount(t *testing.T) {
+	start := time.Now()
+	var observationStartedAt time.Time
+
+	observed, err := observeZeroLogCount(0, start, &observationStartedAt)
+	require.NoError(t, err)
+	require.False(t, observed)
+	require.Equal(t, start, observationStartedAt)
+
+	observed, err = observeZeroLogCount(
+		0,
+		start.Add(zeroLogObservationWindow-time.Millisecond),
+		&observationStartedAt,
+	)
+	require.NoError(t, err)
+	require.False(t, observed)
+
+	observed, err = observeZeroLogCount(1, start.Add(zeroLogObservationWindow), &observationStartedAt)
+	require.ErrorContains(t, err, "expect 0, got 1")
+	require.False(t, observed, "a matching log observed during the window must fail the assertion")
 }

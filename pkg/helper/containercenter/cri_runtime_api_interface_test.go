@@ -160,6 +160,7 @@ func TestNewRuntimeServiceClient(t *testing.T) {
 	tests := []struct {
 		name            string
 		expectError     bool
+		expectedError   string
 		expectedVersion string
 		setupServer     func(*testRuntimeServiceServer) // 自定义服务端配置
 	}{
@@ -172,8 +173,9 @@ func TestNewRuntimeServiceClient(t *testing.T) {
 			},
 		},
 		{
-			name:        "V1_Failed_Does_Not_Fallback",
-			expectError: true,
+			name:          "V1_Failed_Does_Not_Fallback",
+			expectError:   true,
+			expectedError: "v1 version failed",
 			setupServer: func(s *testRuntimeServiceServer) {
 				s.versionResp = invalidResp
 				s.versionErr = fmt.Errorf("v1 version failed")
@@ -215,7 +217,8 @@ func TestNewRuntimeServiceClient(t *testing.T) {
 
 			// 验证结果
 			if tt.expectError {
-				assert.Error(t, err)
+				assert.ErrorContains(t, err, "failed to initialize CRI v1 RuntimeServiceClient (v1alpha2 is no longer supported)")
+				assert.ErrorContains(t, err, tt.expectedError)
 				assert.Nil(t, client)
 			} else {
 				assert.NoError(t, err)

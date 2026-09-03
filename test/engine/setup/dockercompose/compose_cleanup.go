@@ -102,19 +102,30 @@ func removeContainersByNameFilters(filters ...string) error {
 	}
 	var joined error
 	for _, nameFilter := range filters {
-		out, err := exec.Command("docker", "ps", "-aq", "--filter", "name="+nameFilter).CombinedOutput()
+		out, err := runDockerCommandWithTimeout(
+			context.Background(),
+			dockerCommandTimeout,
+			"ps",
+			"-aq",
+			"--filter",
+			"name="+nameFilter,
+		)
 		if err != nil {
 			joined = errors.Join(joined, err)
 			continue
 		}
-		ids := strings.Fields(strings.TrimSpace(string(out)))
+		ids := strings.Fields(out)
 		if len(ids) == 0 {
 			continue
 		}
 		args := append([]string{"rm", "-f"}, ids...)
-		if rmOut, rmErr := exec.Command("docker", args...).CombinedOutput(); rmErr != nil {
+		if rmOut, rmErr := runDockerCommandWithTimeout(
+			context.Background(),
+			dockerCommandTimeout,
+			args...,
+		); rmErr != nil {
 			logger.Warning(context.Background(), selfmonitor.StopDockerComposeError,
-				"filter", nameFilter, "err", rmErr, "output", string(rmOut))
+				"filter", nameFilter, "err", rmErr, "output", rmOut)
 			joined = errors.Join(joined, rmErr)
 		} else {
 			logger.Infof(context.Background(), "removed %d e2e container(s) matching name=%s", len(ids), nameFilter)

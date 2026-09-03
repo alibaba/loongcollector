@@ -65,7 +65,7 @@ require (
 	go.uber.org/atomic v1.11.0
 	go.uber.org/multierr v1.11.0
 	golang.org/x/sys v0.47.0
-	google.golang.org/grpc v1.82.1
+	google.golang.org/grpc v1.83.1
 	google.golang.org/protobuf v1.36.11
 	gopkg.in/yaml.v2 v2.4.0
 	gopkg.in/yaml.v3 v3.0.1
@@ -76,8 +76,12 @@ require (
 )
 
 require (
+	cloud.google.com/go/compute/metadata v0.9.0 // indirect
 	github.com/99designs/go-keychain v0.0.0-20191008050251-8e49817e8af4 // indirect
 	github.com/99designs/keyring v1.2.1 // indirect
+	github.com/VictoriaMetrics/fasthttp v1.1.0 // indirect
+	github.com/VictoriaMetrics/metrics v1.23.0 // indirect
+	github.com/VictoriaMetrics/metricsql v0.45.0 // indirect
 	github.com/containerd/cgroups/v3 v3.1.2 // indirect
 	github.com/containerd/containerd/api v1.10.0 // indirect
 	github.com/containerd/containerd/v2 v2.2.5 // indirect
@@ -114,9 +118,13 @@ require (
 	github.com/moby/sys/user v0.4.0 // indirect
 	github.com/moby/sys/userns v0.1.0 // indirect
 	github.com/mtibben/percent v0.2.1 // indirect
+	github.com/valyala/fastjson v1.6.3 // indirect
+	github.com/valyala/fastrand v1.1.0 // indirect
+	github.com/valyala/fasttemplate v1.2.2 // indirect
+	github.com/valyala/gozstd v1.17.0 // indirect
+	github.com/valyala/histogram v1.2.0 // indirect
+	github.com/valyala/quicktemplate v1.7.0 // indirect
 	go.opentelemetry.io/collector/featuregate v1.54.0 // indirect
-	go.opentelemetry.io/otel/sdk v1.44.0 // indirect
-	go.opentelemetry.io/otel/sdk/metric v1.44.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.4 // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	golang.org/x/tools v0.49.0 // indirect
@@ -125,7 +133,6 @@ require (
 )
 
 require (
-	cloud.google.com/go/compute/metadata v0.9.0 // indirect
 	github.com/AthenZ/athenz v1.12.13 // indirect
 	github.com/BurntSushi/toml v1.4.0 // indirect
 	github.com/ClickHouse/ch-go v0.51.2 // indirect
@@ -133,9 +140,6 @@ require (
 	github.com/Masterminds/semver v1.5.0 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/Microsoft/hcsshim v0.14.1 // indirect
-	github.com/VictoriaMetrics/fasthttp v1.1.0 // indirect
-	github.com/VictoriaMetrics/metrics v1.23.0 // indirect
-	github.com/VictoriaMetrics/metricsql v0.45.0 // indirect
 	github.com/andrewkroh/sys v0.0.0-20151128191922-287798fe3e43 // indirect
 	github.com/andybalholm/brotli v1.0.5 // indirect
 	github.com/ardielle/ardielle-go v1.5.2 // indirect
@@ -245,12 +249,6 @@ require (
 	github.com/tklauser/go-sysconf v0.3.16 // indirect
 	github.com/tklauser/numcpus v0.11.0 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
-	github.com/valyala/fastjson v1.6.3 // indirect
-	github.com/valyala/fastrand v1.1.0 // indirect
-	github.com/valyala/fasttemplate v1.2.2 // indirect
-	github.com/valyala/gozstd v1.24.0 // indirect
-	github.com/valyala/histogram v1.2.0 // indirect
-	github.com/valyala/quicktemplate v1.7.0 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xdg-go/pbkdf2 v1.0.0 // indirect
 	github.com/xdg-go/stringprep v1.0.4 // indirect

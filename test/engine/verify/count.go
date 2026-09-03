@@ -27,7 +27,7 @@ import (
 	"github.com/alibaba/ilogtail/test/engine/setup/subscriber"
 )
 
-const zeroLogObservationWindow = 3 * time.Second
+const zeroLogObservationWindow = 10 * time.Second
 
 func LogCount(ctx context.Context, expect int) (context.Context, error) {
 	var from int32
@@ -276,7 +276,7 @@ func LogCountAtLeastWithFilter(ctx context.Context, expect int, filterKey string
 	var groups []*protocol.LogGroup
 	var err error
 	var count int
-	startTime := time.Now()
+	var zeroObservationStartedAt time.Time
 	retryDelay := 5 * time.Second
 	if expect == 0 {
 		retryDelay = 200 * time.Millisecond
@@ -293,14 +293,16 @@ func LogCountAtLeastWithFilter(ctx context.Context, expect int, filterKey string
 		func() error {
 			groups, err = subscriber.TestSubscriber.GetData(control.GetQuery(ctx), from)
 			if err != nil {
+				zeroObservationStartedAt = time.Time{}
 				return err
 			}
 			count = countLogsWithFilter(groups, filterKey, filterValue)
 			if expect == 0 {
-				if count != 0 {
-					return fmt.Errorf("log count not match, expect 0, got %d", count)
+				observed, observeErr := observeZeroLogCount(count, time.Now(), &zeroObservationStartedAt)
+				if observeErr != nil {
+					return retry.Unrecoverable(observeErr)
 				}
-				if time.Since(startTime) < zeroLogObservationWindow {
+				if !observed {
 					return fmt.Errorf("observing zero matching logs")
 				}
 				return nil
@@ -316,6 +318,16 @@ func LogCountAtLeastWithFilter(ctx context.Context, expect int, filterKey string
 		return ctx, err
 	}
 	return ctx, nil
+}
+
+func observeZeroLogCount(count int, now time.Time, observationStartedAt *time.Time) (bool, error) {
+	if count != 0 {
+		return false, fmt.Errorf("log count not match, expect 0, got %d", count)
+	}
+	if observationStartedAt.IsZero() {
+		*observationStartedAt = now
+	}
+	return now.Sub(*observationStartedAt) >= zeroLogObservationWindow, nil
 }
 
 func countLogsWithFilter(groups []*protocol.LogGroup, filterKey, filterValue string) int {

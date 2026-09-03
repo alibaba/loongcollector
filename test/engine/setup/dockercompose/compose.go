@@ -103,14 +103,16 @@ func (c *ComposeBooter) Start(ctx context.Context) (err error) {
 			_ = RemoveLeftoverE2EContainers()
 			return execErr
 		}
-		if _, downErr := runComposeCommand(
+		downErr := runComposeCommandWithTimeout(
 			ctx,
+			dockerCommandTimeout,
 			composeFile,
 			projectName,
 			"down",
 			"--volumes",
 			"--remove-orphans",
-		); downErr != nil {
+		)
+		if downErr != nil {
 			logger.Error(context.Background(), selfmonitor.DownDockerComposeError, "stdout", downErr.Error())
 			return downErr
 		}
