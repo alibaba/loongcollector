@@ -24,9 +24,9 @@ import (
 	"time"
 
 	"github.com/dlclark/regexp2"
-	"github.com/docker/docker/api/types/container"
-	docker "github.com/docker/docker/client"
-	"github.com/docker/docker/pkg/stdcopy"
+	"github.com/moby/moby/api/pkg/stdcopy"
+	"github.com/moby/moby/api/types/container"
+	docker "github.com/moby/moby/client"
 
 	"github.com/alibaba/ilogtail/pkg/helper/containercenter"
 	"github.com/alibaba/ilogtail/pkg/logger"
@@ -244,7 +244,7 @@ func (ss *stdoutSyner) Start(c pipeline.Collector) {
 				"name", ss.info.ContainerInfo.Name, "created", ss.info.ContainerInfo.Created, "status", ss.info.Status())
 		}
 		ss.lock.Unlock()
-		options := container.LogsOptions{
+		options := docker.ContainerLogsOptions{
 			ShowStdout: ss.stdout,
 			ShowStderr: ss.stderr,
 			Since:      cpTime.Format(containercenter.DockerTimeFormat),

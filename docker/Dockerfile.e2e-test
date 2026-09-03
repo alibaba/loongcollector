@@ -1,15 +1,18 @@
-FROM sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/common/golang:1.23.12
+FROM golang:1.25.9
 
 RUN mkdir -p /tmp/loongcollector
 
 WORKDIR /root
 COPY . ./loongcollector
 
-RUN apt-get update
-RUN apt-get -y install python3-setuptools
-RUN apt-get -y install python3-pip
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends python3 python3-venv && \
+    rm -rf /var/lib/apt/lists/*
 
 WORKDIR /root/loongcollector/test
-RUN pip3 install -r requirements.txt --break-system-packages
+RUN python3 -m venv /opt/loongcollector-e2e-venv && \
+    /opt/loongcollector-e2e-venv/bin/pip install --no-cache-dir -r requirements.txt
+
+ENV PATH="/opt/loongcollector-e2e-venv/bin:${PATH}"
 
 CMD ["sh", "-c", "while true; do sleep 3600; done"]

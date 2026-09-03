@@ -20,6 +20,7 @@ import (
 	"sort"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/apache/pulsar-client-go/pulsar"
 	"github.com/stretchr/testify/require"
@@ -142,6 +143,8 @@ func (p *capturePulsarProducer) Flush() error { return nil }
 
 func (p *capturePulsarProducer) FlushWithContext(_ context.Context) error { return nil }
 
+func (p *capturePulsarProducer) FlushWithCtx(_ context.Context) error { return nil }
+
 func (p *capturePulsarProducer) Close() {}
 
 type capturePulsarClient struct {
@@ -165,6 +168,10 @@ func (c *capturePulsarClient) CreateReader(_ pulsar.ReaderOptions) (pulsar.Reade
 func (c *capturePulsarClient) TopicPartitions(_ string) ([]string, error) { return nil, nil }
 
 func (c *capturePulsarClient) CreateTableView(_ pulsar.TableViewOptions) (pulsar.TableView, error) {
+	return nil, nil
+}
+
+func (c *capturePulsarClient) NewTransaction(_ time.Duration) (pulsar.Transaction, error) {
 	return nil, nil
 }
 

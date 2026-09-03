@@ -18,7 +18,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/docker/docker/api/types/container"
+	"github.com/moby/moby/api/types/container"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/alibaba/ilogtail/pkg/flags"
@@ -97,10 +97,8 @@ func (s *containerExportTestSuite) AfterTest(suiteName, testName string) {
 
 func mockDockerInfoDetail(containerName string, envList []string) *DockerInfoDetail {
 	dockerInfo := container.InspectResponse{
-		ContainerJSONBase: &container.ContainerJSONBase{
-			Name: containerName,
-			ID:   "test",
-		},
+		Name: containerName,
+		ID:   "test",
 	}
 	dockerInfo.Config = &container.Config{}
 	dockerInfo.Config.Env = envList

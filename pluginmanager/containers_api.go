@@ -62,8 +62,10 @@ func convertDockerInfos(info *containercenter.DockerInfoDetail, cmds *[]Containe
 		cmd.MetaDatas[key] = val
 	}
 	cmd.Name = info.ContainerInfo.Name
-	cmd.Status = info.ContainerInfo.State.Status
 	cmd.MetadataHash = info.MetadataHash()
+	if info.ContainerInfo.State != nil {
+		cmd.Status = string(info.ContainerInfo.State.Status)
+	}
 	// K8s info
 	if info.K8SInfo != nil {
 		cmd.K8sInfo = K8sInfo{
@@ -104,7 +106,6 @@ func convertDockerInfos(info *containercenter.DockerInfoDetail, cmds *[]Containe
 	}
 
 	// Container stopped status
-	cmd.Stopped = false
 	if info.ContainerInfo.State != nil {
 		status := info.ContainerInfo.State.Status
 		cmd.Stopped = status == "exited" || status == "dead" || status == "removing"

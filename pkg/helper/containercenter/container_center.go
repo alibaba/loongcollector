@@ -30,9 +30,11 @@ import (
 	"time"
 
 	"github.com/dlclark/regexp2"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/events"
-	"github.com/docker/docker/api/types/image"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/events"
+	"github.com/moby/moby/api/types/image"
+	"github.com/moby/moby/api/types/network"
+	docker "github.com/moby/moby/client"
 
 	"github.com/alibaba/ilogtail/pkg/flags"
 	"github.com/alibaba/ilogtail/pkg/helper"
@@ -326,7 +328,7 @@ func (did *DockerInfoDetail) FinishedAt() string {
 
 func (did *DockerInfoDetail) Status() string {
 	if did.ContainerInfo.State != nil {
-		return did.ContainerInfo.State.Status
+		return string(did.ContainerInfo.State.Status)
 	}
 	return ""
 }
@@ -558,10 +560,43 @@ type ContainerCenter struct {
 }
 
 type ClientInterface interface {
-	ContainerList(ctx context.Context, options container.ListOptions) ([]container.Summary, error)
+	ContainerList(ctx context.Context, all bool) ([]container.Summary, error)
 	ImageInspectWithRaw(ctx context.Context, imageID string) (image.InspectResponse, []byte, error)
 	ContainerInspect(ctx context.Context, containerID string) (container.InspectResponse, error)
-	Events(ctx context.Context, options events.ListOptions) (<-chan events.Message, <-chan error)
+	Events(ctx context.Context) (<-chan events.Message, <-chan error)
+}
+
+type dockerClientAdapter struct {
+	client *docker.Client
+}
+
+func (a *dockerClientAdapter) ContainerList(ctx context.Context, all bool) ([]container.Summary, error) {
+	result, err := a.client.ContainerList(ctx, docker.ContainerListOptions{All: all})
+	if err != nil {
+		return nil, err
+	}
+	return result.Items, nil
+}
+
+func (a *dockerClientAdapter) ImageInspectWithRaw(ctx context.Context, imageID string) (image.InspectResponse, []byte, error) {
+	result, err := a.client.ImageInspect(ctx, imageID)
+	if err != nil {
+		return image.InspectResponse{}, nil, err
+	}
+	return result.InspectResponse, nil, nil
+}
+
+func (a *dockerClientAdapter) ContainerInspect(ctx context.Context, containerID string) (container.InspectResponse, error) {
+	result, err := a.client.ContainerInspect(ctx, containerID, docker.ContainerInspectOptions{})
+	if err != nil {
+		return container.InspectResponse{}, err
+	}
+	return result.Container, nil
+}
+
+func (a *dockerClientAdapter) Events(ctx context.Context) (<-chan events.Message, <-chan error) {
+	result := a.client.Events(ctx, docker.EventsListOptions{})
+	return result.Messages, result.Err
 }
 
 type ContainerHelperInterface interface {
@@ -629,7 +664,7 @@ func computeContainerMetadataHash(info *DockerInfoDetail) string {
 
 	// Container status - the primary field that changes for same container ID
 	if info.ContainerInfo.State != nil {
-		hashComponents = append(hashComponents, info.ContainerInfo.State.Status)
+		hashComponents = append(hashComponents, string(info.ContainerInfo.State.Status))
 		hashComponents = append(hashComponents, strconv.Itoa(info.ContainerInfo.State.Pid))
 	}
 	// Compute FNV hash (non-cryptographic, suitable for change detection)
@@ -664,13 +699,36 @@ func (dc *ContainerCenter) getIPAddress(info container.InspectResponse) string {
 	if detail, ok := dc.getContainerDetail(info.ID); ok && detail != nil {
 		return detail.ContainerIP
 	}
-	if info.NetworkSettings != nil && len(info.NetworkSettings.IPAddress) > 0 {
-		return info.NetworkSettings.IPAddress
+	if info.NetworkSettings != nil {
+		if ip := preferredNetworkIPAddress(info.NetworkSettings.Networks); ip != "" {
+			return ip
+		}
 	}
 	if len(info.Config.Hostname) > 0 && len(info.HostsPath) > 0 {
 		return getIPByHosts(GetMountedFilePath(info.HostsPath), info.Config.Hostname)
 	}
 	return ""
+}
+
+func preferredNetworkIPAddress(networks map[string]*network.EndpointSettings) string {
+	names := make([]string, 0, len(networks))
+	for name, endpoint := range networks {
+		if endpoint != nil && endpoint.IPAddress.IsValid() {
+			names = append(names, name)
+		}
+	}
+	sort.Slice(names, func(i, j int) bool {
+		left := networks[names[i]]
+		right := networks[names[j]]
+		if left.GwPriority != right.GwPriority {
+			return left.GwPriority > right.GwPriority
+		}
+		return names[i] < names[j]
+	})
+	if len(names) == 0 {
+		return ""
+	}
+	return networks[names[0]].IPAddress.String()
 }
 
 // extractUpperDirFromProcMounts extracts upperdir from /proc/{pid}/mounts for containerd overlayfs
@@ -824,7 +882,7 @@ func (dc *ContainerCenter) CreateInfoDetail(info container.InspectResponse, envC
 
 	// Find Container FS Root Path on Host
 	// @note for overlayfs only, some driver like nas, you can not see it in upper dir
-	if info.GraphDriver.Data != nil {
+	if info.GraphDriver != nil && info.GraphDriver.Data != nil {
 		if rootPath, ok := did.ContainerInfo.GraphDriver.Data["UpperDir"]; ok {
 			did.DefaultRootPath = rootPath
 		}
@@ -860,7 +918,7 @@ func formatContainerJSONPath(info *container.InspectResponse) {
 		info.Mounts[i].Source = filepath.Clean(info.Mounts[i].Source)
 		info.Mounts[i].Destination = filepath.Clean(info.Mounts[i].Destination)
 	}
-	if info.GraphDriver.Data != nil {
+	if info.GraphDriver != nil && info.GraphDriver.Data != nil {
 		if rootPath, ok := info.GraphDriver.Data["UpperDir"]; ok {
 			info.GraphDriver.Data["UpperDir"] = filepath.Clean(rootPath)
 		}
@@ -1312,7 +1370,7 @@ func (dc *ContainerCenter) fetchAll() error {
 	defer dc.containerStateLock.Unlock()
 	ctx, cancel := getContextWithTimeout(defaultContextTimeout)
 	defer cancel()
-	containers, err := dc.client.ContainerList(ctx, container.ListOptions{All: true})
+	containers, err := dc.client.ContainerList(ctx, true)
 	if err != nil {
 		dc.setLastError(err, "list container error")
 		return err
@@ -1448,14 +1506,15 @@ func containerCenterRecover() {
 }
 
 func (dc *ContainerCenter) initClient() error {
-	var err error
 	// do not CreateDockerClient multi times
 	if dc.client == nil {
-		if dc.client, err = CreateDockerClient(); err != nil {
+		client, clientErr := CreateDockerClient()
+		if clientErr != nil {
 			dc.client = nil
-			dc.setLastError(err, "init docker client from env error")
-			return err
+			dc.setLastError(clientErr, "init docker client from env error")
+			return clientErr
 		}
+		dc.client = &dockerClientAdapter{client: client}
 	}
 	return nil
 }
@@ -1468,7 +1527,7 @@ func (dc *ContainerCenter) eventListener() {
 	for {
 		logger.Info(context.Background(), "docker event listener", "start")
 		ctx, cancel := context.WithCancel(context.Background())
-		events, errors := dc.client.Events(ctx, events.ListOptions{})
+		events, errors := dc.client.Events(ctx)
 		breakFlag := false
 		for !breakFlag {
 			timer.Reset(EventListenerTimeout)
@@ -1482,25 +1541,7 @@ func (dc *ContainerCenter) eventListener() {
 				}
 				logger.Debug(context.Background(), "docker event captured", event)
 				errorCount = 0
-				switch event.Status {
-				case "start", "restart":
-					_ = dc.fetchOne(event.ID, false)
-				case "rename":
-					_ = dc.fetchOne(event.ID, false)
-				case "die":
-					dc.markRemove(event.ID)
-				default:
-				}
-				dc.eventChanLock.Lock()
-				if dc.eventChan != nil {
-					// no block insert
-					select {
-					case dc.eventChan <- event:
-					default:
-						logger.Error(context.Background(), selfmonitor.DockerEventAlarm, "event queue is full, miss event", event)
-					}
-				}
-				dc.eventChanLock.Unlock()
+				dc.handleDockerEvent(event)
 			case err = <-errors:
 				logger.Warning(context.Background(), selfmonitor.DockerEventAlarm, "docker event listener error", err)
 				breakFlag = true
@@ -1522,4 +1563,24 @@ func (dc *ContainerCenter) eventListener() {
 		}
 	}
 	dc.setLastError(err, "docker event stream closed")
+}
+
+func (dc *ContainerCenter) handleDockerEvent(event events.Message) {
+	switch event.Action {
+	case "start", "restart", "rename":
+		_ = dc.fetchOne(event.Actor.ID, false)
+	case "die":
+		dc.markRemove(event.Actor.ID)
+	default:
+	}
+	dc.eventChanLock.Lock()
+	defer dc.eventChanLock.Unlock()
+	if dc.eventChan == nil {
+		return
+	}
+	select {
+	case dc.eventChan <- event:
+	default:
+		logger.Error(context.Background(), selfmonitor.DockerEventAlarm, "event queue is full, miss event", event)
+	}
 }

@@ -19,14 +19,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/netip"
 	"os"
 	"sync"
 	"testing"
-	"time"
 
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/events"
-	"github.com/docker/docker/api/types/image"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/events"
+	"github.com/moby/moby/api/types/image"
+	"github.com/moby/moby/api/types/network"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -57,6 +58,38 @@ func resetContainerCenter() {
 	containerCenterInstance = nil
 	onceDocker = sync.Once{}
 
+}
+
+func newTestContainerCenter() *ContainerCenter {
+	return &ContainerCenter{
+		containerHelper: &ContainerHelperWrapper{},
+		imageCache:      make(map[string]string),
+		containerMap:    make(map[string]*DockerInfoDetail),
+	}
+}
+
+func TestPreferredNetworkIPAddress(t *testing.T) {
+	require.Empty(t, preferredNetworkIPAddress(nil))
+	require.Empty(t, preferredNetworkIPAddress(map[string]*network.EndpointSettings{
+		"nil-endpoint": nil,
+		"invalid-ip":   {},
+	}))
+
+	networks := map[string]*network.EndpointSettings{
+		"lower-priority": {
+			GwPriority: 0,
+			IPAddress:  netip.MustParseAddr("192.0.2.10"),
+		},
+		"z-network": {
+			GwPriority: 10,
+			IPAddress:  netip.MustParseAddr("192.0.2.20"),
+		},
+		"a-network": {
+			GwPriority: 10,
+			IPAddress:  netip.MustParseAddr("192.0.2.30"),
+		},
+	}
+	require.Equal(t, "192.0.2.30", preferredNetworkIPAddress(networks))
 }
 
 func TestGetIpByHost_1(t *testing.T) {
@@ -154,16 +187,13 @@ func TestFormatContainerJSONPath(t *testing.T) {
 }
 
 func TestGetAllAcceptedInfoV2(t *testing.T) {
-	resetContainerCenter()
-	dc := getContainerCenterInstance()
+	dc := newTestContainerCenter()
 
 	newContainer := func(id string) *DockerInfoDetail {
 		return dc.CreateInfoDetail(container.InspectResponse{
-			ContainerJSONBase: &container.ContainerJSONBase{
-				ID:    id,
-				Name:  id,
-				State: &container.State{},
-			},
+			ID:    id,
+			Name:  id,
+			State: &container.State{},
 			Config: &container.Config{
 				Env: make([]string, 0),
 			},
@@ -189,7 +219,7 @@ func TestGetAllAcceptedInfoV2(t *testing.T) {
 		require.True(t, matchList["c1"] != nil)
 		require.Equal(t, newCount, 1)
 		require.Equal(t, delCount, 0)
-		require.Equal(t, len(matchAddedList), 0)
+		require.Equal(t, len(matchAddedList), 1)
 		require.Equal(t, len(matchDeletedList), 0)
 	}
 
@@ -429,8 +459,8 @@ type ContainerHelperMock struct {
 }
 
 // Events 实现了 DockerClient 的 Events 方法
-func (m *DockerClientMock) Events(ctx context.Context, options events.ListOptions) (<-chan events.Message, <-chan error) {
-	args := m.Called(ctx, options)
+func (m *DockerClientMock) Events(ctx context.Context) (<-chan events.Message, <-chan error) {
+	args := m.Called(ctx)
 	return args.Get(0).(chan events.Message), args.Get(1).(chan error)
 }
 
@@ -443,8 +473,8 @@ func (m *DockerClientMock) ContainerInspect(ctx context.Context, containerID str
 	args := m.Called(ctx, containerID)
 	return args.Get(0).(container.InspectResponse), args.Error(1)
 }
-func (m *DockerClientMock) ContainerList(ctx context.Context, options container.ListOptions) ([]container.Summary, error) {
-	args := m.Called(ctx, options)
+func (m *DockerClientMock) ContainerList(ctx context.Context, all bool) ([]container.Summary, error) {
+	args := m.Called(ctx, all)
 	return args.Get(0).([]container.Summary), args.Error(1)
 }
 
@@ -454,60 +484,55 @@ func (m *ContainerHelperMock) ContainerProcessAlive(pid int) bool {
 }
 
 func TestContainerCenterEvents(t *testing.T) {
-	containerCenterInstance = &ContainerCenter{}
-	containerCenterInstance.imageCache = make(map[string]string)
-	containerCenterInstance.containerMap = make(map[string]*DockerInfoDetail)
-
+	center := newTestContainerCenter()
 	mockClient := DockerClientMock{}
-	containerCenterInstance.client = &mockClient
-
+	center.client = &mockClient
 	containerHelper := ContainerHelperMock{}
+	center.containerHelper = &containerHelper
 
-	// 创建一个模拟的事件通道
-	eventChan := make(chan events.Message, 1)
-	errChan := make(chan error, 1)
+	center.eventChan = make(chan events.Message, 3)
 
-	mockClient.On("Events", mock.Anything, mock.Anything).Return(eventChan, errChan)
-
-	go containerCenterInstance.eventListener()
-
-	containerHelper.On("ContainerProcessAlive", mock.Anything).Return(false).Once()
+	containerHelper.On("ContainerProcessAlive", mock.Anything).Return(true).Twice()
 	mockClient.On("ContainerInspect", mock.Anything, "event1").Return(container.InspectResponse{
-		ContainerJSONBase: &container.ContainerJSONBase{
-			ID:    "event1",
-			Name:  "name1",
-			State: &container.State{},
+		ID:    "event1",
+		Name:  "name1",
+		State: &container.State{Status: ContainerStatusRunning},
+		Config: &container.Config{
+			Env: make([]string, 0),
 		},
+	}, nil).Once()
+	mockClient.On("ContainerInspect", mock.Anything, "event1").Return(container.InspectResponse{
+		ID:    "event1",
+		Name:  "start",
+		State: &container.State{Status: ContainerStatusRunning},
 		Config: &container.Config{
 			Env: make([]string, 0),
 		},
 	}, nil).Once()
 
-	eventChan <- events.Message{ID: "event1", Status: "rename"}
+	eventMessages := []events.Message{
+		{Actor: events.Actor{ID: "event1"}, Action: events.ActionRename},
+		{Actor: events.Actor{ID: "event1"}, Action: events.ActionStart},
+		{Actor: events.Actor{ID: "event1"}, Action: events.ActionDie},
+	}
+	for _, event := range eventMessages {
+		center.handleDockerEvent(event)
+	}
+	for _, expected := range eventMessages {
+		actual := <-center.eventChan
+		assert.Equal(t, expected.Action, actual.Action)
+	}
 
-	time.Sleep(5 * time.Second)
-	containerLen := len(containerCenterInstance.containerMap)
-	assert.Equal(t, 1, containerLen)
-
-	containerHelper.On("ContainerProcessAlive", mock.Anything).Return(true).Once()
-	mockClient.On("ContainerInspect", mock.Anything, "event1").Return(container.InspectResponse{
-		ContainerJSONBase: &container.ContainerJSONBase{
-			ID:    "event1",
-			Name:  "start",
-			State: &container.State{},
-		},
-		Config: &container.Config{
-			Env: make([]string, 0),
-		},
-	}, nil).Once()
-	eventChan <- events.Message{ID: "event1", Status: "start"}
-
-	time.Sleep(5 * time.Second)
-	// 设置期望
-	close(eventChan)
-
-	containerLen = len(containerCenterInstance.containerMap)
-	assert.Equal(t, 1, containerLen)
+	center.lock.RLock()
+	detail := center.containerMap["event1"]
+	containerLen := len(center.containerMap)
+	center.lock.RUnlock()
+	require.Equal(t, 1, containerLen)
+	require.NotNil(t, detail)
+	assert.Equal(t, "start", detail.ContainerInfo.Name)
+	assert.True(t, detail.deleteFlag)
+	mockClient.AssertExpectations(t)
+	containerHelper.AssertExpectations(t)
 }
 
 func TestContainerCenterFetchAll(t *testing.T) {
@@ -519,6 +544,7 @@ func TestContainerCenterFetchAll(t *testing.T) {
 	containerCenterInstance.client = &mockClient
 
 	containerHelper := ContainerHelperMock{}
+	containerCenterInstance.containerHelper = &containerHelper
 
 	mockContainerListResult := []container.Summary{
 		{ID: "id1"},
@@ -531,21 +557,17 @@ func TestContainerCenterFetchAll(t *testing.T) {
 	mockClient.On("ContainerList", mock.Anything, mock.Anything).Return(mockContainerListResult, nil).Once()
 
 	mockClient.On("ContainerInspect", mock.Anything, "id1").Return(container.InspectResponse{
-		ContainerJSONBase: &container.ContainerJSONBase{
-			ID:    "id1",
-			Name:  "event_name1",
-			State: &container.State{},
-		},
+		ID:    "id1",
+		Name:  "event_name1",
+		State: &container.State{},
 		Config: &container.Config{
 			Env: make([]string, 0),
 		},
 	}, nil).Once()
 	mockClient.On("ContainerInspect", mock.Anything, "id2").Return(container.InspectResponse{
-		ContainerJSONBase: &container.ContainerJSONBase{
-			ID:    "id2",
-			Name:  "event_name2",
-			State: &container.State{},
-		},
+		ID:    "id2",
+		Name:  "event_name2",
+		State: &container.State{},
 		Config: &container.Config{
 			Env: make([]string, 0),
 		},
@@ -567,22 +589,18 @@ func TestContainerCenterFetchAll(t *testing.T) {
 	mockClient.On("ContainerList", mock.Anything, mock.Anything).Return(mockContainerListResult2, nil).Once()
 
 	mockClient.On("ContainerInspect", mock.Anything, "id4").Return(container.InspectResponse{
-		ContainerJSONBase: &container.ContainerJSONBase{
-			ID:    "id4",
-			Name:  "event_name4",
-			State: &container.State{},
-		},
+		ID:    "id4",
+		Name:  "event_name4",
+		State: &container.State{},
 		Config: &container.Config{
 			Env: make([]string, 0),
 		},
 	}, nil).Once()
 
 	mockClient.On("ContainerInspect", mock.Anything, "id5").Return(container.InspectResponse{
-		ContainerJSONBase: &container.ContainerJSONBase{
-			ID:    "id5",
-			Name:  "event_name5",
-			State: &container.State{},
-		},
+		ID:    "id5",
+		Name:  "event_name5",
+		State: &container.State{},
 		Config: &container.Config{
 			Env: make([]string, 0),
 		},
@@ -604,6 +622,7 @@ func TestContainerCenterFetchAllAndOne(t *testing.T) {
 	containerCenterInstance.client = &mockClient
 
 	containerHelper := ContainerHelperMock{}
+	containerCenterInstance.containerHelper = &containerHelper
 
 	mockContainerListResult := []container.Summary{
 		{ID: "id1"},
@@ -613,21 +632,17 @@ func TestContainerCenterFetchAllAndOne(t *testing.T) {
 	mockClient.On("ContainerList", mock.Anything, mock.Anything).Return(mockContainerListResult, nil)
 
 	mockClient.On("ContainerInspect", mock.Anything, "id1").Return(container.InspectResponse{
-		ContainerJSONBase: &container.ContainerJSONBase{
-			ID:    "id1",
-			Name:  "event_name1",
-			State: &container.State{},
-		},
+		ID:    "id1",
+		Name:  "event_name1",
+		State: &container.State{},
 		Config: &container.Config{
 			Env: make([]string, 0),
 		},
 	}, nil)
 	mockClient.On("ContainerInspect", mock.Anything, "id2").Return(container.InspectResponse{
-		ContainerJSONBase: &container.ContainerJSONBase{
-			ID:    "id2",
-			Name:  "event_name2",
-			State: &container.State{},
-		},
+		ID:    "id2",
+		Name:  "event_name2",
+		State: &container.State{},
 		Config: &container.Config{
 			Env: make([]string, 0),
 		},
@@ -655,10 +670,17 @@ func TestContainerCenterFetchAllAndOne(t *testing.T) {
 
 func TestInitClientMutiTime(t *testing.T) {
 	containerCenterInstance = &ContainerCenter{}
+	firstErr := containerCenterInstance.initClient()
+	firstClient := containerCenterInstance.client
 	for i := 0; i < 100; i++ {
 		err := containerCenterInstance.initClient()
-		assert.NotNil(t, err)
-		assert.Nil(t, containerCenterInstance.client)
+		if firstErr != nil {
+			assert.Error(t, err)
+			assert.Nil(t, containerCenterInstance.client)
+		} else {
+			assert.NoError(t, err)
+			assert.Same(t, firstClient, containerCenterInstance.client)
+		}
 	}
 }
 
@@ -675,9 +697,7 @@ func TestFindAllEnvConfig(t *testing.T) {
 					"loong_logs_key1_tags=appName=ut1",
 				},
 			},
-			ContainerJSONBase: &container.ContainerJSONBase{
-				Name: "ut-container",
-			},
+			Name: "ut-container",
 		},
 		ContainerNameTag: map[string]string{},
 	}
@@ -936,9 +956,7 @@ func TestCreateInfoDetailWithContainerdStorageDriver(t *testing.T) {
 	require.NoError(t, err)
 	defer os.RemoveAll(pidDir)
 
-	// Reset container center instance
-	resetContainerCenter()
-	dc := getContainerCenterInstance()
+	dc := newTestContainerCenter()
 
 	// Create a mock docker client
 	mockClient := DockerClientMock{}
@@ -947,15 +965,13 @@ func TestCreateInfoDetailWithContainerdStorageDriver(t *testing.T) {
 	// Test container info with empty GraphDriver (docker v29+ with containerd)
 	// GraphDriver is not set, which simulates docker v29+ with containerd storage driver
 	info := container.InspectResponse{
-		ContainerJSONBase: &container.ContainerJSONBase{
-			ID:   "test-container-id",
-			Name: "test-container",
-			State: &container.State{
-				Pid:    pid,
-				Status: "running",
-			},
-			// GraphDriver is not set (nil or empty), simulating docker v29+ with containerd
+		ID:   "test-container-id",
+		Name: "test-container",
+		State: &container.State{
+			Pid:    pid,
+			Status: "running",
 		},
+		// GraphDriver is not set (nil or empty), simulating docker v29+ with containerd
 		Config: &container.Config{
 			Env: make([]string, 0),
 		},

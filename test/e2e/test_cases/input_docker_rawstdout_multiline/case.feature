@@ -8,20 +8,21 @@ Feature: input docker rawstdout multiline
     Given subcribe data from {grpc} with config
     """
     """
-    Given {input-docker-rawstdout-case} local config as below
+    Given {input-docker-rawstdout-multiline-case} local config as below
     """
     enable: true
     inputs:
       - Type: service_docker_stdout_raw
         IncludeEnv:
           STDOUT_SWITCH: "true"
+        BeginLineRegex: "today"
     """
-    When start docker-compose {input_docker_rawstdout}
+    When start docker-compose {input_docker_rawstdout_multiline}
     Then there is at least {1} logs
     Then the log fields match kv
     """
     _time_: ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?([zZ]|([\+-])([01]\d|2[0-3]):?([0-5]\d)?)?$
-    content: "^hello$"
+    content: "^today\nhello$"
     _source_: "^stdout$"
     _image_name_: ".*[-_]container:latest$"
     _container_name_: ".*[-_]container[-_]1$"

@@ -26,6 +26,9 @@ Feature: input docker static file
     Then the log tags match kv
     """
     "__path__": "^/root/test/a/b/c/d/axxxxxxx.log$"
+    _image_name_: ".*[-_]container:latest$"
+    _container_name_: ".*[-_]container[-_]1$"
+    _container_ip_: ^\b(?:(?:2(?:[0-4][0-9]|5[0-5])|[0-1]?[0-9]?[0-9])\.){3}(?:(?:2([0-4][0-9]|5[0-5])|[0-1]?[0-9]?[0-9]))\b$
     """
     Then the log fields match kv
     """
