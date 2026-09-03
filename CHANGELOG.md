@@ -37,5 +37,5 @@ your changes, such as:
 
 ## [Unreleased]
 - [public] [both] [security] Upgrade the source build requirement to Go 1.25.9+ and update vulnerable Go dependencies
-- [public] [linux] [removed] Remove CRI v1alpha2, batch/v1beta1 CronJob, and v1beta1 Ingress compatibility; require CRI v1 (containerd 1.6+), batch/v1 CronJob, and networking.k8s.io/v1 Ingress
+- [public] [linux] [removed] Remove CRI v1alpha2 compatibility and require CRI v1 (containerd 1.6+)
 - [inner] [both] [updated] Support SLS Metricstore output

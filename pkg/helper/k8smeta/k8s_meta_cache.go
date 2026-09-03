@@ -8,7 +8,9 @@ import (
 
 	app "k8s.io/api/apps/v1"
 	batch "k8s.io/api/batch/v1"
+	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	v1 "k8s.io/api/core/v1"
+	extensionsV1beta1 "k8s.io/api/extensions/v1beta1"
 	networking "k8s.io/api/networking/v1"
 	storage "k8s.io/api/storage/v1"
 	meta "k8s.io/apimachinery/pkg/api/meta"
@@ -49,7 +51,9 @@ func newK8sMetaCache(stopCh chan struct{}, resourceType string) *k8sMetaCache {
 	m.giveUp = newInformerGiveUp()
 	_ = v1.AddToScheme(m.schema)
 	_ = batch.AddToScheme(m.schema)
+	_ = batchv1beta1.AddToScheme(m.schema)
 	_ = app.AddToScheme(m.schema)
+	_ = extensionsV1beta1.AddToScheme(m.schema)
 	_ = networking.AddToScheme(m.schema)
 	_ = storage.AddToScheme(m.schema)
 	return m
@@ -290,10 +294,82 @@ func (m *k8sMetaCache) preProcessPod(obj interface{}) interface{} {
 }
 
 func (m *k8sMetaCache) preProcessCronJob(obj interface{}) interface{} {
+	if cronJob, ok := obj.(*batch.CronJob); ok {
+		return m.preProcessCommon(cronJob)
+	}
+
+	if cronJob, ok := obj.(*batchv1beta1.CronJob); ok {
+		v1CronJob := &batch.CronJob{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:              cronJob.Name,
+				Namespace:         cronJob.Namespace,
+				Labels:            cronJob.Labels,
+				Annotations:       cronJob.Annotations,
+				CreationTimestamp: cronJob.CreationTimestamp,
+			},
+			Spec: batch.CronJobSpec{
+				Schedule: cronJob.Spec.Schedule,
+				Suspend:  cronJob.Spec.Suspend,
+			},
+		}
+		return m.preProcessCommon(v1CronJob)
+	}
+
 	return m.preProcessCommon(obj)
 }
 
 func (m *k8sMetaCache) preProcessIngress(obj interface{}) interface{} {
+	if ingress, ok := obj.(*networking.Ingress); ok {
+		return m.preProcessCommon(ingress)
+	}
+
+	if ingress, ok := obj.(*extensionsV1beta1.Ingress); ok {
+		v1Ingress := &networking.Ingress{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:              ingress.Name,
+				Namespace:         ingress.Namespace,
+				Labels:            ingress.Labels,
+				Annotations:       ingress.Annotations,
+				CreationTimestamp: ingress.CreationTimestamp,
+			},
+			Spec: networking.IngressSpec{
+				IngressClassName: ingress.Spec.IngressClassName,
+			},
+		}
+		v1Ingress.Spec.Rules = make([]networking.IngressRule, 0, len(ingress.Spec.Rules))
+		for _, rule := range ingress.Spec.Rules {
+			v1Rule := networking.IngressRule{
+				Host: rule.Host,
+			}
+			if rule.HTTP != nil {
+				v1Rule.HTTP = &networking.HTTPIngressRuleValue{
+					Paths: make([]networking.HTTPIngressPath, 0, len(rule.HTTP.Paths)),
+				}
+				for _, path := range rule.HTTP.Paths {
+					v1Path := networking.HTTPIngressPath{
+						Path:     path.Path,
+						PathType: (*networking.PathType)(path.PathType),
+					}
+					if path.Backend.ServiceName != "" {
+						v1Path.Backend = networking.IngressBackend{
+							Service: &networking.IngressServiceBackend{
+								Name: path.Backend.ServiceName,
+							},
+						}
+						if path.Backend.ServicePort.StrVal != "" {
+							v1Path.Backend.Service.Port.Name = path.Backend.ServicePort.StrVal
+						} else {
+							v1Path.Backend.Service.Port.Number = path.Backend.ServicePort.IntVal
+						}
+					}
+					v1Rule.HTTP.Paths = append(v1Rule.HTTP.Paths, v1Path)
+				}
+			}
+			v1Ingress.Spec.Rules = append(v1Ingress.Spec.Rules, v1Rule)
+		}
+		return m.preProcessCommon(v1Ingress)
+	}
+
 	return m.preProcessCommon(obj)
 }
 
@@ -311,16 +387,35 @@ func (m *k8sMetaCache) getCronJobInformer(factory informers.SharedInformerFactor
 		return nil
 	}
 	resourceList, err := m.clientset.Discovery().ServerResourcesForGroupVersion("batch/v1")
+	if err == nil && containsResource(resourceList.APIResources, "cronjobs") {
+		logger.Info(context.Background(), "Using CronJob batch/v1 API")
+		return factory.Batch().V1().CronJobs().Informer()
+	}
 	if err != nil {
-		logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "batch/v1 CronJob API not found", "error", err)
+		logger.Info(context.Background(), "batch/v1 CronJob API unavailable, trying batch/v1beta1", "error", err)
+	} else {
+		logger.Info(context.Background(), "batch/v1 CronJob resource unavailable, trying batch/v1beta1")
+	}
+
+	betaResourceList, betaErr := m.clientset.Discovery().ServerResourcesForGroupVersion("batch/v1beta1")
+	if betaErr != nil {
+		logger.Warning(
+			context.Background(),
+			K8sMetaUnifyErrorCode,
+			"neither batch/v1 nor batch/v1beta1 CronJob API found",
+			"v1_error",
+			err,
+			"v1beta1_error",
+			betaErr,
+		)
 		return nil
 	}
-	if !containsResource(resourceList.APIResources, "cronjobs") {
-		logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "batch/v1 CronJob resource not found")
+	if !containsResource(betaResourceList.APIResources, "cronjobs") {
+		logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "CronJob resource not found in batch/v1 or batch/v1beta1")
 		return nil
 	}
-	logger.Info(context.Background(), "Using CronJob batch/v1 API")
-	return factory.Batch().V1().CronJobs().Informer()
+	logger.Info(context.Background(), "Using CronJob batch/v1beta1 API")
+	return factory.Batch().V1beta1().CronJobs().Informer()
 }
 
 func (m *k8sMetaCache) getIngressInformer(factory informers.SharedInformerFactory) cache.SharedIndexInformer {
@@ -329,16 +424,35 @@ func (m *k8sMetaCache) getIngressInformer(factory informers.SharedInformerFactor
 		return nil
 	}
 	resourceList, err := m.clientset.Discovery().ServerResourcesForGroupVersion("networking.k8s.io/v1")
+	if err == nil && containsResource(resourceList.APIResources, "ingresses") {
+		logger.Info(context.Background(), "Using Ingress networking.k8s.io/v1 API")
+		return factory.Networking().V1().Ingresses().Informer()
+	}
 	if err != nil {
-		logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "networking.k8s.io/v1 Ingress API not found", "error", err)
+		logger.Info(context.Background(), "networking.k8s.io/v1 Ingress API unavailable, trying extensions/v1beta1", "error", err)
+	} else {
+		logger.Info(context.Background(), "networking.k8s.io/v1 Ingress resource unavailable, trying extensions/v1beta1")
+	}
+
+	betaResourceList, betaErr := m.clientset.Discovery().ServerResourcesForGroupVersion("extensions/v1beta1")
+	if betaErr != nil {
+		logger.Warning(
+			context.Background(),
+			K8sMetaUnifyErrorCode,
+			"neither networking.k8s.io/v1 nor extensions/v1beta1 Ingress API found",
+			"v1_error",
+			err,
+			"v1beta1_error",
+			betaErr,
+		)
 		return nil
 	}
-	if !containsResource(resourceList.APIResources, "ingresses") {
-		logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "networking.k8s.io/v1 Ingress resource not found")
+	if !containsResource(betaResourceList.APIResources, "ingresses") {
+		logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "Ingress resource not found in networking.k8s.io/v1 or extensions/v1beta1")
 		return nil
 	}
-	logger.Info(context.Background(), "Using Ingress networking.k8s.io/v1 API")
-	return factory.Networking().V1().Ingresses().Informer()
+	logger.Info(context.Background(), "Using Ingress extensions/v1beta1 API")
+	return factory.Extensions().V1beta1().Ingresses().Informer()
 }
 
 // helper: 判断资源列表里是否包含指定名称
