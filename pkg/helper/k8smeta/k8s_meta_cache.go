@@ -294,11 +294,14 @@ func (m *k8sMetaCache) preProcessPod(obj interface{}) interface{} {
 }
 
 func (m *k8sMetaCache) preProcessCronJob(obj interface{}) interface{} {
+	// 尝试处理v1 CronJob
 	if cronJob, ok := obj.(*batch.CronJob); ok {
 		return m.preProcessCommon(cronJob)
 	}
 
+	// 尝试处理v1beta1 CronJob，转换为v1格式
 	if cronJob, ok := obj.(*batchv1beta1.CronJob); ok {
+		// 转换为v1格式，保持与现有代码的兼容性
 		v1CronJob := &batch.CronJob{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:              cronJob.Name,
@@ -315,15 +318,19 @@ func (m *k8sMetaCache) preProcessCronJob(obj interface{}) interface{} {
 		return m.preProcessCommon(v1CronJob)
 	}
 
+	// 如果都不是，返回原始对象
 	return m.preProcessCommon(obj)
 }
 
 func (m *k8sMetaCache) preProcessIngress(obj interface{}) interface{} {
+	// 尝试处理v1 Ingress
 	if ingress, ok := obj.(*networking.Ingress); ok {
 		return m.preProcessCommon(ingress)
 	}
 
+	// 尝试处理v1beta1 Ingress，转换为v1格式
 	if ingress, ok := obj.(*extensionsV1beta1.Ingress); ok {
+		// 转换为v1格式，保持与现有代码的兼容性
 		v1Ingress := &networking.Ingress{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:              ingress.Name,
@@ -336,40 +343,50 @@ func (m *k8sMetaCache) preProcessIngress(obj interface{}) interface{} {
 				IngressClassName: ingress.Spec.IngressClassName,
 			},
 		}
-		v1Ingress.Spec.Rules = make([]networking.IngressRule, 0, len(ingress.Spec.Rules))
-		for _, rule := range ingress.Spec.Rules {
-			v1Rule := networking.IngressRule{
-				Host: rule.Host,
-			}
-			if rule.HTTP != nil {
-				v1Rule.HTTP = &networking.HTTPIngressRuleValue{
-					Paths: make([]networking.HTTPIngressPath, 0, len(rule.HTTP.Paths)),
+
+		// 转换 Rules 字段
+		if len(ingress.Spec.Rules) > 0 {
+			v1Ingress.Spec.Rules = make([]networking.IngressRule, 0, len(ingress.Spec.Rules))
+			for _, rule := range ingress.Spec.Rules {
+				v1Rule := networking.IngressRule{
+					Host: rule.Host,
 				}
-				for _, path := range rule.HTTP.Paths {
-					v1Path := networking.HTTPIngressPath{
-						Path:     path.Path,
-						PathType: (*networking.PathType)(path.PathType),
+
+				if rule.HTTP != nil {
+					v1Rule.HTTP = &networking.HTTPIngressRuleValue{
+						Paths: make([]networking.HTTPIngressPath, 0, len(rule.HTTP.Paths)),
 					}
-					if path.Backend.ServiceName != "" {
-						v1Path.Backend = networking.IngressBackend{
-							Service: &networking.IngressServiceBackend{
-								Name: path.Backend.ServiceName,
-							},
+
+					for _, path := range rule.HTTP.Paths {
+						v1Path := networking.HTTPIngressPath{
+							Path:     path.Path,
+							PathType: (*networking.PathType)(path.PathType),
 						}
-						if path.Backend.ServicePort.StrVal != "" {
-							v1Path.Backend.Service.Port.Name = path.Backend.ServicePort.StrVal
-						} else {
-							v1Path.Backend.Service.Port.Number = path.Backend.ServicePort.IntVal
+
+						// 转换 Backend 字段
+						if path.Backend.ServiceName != "" {
+							v1Path.Backend = networking.IngressBackend{
+								Service: &networking.IngressServiceBackend{
+									Name: path.Backend.ServiceName,
+									Port: networking.ServiceBackendPort{
+										Number: path.Backend.ServicePort.IntVal,
+									},
+								},
+							}
 						}
+
+						v1Rule.HTTP.Paths = append(v1Rule.HTTP.Paths, v1Path)
 					}
-					v1Rule.HTTP.Paths = append(v1Rule.HTTP.Paths, v1Path)
 				}
+
+				v1Ingress.Spec.Rules = append(v1Ingress.Spec.Rules, v1Rule)
 			}
-			v1Ingress.Spec.Rules = append(v1Ingress.Spec.Rules, v1Rule)
 		}
+
 		return m.preProcessCommon(v1Ingress)
 	}
 
+	// 如果都不是，返回原始对象
 	return m.preProcessCommon(obj)
 }
 
@@ -381,74 +398,53 @@ func generateCommonKey(obj interface{}) ([]string, error) {
 	return []string{generateNameWithNamespaceKey(meta.GetNamespace(), meta.GetName())}, nil
 }
 
+// CronJobInformer 在 client-go 1.26+下不仅提供batch/v1（1.21以上）支持还提供batch/v1beta1（1.21以下）支持，因此可以兼容1.21以下版本的k8s
 func (m *k8sMetaCache) getCronJobInformer(factory informers.SharedInformerFactory) cache.SharedIndexInformer {
 	if m.clientset == nil {
 		logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "clientset is nil")
 		return nil
 	}
+	// 1. 探测 v1 是否支持当前k8s集群
 	resourceList, err := m.clientset.Discovery().ServerResourcesForGroupVersion("batch/v1")
 	if err == nil && containsResource(resourceList.APIResources, "cronjobs") {
-		logger.Info(context.Background(), "Using CronJob batch/v1 API")
+		logger.Info(context.Background(), "Using CronJob v1 API")
 		return factory.Batch().V1().CronJobs().Informer()
 	}
+	// 2. 如不支持v1，那么 fallback到 v1beta1
+	resourceList, err = m.clientset.Discovery().ServerResourcesForGroupVersion("batch/v1beta1")
 	if err != nil {
-		logger.Info(context.Background(), "batch/v1 CronJob API unavailable, trying batch/v1beta1", "error", err)
-	} else {
-		logger.Info(context.Background(), "batch/v1 CronJob resource unavailable, trying batch/v1beta1")
-	}
-
-	betaResourceList, betaErr := m.clientset.Discovery().ServerResourcesForGroupVersion("batch/v1beta1")
-	if betaErr != nil {
-		logger.Warning(
-			context.Background(),
-			K8sMetaUnifyErrorCode,
-			"neither batch/v1 nor batch/v1beta1 CronJob API found",
-			"v1_error",
-			err,
-			"v1beta1_error",
-			betaErr,
-		)
+		logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "Neither batch/v1 nor batch/v1beta1 CronJob API found", "error", err)
 		return nil
 	}
-	if !containsResource(betaResourceList.APIResources, "cronjobs") {
-		logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "CronJob resource not found in batch/v1 or batch/v1beta1")
+	if !containsResource(resourceList.APIResources, "cronjobs") {
+		logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "CronJob API not found in both v1 and v1beta1")
 		return nil
 	}
-	logger.Info(context.Background(), "Using CronJob batch/v1beta1 API")
+	logger.Info(context.Background(), "Using CronJob v1beta1 API")
 	return factory.Batch().V1beta1().CronJobs().Informer()
 }
 
+// IngressInformer 在 client-go 1.26+下不仅提供networking.k8s.io/v1（1.19以上）支持还提供extensions/v1beta1（1.19以下）支持，因此可以兼容1.19以下版本的k8s
 func (m *k8sMetaCache) getIngressInformer(factory informers.SharedInformerFactory) cache.SharedIndexInformer {
 	if m.clientset == nil {
 		logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "clientset is nil")
 		return nil
 	}
+	// 1. 探测 networking.k8s.io/v1 是否支持当前k8s集群
 	resourceList, err := m.clientset.Discovery().ServerResourcesForGroupVersion("networking.k8s.io/v1")
 	if err == nil && containsResource(resourceList.APIResources, "ingresses") {
 		logger.Info(context.Background(), "Using Ingress networking.k8s.io/v1 API")
 		return factory.Networking().V1().Ingresses().Informer()
 	}
-	if err != nil {
-		logger.Info(context.Background(), "networking.k8s.io/v1 Ingress API unavailable, trying extensions/v1beta1", "error", err)
-	} else {
-		logger.Info(context.Background(), "networking.k8s.io/v1 Ingress resource unavailable, trying extensions/v1beta1")
-	}
 
-	betaResourceList, betaErr := m.clientset.Discovery().ServerResourcesForGroupVersion("extensions/v1beta1")
-	if betaErr != nil {
-		logger.Warning(
-			context.Background(),
-			K8sMetaUnifyErrorCode,
-			"neither networking.k8s.io/v1 nor extensions/v1beta1 Ingress API found",
-			"v1_error",
-			err,
-			"v1beta1_error",
-			betaErr,
-		)
+	// 2. 如不支持networking.k8s.io/v1，那么 fallback到 extensions/v1beta1
+	resourceList, err = m.clientset.Discovery().ServerResourcesForGroupVersion("extensions/v1beta1")
+	if err != nil {
+		logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "Neither networking.k8s.io/v1 nor extensions/v1beta1 Ingress API found", "error", err)
 		return nil
 	}
-	if !containsResource(betaResourceList.APIResources, "ingresses") {
-		logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "Ingress resource not found in networking.k8s.io/v1 or extensions/v1beta1")
+	if !containsResource(resourceList.APIResources, "ingresses") {
+		logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "Ingress API not found in both networking.k8s.io/v1 and extensions/v1beta1")
 		return nil
 	}
 	logger.Info(context.Background(), "Using Ingress extensions/v1beta1 API")

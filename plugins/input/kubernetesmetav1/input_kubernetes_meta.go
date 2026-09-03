@@ -157,7 +157,7 @@ func (in *InputKubernetesMeta) addInformerListerCollectors() {
 			StorageClasses().Lister(), in.collectStorageClass))
 	}
 	if in.Ingress || in.Service {
-		in.collectors = append(in.collectors, newCollector(Ingress, in.informerFactory.Networking().V1().Ingresses().Lister(), in.collectIngresses))
+		in.collectors = append(in.collectors, newCollector(Ingress, in.informerFactory.Networking().V1beta1().Ingresses().Lister(), in.collectIngresses))
 	}
 	if in.Pod || in.Node {
 		in.collectors = append(in.collectors, newCollector(Node, in.informerFactory.Core().V1().Nodes().Lister(), in.collectNodes))
@@ -178,7 +178,7 @@ func (in *InputKubernetesMeta) addInformerListerCollectors() {
 		in.collectors = append(in.collectors, newCollector(Job, in.informerFactory.Batch().V1().Jobs().Lister(), in.collectJobs))
 	}
 	if in.Pod || in.CronJob || in.Job {
-		in.collectors = append(in.collectors, newCollector(CronJob, in.informerFactory.Batch().V1().CronJobs().Lister(), in.collectCronJobs))
+		in.collectors = append(in.collectors, newCollector(CronJob, in.informerFactory.Batch().V1beta1().CronJobs().Lister(), in.collectCronJobs))
 	}
 	if in.Configmap {
 		in.collectors = append(in.collectors, newCollector(Configmap, in.informerFactory.Core().V1().ConfigMaps().Lister(), in.collectConfigmaps))
