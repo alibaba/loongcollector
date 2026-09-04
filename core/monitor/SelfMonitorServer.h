@@ -54,6 +54,7 @@ public:
     static const std::string INTERNAL_DATA_TYPE_METRIC;
     static const std::string INTERNAL_DATA_TYPE_TASK_STATUS;
     static const std::string INTERNAL_DATA_TYPE_CONTAINER;
+    static const std::string INTERNAL_DATA_TYPE_AGENT_LOG;
 
 private:
     SelfMonitorServer();

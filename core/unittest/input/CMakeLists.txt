@@ -56,6 +56,9 @@ endif()
 add_executable(input_internal_alarms_unittest InputInternalAlarmsUnittest.cpp)
 target_link_libraries(input_internal_alarms_unittest ${UT_BASE_TARGET})
 
+add_executable(input_internal_agent_logs_unittest InputInternalAgentLogsUnittest.cpp)
+target_link_libraries(input_internal_agent_logs_unittest ${UT_BASE_TARGET})
+
 add_executable(input_internal_metrics_unittest InputInternalMetricsUnittest.cpp)
 target_link_libraries(input_internal_metrics_unittest ${UT_BASE_TARGET})
 
@@ -84,6 +87,7 @@ endif()
 include(GoogleTest)
 gtest_discover_tests(input_file_unittest)
 gtest_discover_tests(input_internal_alarms_unittest)
+gtest_discover_tests(input_internal_agent_logs_unittest)
 gtest_discover_tests(input_internal_metrics_unittest)
 if (LINUX)
     gtest_discover_tests(input_prometheus_unittest)

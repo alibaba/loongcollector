@@ -24,6 +24,7 @@
 | `input_forward`<br>[转发输入](native/input-forward.md)                           | SLS 官方 | 接收来自其他实例或系统的数据转发。     |
 | `input_host_meta`<br>[主机元数据](native/input-host-meta.md)                   | SLS 官方 | 定时采集主机、进程及关联关系等元数据。 |
 | `input_host_monitor`<br>[主机监控数据](native/input-host-monitor.md)           | SLS 官方 | 采集主机 CPU/内存/磁盘/网络等指标。   |
+| `input_internal_agent_logs_onetime`<br>[本机诊断日志（一次性）](native/input-internal-agent-logs.md) | SLS 官方 | 一次性采集本机运行日志与文本配置。 |
 | `input_internal_alarms`<br>[自监控告警数据](native/input-internal-alarms.md)   | SLS 官方 | 导出自监控告警数据。                  |
 | `input_internal_metrics`<br>[自监控指标数据](native/input-internal-metrics.md) | SLS 官方 | 导出自监控指标数据。                  |
 | `input_network_observer`<br>[网络可观测数据](native/input-network-observer.md) | SLS 官方 | 网络可观测数据采集。                  |
