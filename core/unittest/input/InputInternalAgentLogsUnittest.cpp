@@ -75,19 +75,27 @@ protected:
         ctx.SetConfigName("onetime-al-test");
         p.mPluginID.store(0);
         ctx.SetPipeline(p);
-        writeFile(Join(GetAgentLogDir(), "loongcollector.LOG"),
+        writeFile(Join(GetAgentLogDir(), GetAgentLogName()),
                   "[2026-08-24 13:52:01.123456]\t[info]\t[1]\tAppConfig.cpp:1\t\tstarted\n");
-        writeFile(Join(GetAgentLogDir(), "loongcollector.LOG.1"),
+        writeFile(Join(GetAgentLogDir(), GetAgentLogName() + ".1"),
                   "[2026-08-24 12:00:00.000000]\t[info]\t[1]\tAppConfig.cpp:1\t\trotated\n");
-        writeFile(Join(GetAgentLogDir(), "loongcollector.LOG.2.gz"), "compressed");
+        writeFile(Join(GetAgentLogDir(), GetAgentLogName() + ".2.gz"), "compressed");
         writeFile(Join(GetAgentLogDir(), GetPluginLogName()),
                   "2026-08-24 13:52:01 [info] [metric_mock.go:42] [Start] mock go pipeline started\n"
                   "2026-08-24 13:52:02 [info] [metric_mock.go:88] [Collect] emit 1 points\n");
-        writeFile(Join(GetAgentRunDir(), "app_info.json"), "{\"ip\":\"10.0.1.11\"}\n");
-        writeFile(GetCheckPointFileName(), "{\"version\":1}\n");
-        fs::create_directories(fs::path(GetProcessExecutionDir()) / "continuous_pipeline_config" / "local");
-        writeFile(Join(Join(GetProcessExecutionDir(), "continuous_pipeline_config/local"), "demo.json"), "{}\n");
-        writeFile(Join(Join(GetProcessExecutionDir(), "continuous_pipeline_config/local"), "mock_go_pipeline.json"),
+        writeFile(GetAgentAppInfoFile(), "{\"ip\":\"10.0.1.11\"}\n");
+        {
+            const fs::path checkpoint(GetCheckPointFileName());
+            if (checkpoint.has_parent_path()) {
+                fs::create_directories(checkpoint.parent_path());
+            }
+            writeFile(checkpoint.string(), "{\"version\":1}\n");
+        }
+        const fs::path pipelineLocal = fs::path(AppConfig::GetInstance()->GetLoongcollectorConfDir())
+            / GetContinuousPipelineConfigDir() / "local";
+        fs::create_directories(pipelineLocal);
+        writeFile((pipelineLocal / "demo.json").string(), "{}\n");
+        writeFile((pipelineLocal / "mock_go_pipeline.json").string(),
                   R"({
   "inputs": [{"Type": "metric_mock", "IntervalMs": 1000}],
   "flushers": [{"Type": "flusher_stdout"}]
@@ -96,14 +104,15 @@ protected:
 
     void TearDown() override {
         StaticFileServer::GetInstance()->Clear();
-        removeFile(Join(GetAgentLogDir(), "loongcollector.LOG"));
-        removeFile(Join(GetAgentLogDir(), "loongcollector.LOG.1"));
-        removeFile(Join(GetAgentLogDir(), "loongcollector.LOG.2.gz"));
+        removeFile(Join(GetAgentLogDir(), GetAgentLogName()));
+        removeFile(Join(GetAgentLogDir(), GetAgentLogName() + ".1"));
+        removeFile(Join(GetAgentLogDir(), GetAgentLogName() + ".2.gz"));
         removeFile(Join(GetAgentLogDir(), GetPluginLogName()));
-        removeFile(Join(GetAgentRunDir(), "app_info.json"));
+        removeFile(GetAgentAppInfoFile());
         removeFile(GetCheckPointFileName());
         error_code ec;
-        fs::remove_all(fs::path(GetProcessExecutionDir()) / "continuous_pipeline_config", ec);
+        fs::remove_all(
+            fs::path(AppConfig::GetInstance()->GetLoongcollectorConfDir()) / GetContinuousPipelineConfigDir(), ec);
     }
 
 private:
@@ -335,10 +344,10 @@ void InputInternalAgentLogsUnittest::TestGoMockPipelineAndTimeFilter() {
         = input.buildRuntimeLogsConfig(InputInternalAgentLogs::RuntimeLogKind::Cpp)["FilePaths"].toStyledString();
     const string goPaths
         = input.buildRuntimeLogsConfig(InputInternalAgentLogs::RuntimeLogKind::Go)["FilePaths"].toStyledString();
-    APSARA_TEST_TRUE(cppPaths.find("loongcollector.LOG") != string::npos);
+    APSARA_TEST_TRUE(cppPaths.find(GetAgentLogName()) != string::npos);
     APSARA_TEST_TRUE(cppPaths.find(GetPluginLogName()) == string::npos);
     APSARA_TEST_TRUE(goPaths.find(GetPluginLogName()) != string::npos);
-    APSARA_TEST_TRUE(goPaths.find("loongcollector.LOG") == string::npos);
+    APSARA_TEST_TRUE(goPaths.find(GetAgentLogName()) == string::npos);
 
     tm t{};
     t.tm_year = 2026 - 1900;
