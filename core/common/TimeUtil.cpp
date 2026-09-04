@@ -19,6 +19,8 @@
 
 #include <atomic>
 #include <chrono>
+#include <fstream>
+#include <sstream>
 #ifdef APSARA_UNIT_TEST_MAIN
 #include <functional>
 #endif
@@ -227,6 +229,32 @@ int ReadUtmp(const char* filename, int* n_entries, utmp** utmp_buf) {
     return 0;
 }
 
+int32_t GetBootTimeFromProcStat(const std::string& procStatPath) {
+    std::ifstream fin(procStatPath);
+    if (!fin) {
+        APSARA_LOG_WARNING(sLogger, ("failed to open proc stat file", procStatPath));
+        return 0;
+    }
+
+    std::string line;
+    while (std::getline(fin, line)) {
+        std::istringstream iss(line);
+        std::string key;
+        iss >> key;
+        if (key == "btime") {
+            std::string value;
+            iss >> value;
+            int32_t bootTime = 0;
+            if (!StringTo(value, bootTime) || bootTime <= 0) {
+                APSARA_LOG_WARNING(sLogger, ("failed to parse btime from proc stat", line));
+                return 0;
+            }
+            return bootTime;
+        }
+    }
+    return 0;
+}
+
 int32_t GetBootTimeFromUtmp() {
     int32_t bootTime = -1;
     int n_users = 0;
@@ -283,7 +311,12 @@ int32_t GetUpTime() {
 
 int32_t GetSystemBootTime() {
 #if defined(__linux__)
-    int32_t bootTime = 0;
+    int32_t bootTime = GetBootTimeFromProcStat();
+    if (bootTime > 0) {
+        APSARA_LOG_INFO(sLogger, ("get system boot time from /proc/stat", bootTime));
+        return bootTime;
+    }
+
     int32_t upTime = GetUpTime();
     if (upTime > 0) {
         time_t currentTime = time(NULL);
