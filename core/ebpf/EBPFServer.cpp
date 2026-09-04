@@ -402,8 +402,8 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
             }
             case PluginType::AGENTSIGHT_OBSERVE: {
                 if (!pluginMgr) {
-                    auto mgr
-                        = AgentsightManager::Create(mProcessCacheManager, mEBPFAdapter, mCommonEventQueue, &mEventPool);
+                    auto mgr = AgentsightManager::Create(
+                        mProcessCacheManager, mEBPFAdapter, mCommonEventQueue, &mEventPool, mHostPathPrefix.string());
                     mgr->SetMetrics(mLossKernelEventsTotal, mPushLogFailedTotal);
                     pluginMgr = mgr;
                 }

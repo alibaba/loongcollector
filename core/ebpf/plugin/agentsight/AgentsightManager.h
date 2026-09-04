@@ -28,11 +28,23 @@
 #include "ebpf/plugin/agentsight/AgentsightMessageUtil.h"
 #include "monitor/metric_models/ReentrantMetricsRecord.h"
 
+namespace logtail {
+class PipelineEventGroup;
+struct RawContainerInfo;
+} // namespace logtail
+
 namespace logtail::ebpf {
 
 // Defined in AgentsightEvents.h; only used through pointers here.
 class AgentsightLlmRecord;
 class AgentsightHttpsRecord;
+
+/// Sets the standard container metadata tags on @group from @info — the same keys
+/// input_file / input_container_stdio emit (`_container_name_`, `_image_name_`, `_container_ip_`,
+/// `_pod_name_`, `_namespace_`, `_pod_uid_` via GetDefaultTagKeyString, plus custom metadatas
+/// verbatim). Pure function with no singleton access, so it is unit-testable on its own; the
+/// ContainerManager lookup wrapper lives in AgentsightManager.cpp.
+void AttachAgentsightContainerTagsFromInfo(PipelineEventGroup& group, const RawContainerInfo& info);
 
 class AgentsightManager : public AbstractManager {
 public:
@@ -41,14 +53,17 @@ public:
                       const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
                       moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
                       EventPool* pool,
+                      std::string hostRootPath,
                       size_t sessionInputCacheMaxSize = kMaxSessionInputStates);
 
     static std::shared_ptr<AgentsightManager>
     Create(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
            const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
            moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
-           EventPool* pool) {
-        return std::make_shared<AgentsightManager>(processCacheManager, eBPFAdapter, queue, pool);
+           EventPool* pool,
+           std::string hostRootPath) {
+        return std::make_shared<AgentsightManager>(
+            processCacheManager, eBPFAdapter, queue, pool, std::move(hostRootPath));
     }
 
     ~AgentsightManager() override = default;
@@ -113,6 +128,12 @@ private:
     void clearSessionInputState();
 
     static constexpr size_t kMaxSessionInputStates = 4096;
+
+    // Host root as seen from inside the container ("/logtail_host", or "/" on a host install).
+    // Passed to libagentsight so its pid lookups read <root>/proc instead of our own /proc, which
+    // only lists processes sharing our pid namespace. Declared before mSessionInputCache to match
+    // the constructor's initialisation order.
+    std::string mHostRootPath;
 
     std::string mConfigName;
     const CollectionPipelineContext* mPipelineCtx{nullptr};

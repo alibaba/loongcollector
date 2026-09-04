@@ -21,17 +21,24 @@
 #include <variant>
 #include <vector>
 
+#include "json/json.h"
+
+#include "app_config/AppConfig.h"
 #include "collection_pipeline/CollectionPipelineContext.h"
 #include "collection_pipeline/queue/ProcessQueueItem.h"
 #include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "collection_pipeline/queue/QueueKeyManager.h"
+#include "common/FileSystemUtil.h"
 #include "common/StringView.h"
+#include "constants/TagConstants.h"
+#include "container_manager/ContainerManager.h"
 #include "ebpf/Config.h"
 #include "ebpf/EBPFAdapter.h"
 #include "ebpf/plugin/agentsight/AgentsightEvents.h"
 #include "ebpf/plugin/agentsight/AgentsightManager.h"
 #include "ebpf/type/FileEvent.h"
 #include "models/LogEvent.h"
+#include "models/PipelineEventGroup.h"
 #include "unittest/Unittest.h"
 #include "unittest/ebpf/ManagerUnittestBase.h"
 
@@ -289,6 +296,63 @@ std::string contentOf(const LogEvent& log, const char* key) {
     return std::string(v.data(), v.size());
 }
 
+std::string tagOf(const PipelineEventGroup& group, const char* key) {
+    const StringView v = group.GetTag(StringView(key));
+    return v.empty() ? std::string() : std::string(v.data(), v.size());
+}
+
+/// Fixture container for the metadata-enrichment tests. The ContainerManager singleton is
+/// process-global and never torn down in this binary, so the seeded entry stays visible to later
+/// tests; the ID is distinct enough that no other test fabricates it by accident.
+const char* kUtContainerId = "c0ffee00c0ffee00c0ffee00c0ffee00c0ffee00c0ffee00c0ffee00c0ffee00";
+
+/// Seeds the process-wide ContainerManager singleton through the public persistence path (the same
+/// one ContainerManagerUnittest::TestSaveLoadContainerInfo exercises): write a v1.0.0
+/// docker_path_config.json and reload it, which swaps the whole container map. MetaDatas carries
+/// the six standard keys (routed to RawContainerInfo::mMetadatas by AddMetadata) plus one custom
+/// key (routed to mCustomMetadatas), covering both tag sources the enricher reads.
+void seedContainerInventory() {
+    Json::Value meta(Json::objectValue);
+    meta["_container_name_"] = "ut-agent-container";
+    meta["_image_name_"] = "registry.example.com/agent:ut";
+    meta["_container_ip_"] = "172.17.0.7";
+    meta["_pod_name_"] = "agent-pod-ut";
+    meta["_namespace_"] = "ut-ns";
+    meta["_pod_uid_"] = "ut-pod-uid";
+    meta["app"] = "ut-custom-tag";
+    Json::Value container(Json::objectValue);
+    container["ID"] = kUtContainerId;
+    container["Name"] = "ut-agent-container";
+    container["MetaDatas"] = meta;
+    Json::Value arr(Json::arrayValue);
+    arr.append(container);
+    Json::Value root(Json::objectValue);
+    root["version"] = "1.0.0";
+    root["Containers"] = arr;
+    OverwriteFile(PathJoin(GetAgentDataDir(), "docker_path_config.json"), root.toStyledString());
+    ContainerManager::GetInstance()->LoadContainerInfo();
+}
+
+/// The six standard container metadata tag keys, in default-key-name form.
+const char* kUtContainerTagKeys[] = {
+    "_container_name_",
+    "_image_name_",
+    "_container_ip_",
+    "_pod_name_",
+    "_namespace_",
+    "_pod_uid_",
+};
+
+void expectUtContainerTags(const PipelineEventGroup& group) {
+    APSARA_TEST_EQUAL("ut-agent-container", tagOf(group, "_container_name_"));
+    APSARA_TEST_EQUAL("registry.example.com/agent:ut", tagOf(group, "_image_name_"));
+    APSARA_TEST_EQUAL("172.17.0.7", tagOf(group, "_container_ip_"));
+    APSARA_TEST_EQUAL("agent-pod-ut", tagOf(group, "_pod_name_"));
+    APSARA_TEST_EQUAL("ut-ns", tagOf(group, "_namespace_"));
+    APSARA_TEST_EQUAL("ut-pod-uid", tagOf(group, "_pod_uid_"));
+    APSARA_TEST_EQUAL("ut-custom-tag", tagOf(group, "app"));
+}
+
 class AgentSightTestEBPFAdapter : public EBPFAdapter {
 public:
     void setAgentSightSymbols(std::unique_ptr<AgentSightSymbolTable> sym) { mTestSyms = std::move(sym); }
@@ -369,10 +433,12 @@ public:
     PluginOptions asVariant() { return &agentsightOptions(); }
 
     std::shared_ptr<AgentsightManager> makeManager(const size_t sessionInputCacheMaxSize = 4096) {
+        // "/" is the host-mode root: the procfs-root setter path is skipped for it.
         auto m = std::make_shared<AgentsightManager>(mProcessCacheManager,
                                                      std::static_pointer_cast<EBPFAdapter>(mAgentSightAdapter),
                                                      *mEventQueue,
                                                      mEventPool.get(),
+                                                     "/",
                                                      sessionInputCacheMaxSize);
         APSARA_TEST_EQUAL(0, m->Init());
         return m;
@@ -486,6 +552,10 @@ public:
     void TestHttpsHostExtractionVariants();
     void TestHttpsEventOmitsEmptyOptionalFields();
     void TestLlmServerAddressFromRequestUrl();
+    void TestAttachAgentsightContainerTagsFromInfo();
+    void TestContainerTagsAttachedForLlmEvent();
+    void TestContainerTagsAttachedForHttpsEvent();
+    void TestContainerTagsMissDegradesSilently();
 
 protected:
     std::shared_ptr<AgentSightTestEBPFAdapter> mAgentSightAdapter;
@@ -649,7 +719,8 @@ void AgentsightManagerUnittest::TestResumeInvalidOptions() {
     auto p = new TestableAgentsightManager(mProcessCacheManager,
                                            std::static_pointer_cast<EBPFAdapter>(mAgentSightAdapter),
                                            *mEventQueue,
-                                           mEventPool.get());
+                                           mEventPool.get(),
+                                           "/");
     std::shared_ptr<TestableAgentsightManager> mgr(p);
     APSARA_TEST_EQUAL(0, mgr->Init());
     PluginOptions nullSec{static_cast<SecurityOptions*>(nullptr)};
@@ -661,7 +732,8 @@ void AgentsightManagerUnittest::TestResumeWithNoRegistration() {
     auto p = new TestableAgentsightManager(mProcessCacheManager,
                                            std::static_pointer_cast<EBPFAdapter>(mAgentSightAdapter),
                                            *mEventQueue,
-                                           mEventPool.get());
+                                           mEventPool.get(),
+                                           "/");
     std::shared_ptr<TestableAgentsightManager> mgr(p);
     APSARA_TEST_EQUAL(0, mgr->Init());
     APSARA_TEST_EQUAL(0, mgr->resume(asVariant()));
@@ -1444,6 +1516,99 @@ void AgentsightManagerUnittest::TestLlmServerAddressFromRequestUrl() {
     mgr->Destroy();
 }
 
+void AgentsightManagerUnittest::TestAttachAgentsightContainerTagsFromInfo() {
+    // Pure function: no singleton involved, tags come straight from the info's metadata vectors.
+    RawContainerInfo info;
+    info.AddMetadata("_container_name_", "pure-container"); // known key -> mMetadatas
+    info.AddMetadata("_image_name_", "registry.example.com/pure:1");
+    info.AddMetadata("app", "pure-custom"); // unknown key -> mCustomMetadatas
+
+    auto sourceBuffer = std::make_shared<SourceBuffer>();
+    PipelineEventGroup group(sourceBuffer);
+    AttachAgentsightContainerTagsFromInfo(group, info);
+
+    APSARA_TEST_EQUAL("pure-container", tagOf(group, "_container_name_"));
+    APSARA_TEST_EQUAL("registry.example.com/pure:1", tagOf(group, "_image_name_"));
+    APSARA_TEST_EQUAL("pure-custom", tagOf(group, "app"));
+    APSARA_TEST_FALSE(group.HasTag(StringView("_pod_name_")));
+
+    // Empty info attaches nothing.
+    RawContainerInfo empty;
+    PipelineEventGroup bareGroup(std::make_shared<SourceBuffer>());
+    AttachAgentsightContainerTagsFromInfo(bareGroup, empty);
+    APSARA_TEST_EQUAL(0UL, bareGroup.GetTags().size());
+}
+
+void AgentsightManagerUnittest::TestContainerTagsAttachedForLlmEvent() {
+    seedContainerInventory();
+    const char* kConfig = "p_container_tags_llm";
+    auto mgr = makeManager();
+    registerConfigWithPoppableQueue(*mgr, kConfig);
+    // EventStreamFormat is static state shared across tests; pin the split shape explicitly.
+    agentsightOptions().mAgentsightEventStreamFormat = true;
+
+    auto rec = makeMinimalLlmRecord(kConfig, "sess-container");
+    rec->mContainerId = kUtContainerId;
+    APSARA_TEST_EQUAL(0, mgr->HandleEvent(rec));
+
+    std::unique_ptr<ProcessQueueItem> item;
+    const auto logs = popLogEvents(item);
+    APSARA_TEST_EQUAL(2UL, logs.size());
+    expectUtContainerTags(item->mEventGroup);
+    mgr->Destroy();
+}
+
+void AgentsightManagerUnittest::TestContainerTagsAttachedForHttpsEvent() {
+    seedContainerInventory();
+    const char* kConfig = "p_container_tags_https";
+    auto mgr = makeManager();
+    registerConfigWithPoppableQueue(*mgr, kConfig);
+
+    HttpsSpec spec;
+    spec.containerId = kUtContainerId;
+    spec.statusCode = 200;
+    spec.responseBody = "ok";
+
+    std::unique_ptr<ProcessQueueItem> item;
+    const auto logs = emitHttps(*mgr, kConfig, spec, item);
+    APSARA_TEST_EQUAL(2UL, logs.size());
+    expectUtContainerTags(item->mEventGroup);
+    mgr->Destroy();
+}
+
+void AgentsightManagerUnittest::TestContainerTagsMissDegradesSilently() {
+    seedContainerInventory();
+    const char* kConfig = "p_container_tags_miss";
+    auto mgr = makeManager();
+    registerConfigWithPoppableQueue(*mgr, kConfig);
+
+    // Unknown container ID (container gone from the snapshot, or a short/variant form): the event
+    // is still pushed and simply carries no container tags.
+    {
+        auto rec = makeMinimalLlmRecord(kConfig, "sess-unknown-container");
+        rec->mContainerId = "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
+        APSARA_TEST_EQUAL(0, mgr->HandleEvent(rec));
+        std::unique_ptr<ProcessQueueItem> item;
+        const auto logs = popLogEvents(item);
+        APSARA_TEST_TRUE(!logs.empty());
+        for (const char* key : kUtContainerTagKeys) {
+            APSARA_TEST_FALSE(item->mEventGroup.HasTag(StringView(key)));
+        }
+    }
+    // Empty container ID (host process): same degradation, exercised through the raw HTTP path.
+    {
+        HttpsSpec spec;
+        spec.containerId = nullptr;
+        std::unique_ptr<ProcessQueueItem> item;
+        const auto logs = emitHttps(*mgr, kConfig, spec, item);
+        APSARA_TEST_TRUE(!logs.empty());
+        for (const char* key : kUtContainerTagKeys) {
+            APSARA_TEST_FALSE(item->mEventGroup.HasTag(StringView(key)));
+        }
+    }
+    mgr->Destroy();
+}
+
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestGetPluginType);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestAddOrUpdateValidation);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestAddOrUpdateNoSymbols);
@@ -1480,5 +1645,9 @@ UNIT_TEST_CASE(AgentsightManagerUnittest, TestStaleConfigRecordDroppedNotReroute
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestHttpsHostExtractionVariants);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestHttpsEventOmitsEmptyOptionalFields);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestLlmServerAddressFromRequestUrl);
+UNIT_TEST_CASE(AgentsightManagerUnittest, TestAttachAgentsightContainerTagsFromInfo);
+UNIT_TEST_CASE(AgentsightManagerUnittest, TestContainerTagsAttachedForLlmEvent);
+UNIT_TEST_CASE(AgentsightManagerUnittest, TestContainerTagsAttachedForHttpsEvent);
+UNIT_TEST_CASE(AgentsightManagerUnittest, TestContainerTagsMissDegradesSilently);
 
 UNIT_TEST_MAIN
