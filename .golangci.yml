@@ -82,6 +82,10 @@ linters:
       - linters:
           - staticcheck
         text: 'SA1019:'
+      - linters:
+          - gosec
+        path: pkg/selfmonitor/alarm_type.go
+        text: 'G101:'
     paths:
       - plugins/input/journal/unit.go
       - plugins/input/journal/follow.go
