@@ -32,6 +32,27 @@ func metricLog(kv ...string) *protocol.Log {
 	return log
 }
 
+func TestLogFieldGreaterThanEqual(t *testing.T) {
+	groups := []*protocol.LogGroup{{
+		Logs: []*protocol.Log{
+			metricLog("count", "9"),
+			metricLog("count", "10"),
+		},
+	}}
+
+	require.NoError(t, logFieldGreaterThanEqual(groups, "count", 10))
+	require.EqualError(t, logFieldGreaterThanEqual(groups, "count", 11), "want count >= 11, but got 10")
+	negativeGroups := []*protocol.LogGroup{{Logs: []*protocol.Log{metricLog("count", "-10")}}}
+	require.NoError(t, logFieldGreaterThanEqual(negativeGroups, "count", -10))
+	require.EqualError(t, logFieldGreaterThanEqual(groups, "missing", 1), "want contains key missing, but not found")
+	require.EqualError(t, logFieldGreaterThanEqual(nil, "count", 1), "want contains key count, but not found")
+	require.ErrorContains(
+		t,
+		logFieldGreaterThanEqual([]*protocol.LogGroup{{Logs: []*protocol.Log{metricLog("count", "invalid")}}}, "count", 1),
+		`parse field count value "invalid"`,
+	)
+}
+
 func TestLogContainsExactKV(t *testing.T) {
 	// A canonical multi-value metric-log row produced by metric_mock via the v2
 	// export path: __name__/__value__/__labels__ carry exact values.

@@ -102,6 +102,7 @@ func ScenarioInitializer(ctx *godog.ScenarioContext) {
 	ctx.Then(`^there is at least \{(\d+)\} logs$`, verify.LogCountAtLeast)
 	ctx.Then(`^there is at least \{(\d+)\} logs with filter key \{(.*)\} value \{(.*)\}$`, verify.LogCountAtLeastWithFilter)
 	ctx.Then(`^the log fields match kv`, verify.LogFieldKV)
+	ctx.Then(`^the log field \{(.*)\} greater or equal than \{(-?\d+)\}`, verify.LogFieldGreaterThanEqual)
 	ctx.Then(`^the log fields have exact kv`, verify.LogFieldExactKV)
 	ctx.Then(`^the log tags match kv`, verify.TagKV)
 	ctx.Then(`^the kafka partitions at least \{(\d+)\}$`, verify.KafkaPartitionsAtLeast)
