@@ -44,6 +44,12 @@ func ScenarioInitializer(ctx *godog.ScenarioContext) {
 	ctx.Given(`^disk full for \{(\d+)\} seconds$`, chaos.DiskFull)
 	ctx.Given(`^disk burn read for \{(\d+)\} seconds$`, chaos.DiskBurRead)
 	ctx.Given(`^disk burn write for \{(\d+)\} seconds$`, chaos.DiskBurWrite)
+	ctx.Given(`^cpu fullload for \{(\d+)\} seconds$`, chaos.CPUFullLoad)
+	ctx.Given(`^cpu 100nproc for \{(\d+)\} seconds$`, chaos.CPU100NProc)
+	ctx.Given(`^cpu nproc for \{(\d+)\} seconds$`, chaos.CPUNProc)
+	ctx.Given(`^mem high for \{(\d+)\} seconds$`, chaos.MemHigh)
+	ctx.Given(`^oom$`, chaos.Oom)
+	ctx.Given(`^mem frag for \{(\d+)\} seconds$`, chaos.MemFrag)
 	ctx.Given(`^clean all chaos$`, cleanup.DestoryAllChaos)
 	// ------------------------------------------
 
