@@ -77,10 +77,13 @@ func Test_Tags_SortTo(t *testing.T) {
 
 func BenchmarkMetricGetSize(b *testing.B) {
 	tags := NewTags()
+	sortedTags := NewTagSlice()
 	for i := 0; i < 15; i++ {
 		tags.Add(fmt.Sprintf("tag_%d", i), fmt.Sprintf("value_%d", i))
+		sortedTags.Add(fmt.Sprintf("tag_%d", i), fmt.Sprintf("value_%d", i))
 	}
 	metric := NewSingleValueMetric("cpu_usage", MetricTypeGauge, tags, time.Now().UnixNano(), 1.0)
+	sortedMetric := NewSingleValueMetric("cpu_usage", MetricTypeGauge, sortedTags, time.Now().UnixNano(), 1.0)
 
 	b.Run("GetSizeByString", func(b *testing.B) {
 		b.ReportAllocs()
@@ -97,6 +100,14 @@ func BenchmarkMetricGetSize(b *testing.B) {
 			_ = metric.GetSize()
 		}
 	})
+
+	b.Run("MetricGetSize_WithSortTags", func(b *testing.B) {
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			_ = sortedMetric.GetSize()
+		}
+	})
 }
 
 func BenchmarkNilKeyValueGetIterator(b *testing.B) {
@@ -109,4 +120,10 @@ func BenchmarkNilKeyValueGetIterator(b *testing.B) {
 			_ = kvs.Iterator()
 		}
 	})
+}
+
+func TestNilGroup(t *testing.T) {
+	var group *GroupInfo
+	assert.NotNil(t, group.GetMetadata())
+	assert.NotNil(t, group.GetTags())
 }
