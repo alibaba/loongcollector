@@ -91,8 +91,8 @@ protected:
             }
             writeFile(checkpoint.string(), "{\"version\":1}\n");
         }
-        const fs::path pipelineLocal
-            = fs::path(AppConfig::GetInstance()->GetLoongcollectorConfDir()) / GetContinuousPipelineConfigDir() / "local";
+        const fs::path pipelineLocal = fs::path(AppConfig::GetInstance()->GetLoongcollectorConfDir())
+            / GetContinuousPipelineConfigDir() / "local";
         fs::create_directories(pipelineLocal);
         writeFile((pipelineLocal / "demo.json").string(), "{}\n");
         writeFile((pipelineLocal / "mock_go_pipeline.json").string(),
@@ -111,8 +111,8 @@ protected:
         removeFile(GetAgentAppInfoFile());
         removeFile(GetCheckPointFileName());
         error_code ec;
-        fs::remove_all(fs::path(AppConfig::GetInstance()->GetLoongcollectorConfDir()) / GetContinuousPipelineConfigDir(),
-                       ec);
+        fs::remove_all(
+            fs::path(AppConfig::GetInstance()->GetLoongcollectorConfDir()) / GetContinuousPipelineConfigDir(), ec);
     }
 
 private:
