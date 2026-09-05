@@ -545,10 +545,15 @@ EventDispatcher::ValidateCheckpointResult EventDispatcher::validateCheckpoint(
         return ValidateCheckpointResult::kZeroSigSize;
     }
 
+    uint16_t searchDepth = 0;
+    if (inputFile) {
+        searchDepth = inputFile->mMaxCheckpointDirSearchDepth;
+    }
+
     // Try to find the real file with dev inode, check cache at first.
     map<DevInode, SplitedFilePath>::iterator findIter = cachePathDevInodeMap.find(checkpoint->mDevInode);
     if (findIter != cachePathDevInodeMap.end()) {
-        if (findIter->second.mFileDir != path) {
+        if (!IsDirectoryWithinSearchDepth(path, findIter->second.mFileDir, searchDepth)) {
             LOG_INFO(sLogger,
                      ("delete checkpoint", "file has been moved to other dir")("config", checkpoint->mConfigName)(
                          "log reader queue name", checkpoint->mFileName)("original real file path", realFilePath)(
@@ -557,9 +562,9 @@ EventDispatcher::ValidateCheckpointResult EventDispatcher::validateCheckpoint(
             return ValidateCheckpointResult::kLogDirChanged;
         }
 
-        if (CheckFileSignature(
-                PathJoin(path, findIter->second.mFileName), checkpoint->mSignatureHash, checkpoint->mSignatureSize)) {
-            checkpoint->mRealFileName = PathJoin(findIter->second.mFileDir, findIter->second.mFileName);
+        const string cachedFilePath = PathJoin(findIter->second.mFileDir, findIter->second.mFileName);
+        if (CheckFileSignature(cachedFilePath, checkpoint->mSignatureHash, checkpoint->mSignatureSize)) {
+            checkpoint->mRealFileName = cachedFilePath;
             LOG_INFO(sLogger,
                      ("generate MODIFY event for file with checkpoint",
                       "file has been renamed, but still in the same dir")("config", checkpoint->mConfigName)(
@@ -603,10 +608,6 @@ EventDispatcher::ValidateCheckpointResult EventDispatcher::validateCheckpoint(
             config->GetContext().GetConfigName(),
             config->GetContext().GetLogstoreName());
         return ValidateCheckpointResult::kCacheFull;
-    }
-    uint16_t searchDepth = 0;
-    if (inputFile) {
-        searchDepth = inputFile->mMaxCheckpointDirSearchDepth;
     }
     auto const searchResult
         = SearchFilePathByDevInodeInDirectory(path, searchDepth, checkpoint->mDevInode, &cachePathDevInodeMap);
