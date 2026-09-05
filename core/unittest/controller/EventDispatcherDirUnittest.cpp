@@ -16,13 +16,22 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+#include <fstream>
 #include <memory>
 #include <string>
 
+#include "collection_pipeline/CollectionPipelineManager.h"
+#include "collection_pipeline/plugin/PluginRegistry.h"
+#include "common/FileSystemUtil.h"
 #include "common/Flags.h"
+#include "common/HashUtil.h"
+#include "config/CollectionConfig.h"
+#include "file_server/ConfigManager.h"
 #include "file_server/EventDispatcher.h"
+#include "file_server/FileServer.h"
 #include "file_server/event/Event.h"
 #include "file_server/event_handler/EventHandler.h"
+#include "plugin/input/InputFile.h"
 #include "unittest/Unittest.h"
 using namespace std;
 
@@ -65,7 +74,13 @@ public:
 
 class EventDispatcherDirUnittest : public ::testing::Test {
 protected:
+    static void SetUpTestCase() { PluginRegistry::GetInstance()->LoadPlugins(); }
+
+    static void TearDownTestCase() { PluginRegistry::GetInstance()->UnloadPlugins(); }
+
     void SetUp() override {
+        mCheckpointTestRoot = (bfs::path(GetProcessExecutionDir()) / "EventDispatcherCheckpointUnittest").string();
+        bfs::remove_all(mCheckpointTestRoot);
         mHandlers.resize(10);
         for (int i = 0; i < 10; ++i) {
             std::string dir;
@@ -84,6 +99,12 @@ protected:
     }
 
     void TearDown() override {
+        const string baseDir = (bfs::path(mCheckpointTestRoot) / "logs").string();
+        EventDispatcher::GetInstance()->mPathWdMap.erase(baseDir);
+        FileServer::GetInstance()->RemoveFileDiscoveryConfig(kCheckpointConfigName);
+        ConfigManager::GetInstance()->ClearFilePipelineMatchCache();
+        CollectionPipelineManager::GetInstance()->ClearAllPipelines();
+        bfs::remove_all(mCheckpointTestRoot);
         mHandlers.clear();
         for (int i = 0; i < 10; ++i) {
             EventDispatcher::GetInstance()->RemoveOneToOneMapEntry(i);
@@ -91,6 +112,9 @@ protected:
     }
     std::vector<MockHandler> mHandlers;
     MockHandler* mTimeOutHandler;
+    std::string mCheckpointTestRoot;
+
+    static const std::string kCheckpointConfigName;
 
 public:
     void TestFindAllSubDirAndHandler() {
@@ -145,11 +169,78 @@ public:
             }
         }
     }
+
+    void TestValidateCheckpointUsesCachedSubdirectory() {
+        const string baseDir = (bfs::path(mCheckpointTestRoot) / "logs").string();
+        const string archiveDir = (bfs::path(baseDir) / "archive").string();
+        const string logicalPath = (bfs::path(baseDir) / "app.log").string();
+        const string rotatedFileName = "app.log.1";
+        const string rotatedPath = (bfs::path(archiveDir) / rotatedFileName).string();
+        const string contents = "rotated log\n";
+        bfs::create_directories(archiveDir);
+        std::ofstream(rotatedPath) << contents;
+
+        Json::Value input(Json::objectValue);
+        input["Type"] = "input_file";
+        input["FilePaths"] = Json::Value(Json::arrayValue);
+        input["FilePaths"].append((bfs::path(baseDir) / "*.log").string());
+        input["MaxCheckpointDirSearchDepth"] = 1;
+        Json::Value flusher(Json::objectValue);
+        flusher["Type"] = "flusher_blackhole";
+        auto configJson = std::make_unique<Json::Value>(Json::objectValue);
+        (*configJson)["inputs"] = Json::Value(Json::arrayValue);
+        (*configJson)["inputs"].append(input);
+        (*configJson)["flushers"] = Json::Value(Json::arrayValue);
+        (*configJson)["flushers"].append(flusher);
+
+        CollectionConfig pipelineConfig(kCheckpointConfigName, std::move(configJson), "/fake/path");
+        ASSERT_TRUE(pipelineConfig.Parse());
+        auto* pipelineManager = CollectionPipelineManager::GetInstance();
+        auto pipeline = pipelineManager->BuildPipeline(std::move(pipelineConfig));
+        ASSERT_NE(nullptr, pipeline);
+        pipelineManager->mPipelineNameEntityMap[kCheckpointConfigName] = pipeline;
+        auto* inputFile = const_cast<InputFile*>(static_cast<const InputFile*>(pipeline->GetInputs()[0]->GetPlugin()));
+        FileServer::GetInstance()->AddFileDiscoveryConfig(
+            kCheckpointConfigName, &inputFile->mFileDiscovery, &pipeline->GetContext());
+        ConfigManager::GetInstance()->ClearFilePipelineMatchCache();
+
+        uint64_t signatureHash = 0;
+        uint32_t signatureSize = 0;
+        SignatureToHash(contents, signatureHash, signatureSize);
+        auto checkpoint = std::make_shared<CheckPoint>(logicalPath,
+                                                       "",
+                                                       0,
+                                                       signatureSize,
+                                                       signatureHash,
+                                                       GetFileDevInode(rotatedPath),
+                                                       kCheckpointConfigName,
+                                                       "",
+                                                       false,
+                                                       false,
+                                                       "",
+                                                       false);
+        map<DevInode, SplitedFilePath> cache{{checkpoint->mDevInode, SplitedFilePath(archiveDir, rotatedFileName)}};
+        vector<Event*> events;
+        EventDispatcher::GetInstance()->mPathWdMap[baseDir] = 100;
+
+        const auto result = EventDispatcher::GetInstance()->validateCheckpoint(checkpoint, cache, events);
+
+        EXPECT_EQ(EventDispatcher::ValidateCheckpointResult::kRotate, result);
+        EXPECT_EQ(rotatedPath, checkpoint->mRealFileName);
+        ASSERT_EQ(1U, events.size());
+        EXPECT_EQ(kCheckpointConfigName, events[0]->GetConfigName());
+        for (auto* event : events) {
+            delete event;
+        }
+    }
 };
+
+const std::string EventDispatcherDirUnittest::kCheckpointConfigName = "checkpoint_cache_subdir";
 
 APSARA_UNIT_TEST_CASE(EventDispatcherDirUnittest, TestFindAllSubDirAndHandler, 0);
 APSARA_UNIT_TEST_CASE(EventDispatcherDirUnittest, TestUnregisterAllDir, 0);
 APSARA_UNIT_TEST_CASE(EventDispatcherDirUnittest, TestStopAllDir, 0);
+APSARA_UNIT_TEST_CASE(EventDispatcherDirUnittest, TestValidateCheckpointUsesCachedSubdirectory, 0);
 } // end of namespace logtail
 
 int main(int argc, char** argv) {

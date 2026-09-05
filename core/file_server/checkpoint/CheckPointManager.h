@@ -198,4 +198,7 @@ boost::optional<std::string> SearchFilePathByDevInodeInDirectory(const std::stri
                                                                  std::map<DevInode, SplitedFilePath>* cache,
                                                                  bool* searchTruncated);
 
+// Return whether candidateDir is reachable when searching baseDir with searchDepth.
+bool IsDirectoryWithinSearchDepth(const std::string& baseDir, const std::string& candidateDir, uint16_t searchDepth);
+
 } // namespace logtail
