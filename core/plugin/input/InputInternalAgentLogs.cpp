@@ -64,18 +64,32 @@ string JoinFile(const string& dir, const string& name) {
     return (filesystem::path(dir) / name).lexically_normal().string();
 }
 
-bool ExistsPath(const string& path) {
-    error_code ec;
-    return !path.empty() && filesystem::exists(path, ec);
-}
-
 bool ExistsDir(const string& path) {
     error_code ec;
     return !path.empty() && filesystem::is_directory(path, ec);
 }
 
+bool HasNonEmptyFile(const string& path) {
+    error_code ec;
+    if (path.empty() || !filesystem::is_regular_file(path, ec) || ec) {
+        return false;
+    }
+    const auto size = filesystem::file_size(path, ec);
+    return !ec && size > 0;
+}
+
+bool IsBlankContent(const StringView& value) {
+    for (size_t i = 0; i < value.size(); ++i) {
+        const char c = value[i];
+        if (c != ' ' && c != '\t' && c != '\r' && c != '\n') {
+            return false;
+        }
+    }
+    return true;
+}
+
 void AppendIfExists(Json::Value& filePaths, const string& path) {
-    if (ExistsPath(path)) {
+    if (HasNonEmptyFile(path)) {
         filePaths.append(path);
     }
 }
@@ -145,6 +159,39 @@ private:
 };
 
 const string ProcessorAgentLogTag::sName = "processor_agent_log_tag";
+
+class ProcessorAgentLogDropEmpty : public Processor {
+public:
+    static const string sName;
+
+    const string& Name() const override { return sName; }
+
+    bool Init(const Json::Value&) override { return true; }
+
+    void Process(PipelineEventGroup& logGroup) override {
+        auto& events = logGroup.MutableEvents();
+        size_t wIdx = 0;
+        for (size_t rIdx = 0; rIdx < events.size(); ++rIdx) {
+            bool keep = true;
+            if (events[rIdx].Is<LogEvent>()) {
+                keep = !IsBlankContent(events[rIdx].Cast<LogEvent>().GetContent("content"));
+            }
+            if (!keep) {
+                continue;
+            }
+            if (wIdx != rIdx) {
+                events[wIdx] = std::move(events[rIdx]);
+            }
+            ++wIdx;
+        }
+        events.resize(wIdx);
+    }
+
+protected:
+    bool IsSupportedEvent(const PipelineEventPtr& e) const override { return true; }
+};
+
+const string ProcessorAgentLogDropEmpty::sName = "processor_agent_log_drop_empty";
 
 class ProcessorAgentLogMicrotime : public Processor {
 public:
@@ -427,7 +474,7 @@ bool InputInternalAgentLogs::createStaticFileInput(size_t inputIdx,
     if (runtimeKind != RuntimeLogKind::None && !appendRuntimeLogProcessors(processors, runtimeKind)) {
         return false;
     }
-    return true;
+    return appendDropEmptyContentProcessor(processors);
 }
 
 bool InputInternalAgentLogs::appendAgentLogTagProcessor(vector<unique_ptr<ProcessorInstance>>& processors) {
@@ -437,6 +484,17 @@ bool InputInternalAgentLogs::appendAgentLogTagProcessor(vector<unique_ptr<Proces
     if (!mAliuid.empty()) {
         detail["Aliuid"] = mAliuid;
     }
+    if (!instance->Init(detail, *mContext)) {
+        return false;
+    }
+    processors.emplace_back(std::move(instance));
+    return true;
+}
+
+bool InputInternalAgentLogs::appendDropEmptyContentProcessor(vector<unique_ptr<ProcessorInstance>>& processors) {
+    auto instance = make_unique<ProcessorInstance>(new ProcessorAgentLogDropEmpty(),
+                                                   mContext->GetPipeline().GenNextPluginMeta(false));
+    Json::Value detail;
     if (!instance->Init(detail, *mContext)) {
         return false;
     }

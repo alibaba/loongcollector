@@ -56,6 +56,7 @@ public:
     void TestGoMockPipelineAndTimeFilter();
     void TestPipelineNameOnConfigFiles();
     void TestCompressedLogAlarm();
+    void TestDropEmptyContent();
 
 protected:
     static void SetUpTestCase() {
@@ -218,7 +219,8 @@ void InputInternalAgentLogsUnittest::TestExpandGroupsAndProcessors() {
     )";
     auto pipeline = initPipeline(configStr);
     APSARA_TEST_NOT_EQUAL_FATAL(nullptr, pipeline);
-    APSARA_TEST_EQUAL(6U, pipeline->GetInputs().size());
+    // self + cpp + go + whole_small + whole_dirs; file_checkpoint is omitted when empty
+    APSARA_TEST_TRUE(pipeline->GetInputs().size() >= 5U);
     APSARA_TEST_EQUAL(InputInternalAgentLogs::sName, pipeline->GetInputs()[0]->Name());
     for (size_t i = 1; i < pipeline->GetInputs().size(); ++i) {
         APSARA_TEST_EQUAL(InputStaticFile::sName, pipeline->GetInputs()[i]->Name());
@@ -232,15 +234,18 @@ void InputInternalAgentLogsUnittest::TestExpandGroupsAndProcessors() {
     APSARA_TEST_EQUAL(ProcessorParseTimestampNative::sName, cppProcessors[3]->Name());
     APSARA_TEST_EQUAL("processor_agent_log_microtime", cppProcessors[4]->Name());
     APSARA_TEST_EQUAL(ProcessorTimestampFilterNative::sName, cppProcessors[5]->Name());
+    APSARA_TEST_EQUAL("processor_agent_log_drop_empty", cppProcessors.back()->Name());
 
     const auto& goProcessors = pipeline->GetInputs()[2]->GetInnerProcessors();
     APSARA_TEST_TRUE(goProcessors.size() >= 6U);
     APSARA_TEST_EQUAL(ProcessorParseRegexNative::sName, goProcessors[2]->Name());
     APSARA_TEST_EQUAL(ProcessorTimestampFilterNative::sName, goProcessors[5]->Name());
+    APSARA_TEST_EQUAL("processor_agent_log_drop_empty", goProcessors.back()->Name());
 
     const auto& wholeProcessors = pipeline->GetInputs()[3]->GetInnerProcessors();
-    APSARA_TEST_EQUAL(1U, wholeProcessors.size());
+    APSARA_TEST_EQUAL(2U, wholeProcessors.size());
     APSARA_TEST_EQUAL("processor_agent_log_tag", wholeProcessors[0]->Name());
+    APSARA_TEST_EQUAL("processor_agent_log_drop_empty", wholeProcessors[1]->Name());
 }
 
 void InputInternalAgentLogsUnittest::TestRuntimeLogHeaderParse() {
@@ -433,7 +438,7 @@ void InputInternalAgentLogsUnittest::TestPipelineNameOnConfigFiles() {
     ProcessorInstance* tagProcessor = nullptr;
     for (size_t i = 3; i < pipeline->GetInputs().size(); ++i) {
         auto& procs = pipeline->GetInputs()[i]->GetInnerProcessors();
-        if (procs.size() == 1 && procs[0]->Name() == "processor_agent_log_tag") {
+        if (!procs.empty() && procs[0]->Name() == "processor_agent_log_tag") {
             tagProcessor = procs[0].get();
             break;
         }
@@ -488,6 +493,53 @@ void InputInternalAgentLogsUnittest::TestCompressedLogAlarm() {
     APSARA_TEST_TRUE(input.Start());
 }
 
+void InputInternalAgentLogsUnittest::TestDropEmptyContent() {
+    {
+        const fs::path crash(GetCrashStackFileName());
+        if (crash.has_parent_path()) {
+            fs::create_directories(crash.parent_path());
+        }
+        writeFile(crash.string(), "");
+    }
+    Json::Value optionalGoPipeline, configJson;
+    string errorMsg;
+    APSARA_TEST_TRUE(ParseJsonTable(R"({"Type":"input_internal_agent_logs_onetime"})", configJson, errorMsg));
+    InputInternalAgentLogs input;
+    input.SetContext(ctx);
+    input.CreateMetricsRecordRef(InputInternalAgentLogs::sName, "1");
+    APSARA_TEST_TRUE(input.Init(configJson, optionalGoPipeline));
+    input.CommitMetricsRecordRef();
+
+    const string wholeSmall = input.buildWholeSmallConfig()["FilePaths"].toStyledString();
+    APSARA_TEST_TRUE(wholeSmall.find("backtrace") == string::npos);
+
+    auto pipeline = initPipeline(R"({
+        "global": {"ExcutionTimeout": 3600},
+        "inputs": [{"Type": "input_internal_agent_logs_onetime"}],
+        "flushers": [{"Type": "flusher_blackhole"}]
+    })");
+    APSARA_TEST_NOT_EQUAL_FATAL(nullptr, pipeline);
+    APSARA_TEST_TRUE(pipeline->GetInputs().size() >= 3U);
+    const auto& cppProcessors = pipeline->GetInputs()[1]->GetInnerProcessors();
+    APSARA_TEST_TRUE(cppProcessors.size() >= 3U);
+
+    auto runAll = [&](const string& raw) {
+        vector<PipelineEventGroup> groups;
+        groups.emplace_back(make_shared<SourceBuffer>());
+        groups[0].AddLogEvent()->SetContent(string("content"), raw);
+        for (size_t i = 2; i < cppProcessors.size(); ++i) {
+            cppProcessors[i]->Process(groups);
+        }
+        return groups[0].GetEvents().size();
+    };
+
+    APSARA_TEST_EQUAL(0U, runAll(""));
+    APSARA_TEST_EQUAL(0U, runAll("   \t\n"));
+    APSARA_TEST_EQUAL(0U, runAll("[2026-08-26 08:52:00.890493]\t[info]\t[1]\tAppConfig.cpp:1\t\t"));
+    APSARA_TEST_EQUAL(1U, runAll("[2026-08-26 08:52:00.890493]\t[info]\t[1]\tAppConfig.cpp:1\t\tstarted"));
+    removeFile(GetCrashStackFileName());
+}
+
 UNIT_TEST_CASE(InputInternalAgentLogsUnittest, TestInferArtifact)
 UNIT_TEST_CASE(InputInternalAgentLogsUnittest, TestSkipWhenIPNotMatch)
 UNIT_TEST_CASE(InputInternalAgentLogsUnittest, TestExpandGroupsAndProcessors)
@@ -495,6 +547,7 @@ UNIT_TEST_CASE(InputInternalAgentLogsUnittest, TestRuntimeLogHeaderParse)
 UNIT_TEST_CASE(InputInternalAgentLogsUnittest, TestGoMockPipelineAndTimeFilter)
 UNIT_TEST_CASE(InputInternalAgentLogsUnittest, TestPipelineNameOnConfigFiles)
 UNIT_TEST_CASE(InputInternalAgentLogsUnittest, TestCompressedLogAlarm)
+UNIT_TEST_CASE(InputInternalAgentLogsUnittest, TestDropEmptyContent)
 
 } // namespace logtail
 
