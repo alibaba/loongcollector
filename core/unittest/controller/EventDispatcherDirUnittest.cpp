@@ -178,7 +178,7 @@ public:
         const string rotatedPath = (bfs::path(archiveDir) / rotatedFileName).string();
         const string contents = "rotated log\n";
         bfs::create_directories(archiveDir);
-        std::ofstream(rotatedPath) << contents;
+        std::ofstream(rotatedPath, std::ios::binary) << contents;
 
         Json::Value input(Json::objectValue);
         input["Type"] = "input_file";
