@@ -78,17 +78,7 @@ bool HasNonEmptyFile(const string& path) {
     return !ec && size > 0;
 }
 
-bool IsBlankContent(const StringView& value) {
-    for (size_t i = 0; i < value.size(); ++i) {
-        const char c = value[i];
-        if (c != ' ' && c != '\t' && c != '\r' && c != '\n') {
-            return false;
-        }
-    }
-    return true;
-}
-
-void AppendIfExists(Json::Value& filePaths, const string& path) {
+void AppendIfNonEmptyFile(Json::Value& filePaths, const string& path) {
     if (HasNonEmptyFile(path)) {
         filePaths.append(path);
     }
@@ -174,7 +164,7 @@ public:
         for (size_t rIdx = 0; rIdx < events.size(); ++rIdx) {
             bool keep = true;
             if (events[rIdx].Is<LogEvent>()) {
-                keep = !IsBlankContent(events[rIdx].Cast<LogEvent>().GetContent("content"));
+                keep = !TrimSpace(events[rIdx].Cast<LogEvent>().GetContent("content").to_string()).empty();
             }
             if (!keep) {
                 continue;
@@ -602,30 +592,30 @@ Json::Value InputInternalAgentLogs::buildWholeSmallConfig() const {
     Json::Value cfg;
     cfg["Type"] = InputStaticFile::sName;
     Json::Value filePaths(Json::arrayValue);
-    AppendIfExists(filePaths, GetAgentAppInfoFile());
-    AppendIfExists(filePaths, GetInotifyWatcherDirsDumpFileName());
-    AppendIfExists(filePaths, GetCrashStackFileName());
+    AppendIfNonEmptyFile(filePaths, GetAgentAppInfoFile());
+    AppendIfNonEmptyFile(filePaths, GetInotifyWatcherDirsDumpFileName());
+    AppendIfNonEmptyFile(filePaths, GetCrashStackFileName());
 
     const string confDir = AppConfig::GetInstance()->GetLoongcollectorConfDir();
     if (BOOL_FLAG(logtail_mode)) {
-        AppendIfExists(filePaths, GetAgentConfigFile());
-        AppendIfExists(filePaths, JoinFile(GetProcessExecutionDir(), "docker_path_config.json"));
-        AppendIfExists(filePaths, JoinFile(GetProcessExecutionDir(), "checkpoint/docker_path_config.json"));
+        AppendIfNonEmptyFile(filePaths, GetAgentConfigFile());
+        AppendIfNonEmptyFile(filePaths, JoinFile(GetProcessExecutionDir(), "docker_path_config.json"));
+        AppendIfNonEmptyFile(filePaths, JoinFile(GetProcessExecutionDir(), "checkpoint/docker_path_config.json"));
     } else {
-        AppendIfExists(filePaths, JoinFile(JoinFile(confDir, "instance_config/local"), LOONGCOLLECTOR_CONFIG));
-        AppendIfExists(filePaths, JoinFile(GetAgentDataDir(), "docker_path_config.json"));
+        AppendIfNonEmptyFile(filePaths, JoinFile(JoinFile(confDir, "instance_config/local"), LOONGCOLLECTOR_CONFIG));
+        AppendIfNonEmptyFile(filePaths, JoinFile(GetAgentDataDir(), "docker_path_config.json"));
     }
-    AppendIfExists(filePaths, JoinFile(GetAgentDataDir(), "onetime_config_info.json"));
-    AppendIfExists(filePaths, JoinFile(confDir, "apsara_log_conf.json"));
-    AppendIfExists(filePaths, JoinFile(confDir, "plugin_logger.xml"));
-    AppendIfExists(filePaths, JoinFile(confDir, "user_defined_id"));
-    AppendIfExists(filePaths, JoinFile(GetAgentLogDir(), "logger_initialization.log"));
-    AppendIfExists(filePaths, JoinFile(JoinFile(GetAgentLogDir(), "self_metrics"), "self_metrics.log"));
-    AppendIfExists(filePaths, JoinFile(GetLegacyUserLocalConfigFilePath(), "user_log_config.json"));
+    AppendIfNonEmptyFile(filePaths, JoinFile(GetAgentDataDir(), "onetime_config_info.json"));
+    AppendIfNonEmptyFile(filePaths, JoinFile(confDir, "apsara_log_conf.json"));
+    AppendIfNonEmptyFile(filePaths, JoinFile(confDir, "plugin_logger.xml"));
+    AppendIfNonEmptyFile(filePaths, JoinFile(confDir, "user_defined_id"));
+    AppendIfNonEmptyFile(filePaths, JoinFile(GetAgentLogDir(), "logger_initialization.log"));
+    AppendIfNonEmptyFile(filePaths, JoinFile(JoinFile(GetAgentLogDir(), "self_metrics"), "self_metrics.log"));
+    AppendIfNonEmptyFile(filePaths, JoinFile(GetLegacyUserLocalConfigFilePath(), "user_log_config.json"));
 
     const char* staticContainer = getenv("ALIYUN_LOG_STATIC_CONTAINER_INFO");
     if (staticContainer != nullptr && staticContainer[0] != '\0') {
-        AppendIfExists(filePaths, staticContainer);
+        AppendIfNonEmptyFile(filePaths, staticContainer);
     }
 
     cfg["FilePaths"] = filePaths;
@@ -654,7 +644,7 @@ Json::Value InputInternalAgentLogs::buildFileCheckpointConfig() const {
     Json::Value cfg;
     cfg["Type"] = InputStaticFile::sName;
     Json::Value filePaths(Json::arrayValue);
-    AppendIfExists(filePaths, GetCheckPointFileName());
+    AppendIfNonEmptyFile(filePaths, GetCheckPointFileName());
     cfg["FilePaths"] = filePaths;
     cfg["Multiline"]["Mode"] = "whole_file";
     return cfg;

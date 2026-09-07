@@ -219,7 +219,7 @@ void InputInternalAgentLogsUnittest::TestExpandGroupsAndProcessors() {
     )";
     auto pipeline = initPipeline(configStr);
     APSARA_TEST_NOT_EQUAL_FATAL(nullptr, pipeline);
-    // self + cpp + go + whole_small + whole_dirs; file_checkpoint is omitted when empty
+    // self + cpp + go + whole_small + whole_dirs; file_checkpoint is optional
     APSARA_TEST_TRUE(pipeline->GetInputs().size() >= 5U);
     APSARA_TEST_EQUAL(InputInternalAgentLogs::sName, pipeline->GetInputs()[0]->Name());
     for (size_t i = 1; i < pipeline->GetInputs().size(); ++i) {
