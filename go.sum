@@ -383,7 +383,7 @@ github.com/hashicorp/golang-lru/v2 v2.0.7 h1:a+bsQ5rvGLjzHuww6tVxozPZFVghXaHOwFs
 github.com/hashicorp/golang-lru/v2 v2.0.7/go.mod h1:QeFd9opnmA6QUJc5vARoKUSoFhyfM2/ZepoAG6RGpeM=
 github.com/iLogtail/VictoriaMetrics v1.83.4-ilogtail h1:LRDJt9eUKKhHdwPJRbC6tgtiMs/0XTjlCz1dl2pzRt0=
 github.com/iLogtail/VictoriaMetrics v1.83.4-ilogtail/go.mod h1:JagjwAO58g1WNpyr6x/lrQqMTf99d/WU/yxjADxBz8E=
-github.com/iLogtail/VictoriaMetrics v1.83.5-ilogtail.1 h1:jIkMQRUsoqnGWWKDz81FOGF6VuezJZyk7j7/1ekm9sc=
+github.com/iLogtail/VictoriaMetrics v1.83.5-ilogtail.1 h1:FF6VIUXnzYwr5bYcINROJRrRXQt4pwg0fNBBEOtXTAE=
 github.com/iLogtail/VictoriaMetrics v1.83.5-ilogtail.1/go.mod h1:JagjwAO58g1WNpyr6x/lrQqMTf99d/WU/yxjADxBz8E=
 github.com/iLogtail/gonvml v1.0.0 h1:NPXkQ7kRH4b799oBP4SrKDVzWZpe+97m3A1Uvvfpd+8=
 github.com/iLogtail/gonvml v1.0.0/go.mod h1:5YZmsLORwZSHVK8KATd52/YDZm2lmZ1IYh9dL+P4Q6Y=
