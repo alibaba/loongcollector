@@ -136,7 +136,7 @@ require (
 )
 
 replace (
-	github.com/VictoriaMetrics/VictoriaMetrics => github.com/iLogtail/VictoriaMetrics v1.83.4-ilogtail.1
+	github.com/VictoriaMetrics/VictoriaMetrics => github.com/iLogtail/VictoriaMetrics v1.83.5-ilogtail.1
 	github.com/VictoriaMetrics/metrics => github.com/iLogtail/metrics v1.23.0-ilogtail
 	github.com/alibaba/ilogtail => ../
 	github.com/alibaba/ilogtail/pkg => ../pkg
