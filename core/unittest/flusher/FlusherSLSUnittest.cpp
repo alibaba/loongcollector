@@ -27,6 +27,7 @@
 #include "collection_pipeline/queue/QueueKeyManager.h"
 #include "collection_pipeline/queue/SLSSenderQueueItem.h"
 #include "collection_pipeline/queue/SenderQueueManager.h"
+#include "collection_pipeline/serializer/SLSSerializer.h"
 #include "common/JsonUtil.h"
 #include "common/LogtailCommonFlags.h"
 #include "common/compression/CompressorFactory.h"
@@ -55,6 +56,17 @@ using namespace std;
 
 namespace logtail {
 
+class FailingEventGroupListSerializer : public Serializer<vector<CompressedLogGroup>> {
+public:
+    explicit FailingEventGroupListSerializer(Flusher* f) : Serializer<vector<CompressedLogGroup>>(f) {}
+
+private:
+    bool Serialize(vector<CompressedLogGroup>&&, string&, string& errorMsg) override {
+        errorMsg = "mock serialize fail";
+        return false;
+    }
+};
+
 class FlusherSLSUnittest : public testing::Test {
 public:
     void OnSuccessfulInit();
@@ -66,6 +78,7 @@ public:
     void TestFlushAll();
     void TestAddPackId();
     void TestSerializeAndPushAllEmptyGroups();
+    void TestSerializeAndPushGroupListSerializeFail();
     void OnGoPipelineSend();
 
 protected:
@@ -1999,6 +2012,51 @@ void FlusherSLSUnittest::TestSerializeAndPushAllEmptyGroups() {
     APSARA_TEST_TRUE(res.empty());
 }
 
+void FlusherSLSUnittest::TestSerializeAndPushGroupListSerializeFail() {
+    // package list is enabled when there are more than 1 group. if groups are serialized and compressed
+    // successfully but the package list itself fails to serialize, the request must be discarded instead
+    // of pushing leftover bytes from serializedData
+    Json::Value configJson, optionalGoPipeline;
+    string configStr, errorMsg;
+    configStr = R"(
+        {
+            "Type": "flusher_sls",
+            "Project": "test_project",
+            "Logstore": "test_logstore",
+            "Region": "test_region",
+            "Endpoint": "test_region.log.aliyuncs.com",
+            "Aliuid": "123456789"
+        }
+    )";
+    ParseJsonTable(configStr, configJson, errorMsg);
+    FlusherSLS flusher;
+    flusher.SetContext(ctx);
+    flusher.CreateMetricsRecordRef(FlusherSLS::sName, "1");
+    flusher.Init(configJson, optionalGoPipeline);
+    flusher.CommitMetricsRecordRef();
+    flusher.mGroupListSerializer = make_unique<FailingEventGroupListSerializer>(&flusher);
+
+    BatchedEventsList batchedEventsList;
+    for (size_t i = 0; i < 2; ++i) {
+        PipelineEventGroup group(make_shared<SourceBuffer>());
+        group.SetMetadata(EventGroupMetaKey::SOURCE_ID, string("source-id"));
+        auto e = group.AddLogEvent();
+        e->SetTimestamp(1234567890);
+        e->SetContent(string("content_key"), string("content_value"));
+        batchedEventsList.emplace_back(std::move(group.MutableEvents()),
+                                       std::move(group.GetSizedTags()),
+                                       std::move(group.GetSourceBuffer()),
+                                       group.GetMetadata(EventGroupMetaKey::SOURCE_ID),
+                                       std::move(group.GetExactlyOnceCheckpoint()));
+    }
+
+    APSARA_TEST_FALSE(flusher.SerializeAndPush(std::move(batchedEventsList)));
+
+    vector<SenderQueueItem*> res;
+    SenderQueueManager::GetInstance()->GetAvailableItems(res, 80);
+    APSARA_TEST_TRUE(res.empty());
+}
+
 void FlusherSLSUnittest::OnGoPipelineSend() {
     {
         Json::Value configJson, optionalGoPipeline;
@@ -2096,6 +2154,7 @@ UNIT_TEST_CASE(FlusherSLSUnittest, TestFlush)
 UNIT_TEST_CASE(FlusherSLSUnittest, TestFlushAll)
 UNIT_TEST_CASE(FlusherSLSUnittest, TestAddPackId)
 UNIT_TEST_CASE(FlusherSLSUnittest, TestSerializeAndPushAllEmptyGroups)
+UNIT_TEST_CASE(FlusherSLSUnittest, TestSerializeAndPushGroupListSerializeFail)
 UNIT_TEST_CASE(FlusherSLSUnittest, OnGoPipelineSend)
 
 } // namespace logtail
