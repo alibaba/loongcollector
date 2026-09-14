@@ -15,6 +15,7 @@
 #include "config/watcher/PipelineConfigWatcher.h"
 
 #include <memory>
+#include <system_error>
 
 #include "collection_pipeline/CollectionPipelineManager.h"
 #include "common/FileSystemUtil.h"
@@ -22,6 +23,7 @@
 #include "config/common_provider/CommonConfigProvider.h"
 #include "config/feedbacker/ConfigFeedbackReceiver.h"
 #include "logger/Logger.h"
+#include "monitor/AlarmManager.h"
 #include "monitor/Monitor.h"
 #include "task_pipeline/TaskPipelineManager.h"
 #ifdef __ENTERPRISE__
@@ -43,10 +45,19 @@ pair<CollectionConfigDiff, TaskConfigDiff> PipelineConfigWatcher::CheckConfigDif
     TaskConfigDiff tDiff;
     unordered_set<string> configSet;
     SingletonConfigCache singletonCache;
+    auto fileInfoSnapshot = mFileInfoMap;
     // builtin pipeline configs
     InsertBuiltInPipelines(pDiff, tDiff, configSet, singletonCache);
     // file pipeline configs
-    InsertPipelines(pDiff, tDiff, configSet, singletonCache);
+    if (!InsertPipelines(pDiff, tDiff, configSet, singletonCache)) {
+        mFileInfoMap = std::move(fileInfoSnapshot);
+        LOG_WARNING(sLogger,
+                    ("action", "iterate config dir")("status", "incomplete, skip this round")(
+                        "reason", "do not generate added/modified/removed from a torn snapshot"));
+        AlarmManager::GetInstance()->SendAlarmWarning(CATEGORY_CONFIG_ALARM,
+                                                      "config dir scan incomplete, skip this round diff");
+        return {CollectionConfigDiff{}, TaskConfigDiff{}};
+    }
 
     CheckSingletonInput(pDiff, singletonCache);
     for (const auto& name : mCollectionPipelineManager->GetAllConfigNames()) {
@@ -188,18 +199,27 @@ void PipelineConfigWatcher::InsertBuiltInPipelines(CollectionConfigDiff& pDiff,
 #endif
 }
 
-void PipelineConfigWatcher::InsertPipelines(CollectionConfigDiff& pDiff,
+bool PipelineConfigWatcher::InsertPipelines(CollectionConfigDiff& pDiff,
                                             TaskConfigDiff& tDiff,
                                             unordered_set<string>& configSet,
                                             SingletonConfigCache& singletonCache) {
     for (const auto& dir : mSourceDir) {
         error_code ec;
         filesystem::file_status s = filesystem::status(dir, ec);
+#ifdef APSARA_UNIT_TEST_MAIN
+        if (mForceStatusError) {
+            ec = make_error_code(errc::bad_file_descriptor);
+        }
+#endif
         if (ec) {
             LOG_WARNING(sLogger,
                         ("failed to get config dir path info", "skip current object")("dir path", dir.string())(
                             "error code", ec.value())("error msg", ec.message()));
-            continue;
+            // Optional sources (onetime/apm) may be absent; only a real status failure is torn.
+            if (ec == errc::no_such_file_or_directory) {
+                continue;
+            }
+            return false;
         }
         if (!filesystem::exists(s)) {
             LOG_WARNING(sLogger, ("config dir path not existed", "skip current object")("dir path", dir.string()));
@@ -294,13 +314,21 @@ void PipelineConfigWatcher::InsertPipelines(CollectionConfigDiff& pDiff,
                 // check unchanged config just for singleton input
                 CheckUnchangedConfig(configName, path, pDiff, singletonCache);
             }
+#ifdef APSARA_UNIT_TEST_MAIN
+            if (mForceIterateError) {
+                itEc = make_error_code(errc::bad_file_descriptor);
+                break;
+            }
+#endif
         }
         if (itEc) {
             LOG_WARNING(sLogger,
                         ("action", "iterate config dir")("status", "failed")("dir path", dir.string())(
                             "error code", itEc.value())("error msg", itEc.message()));
+            return false;
         }
     }
+    return true;
 }
 
 bool PipelineConfigWatcher::CheckAddedConfig(const string& configName,

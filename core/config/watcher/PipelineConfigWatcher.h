@@ -17,9 +17,11 @@
 #pragma once
 
 #include <filesystem>
+#include <map>
 #include <memory>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 
 #include "config/ConfigDiff.h"
 #include "config/watcher/ConfigWatcher.h"
@@ -56,6 +58,11 @@ public:
 
 #ifdef APSARA_UNIT_TEST_MAIN
     void SetPipelineManager(const CollectionPipelineManager* pm) { mCollectionPipelineManager = pm; }
+    void SetForceIterateError(bool enabled) { mForceIterateError = enabled; }
+    void SetForceStatusError(bool enabled) { mForceStatusError = enabled; }
+    const std::map<std::string, std::pair<uintmax_t, std::filesystem::file_time_type>>& GetFileInfoMap() const {
+        return mFileInfoMap;
+    }
 #endif
 
 private:
@@ -65,7 +72,7 @@ private:
                                 TaskConfigDiff& tDiff,
                                 std::unordered_set<std::string>& configSet,
                                 SingletonConfigCache& singletonCache);
-    void InsertPipelines(CollectionConfigDiff& pDiff,
+    bool InsertPipelines(CollectionConfigDiff& pDiff,
                          TaskConfigDiff& tDiff,
                          std::unordered_set<std::string>& configSet,
                          SingletonConfigCache& singletonCache);
@@ -96,6 +103,8 @@ private:
     size_t mBuiltInPipelineCount = 0;
 
 #ifdef APSARA_UNIT_TEST_MAIN
+    bool mForceIterateError = false;
+    bool mForceStatusError = false;
     friend class SingletonInputCollectionConfigUpdateUnittest;
 #endif
 };
