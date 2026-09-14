@@ -50,7 +50,7 @@ docker pull sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-c
 $ gcc --version
 gcc (GCC) 9.3.1 20200408 (Red Hat 9.3.1-2)
 $ go version
-go version go1.19.10 linux/amd64
+go version go1.25.9 linux/amd64
 $ git --version
 git version 2.46.2
 ```
@@ -84,7 +84,7 @@ go install ...
 
 ```json
 {
-  "image": "sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.18",
+  "image": "sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.19",
   "customizations": {
     "vscode": {
       "extensions": [
@@ -233,7 +233,7 @@ cp -a ./core/build/_thirdparty/coolbpf/src/agentsight/release/libagentsight.so .
 ```bash
 docker run --name loongcollector-build -d \
   -v `pwd`:/src -w /src \
-  sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.18 \
+  sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.19 \
   bash -c "sleep infinity"
 ```
 

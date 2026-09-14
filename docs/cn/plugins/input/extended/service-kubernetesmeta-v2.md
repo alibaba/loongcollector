@@ -21,6 +21,17 @@
 
 * 推荐版本：LoongCollector v3.0.5 及以上
 
+## Kubernetes API 兼容性
+
+插件启动时会通过 discovery API 探测 CronJob 和 Ingress 可用的 API 版本，并优先使用稳定版 API：
+
+* Kubernetes 1.21 及以上优先使用 `batch/v1` CronJob；更早版本自动回退到 `batch/v1beta1`。
+* Kubernetes 1.19 及以上优先使用 `networking.k8s.io/v1` Ingress；更早版本自动回退到 `extensions/v1beta1`。
+* 当前版本仍保留上述 beta API 回退能力，没有因 Kubernetes Go 客户端升级而设置新的 LoongCollector 兼容性截止版本。
+* 当稳定版和 beta API 均不可用时，日志会同时记录探测失败信息，便于检查集群版本、API 启用状态和 RBAC 权限。
+
+Kubernetes Go 客户端当前为 `v0.35.3`。beta API 类型及 informer 由同一版本客户端提供，发生回退时不会降级 Go 依赖。
+
 ## 配置参数
 
 **注意：** 本插件需要在 Kubernetes 集群中（或具备访问 apiserver 的配置）运行，且需要有访问Kubernetes API的权限。并且部署模式为单例模式，且配置环境变量 `DEPLOY_MODE=singleton`、`ENABLE_KUBERNETES_META=true`。

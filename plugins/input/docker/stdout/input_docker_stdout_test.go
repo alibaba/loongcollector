@@ -17,10 +17,35 @@ package stdout
 import (
 	"testing"
 
+	"github.com/moby/moby/api/types/container"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/alibaba/ilogtail/plugins/test/mock"
 )
+
+func TestLogDriverSupported(t *testing.T) {
+	tests := []struct {
+		name       string
+		hostConfig *container.HostConfig
+		expected   bool
+	}{
+		{name: "nil host config", hostConfig: nil, expected: true},
+		{name: "json file", hostConfig: stdoutHostConfigWithLogDriver("json-file"), expected: true},
+		{name: "journald", hostConfig: stdoutHostConfigWithLogDriver("journald"), expected: false},
+		{name: "unsupported", hostConfig: stdoutHostConfigWithLogDriver("syslog"), expected: false},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			assert.Equal(t, test.expected, logDriverSupported(container.InspectResponse{HostConfig: test.hostConfig}))
+		})
+	}
+}
+
+func TestLogPathEmpty(t *testing.T) {
+	assert.True(t, logPathEmpty(container.InspectResponse{}))
+	assert.False(t, logPathEmpty(container.InspectResponse{LogPath: "/var/lib/docker/containers/id/id-json.log"}))
+}
 
 func TestServiceDockerStdout_Init(t *testing.T) {
 	sds := &ServiceDockerStdout{
@@ -126,4 +151,10 @@ func TestServiceDockerStdout_Init(t *testing.T) {
 	assert.True(t, matched)
 
 	assert.NoError(t, err)
+}
+
+func stdoutHostConfigWithLogDriver(driver string) *container.HostConfig {
+	return &container.HostConfig{
+		LogConfig: container.LogConfig{Type: driver},
+	}
 }

@@ -27,6 +27,8 @@
 
 namespace logtail {
 
+class InputInstance;
+
 class Input : public Plugin {
 public:
     virtual ~Input() = default;
@@ -35,6 +37,13 @@ public:
     virtual bool Start() = 0;
     virtual bool Stop(bool isPipelineRemoving) = 0;
     virtual QueueType GetProcessQueueType() const = 0;
+    // Optional: create extra inputs after this JSON input is initialized.
+    // startIdx is the next mInputs index (usually mInputs.size() after this input is emplaced).
+    virtual bool ExpandAdditionalInputs(size_t startIdx, std::vector<std::unique_ptr<InputInstance>>& extras) {
+        (void)startIdx;
+        (void)extras;
+        return true;
+    }
 
     void SetInputIndex(size_t idx) { mIndex = idx; }
     std::vector<std::unique_ptr<ProcessorInstance>>& GetInnerProcessors() { return mInnerProcessors; }

@@ -66,7 +66,7 @@ docker pull sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-c
 
 ### Go插件本地编译
 
-Go插件可以在主机上进行直接编译，编译前，需要安装基础的 Go 1.16+
+Go插件可以在主机上进行直接编译，编译前，需要安装 Go 1.25.9+
 语言开发环境，如何安装可以参见[官方文档](https://golang.org/doc/install)。
 在安装完成后，为了方便后续地开发，请遵照[此文档](https://golang.org/doc/code#Organization)正确地设置你的开发目录以及 GOPATH 等环境变量。。
 

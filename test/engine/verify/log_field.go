@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"strconv"
 	"time"
 
 	"github.com/avast/retry-go/v4"
@@ -75,6 +76,72 @@ func LogField(ctx context.Context, expectFieldStr string) (context.Context, erro
 		}
 	}
 	return ctx, nil
+}
+
+func LogFieldGreaterThanEqual(ctx context.Context, expectFieldStr string, expectValue int64) (context.Context, error) {
+	var from int32
+	value := ctx.Value(config.StartTimeContextKey)
+	if value != nil {
+		from = value.(int32)
+	} else {
+		return ctx, fmt.Errorf("no start time")
+	}
+
+	timeoutCtx, cancel := context.WithTimeout(context.TODO(), config.TestConfig.RetryTimeout)
+	defer cancel()
+	var err error
+	var groups []*protocol.LogGroup
+	err = retry.Do(
+		func() error {
+			groups, err = subscriber.TestSubscriber.GetData(control.GetQuery(ctx), from)
+			return err
+		},
+		retry.Context(timeoutCtx),
+		retry.Delay(5*time.Second),
+		retry.DelayType(retry.FixedDelay),
+	)
+	if err != nil {
+		return ctx, err
+	}
+	return ctx, logFieldGreaterThanEqual(groups, expectFieldStr, expectValue)
+}
+
+func logFieldGreaterThanEqual(groups []*protocol.LogGroup, expectFieldStr string, expectValue int64) error {
+	var (
+		maxValue      int64
+		hasValidValue bool
+		parseErr      error
+	)
+	for _, group := range groups {
+		for _, log := range group.Logs {
+			for _, content := range log.Contents {
+				if content.Key != expectFieldStr {
+					continue
+				}
+				valueInt, err := strconv.ParseInt(content.Value, 10, 64)
+				if err != nil {
+					if parseErr == nil {
+						parseErr = fmt.Errorf("parse field %s value %q: %w", expectFieldStr, content.Value, err)
+					}
+					continue
+				}
+				if valueInt >= expectValue {
+					return nil
+				}
+				if !hasValidValue || valueInt > maxValue {
+					maxValue = valueInt
+					hasValidValue = true
+				}
+			}
+		}
+	}
+	if hasValidValue {
+		return fmt.Errorf("want %s >= %d, but got %d", expectFieldStr, expectValue, maxValue)
+	}
+	if parseErr != nil {
+		return parseErr
+	}
+	return fmt.Errorf("want contains key %s, but not found", expectFieldStr)
 }
 
 func LogFieldKV(ctx context.Context, expectKeyValuesStr string) (context.Context, error) {

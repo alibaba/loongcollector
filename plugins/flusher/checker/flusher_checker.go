@@ -73,7 +73,7 @@ func (p *FlusherChecker) CheckKeyValue(key, value string) error {
 			}
 		}
 	}
-	return fmt.Errorf("cannot find this key :" + key)
+	return fmt.Errorf("cannot find this key: %s", key)
 }
 
 func (p *FlusherChecker) CheckKeyValueAny(key, value string) error {
@@ -88,7 +88,7 @@ func (p *FlusherChecker) CheckKeyValueAny(key, value string) error {
 			}
 		}
 	}
-	return fmt.Errorf("cannot find this key :" + key + ", value :" + value)
+	return fmt.Errorf("cannot find this key: %s, value: %s", key, value)
 }
 
 func (p *FlusherChecker) CheckKeyValueRegex(key, valueRegex string) error {
@@ -104,7 +104,7 @@ func (p *FlusherChecker) CheckKeyValueRegex(key, valueRegex string) error {
 			}
 		}
 	}
-	return fmt.Errorf("cannot find this key :" + key)
+	return fmt.Errorf("cannot find this key: %s", key)
 }
 
 func (p *FlusherChecker) CheckEveryLog(checker func(*protocol.Log) error) error {
