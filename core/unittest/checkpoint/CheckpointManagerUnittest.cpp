@@ -73,6 +73,7 @@ public:
     }
 
     void TestSearchFilePathByDevInodeInDirectory();
+    void TestIsDirectoryWithinSearchDepth();
     void TestPendingSurvivesDumpRound();
     void TestPendingSurvivesTwoDumpRounds();
     void TestConsumeDeletesPending();
@@ -124,6 +125,7 @@ FileDiscoveryOptions CheckpointManagerUnittest::sDiscoveryOpts;
 CollectionPipelineContext CheckpointManagerUnittest::sCtx;
 
 UNIT_TEST_CASE(CheckpointManagerUnittest, TestSearchFilePathByDevInodeInDirectory);
+UNIT_TEST_CASE(CheckpointManagerUnittest, TestIsDirectoryWithinSearchDepth);
 UNIT_TEST_CASE(CheckpointManagerUnittest, TestPendingSurvivesDumpRound);
 UNIT_TEST_CASE(CheckpointManagerUnittest, TestPendingSurvivesTwoDumpRounds);
 UNIT_TEST_CASE(CheckpointManagerUnittest, TestConsumeDeletesPending);
@@ -203,6 +205,17 @@ void CheckpointManagerUnittest::TestSearchFilePathByDevInodeInDirectory() {
         EXPECT_EQ(cache.at(devInode).mFileDir, kSubDir.string());
         EXPECT_EQ(cache.at(devInode).mFileName, kRotateFileName);
     }
+}
+
+void CheckpointManagerUnittest::TestIsDirectoryWithinSearchDepth() {
+    const std::string baseDir = PathJoin(kTestRootDir, "logs");
+
+    EXPECT_TRUE(IsDirectoryWithinSearchDepth(baseDir, baseDir, 0));
+    EXPECT_FALSE(IsDirectoryWithinSearchDepth(baseDir, PathJoin(baseDir, "archive"), 0));
+    EXPECT_TRUE(IsDirectoryWithinSearchDepth(baseDir, PathJoin(baseDir, "archive"), 1));
+    EXPECT_TRUE(IsDirectoryWithinSearchDepth(baseDir, PathJoin(PathJoin(baseDir, "2026"), "09"), 2));
+    EXPECT_FALSE(IsDirectoryWithinSearchDepth(baseDir, PathJoin(PathJoin(baseDir, "2026"), "09"), 1));
+    EXPECT_FALSE(IsDirectoryWithinSearchDepth(baseDir, baseDir + "-old", 2));
 }
 
 // A pending handoff entry (written outside any dump round) must survive a periodic

@@ -81,6 +81,7 @@ private:
     friend class BoundedProcessQueueUnittest;
     friend class CircularProcessQueueUnittest;
     friend class CommonConfigProviderUnittest;
+    friend class EventDispatcherDirUnittest;
     friend class FlusherUnittest;
     friend class PipelineUnittest;
     friend class PipelineUpdateUnittest;

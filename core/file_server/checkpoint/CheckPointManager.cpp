@@ -721,6 +721,24 @@ boost::optional<std::string> SearchFilePathByDevInodeInDirectory(const std::stri
 #undef METHOD_LOG_PATTERN
 }
 
+bool IsDirectoryWithinSearchDepth(const std::string& baseDir, const std::string& candidateDir, uint16_t searchDepth) {
+    if (candidateDir == baseDir) {
+        return true;
+    }
+    if (candidateDir.size() <= baseDir.size() || candidateDir.compare(0, baseDir.size(), baseDir) != 0
+        || candidateDir[baseDir.size()] != PATH_SEPARATOR[0]) {
+        return false;
+    }
+
+    size_t depth = 0;
+    for (size_t i = baseDir.size(); i < candidateDir.size(); ++i) {
+        if (candidateDir[i] == PATH_SEPARATOR[0] && ++depth > searchDepth) {
+            return false;
+        }
+    }
+    return true;
+}
+
 #ifdef APSARA_UNIT_TEST_MAIN
 void CheckPointManager::RemoveLocalCheckPoint() {
     std::string checkPointFile = AppConfig::GetInstance()->GetCheckPointFilePath();
