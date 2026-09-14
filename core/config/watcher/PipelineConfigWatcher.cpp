@@ -45,19 +45,23 @@ pair<CollectionConfigDiff, TaskConfigDiff> PipelineConfigWatcher::CheckConfigDif
     TaskConfigDiff tDiff;
     unordered_set<string> configSet;
     SingletonConfigCache singletonCache;
-    auto fileInfoSnapshot = mFileInfoMap;
+    ConfigFileInfoMap nextFileInfo;
     // builtin pipeline configs
     InsertBuiltInPipelines(pDiff, tDiff, configSet, singletonCache);
     // file pipeline configs
-    if (!InsertPipelines(pDiff, tDiff, configSet, singletonCache)) {
-        mFileInfoMap = std::move(fileInfoSnapshot);
+    if (!InsertPipelines(pDiff, tDiff, configSet, singletonCache, nextFileInfo)) {
         LOG_WARNING(sLogger,
                     ("action", "iterate config dir")("status", "incomplete, skip this round")(
                         "reason", "do not generate added/modified/removed from a torn snapshot"));
-        AlarmManager::GetInstance()->SendAlarmWarning(CATEGORY_CONFIG_ALARM,
-                                                      "config dir scan incomplete, skip this round diff");
+        if (!mConfigDirScanIncomplete) {
+            AlarmManager::GetInstance()->SendAlarmWarning(CATEGORY_CONFIG_ALARM,
+                                                          "config dir scan incomplete, skip this round diff");
+            mConfigDirScanIncomplete = true;
+        }
         return {CollectionConfigDiff{}, TaskConfigDiff{}};
     }
+    mConfigDirScanIncomplete = false;
+    mFileInfoMap = std::move(nextFileInfo);
 
     CheckSingletonInput(pDiff, singletonCache);
     for (const auto& name : mCollectionPipelineManager->GetAllConfigNames()) {
@@ -74,15 +78,6 @@ pair<CollectionConfigDiff, TaskConfigDiff> PipelineConfigWatcher::CheckConfigDif
                      ("existing valid config is removed", "prepare to stop current running task")("config", name));
         }
     }
-    for (auto it = mFileInfoMap.begin(); it != mFileInfoMap.end();) {
-        string configName = filesystem::path(it->first).stem().string();
-        if (configSet.find(configName) == configSet.end()) {
-            it = mFileInfoMap.erase(it);
-        } else {
-            ++it;
-        }
-    }
-
     if (pDiff.HasDiff() || pDiff.HasIgnored()) {
         LOG_INFO(sLogger,
                  ("config files scan done", "got updates, begin to update pipelines")("added", pDiff.mAdded.size())(
@@ -202,7 +197,8 @@ void PipelineConfigWatcher::InsertBuiltInPipelines(CollectionConfigDiff& pDiff,
 bool PipelineConfigWatcher::InsertPipelines(CollectionConfigDiff& pDiff,
                                             TaskConfigDiff& tDiff,
                                             unordered_set<string>& configSet,
-                                            SingletonConfigCache& singletonCache) {
+                                            SingletonConfigCache& singletonCache,
+                                            ConfigFileInfoMap& nextFileInfo) {
     for (const auto& dir : mSourceDir) {
         error_code ec;
         filesystem::file_status s = filesystem::status(dir, ec);
@@ -212,13 +208,15 @@ bool PipelineConfigWatcher::InsertPipelines(CollectionConfigDiff& pDiff,
         }
 #endif
         if (ec) {
-            LOG_WARNING(sLogger,
-                        ("failed to get config dir path info", "skip current object")("dir path", dir.string())(
-                            "error code", ec.value())("error msg", ec.message()));
-            // Optional sources (onetime/apm) may be absent; only a real status failure is torn.
             if (ec == errc::no_such_file_or_directory) {
+                LOG_WARNING(sLogger,
+                            ("failed to get config dir path info", "skip current object")("dir path", dir.string())(
+                                "error code", ec.value())("error msg", ec.message()));
                 continue;
             }
+            LOG_WARNING(sLogger,
+                        ("action", "iterate config dir")("status", "incomplete, skip this round")(
+                            "dir path", dir.string())("error code", ec.value())("error msg", ec.message()));
             return false;
         }
         if (!filesystem::exists(s)) {
@@ -259,7 +257,7 @@ bool PipelineConfigWatcher::InsertPipelines(CollectionConfigDiff& pDiff,
             uintmax_t size = filesystem::file_size(path, ec);
             filesystem::file_time_type mTime = filesystem::last_write_time(path, ec);
             if (iter == mFileInfoMap.end()) {
-                mFileInfoMap[filepath] = make_pair(size, mTime);
+                nextFileInfo[filepath] = make_pair(size, mTime);
                 unique_ptr<Json::Value> detail = make_unique<Json::Value>();
                 if (!LoadConfigDetailFromFile(path, *detail)) {
                     continue;
@@ -273,7 +271,7 @@ bool PipelineConfigWatcher::InsertPipelines(CollectionConfigDiff& pDiff,
                 }
             } else if (iter->second.first != size || iter->second.second != mTime) {
                 // for config currently running, we leave it untouched if new config is invalid
-                mFileInfoMap[filepath] = make_pair(size, mTime);
+                nextFileInfo[filepath] = make_pair(size, mTime);
                 unique_ptr<Json::Value> detail = make_unique<Json::Value>();
                 if (!LoadConfigDetailFromFile(path, *detail)) {
                     continue;
@@ -311,6 +309,7 @@ bool PipelineConfigWatcher::InsertPipelines(CollectionConfigDiff& pDiff,
                     continue;
                 }
             } else {
+                nextFileInfo[filepath] = iter->second;
                 // check unchanged config just for singleton input
                 CheckUnchangedConfig(configName, path, pDiff, singletonCache);
             }

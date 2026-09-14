@@ -66,6 +66,8 @@ public:
 #endif
 
 private:
+    using ConfigFileInfoMap = std::map<std::string, std::pair<uintmax_t, std::filesystem::file_time_type>>;
+
     PipelineConfigWatcher();
 
     void InsertBuiltInPipelines(CollectionConfigDiff& pDiff,
@@ -75,7 +77,8 @@ private:
     bool InsertPipelines(CollectionConfigDiff& pDiff,
                          TaskConfigDiff& tDiff,
                          std::unordered_set<std::string>& configSet,
-                         SingletonConfigCache& singletonCache);
+                         SingletonConfigCache& singletonCache,
+                         ConfigFileInfoMap& nextFileInfo);
     bool CheckAddedConfig(const std::string& configName,
                           const std::filesystem::path& filepath,
                           std::unique_ptr<Json::Value>&& configDetail,
@@ -101,6 +104,7 @@ private:
     const CollectionPipelineManager* mCollectionPipelineManager = nullptr;
     const TaskPipelineManager* mTaskPipelineManager = nullptr;
     size_t mBuiltInPipelineCount = 0;
+    bool mConfigDirScanIncomplete = false;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     bool mForceIterateError = false;
