@@ -293,8 +293,8 @@ bool EBPFAdapter::tryLoadAgentSightDylib() {
     mAgentSightSymbols = std::make_unique<AgentSightSymbolTable>(sym);
     LOG_INFO(sLogger,
              ("[EBPFAdapter] AgentSight symbols loaded", STRING_FLAG(ebpf_agentsight_dylib_base_name))(
-                 "raw_https_api", sym.config_set_enable_raw_https != nullptr)(
-                 "procfs_root_api", sym.config_set_procfs_root != nullptr));
+                 "raw_https_api", sym.config_set_enable_raw_https != nullptr)("procfs_root_api",
+                                                                              sym.config_set_procfs_root != nullptr));
     return true;
 }
 
