@@ -21,19 +21,19 @@ import (
 type testRuntimeServiceServer struct {
 	mu sync.Mutex
 
-	// 控制返回值
-	versionResp *CriVersionResponse
+	versionResp  *CriVersionResponse
+	versionErr   error
+	versionCalls int
 }
 
 func (s *testRuntimeServiceServer) Version(ctx context.Context) (*CriVersionResponse, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.versionResp.RuntimeAPIVersion == "v1" {
-		return s.versionResp, nil
-	} else if s.versionResp.RuntimeAPIVersion == "v1alpha2" {
-		return s.versionResp, nil
+	s.versionCalls++
+	if s.versionErr != nil {
+		return nil, s.versionErr
 	}
-	return nil, fmt.Errorf("failed to initialize RuntimeServiceClient")
+	return s.versionResp, nil
 }
 
 func (s *testRuntimeServiceServer) ListContainers(ctx context.Context) (*CriListContainersResponse, error) {
@@ -150,13 +150,6 @@ func TestNewRuntimeServiceClient(t *testing.T) {
 		RuntimeAPIVersion: "v1",
 	}
 
-	v1alpha2Resp := &CriVersionResponse{
-		Version:           "0.1.0",
-		RuntimeName:       "containerd",
-		RuntimeVersion:    "v1.6.0",
-		RuntimeAPIVersion: "v1alpha2",
-	}
-
 	invalidResp := &CriVersionResponse{
 		Version:           "0.1.0",
 		RuntimeName:       "containerd",
@@ -166,14 +159,13 @@ func TestNewRuntimeServiceClient(t *testing.T) {
 
 	tests := []struct {
 		name            string
-		serviceName     string
 		expectError     bool
+		expectedError   string
 		expectedVersion string
 		setupServer     func(*testRuntimeServiceServer) // 自定义服务端配置
 	}{
 		{
 			name:            "V1_Success",
-			serviceName:     "runtime.v1.RuntimeService",
 			expectError:     false,
 			expectedVersion: "v1",
 			setupServer: func(s *testRuntimeServiceServer) {
@@ -181,29 +173,27 @@ func TestNewRuntimeServiceClient(t *testing.T) {
 			},
 		},
 		{
-			name:            "V1Alpha2_Success",
-			serviceName:     "runtime.v1alpha2.RuntimeService",
-			expectError:     false,
-			expectedVersion: "v1alpha2",
-			setupServer: func(s *testRuntimeServiceServer) {
-				s.versionResp = v1alpha2Resp
-			},
-		},
-		{
-			name:            "Both_Failed",
-			serviceName:     "invalid.service.name",
-			expectError:     true,
-			expectedVersion: "invalid",
+			name:          "V1_Failed_Does_Not_Fallback",
+			expectError:   true,
+			expectedError: "v1 version failed",
 			setupServer: func(s *testRuntimeServiceServer) {
 				s.versionResp = invalidResp
+				s.versionErr = fmt.Errorf("v1 version failed")
 			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			originalGetAddressAndDialer := getAddressAndDialer
+			originalGRPCDialContext := grpcDialContext
+			t.Cleanup(func() {
+				getAddressAndDialer = originalGetAddressAndDialer
+				grpcDialContext = originalGRPCDialContext
+			})
+
 			// 创建测试服务端
-			testServer, listener := createTestServer(t, tt.serviceName)
+			testServer, listener := createTestServer(t, "runtime.v1.RuntimeService")
 
 			// 应用自定义配置
 			if tt.setupServer != nil {
@@ -227,13 +217,17 @@ func TestNewRuntimeServiceClient(t *testing.T) {
 
 			// 验证结果
 			if tt.expectError {
-				assert.Error(t, err)
+				assert.ErrorContains(t, err, "failed to initialize CRI v1 RuntimeServiceClient (v1alpha2 is no longer supported)")
+				assert.ErrorContains(t, err, tt.expectedError)
 				assert.Nil(t, client)
 			} else {
 				assert.NoError(t, err)
 				assert.NotNil(t, client)
 				assert.Equal(t, tt.expectedVersion, client.info.RuntimeAPIVersion)
 			}
+			testServer.mu.Lock()
+			assert.Equal(t, 1, testServer.versionCalls, "v1 failure must not trigger a fallback Version call")
+			testServer.mu.Unlock()
 
 			// 清理
 			if client != nil {

@@ -43,6 +43,7 @@
 | `input_forward`<br>[转发输入插件](input/native/input-forward.md) | SLS 官方 | ✓ | ✓ | ✓ | 接收转发数据；经 `processor_parse_from_pb_native` 解码后进入 Pipeline。 |
 | `input_host_meta`<br>[主机元数据](input/native/input-host-meta.md) | SLS 官方 | ✓ | — | — | 定时采集主机、进程及关联关系等元数据。 |
 | `input_host_monitor`<br>[主机监控数据](input/native/input-host-monitor.md) | SLS 官方 | — | ✓ | — | 采集主机 CPU/内存/磁盘/网络等指标。 |
+| `input_internal_agent_logs_onetime`<br>[本机诊断日志（一次性）](input/native/input-internal-agent-logs.md) | SLS 官方 | ✓ | — | — | 一次性采集本机运行日志与文本配置。 |
 | `input_internal_alarms`<br>[自监控告警数据](input/native/input-internal-alarms.md) | SLS 官方 | ✓ | — | — | 导出自监控告警数据。 |
 | `input_internal_config_container_info`<br>(暂无文档) | SLS 官方 | ✓ | — | — | 导出容器配置快照。 |
 | `input_internal_metrics`<br>[自监控指标数据](input/native/input-internal-metrics.md) | SLS 官方 | — | ✓ | — | 导出自监控指标数据。 |
