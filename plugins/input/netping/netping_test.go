@@ -18,7 +18,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"testing"
+	"time"
 
+	goping "github.com/go-ping/ping"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/alibaba/ilogtail/pkg/pipeline"
@@ -26,6 +28,43 @@ import (
 	"github.com/alibaba/ilogtail/plugins/test"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
 )
+
+func TestDurationToMillisecondsPreservesSubMillisecondPrecision(t *testing.T) {
+	tests := []struct {
+		name     string
+		duration time.Duration
+		want     float64
+	}{
+		{name: "microseconds", duration: 169 * time.Microsecond, want: 0.169},
+		{name: "nanoseconds", duration: 270500 * time.Nanosecond, want: 0.2705},
+		{name: "milliseconds", duration: 20 * time.Millisecond, want: 20},
+	}
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			assert.InDelta(t, testCase.want, durationToMilliseconds(testCase.duration), 1e-9)
+		})
+	}
+}
+
+func TestICMPStartDelaySpreadsTargetsAcrossOneSecond(t *testing.T) {
+	const targets = 318
+	assert.Zero(t, icmpStartDelay(0, targets))
+	assert.Equal(t, time.Second/targets, icmpStartDelay(1, targets))
+	assert.Equal(t, time.Duration(targets-1)*time.Second/targets, icmpStartDelay(targets-1, targets))
+	assert.Less(t, icmpStartDelay(targets-1, targets), time.Second)
+}
+
+func TestConfigureICMPPinger(t *testing.T) {
+	pinger := goping.New("127.0.0.1")
+	config := &ICMPConfig{Src: "127.0.0.2", Count: 3}
+	configureICMPPinger(pinger, config, 7*time.Second, true)
+
+	assert.Equal(t, config.Src, pinger.Source)
+	assert.Equal(t, icmpPayloadSize, pinger.Size)
+	assert.Equal(t, config.Count, pinger.Count)
+	assert.Equal(t, 7*time.Second, pinger.Timeout)
+	assert.True(t, pinger.Privileged())
+}
 
 func TestInitEmpty(t *testing.T) {
 

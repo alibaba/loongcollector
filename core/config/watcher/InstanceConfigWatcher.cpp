@@ -15,6 +15,7 @@
 #include "config/watcher/InstanceConfigWatcher.h"
 
 #include <memory>
+#include <mutex>
 #include <unordered_set>
 
 #include "common/FileSystemUtil.h"
@@ -52,15 +53,16 @@ InstanceConfigDiff InstanceConfigWatcher::CheckConfigDiff() {
                         ("config dir path is not a directory", "skip current object")("dir path", dir.string()));
             continue;
         }
-        for (auto const& entry : filesystem::directory_iterator(dir, ec)) {
-            // lock the dir if it is provided by config provider
-            unique_lock<mutex> lock;
-            auto itr = mDirMutexMap.find(dir.string());
-            if (itr != mDirMutexMap.end()) {
-                lock = unique_lock<mutex>(*itr->second, defer_lock);
-                lock.lock();
-            }
+        unique_lock<mutex> lock;
+        auto muxItr = mDirMutexMap.find(dir.string());
+        if (muxItr != mDirMutexMap.end()) {
+            lock = unique_lock<mutex>(*muxItr->second);
+        }
 
+        error_code itEc;
+        for (auto it = filesystem::directory_iterator(dir, itEc); !itEc && it != filesystem::directory_iterator();
+             it.increment(itEc)) {
+            const auto& entry = *it;
             const filesystem::path& path = entry.path();
             const string& configName = path.stem().string();
             if (configName == REGION_CONFIG || configName == READABLE_REGION_CONFIG) {
@@ -137,6 +139,11 @@ InstanceConfigDiff InstanceConfigWatcher::CheckConfigDiff() {
             } else {
                 LOG_DEBUG(sLogger, ("existing config file unchanged", "skip current object"));
             }
+        }
+        if (itEc) {
+            LOG_WARNING(sLogger,
+                        ("action", "iterate config dir")("status", "failed")("dir path", dir.string())(
+                            "error code", itEc.value())("error msg", itEc.message()));
         }
     }
     for (const auto& name : mInstanceConfigManager->GetAllConfigNames()) {

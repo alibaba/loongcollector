@@ -57,6 +57,17 @@ type ServiceInputV1 interface {
 	Start(Collector) error
 }
 
+// PipelineRemovedCleaner is an optional interface a ServiceInput may implement to run
+// cleanup when its pipeline config is permanently removed. It is invoked ONLY on genuine
+// config removal — not on a reload/restart of the same config, and not on process
+// shutdown — so plugins can safely tear down host-global external state they installed
+// (e.g. an rsyslog forwarding drop-in) without disturbing it on ordinary reloads.
+type PipelineRemovedCleaner interface {
+	// OnPipelineRemoved is called after the pipeline has stopped and just before its
+	// config is deleted. Implementations must not block for long.
+	OnPipelineRemoved()
+}
+
 type ServiceInputV2 interface {
 	ServiceInput
 	// StartService starts the ServiceInput's service, whatever that may be

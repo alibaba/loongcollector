@@ -46,6 +46,7 @@ public:
     void TestGenerateFileTagsDir();
     void TestIgnoredInterfacesConfig();
     void TestIgnoredInterfacesEnv();
+    void TestBindInterfaceWorkingInterfacePrecedence();
 
 private:
     static Json::Value MakeDefaultIgnoredInterfacesConfig() {
@@ -283,6 +284,42 @@ void AppConfigUnittest::TestIgnoredInterfacesEnv() {
     cfg->ParseJsonToFlags(MakeDefaultIgnoredInterfacesConfig());
 }
 
+void AppConfigUnittest::TestBindInterfaceWorkingInterfacePrecedence() {
+    AppConfig* cfg = AppConfig::GetInstance();
+    std::string savedWorking = STRING_FLAG(working_interface);
+    std::string savedBind = cfg->mBindInterface;
+
+    // working_interface empty: LoadResourceConf keeps the configured bind_interface as-is.
+    STRING_FLAG(working_interface) = "";
+    {
+        Json::Value conf;
+        conf["bind_interface"] = "eth0";
+        cfg->LoadResourceConf(conf);
+        APSARA_TEST_EQUAL(cfg->GetBindInterface(), "eth0");
+    }
+
+    // working_interface set: it overrides bind_interface at load time, so GetBindInterface (and thus
+    // the curl egress binding) uses the same interface from which GetHostIp resolves the reported IP.
+    STRING_FLAG(working_interface) = "eth1";
+    {
+        Json::Value conf;
+        conf["bind_interface"] = "eth0";
+        cfg->LoadResourceConf(conf);
+        APSARA_TEST_EQUAL(cfg->GetBindInterface(), "eth1");
+    }
+
+    // The override applies even when bind_interface is absent from the config.
+    cfg->mBindInterface = "eth2";
+    {
+        Json::Value conf; // no bind_interface key
+        cfg->LoadResourceConf(conf);
+        APSARA_TEST_EQUAL(cfg->GetBindInterface(), "eth1");
+    }
+
+    STRING_FLAG(working_interface) = savedWorking;
+    cfg->mBindInterface = savedBind;
+}
+
 void AppConfigUnittest::TestGenerateFileTagsDir() {
     {
         STRING_FLAG(ALIYUN_LOG_FILE_TAGS) = "";
@@ -336,6 +373,7 @@ UNIT_TEST_CASE(AppConfigUnittest, TestLoadSingleValueEnvConfig);
 UNIT_TEST_CASE(AppConfigUnittest, TestLoadStringParameter);
 UNIT_TEST_CASE(AppConfigUnittest, TestIgnoredInterfacesConfig);
 UNIT_TEST_CASE(AppConfigUnittest, TestIgnoredInterfacesEnv);
+UNIT_TEST_CASE(AppConfigUnittest, TestBindInterfaceWorkingInterfacePrecedence);
 UNIT_TEST_CASE(AppConfigUnittest, TestGenerateFileTagsDir);
 
 } // namespace logtail

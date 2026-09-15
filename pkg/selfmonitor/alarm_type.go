@@ -228,6 +228,8 @@ const (
 	ServiceSyslogInitAlarm              AlarmType = "SERVICE_SYSLOG_INIT_ALARM"
 	ServiceSyslogPacketAlarm            AlarmType = "SERVICE_SYSLOG_PACKET_ALARM"
 	ServiceSyslogParseAlarm             AlarmType = "SERVICE_SYSLOG_PARSE_ALARM"
+	ServiceSyslogRsyslogConfigAlarm     AlarmType = "SERVICE_SYSLOG_RSYSLOG_CONFIG_ALARM"
+	ServiceSyslogRsyslogRestartAlarm    AlarmType = "SERVICE_SYSLOG_RSYSLOG_RESTART_ALARM"
 	ServiceSyslogStreamAlarm            AlarmType = "SERVICE_SYSLOG_STREAM_ALARM"
 	ServiceTelegrafOverwriteConfigAlarm AlarmType = "SERVICE_TELEGRAF_OVERWRITE_CONFIG_ALARM"
 	ServiceTelegrafRemoveConfigAlarm    AlarmType = "SERVICE_TELEGRAF_REMOVE_CONFIG_ALARM"

@@ -2,8 +2,10 @@
 
 #include <cstddef>
 
+#include <chrono>
 #include <memory>
 #include <string>
+#include <thread>
 #include <utility>
 
 #include "Flags.h"
@@ -122,7 +124,7 @@ void StreamScraper::PushEventGroup(PipelineEventGroup&& eGroup) const {
             LOG_DEBUG(sLogger, ("prometheus stream scraper", "queue not exist"));
             break;
         }
-        usleep(10 * 1000);
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
 }
 

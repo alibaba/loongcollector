@@ -30,6 +30,10 @@
 
 namespace logtail::ebpf {
 
+// Defined in AgentsightEvents.h; only used through pointers here.
+class AgentsightLlmRecord;
+class AgentsightHttpsRecord;
+
 class AgentsightManager : public AbstractManager {
 public:
     AgentsightManager() = delete;
@@ -94,6 +98,12 @@ protected:
 
 private:
     static void OnLlmCallback(const AgentsightLLMData* data, void* user_data);
+    /// Raw HTTP fallback for traffic AgentSight could not parse as an LLM call. Only registered with
+    /// handle_read when mRawHttpsFallback is on; otherwise the Rust side never emits these events.
+    static void OnHttpsCallback(const AgentsightHttpsData* data, void* user_data);
+
+    int HandleLlmEvent(AgentsightLlmRecord* rec);
+    int HandleHttpsEvent(const AgentsightHttpsRecord* rec);
 
     void StopAgentSightLocked();
     bool RestartAgentSightLocked(const SecurityOptions& opts);
@@ -122,12 +132,37 @@ private:
     bool mRunning = false;
     bool mEventStreamFormat = true;
     bool mMessageDeltaOnly = true;
+    bool mRawHttpsFallback = false;
 
+    /// Runner-level aggregates owned by EBPFServer and shared with the other eBPF plugins, so they
+    /// stay unlabelled here — narrowing them would change a metric four managers report into.
     CounterPtr mLossKernelEventsTotal;
     CounterPtr mPushLogFailedTotal;
-    CounterPtr mPluginInEventsTotal;
-    CounterPtr mPushLogsTotal;
-    CounterPtr mPushLogGroupTotal;
+
+    /// Per-stream counters, one set per `record_type` label value.
+    ///
+    /// AgentSight produces two streams of wildly different volume: once a process is attached, *every*
+    /// non-LLM HTTPS exchange it makes becomes a raw HTTP event, while gen_ai events are one per LLM
+    /// call. Sharing one counter set made it impossible to tell whether a jump came from enabling
+    /// RawHttpsFallback or from real LLM traffic growth, to size capacity for turning the switch on,
+    /// or — when events are dropped — to tell which stream filled the shared mCommonEventQueue.
+    struct StreamMetrics {
+        CounterPtr inEventsTotal;
+        CounterPtr pushLogsTotal;
+        CounterPtr pushLogGroupTotal;
+        /// Plugin-level counterpart of mLossKernelEventsTotal: same increments, but attributable.
+        CounterPtr lossEventsTotal;
+
+        void reset() {
+            inEventsTotal.reset();
+            pushLogsTotal.reset();
+            pushLogGroupTotal.reset();
+            lossEventsTotal.reset();
+        }
+    };
+    StreamMetrics mRawHttpMetrics;
+    StreamMetrics mGenAiMetrics;
+
     std::vector<MetricLabels> mRefAndLabels;
     PluginMetricManagerPtr mMetricMgr;
 };

@@ -208,12 +208,49 @@ func DeleteLogstoreConfig(config *LogstoreConfig, removedFlag bool) {
 }
 
 func DeleteLogstoreConfigFromLogtailConfig(configName string, removedFlag bool) {
+	// Only take the config out of the map under the lock; run notifyPipelineRemoved
+	// (which may execute external commands / IO, e.g. rewriting rsyslog config and
+	// restarting rsyslogd with a timeout) and DeleteLogstoreConfig outside the lock so
+	// the global config lock is never held across a slow, potentially reentrant hook.
+	var cfg *LogstoreConfig
 	LogtailConfigLock.Lock()
 	if config, ok := LogtailConfig[configName]; ok {
-		DeleteLogstoreConfig(config, removedFlag)
+		cfg = config
 		delete(LogtailConfig, configName)
 	}
 	LogtailConfigLock.Unlock()
+	if cfg == nil {
+		return
+	}
+	if removedFlag {
+		notifyPipelineRemoved(cfg)
+	}
+	DeleteLogstoreConfig(cfg, removedFlag)
+}
+
+// notifyPipelineRemoved invokes the optional pipeline.PipelineRemovedCleaner hook on every
+// service input of a config that is being permanently removed. It is called only from the
+// genuine per-config removal paths (removedFlag=true), never from reloads or from
+// StopAllPipelines on shutdown, so plugins clean up host-global state only on real removal.
+// It must run before DeleteLogstoreConfig, which nils out the runner.
+func notifyPipelineRemoved(config *LogstoreConfig) {
+	if config == nil || config.PluginRunner == nil {
+		return
+	}
+	switch runner := config.PluginRunner.(type) {
+	case *pluginv1Runner:
+		for _, sw := range runner.ServicePlugins {
+			if cleaner, ok := sw.Input.(pipeline.PipelineRemovedCleaner); ok {
+				cleaner.OnPipelineRemoved()
+			}
+		}
+	case *pluginv2Runner:
+		for _, sw := range runner.ServicePlugins {
+			if cleaner, ok := sw.Input.(pipeline.PipelineRemovedCleaner); ok {
+				cleaner.OnPipelineRemoved()
+			}
+		}
+	}
 }
 
 // StopBuiltInModulesConfig stops built-in services (container and checkpoint manager).
@@ -237,7 +274,15 @@ func Stop(configName string, removedFlag bool) error {
 	LogtailConfigLock.RLock()
 	if config, exists := LogtailConfig[configName]; exists {
 		LogtailConfigLock.RUnlock()
-		if hasStopped := timeoutStop(config, removedFlag); !hasStopped {
+		hasStopped := timeoutStop(config, removedFlag)
+		// Notify service plugins of genuine removal only after the pipeline has actually
+		// stopped and while the runner is still intact (DeleteLogstoreConfig below nils it
+		// out). On stop timeout (hasStopped=false) goroutines/services may still be running,
+		// so we skip the host-global cleanup hook to avoid disrupting a live service.
+		if removedFlag && hasStopped {
+			notifyPipelineRemoved(config)
+		}
+		if !hasStopped {
 			logger.Error(config.Context.GetRuntimeContext(), selfmonitor.ConfigStopTimeoutAlarm, "timeout when stop config, goroutine might leak")
 			DisabledLogtailConfigLock.Lock()
 			DisabledLogtailConfig[config] = struct{}{}

@@ -84,7 +84,7 @@
 | `METRIC_LABEL_KEY_PARSE_STATUS` | — | `parser_status` | 协议解析结果状态 |
 | `METRIC_LABEL_KEY_EVENT_SOURCE` | — | `event_source` | 事件来源 |
 | `METRIC_LABEL_KEY_META_TYPE` | — | `meta_type` | 元数据富化类型 |
-| `METRIC_LABEL_KEY_RECORD_TYPE` | — | `record_type` | 记录类型（应用层/网络层） |
+| `METRIC_LABEL_KEY_RECORD_TYPE` | — | `record_type` | 记录类型（应用层/网络层；AgentSight 用它区分 raw HTTP 与 GenAI 两条流）|
 
 ### 2.7 Component 标签
 
@@ -152,6 +152,8 @@
 | `METRIC_LABEL_VALUE_EVENT_SOURCE_EBPF` | `ebpf` | 事件源：eBPF 子系统 |
 | `METRIC_LABEL_VALUE_RECORD_TYPE_APP` | `app` | 记录类型：应用层 |
 | `METRIC_LABEL_VALUE_RECORD_TYPE_NET` | `net` | 记录类型：网络层 |
+| `METRIC_LABEL_VALUE_RECORD_TYPE_RAW_HTTP` | `raw_http` | 记录类型：AgentSight 原始 HTTP 事件（`RawHttpsFallback`）|
+| `METRIC_LABEL_VALUE_RECORD_TYPE_GEN_AI` | `gen_ai` | 记录类型：AgentSight GenAI 语义事件 |
 | `METRIC_LABEL_VALUE_EVENT_TYPE_CONN_STATS` | `conn_stats` | 事件类型：连接统计 |
 | `METRIC_LABEL_VALUE_EVENT_TYPE_DATA_EVENT` | `data_event` | 事件类型：数据事件 |
 | `METRIC_LABEL_VALUE_EVENT_TYPE_CTRL_EVENT` | `ctrl_event` | 事件类型：控制事件 |

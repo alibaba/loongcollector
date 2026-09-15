@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/fs"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"sort"
@@ -32,8 +33,9 @@ import (
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pkg/util"
 
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/storage"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/network"
+	"github.com/moby/moby/api/types/storage"
 )
 
 const staticContainerInfoPathEnvKey = "ALIYUN_LOG_STATIC_CONTAINER_INFO"
@@ -105,26 +107,24 @@ func staticContainerInfoToStandard(staticInfo *staticContainerInfo, stat fs.File
 	}
 
 	dockerContainer := container.InspectResponse{
-		ContainerJSONBase: &container.ContainerJSONBase{
-			ID:      staticInfo.ID,
-			Name:    staticInfo.Name,
-			Created: created.Format(time.RFC3339Nano),
-			LogPath: staticInfo.LogPath,
-			HostConfig: &container.HostConfig{
-				LogConfig: container.LogConfig{
-					Type: staticInfo.LogType,
-				},
+		ID:      staticInfo.ID,
+		Name:    staticInfo.Name,
+		Created: created.Format(time.RFC3339Nano),
+		LogPath: staticInfo.LogPath,
+		HostConfig: &container.HostConfig{
+			LogConfig: container.LogConfig{
+				Type: staticInfo.LogType,
 			},
-			GraphDriver: storage.DriverData{
-				Name: "overlay",
-				Data: map[string]string{
-					"UpperDir": staticInfo.UpperDir,
-				},
+		},
+		GraphDriver: &storage.DriverData{
+			Name: "overlay",
+			Data: map[string]string{
+				"UpperDir": staticInfo.UpperDir,
 			},
-			State: &container.State{
-				Status: status,
-				Pid:    staticInfo.State.Pid,
-			},
+		},
+		State: &container.State{
+			Status: container.ContainerState(status),
+			Pid:    staticInfo.State.Pid,
 		},
 		Config: &container.Config{
 			Labels:   staticInfo.Labels,
@@ -132,11 +132,13 @@ func staticContainerInfoToStandard(staticInfo *staticContainerInfo, stat fs.File
 			Env:      allEnv,
 			Hostname: staticInfo.HostName,
 		},
-		NetworkSettings: &container.NetworkSettings{
-			DefaultNetworkSettings: container.DefaultNetworkSettings{
-				IPAddress: staticInfo.IP,
+	}
+	if ip, err := netip.ParseAddr(staticInfo.IP); err == nil {
+		dockerContainer.NetworkSettings = &container.NetworkSettings{
+			Networks: map[string]*network.EndpointSettings{
+				"default": {IPAddress: ip},
 			},
-		},
+		}
 	}
 
 	for _, mount := range staticInfo.Mounts {
@@ -299,7 +301,13 @@ func tryReadStaticContainerInfo() ([]container.InspectResponse, []string, bool, 
 		return staticDockerContainers, nil, statusChanged, nil
 	}
 
-	newStaticDockerContainer, removedIDs, changed, staticDockerContainerError := innerReadStatisContainerInfo(staticDockerContainerFile, staticDockerContainers, stat)
+	// Assign the package-level staticDockerContainerError (not `:=`, which would
+	// shadow it and leave the global stale), so the IsChange gate above can force a
+	// re-read after a previous read error.
+	var newStaticDockerContainer []container.InspectResponse
+	var removedIDs []string
+	var changed bool
+	newStaticDockerContainer, removedIDs, changed, staticDockerContainerError = innerReadStatisContainerInfo(staticDockerContainerFile, staticDockerContainers, stat)
 	changed = changed || statusChanged
 	if staticDockerContainerError == nil {
 		staticDockerContainers = newStaticDockerContainer

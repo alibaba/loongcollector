@@ -34,6 +34,8 @@
 | ParseProtocol | string，`""` | 指定解析日志所使用的协议，默认为空，表示不解析。其中：`rfc3164`：指定使用RFC3164协议解析日志。`rfc5424`：指定使用RFC5424协议解析日志。`auto`：指定插件根据日志内容自动选择合适的解析协议。 |
 | IgnoreParseFailure | bool，`true` | 指定解析失败后的操作，不配置表示放弃解析，直接填充所返回的content字段。配置为`false` ，表示解析失败时丢弃日志。 |
 | AddHostname | bool，`false` | 当从/dev/log监听unixgram时，log中不包括hostname字段，所以使用rfc3164会导致解析错误，这时将AddHostname设置为`true`，就会给解析器当前主机的hostname，然后解析器就可以解析tag、program、content字段了。 |
+| AutoConfigRsyslog | bool，`false` | 是否自动配置 rsyslog 转发。开启后，LoongCollector 会自动在 `/etc/rsyslog.d/` 下生成转发配置并重启 rsyslogd。仅支持 TCP 和 UDP 协议，需要 root 权限。 |
+| RsyslogFilters | string 数组，不配置则默认转发所有日志（`*.*`） | 通过 rsyslog 过滤规则选择采集哪些日志。每个条目为 rsyslog 标准的 `facility.severity` 格式（如 "auth.warning"、"kern.err"）。仅在 AutoConfigRsyslog 为 true 时生效。 |
 
 ## 样例
 
@@ -82,3 +84,64 @@ flushers:
 | `_content_` | 日志内容, 如果解析失败的话, 此字段包含末解析日志的所有内容。 |
 | `_ip_` | 当前主机的IP地址。 |
 |`_client_ip_`|传输日志的客户端ip地址。|
+
+## 自动配置 rsyslog 转发
+
+开启 `AutoConfigRsyslog` 后，LoongCollector 会在 `/etc/rsyslog.d/` 目录下自动生成 rsyslog v8+ 转发配置文件（文件名格式为 `10-loongcollector-{configName}.conf`），并在生成的转发配置内容发生变化时自动重启 rsyslogd 使其生效。
+
+> **注意**：文件名中的 `{configName}` 会经过清洗——所有非 `[a-zA-Z0-9_-]` 的字符（如空格、`/`、`.`、`:`、中文等）都会被替换为 `_`。例如采集配置名为 `my config.a` 时，实际生成的文件为 `10-loongcollector-my_config_a.conf`。请按清洗后的名称查找文件；此外，若两个配置名清洗后相同，会指向同一个文件，需注意避免相互覆盖。
+
+> **副作用与清理**：由于 rsyslog v8+ 的 `reload`/`SIGHUP` 不会重载配置，应用或撤销转发配置只能通过 **重启 rsyslogd**（`systemctl restart rsyslog` 或 `service rsyslog restart`）实现。这是 **宿主机全局操作**，会短暂影响该主机上所有基于 rsyslog 的日志链路，因此仅在确有必要时触发。当采集配置被 **永久删除** 时，LoongCollector 会自动删除对应的转发配置文件并重启 rsyslogd，以避免残留的转发规则持续向已停止的端口投递并堆积磁盘队列。
+>
+> **重启判定原则**：生成的转发配置内容仅由 `Address` 解析出的 **目标地址 / 端口 / 网络协议（tcp、udp）** 以及 **`RsyslogFilters`** 决定。仅当这些字段变化、导致转发配置**内容真正改变**时才重启 rsyslogd；接收端参数（如 `MaxConnections`、`TimeoutSeconds`、`KeepAliveSeconds`、`ParseProtocol` 等）与转发规则无关，改动它们不会触发重启。判定通过“重写前先与磁盘上现有文件逐字节比对”实现，因此纯重载（reload）本身不会重启。
+>
+> **各场景重启行为**：
+>
+> | 场景 | 是否影响转发配置 | rsyslogd 重启次数 | 说明 |
+> |------|:---:|:---:|------|
+> | 采集配置未开启 `AutoConfigRsyslog`（默认） | — | 0 | 不生成任何转发配置，不介入 rsyslog |
+> | 首次开启 `AutoConfigRsyslog`（新建配置，或将开关由 false 改为 true） | 是（首次建立） | 1 | 转发配置文件此前不存在，写入并重启 |
+> | 修改 `MaxConnections` / `TimeoutSeconds` / `KeepAliveSeconds` 等接收端参数 | 否 | 0 | 转发配置内容不变，重载时按内容比对跳过重启（日志：`rsyslog config unchanged (no restart needed)`） |
+> | 修改 `ParseProtocol`（如 rfc3164 → rfc5424） | 否 | 0 | 报文解析协议仅作用于接收端，不写入转发配置 |
+> | 修改监听 **端口**（如 9001 → 9002） | 是 | 1 | omfwd 的 `Port` 变化，重写并重启 |
+> | 修改 **网络协议**（`Address` scheme，如 tcp → udp） | 是 | 1 | omfwd 的 `Protocol` 变化，重写并重启（注意与 `ParseProtocol` 区分） |
+> | 修改目标 **地址 / 主机** 或 `RsyslogFilters` | 是 | 1 | omfwd 的 `target` / 过滤选择器变化，重写并重启 |
+> | **永久删除** 采集配置 | 是（移除） | 1 | 删除对应转发配置文件并重启，避免残留转发规则持续向已停端口投递、堆积磁盘队列 |
+> | LoongCollector 进程退出 / 升级重启 | — | 0 | 保留转发配置，日志继续在 rsyslog 磁盘队列中缓冲，待 agent 恢复后送达 |
+>
+> 每次真正的重启在日志中都表现为一对配对记录，便于核对重启次数：
+>
+> ```text
+> [configureRsyslogIfNeeded] rsyslog config updated, restarting rsyslogd:configName ...
+> [restartRsyslog] rsyslog restarted successfully:via systemctl
+> ```
+>
+> 删除配置触发的重启则为：
+>
+> ```text
+> [cleanupRsyslogConfig] rsyslog config removed on stop, restarting rsyslogd:configName ...
+> [restartRsyslog] rsyslog restarted successfully:via systemctl
+> ```
+
+**前提条件**：
+- 需要 root 权限运行 LoongCollector
+- 仅支持 TCP 和 UDP 协议（不支持 unixgram）
+- 目标机器需安装 rsyslogd v8 及以上版本
+
+* 采集配置
+
+```yaml
+enable: true
+inputs:
+  - Type: service_syslog
+    Address: tcp://127.0.0.1:9000
+    AutoConfigRsyslog: true
+    RsyslogFilters:
+      - "auth.warning"
+      - "kern.err"
+flushers:
+  - Type: flusher_stdout
+    OnlyStdout: true
+```
+
+上述配置将自动在 `/etc/rsyslog.d/` 下生成仅转发 `auth.warning` 和 `kern.err` 级别日志的配置，并重启 rsyslogd 使其生效。若不配置 `RsyslogFilters`，则默认转发所有日志（`*.*`）。

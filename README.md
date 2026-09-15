@@ -120,7 +120,7 @@ LoongCollector has been battle-tested in some of the world's most demanding prod
 
 ### Prerequisites
 - Docker (for building from source)
-- Go 1.23+ (for building from source)
+- Go 1.25.9+ (for building from source)
 
 ### Build and Run
 

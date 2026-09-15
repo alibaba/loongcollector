@@ -16,9 +16,15 @@
 #include "unittest/Unittest.h"
 
 #if defined(__linux__)
+#include <arpa/inet.h>
+#include <ifaddrs.h>
+
+#include <string>
+
 #include "json/value.h"
 
 #include "app_config/AppConfig.h"
+#include "common/LogtailCommonFlags.h"
 #endif
 
 namespace logtail {
@@ -157,6 +163,32 @@ public:
 UNIT_TEST_CASE(HostnameValidationUnittest, DecHostnameValidationTest);
 UNIT_TEST_CASE(HostnameValidationUnittest, OctHostnameValidationTest);
 
+class LoopbackAddressUnittest : public ::testing::Test {
+public:
+    void TestIsLoopbackAddress() {
+        EXPECT_TRUE(IsLoopbackAddress("127.0.0.1"));
+        EXPECT_TRUE(IsLoopbackAddress("127.0.0.53"));
+        EXPECT_TRUE(IsLoopbackAddress("127.1.2.3"));
+        EXPECT_TRUE(IsLoopbackAddress("::1"));
+        EXPECT_TRUE(IsLoopbackAddress("[::1]"));
+        EXPECT_TRUE(IsLoopbackAddress("localhost"));
+        EXPECT_TRUE(IsLoopbackAddress("LocalHost"));
+
+        EXPECT_FALSE(IsLoopbackAddress(""));
+        EXPECT_FALSE(IsLoopbackAddress("192.168.1.10"));
+        EXPECT_FALSE(IsLoopbackAddress("10.0.0.1"));
+        EXPECT_FALSE(IsLoopbackAddress("1270.0.0.1"));
+        EXPECT_FALSE(IsLoopbackAddress("127001"));
+        EXPECT_FALSE(IsLoopbackAddress("::2"));
+        EXPECT_FALSE(IsLoopbackAddress("[::2]"));
+        EXPECT_FALSE(IsLoopbackAddress("localhost.localdomain"));
+        // Only the compressed IPv6 form is in scope; inet_ntop never emits the expanded spelling.
+        EXPECT_FALSE(IsLoopbackAddress("0:0:0:0:0:0:0:1"));
+    }
+};
+
+UNIT_TEST_CASE(LoopbackAddressUnittest, TestIsLoopbackAddress);
+
 #if defined(__linux__)
 class MachineInfoUtilLinuxUnittest : public ::testing::Test {
 public:
@@ -168,9 +200,59 @@ public:
         EXPECT_TRUE(IsIgnoredInterfaceForHostIdentity("kube-ipvs0"));
         (void)GetAnyAvailableIP();
     }
+
+    // Find an interface whose IPv4 address is neither empty nor loopback, so the working_interface
+    // branch of GetHostIp can be exercised deterministically. Returns "" if none is available.
+    static std::string FindInterfaceWithValidIp() {
+        struct ifaddrs* ifaddr = nullptr;
+        if (getifaddrs(&ifaddr) != 0) {
+            return "";
+        }
+        std::string result;
+        for (struct ifaddrs* ifa = ifaddr; ifa != nullptr; ifa = ifa->ifa_next) {
+            if (ifa->ifa_addr == nullptr || ifa->ifa_addr->sa_family != AF_INET) {
+                continue;
+            }
+            std::string name = ifa->ifa_name;
+            std::string ip = GetHostIpByInterface(name);
+            if (!ip.empty() && ip.find("127.") != 0) {
+                result = name;
+                break;
+            }
+        }
+        freeifaddrs(ifaddr);
+        return result;
+    }
+
+    void TestGetHostIpWithWorkingInterface() {
+        std::string savedFlag = STRING_FLAG(working_interface);
+
+        // Case 1: working_interface points to a non-existent NIC. GetHostIpByInterface yields "",
+        // so GetHostIp must fall through to the original hostname + interface fallback chain and
+        // return exactly what it returns when working_interface is empty.
+        STRING_FLAG(working_interface) = "";
+        std::string baseline = GetHostIp();
+        STRING_FLAG(working_interface) = "loongcollector_nonexistent_iface";
+        EXPECT_EQ(GetHostIp(), baseline);
+
+        // Case 2: working_interface points to a NIC with a valid (non-loopback) IP. GetHostIp must
+        // prioritize that interface and return its IP directly, regardless of hostname resolution.
+        std::string goodIntf = FindInterfaceWithValidIp();
+        if (!goodIntf.empty()) {
+            std::string expectedIp = GetHostIpByInterface(goodIntf);
+            STRING_FLAG(working_interface) = goodIntf;
+            EXPECT_EQ(GetHostIp(), expectedIp);
+            // The passed-in intf argument must not override the working_interface priority.
+            EXPECT_EQ(GetHostIp("loongcollector_nonexistent_iface"), expectedIp);
+        }
+        // else: no non-loopback IPv4 interface in this environment; the valid-IP case is skipped.
+
+        STRING_FLAG(working_interface) = savedFlag;
+    }
 };
 
 UNIT_TEST_CASE(MachineInfoUtilLinuxUnittest, TestNicIpv4AndHostIdentityHelpers);
+UNIT_TEST_CASE(MachineInfoUtilLinuxUnittest, TestGetHostIpWithWorkingInterface);
 #endif
 
 } // end of namespace logtail

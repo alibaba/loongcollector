@@ -27,6 +27,7 @@ public:
     void TestSendHttpRequest();
     void TestCurlTLS();
     void TestFollowRedirect();
+    void TestSkipInterfaceBindForLoopback();
 };
 
 
@@ -99,9 +100,40 @@ void CurlUnittest::TestFollowRedirect() {
     APSARA_TEST_EQUAL(404, res.GetStatusCode());
 }
 
+void CurlUnittest::TestSkipInterfaceBindForLoopback() {
+    // "if!<name>" forces curl to treat the value as an interface name; a nonexistent one
+    // makes curl_easy_perform fail with CURLE_INTERFACE_FAILED iff the binding is applied.
+    const std::string badIntf = "if!nonexistent-intf-for-ut";
+    const std::map<std::string, std::string> emptyHeader;
+
+    auto performAndCheckInterfaceApplied = [&](const std::string& endpoint) -> bool {
+        HttpResponse res;
+        curl_slist* headers = nullptr;
+        CURL* curl = CreateCurlHandler("GET", false, endpoint, 80, "/", "", emptyHeader, "", res, headers, 1, badIntf);
+        APSARA_TEST_NOT_EQUAL(nullptr, curl);
+        CURLcode code = curl_easy_perform(curl);
+        if (headers != nullptr) {
+            curl_slist_free_all(headers);
+        }
+        curl_easy_cleanup(curl);
+        return code == CURLE_INTERFACE_FAILED;
+    };
+
+    // loopback endpoints: binding skipped, must not fail with CURLE_INTERFACE_FAILED.
+    // IPv6 needs the bracketed form: the endpoint is concatenated into the URL verbatim, and a
+    // bare "::1" yields a malformed URL that fails before interface binding is ever attempted.
+    APSARA_TEST_FALSE(performAndCheckInterfaceApplied("127.0.0.1"));
+    APSARA_TEST_FALSE(performAndCheckInterfaceApplied("localhost"));
+    APSARA_TEST_FALSE(performAndCheckInterfaceApplied("[::1]"));
+
+    // non-loopback endpoint: binding applied, fails on the nonexistent interface
+    APSARA_TEST_TRUE(performAndCheckInterfaceApplied("192.0.2.1"));
+}
+
 UNIT_TEST_CASE(CurlUnittest, TestSendHttpRequest)
 UNIT_TEST_CASE(CurlUnittest, TestCurlTLS)
 UNIT_TEST_CASE(CurlUnittest, TestFollowRedirect)
+UNIT_TEST_CASE(CurlUnittest, TestSkipInterfaceBindForLoopback)
 
 } // namespace logtail
 
