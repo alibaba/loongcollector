@@ -757,18 +757,27 @@ void SLSSerializerUnittest::TestSerializeEventGroup() {
 }
 
 void SLSSerializerUnittest::TestSerializeEventGroupList() {
-    vector<CompressedLogGroup> v;
-    v.emplace_back("data1", 10);
-
     SLSEventGroupListSerializer serializer(sFlusher.get());
-    string res, errorMsg;
-    APSARA_TEST_TRUE(serializer.DoSerialize(std::move(v), res, errorMsg));
-    sls_logs::SlsLogPackageList logPackageList;
-    APSARA_TEST_TRUE(logPackageList.ParseFromString(res));
-    APSARA_TEST_EQUAL(1, logPackageList.packages_size());
-    APSARA_TEST_STREQ("data1", logPackageList.packages(0).data().c_str());
-    APSARA_TEST_EQUAL(10, logPackageList.packages(0).uncompress_size());
-    APSARA_TEST_EQUAL(sls_logs::SlsCompressType::SLS_CMP_NONE, logPackageList.packages(0).compress_type());
+    {
+        vector<CompressedLogGroup> v;
+        v.emplace_back("data1", 10);
+
+        string res, errorMsg;
+        APSARA_TEST_TRUE(serializer.DoSerialize(std::move(v), res, errorMsg));
+        sls_logs::SlsLogPackageList logPackageList;
+        APSARA_TEST_TRUE(logPackageList.ParseFromString(res));
+        APSARA_TEST_EQUAL(1, logPackageList.packages_size());
+        APSARA_TEST_STREQ("data1", logPackageList.packages(0).data().c_str());
+        APSARA_TEST_EQUAL(10, logPackageList.packages(0).uncompress_size());
+        APSARA_TEST_EQUAL(sls_logs::SlsCompressType::SLS_CMP_NONE, logPackageList.packages(0).compress_type());
+    }
+    {
+        // empty package list should not be serialized, otherwise an empty request would be sent
+        vector<CompressedLogGroup> v;
+        string res, errorMsg;
+        APSARA_TEST_FALSE(serializer.DoSerialize(std::move(v), res, errorMsg));
+        APSARA_TEST_TRUE(res.empty());
+    }
 }
 
 
