@@ -953,6 +953,7 @@ void LogFileReaderUnittest::TestContainerMetricLabels() {
                              std::make_pair(&multilineOpts, &metricCtx),
                              std::make_pair(&tagOpts, &metricCtx));
         reader.SetContainerMetadatas(MakeContainerMetadatas("test_pod_uid"));
+        reader.SetContainerCustomMetadatas({{"env_config_tag", "custom_value"}, {"", "ignored_custom"}});
         reader.SetContainerExtraTags({{"app_name", "hago"}, {"", "ignored"}});
         reader.SetMetrics();
 
@@ -964,6 +965,7 @@ void LogFileReaderUnittest::TestContainerMetricLabels() {
             HasMetricLabel(reader.mMetricLabels, METRIC_LABEL_KEY_CONTAINER_IP, "test_container_ip"));
         APSARA_TEST_TRUE_FATAL(
             HasMetricLabel(reader.mMetricLabels, METRIC_LABEL_KEY_CONTAINER_IMAGE_NAME, "test_image"));
+        APSARA_TEST_TRUE_FATAL(HasMetricLabel(reader.mMetricLabels, "env_config_tag", "custom_value"));
         APSARA_TEST_TRUE_FATAL(HasMetricLabel(reader.mMetricLabels, "app_name", "hago"));
         APSARA_TEST_FALSE_FATAL(HasMetricLabelKey(reader.mMetricLabels, ""));
     }
@@ -1024,11 +1026,27 @@ void LogFileReaderUnittest::TestContainerMetricLabelsRebind() {
     const std::string configName = "container_metric_labels_rebind";
     auto pluginMetricManager = CreateFilePluginMetricManager(configName);
     FileServer::GetInstance()->AddPluginMetricManager(configName, pluginMetricManager);
-    std::shared_ptr<void> managerGuard(
-        nullptr, [&configName](void*) { FileServer::GetInstance()->RemovePluginMetricManager(configName); });
 
     CollectionPipelineContext metricCtx;
     metricCtx.SetConfigName(configName);
+    FileDiscoveryOptions containerDiscoveryOpts;
+    containerDiscoveryOpts.SetEnableContainerDiscoveryFlag(true);
+    auto containerInfos = std::make_shared<std::vector<ContainerInfo>>();
+    ContainerInfo newContainer;
+    newContainer.mRawContainerInfo = std::make_shared<RawContainerInfo>();
+    newContainer.mRawContainerInfo->mID = "new-container-id";
+    newContainer.mRawContainerInfo->mMetadatas = MakeContainerMetadatas("new_pod_uid");
+    newContainer.mRawContainerInfo->mCustomMetadatas = {{"env_config_tag", "new_custom"}};
+    newContainer.mRealBaseDirs = {logPathDir};
+    newContainer.mExtraTags = {{"app_name", "new_app"}};
+    containerInfos->push_back(newContainer);
+    containerDiscoveryOpts.SetContainerInfo(containerInfos);
+    FileServer::GetInstance()->AddFileDiscoveryConfig(configName, &containerDiscoveryOpts, &metricCtx);
+    std::shared_ptr<void> managerGuard(nullptr, [&configName](void*) {
+        FileServer::GetInstance()->RemovePluginMetricManager(configName);
+        FileServer::GetInstance()->RemoveFileDiscoveryConfig(configName);
+    });
+
     MultilineOptions multilineOpts;
     FileReaderOptions metricReaderOpts;
     metricReaderOpts.mInputType = FileReaderOptions::InputType::InputFile;
@@ -1044,24 +1062,23 @@ void LogFileReaderUnittest::TestContainerMetricLabelsRebind() {
                          std::make_pair(&metricReaderOpts, &metricCtx),
                          std::make_pair(&multilineOpts, &metricCtx),
                          std::make_pair(&tagOpts, &metricCtx));
+    reader.SetContainerID("old-container-id");
     reader.SetContainerMetadatas(MakeContainerMetadatas("old_pod_uid"));
+    reader.SetContainerCustomMetadatas({{"env_config_tag", "old_custom"}});
     reader.SetContainerExtraTags({{"app_name", "old_app"}});
     reader.SetMetrics();
     APSARA_TEST_TRUE_FATAL(HasMetricLabel(reader.mMetricLabels, METRIC_LABEL_KEY_K8S_POD_UID, "old_pod_uid"));
+    APSARA_TEST_TRUE_FATAL(HasMetricLabel(reader.mMetricLabels, "env_config_tag", "old_custom"));
     APSARA_TEST_TRUE_FATAL(HasMetricLabel(reader.mMetricLabels, "app_name", "old_app"));
 
     const int64_t consumedOffset = 64;
     reader.mLastFilePos = consumedOffset;
-    reader.InitMetricGauges();
 
-    FileServer::GetInstance()->ReleaseReentrantMetricsRecordRef(configName, reader.mMetricLabels);
-    reader.SetContainerMetadatas(MakeContainerMetadatas("new_pod_uid"));
-    reader.SetContainerExtraTags({{"app_name", "new_app"}});
-    reader.SetMetrics();
-    reader.InitMetricGauges();
-
+    APSARA_TEST_TRUE_FATAL(reader.UpdateContainerInfo());
+    APSARA_TEST_EQUAL_FATAL(reader.GetContainerID(), "new-container-id");
     APSARA_TEST_TRUE_FATAL(HasMetricLabel(reader.mMetricLabels, METRIC_LABEL_KEY_K8S_POD_UID, "new_pod_uid"));
     APSARA_TEST_FALSE_FATAL(HasMetricLabel(reader.mMetricLabels, METRIC_LABEL_KEY_K8S_POD_UID, "old_pod_uid"));
+    APSARA_TEST_TRUE_FATAL(HasMetricLabel(reader.mMetricLabels, "env_config_tag", "new_custom"));
     APSARA_TEST_TRUE_FATAL(HasMetricLabel(reader.mMetricLabels, "app_name", "new_app"));
     APSARA_TEST_TRUE_FATAL(reader.mSourceReadOffsetBytes != nullptr);
     APSARA_TEST_EQUAL_FATAL(reader.mSourceReadOffsetBytes->GetValue(), (uint64_t)consumedOffset);

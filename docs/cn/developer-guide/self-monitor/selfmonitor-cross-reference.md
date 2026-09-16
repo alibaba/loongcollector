@@ -69,7 +69,7 @@
 | `METRIC_LABEL_KEY_CONTAINER_IP` | — | `_container_ip_` | 默认容器 IP，值引用 `DEFAULT_LOG_TAG_CONTAINER_IP`；运行期以 FileTagOptions 为准 |
 | `METRIC_LABEL_KEY_CONTAINER_IMAGE_NAME` | — | `_image_name_` | 默认镜像名，值引用 `DEFAULT_LOG_TAG_IMAGE_NAME`；运行期以 FileTagOptions 为准 |
 
-ExternalK8sLabel / ExternalEnv 映射出的 tag 无固定 `METRIC_LABEL_KEY_*` 常量，名称与日志 tag 一致。
+`ExternalK8sLabelTag` / `ExternalEnvTag` 映射出的 tag 无固定 `METRIC_LABEL_KEY_*` 常量，名称与日志 tag 一致。
 
 ### 2.5 Prometheus 标签
 

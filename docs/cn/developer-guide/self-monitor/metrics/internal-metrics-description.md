@@ -185,7 +185,7 @@ Runner 是 LoongCollector 内部的独立线程的单例，通常是一整个功
 | `_container_name_` | 容器名 | 仅限容器发现；名称随 FileTagOptions 与日志 tag 一致 |
 | `_container_ip_` | 容器 IP | 仅限容器发现；名称随 FileTagOptions 与日志 tag 一致 |
 | `_image_name_` | 容器镜像名 | 仅限容器发现；名称随 FileTagOptions 与日志 tag 一致 |
-| ExternalK8sLabel / ExternalEnv 映射名 | 配置映射出的自定义 tag | 仅配置了对应映射时出现，名称与日志一致 |
+| ExternalK8sLabelTag / ExternalEnvTag 映射名 | 配置映射出的自定义 tag | 仅配置了对应映射时出现，名称与日志一致 |
 
 常见Metric Key：
 
