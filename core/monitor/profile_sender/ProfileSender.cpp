@@ -22,6 +22,7 @@
 #include "common/CompressTools.h"
 #include "common/Flags.h"
 #include "common/LogtailCommonFlags.h"
+#include "common/StringTools.h"
 #include "logger/Logger.h"
 #include "plugin/flusher/sls/SLSClientManager.h"
 #ifdef __ENTERPRISE__
@@ -122,10 +123,14 @@ bool ProfileSender::IsProfileData(const string& region, const string& project, c
 #ifndef APSARA_UNIT_TEST_MAIN
     if ((logstore == "shennong_log_profile" || logstore == "logtail_alarm" || logstore == "logtail_status_profile"
          || logstore == "logtail_suicide_profile")
-        && (project == GetProfileProjectName(region) || region == ""))
+        && (project == GetProfileProjectName(region) || region.empty())) {
         return true;
-    else
-        return false;
+    }
+    static const string kShennongMetricsStoreSuffix = "shennong_metrics";
+    if (EndWith(logstore, kShennongMetricsStoreSuffix)) {
+        return true;
+    }
+    return false;
 #else
     return false;
 #endif
