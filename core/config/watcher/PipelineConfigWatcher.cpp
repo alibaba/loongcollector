@@ -15,6 +15,7 @@
 #include "config/watcher/PipelineConfigWatcher.h"
 
 #include <memory>
+#include <system_error>
 
 #include "collection_pipeline/CollectionPipelineManager.h"
 #include "common/FileSystemUtil.h"
@@ -22,6 +23,7 @@
 #include "config/common_provider/CommonConfigProvider.h"
 #include "config/feedbacker/ConfigFeedbackReceiver.h"
 #include "logger/Logger.h"
+#include "monitor/AlarmManager.h"
 #include "monitor/Monitor.h"
 #include "task_pipeline/TaskPipelineManager.h"
 #ifdef __ENTERPRISE__
@@ -43,10 +45,23 @@ pair<CollectionConfigDiff, TaskConfigDiff> PipelineConfigWatcher::CheckConfigDif
     TaskConfigDiff tDiff;
     unordered_set<string> configSet;
     SingletonConfigCache singletonCache;
+    ConfigFileInfoMap nextFileInfo;
     // builtin pipeline configs
     InsertBuiltInPipelines(pDiff, tDiff, configSet, singletonCache);
     // file pipeline configs
-    InsertPipelines(pDiff, tDiff, configSet, singletonCache);
+    if (!InsertPipelines(pDiff, tDiff, configSet, singletonCache, nextFileInfo)) {
+        LOG_WARNING(sLogger,
+                    ("action", "iterate config dir")("status", "incomplete, skip this round")(
+                        "reason", "do not generate added/modified/removed from a torn snapshot"));
+        if (!mConfigDirScanIncomplete) {
+            AlarmManager::GetInstance()->SendAlarmWarning(CATEGORY_CONFIG_ALARM,
+                                                          "config dir scan incomplete, skip this round diff");
+            mConfigDirScanIncomplete = true;
+        }
+        return {CollectionConfigDiff{}, TaskConfigDiff{}};
+    }
+    mConfigDirScanIncomplete = false;
+    mFileInfoMap = std::move(nextFileInfo);
 
     CheckSingletonInput(pDiff, singletonCache);
     for (const auto& name : mCollectionPipelineManager->GetAllConfigNames()) {
@@ -63,15 +78,6 @@ pair<CollectionConfigDiff, TaskConfigDiff> PipelineConfigWatcher::CheckConfigDif
                      ("existing valid config is removed", "prepare to stop current running task")("config", name));
         }
     }
-    for (auto it = mFileInfoMap.begin(); it != mFileInfoMap.end();) {
-        string configName = filesystem::path(it->first).stem().string();
-        if (configSet.find(configName) == configSet.end()) {
-            it = mFileInfoMap.erase(it);
-        } else {
-            ++it;
-        }
-    }
-
     if (pDiff.HasDiff() || pDiff.HasIgnored()) {
         LOG_INFO(sLogger,
                  ("config files scan done", "got updates, begin to update pipelines")("added", pDiff.mAdded.size())(
@@ -188,18 +194,30 @@ void PipelineConfigWatcher::InsertBuiltInPipelines(CollectionConfigDiff& pDiff,
 #endif
 }
 
-void PipelineConfigWatcher::InsertPipelines(CollectionConfigDiff& pDiff,
+bool PipelineConfigWatcher::InsertPipelines(CollectionConfigDiff& pDiff,
                                             TaskConfigDiff& tDiff,
                                             unordered_set<string>& configSet,
-                                            SingletonConfigCache& singletonCache) {
+                                            SingletonConfigCache& singletonCache,
+                                            ConfigFileInfoMap& nextFileInfo) {
     for (const auto& dir : mSourceDir) {
         error_code ec;
         filesystem::file_status s = filesystem::status(dir, ec);
+#ifdef APSARA_UNIT_TEST_MAIN
+        if (mForceStatusError) {
+            ec = make_error_code(errc::bad_file_descriptor);
+        }
+#endif
         if (ec) {
+            if (ec == errc::no_such_file_or_directory) {
+                LOG_WARNING(sLogger,
+                            ("failed to get config dir path info", "skip current object")("dir path", dir.string())(
+                                "error code", ec.value())("error msg", ec.message()));
+                continue;
+            }
             LOG_WARNING(sLogger,
-                        ("failed to get config dir path info", "skip current object")("dir path", dir.string())(
-                            "error code", ec.value())("error msg", ec.message()));
-            continue;
+                        ("action", "iterate config dir")("status", "incomplete, skip this round")(
+                            "dir path", dir.string())("error code", ec.value())("error msg", ec.message()));
+            return false;
         }
         if (!filesystem::exists(s)) {
             LOG_WARNING(sLogger, ("config dir path not existed", "skip current object")("dir path", dir.string()));
@@ -239,7 +257,7 @@ void PipelineConfigWatcher::InsertPipelines(CollectionConfigDiff& pDiff,
             uintmax_t size = filesystem::file_size(path, ec);
             filesystem::file_time_type mTime = filesystem::last_write_time(path, ec);
             if (iter == mFileInfoMap.end()) {
-                mFileInfoMap[filepath] = make_pair(size, mTime);
+                nextFileInfo[filepath] = make_pair(size, mTime);
                 unique_ptr<Json::Value> detail = make_unique<Json::Value>();
                 if (!LoadConfigDetailFromFile(path, *detail)) {
                     continue;
@@ -253,7 +271,7 @@ void PipelineConfigWatcher::InsertPipelines(CollectionConfigDiff& pDiff,
                 }
             } else if (iter->second.first != size || iter->second.second != mTime) {
                 // for config currently running, we leave it untouched if new config is invalid
-                mFileInfoMap[filepath] = make_pair(size, mTime);
+                nextFileInfo[filepath] = make_pair(size, mTime);
                 unique_ptr<Json::Value> detail = make_unique<Json::Value>();
                 if (!LoadConfigDetailFromFile(path, *detail)) {
                     continue;
@@ -291,16 +309,25 @@ void PipelineConfigWatcher::InsertPipelines(CollectionConfigDiff& pDiff,
                     continue;
                 }
             } else {
+                nextFileInfo[filepath] = iter->second;
                 // check unchanged config just for singleton input
                 CheckUnchangedConfig(configName, path, pDiff, singletonCache);
             }
+#ifdef APSARA_UNIT_TEST_MAIN
+            if (mForceIterateError) {
+                itEc = make_error_code(errc::bad_file_descriptor);
+                break;
+            }
+#endif
         }
         if (itEc) {
             LOG_WARNING(sLogger,
                         ("action", "iterate config dir")("status", "failed")("dir path", dir.string())(
                             "error code", itEc.value())("error msg", itEc.message()));
+            return false;
         }
     }
+    return true;
 }
 
 bool PipelineConfigWatcher::CheckAddedConfig(const string& configName,
