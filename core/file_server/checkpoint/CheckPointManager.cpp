@@ -118,6 +118,14 @@ bool CheckPointManager::CheckVersion() {
     return (mLoadVersion == NO_CHECKPOINT_VERSION) || (mLoadVersion / 10000 == INT32_FLAG(check_point_version) / 10000);
 }
 
+bool CheckPointManager::CheckPointFileStillExists(const CheckPoint& checkPoint) {
+    // Reuse the silent PathStat helper from dump-round GC: GetFileDevInode logs INFO
+    // on Linux when stat fails, and collision checks often probe deleted stale paths.
+    return pathMatchesDevInode(checkPoint.mFileName, checkPoint.mDevInode)
+        || pathMatchesDevInode(checkPoint.mRealFileName, checkPoint.mDevInode)
+        || pathMatchesDevInode(checkPoint.mResolvedFileName, checkPoint.mDevInode);
+}
+
 // Same check as the front half of EventDispatcher::validateCheckpoint. It also
 // returns the matched input's configured inode-search depth so GC cannot weaken
 // MaxCheckpointDirSearchDepth before validateCheckpoint gets a chance to run.
@@ -148,7 +156,26 @@ void CheckPointManager::AddCheckPoint(CheckPoint* checkPointPtr) {
     CheckPointPtr newCheckPoint(checkPointPtr);
     newCheckPoint->mMemInsertTime = (int32_t)time(NULL);
     CheckPointKey key(newCheckPoint->mDevInode, newCheckPoint->mConfigName);
-    mDevInodeCheckPointPtrMap[key] = newCheckPoint;
+    DevInodeCheckPointHashMap::iterator it = mDevInodeCheckPointPtrMap.find(key);
+    if (it != mDevInodeCheckPointPtrMap.end()) {
+        // Active-priority on key collision: the key (dev, inode, configName) cannot tell apart
+        // two physical files that reuse the same inode (fake rotation). Keep the checkpoint whose
+        // file still exists, so a stale reader of an already-deleted file cannot overwrite the
+        // active reader's offset and cause re-collection from the beginning. When neither or both
+        // files exist, fall back to the legacy last-writer-wins behavior to avoid losing state.
+        const CheckPointPtr& oldCheckPoint = it->second;
+        if (!CheckPointFileStillExists(*newCheckPoint) && CheckPointFileStillExists(*oldCheckPoint)) {
+            LOG_INFO(
+                sLogger,
+                ("skip stale checkpoint", "keep active file checkpoint")("config", newCheckPoint->mConfigName)(
+                    "dev", ToString(newCheckPoint->mDevInode.dev))("inode", ToString(newCheckPoint->mDevInode.inode))(
+                    "stale file", newCheckPoint->mFileName)("active file", oldCheckPoint->mFileName));
+            return;
+        }
+        it->second = newCheckPoint;
+    } else {
+        mDevInodeCheckPointPtrMap[key] = newCheckPoint;
+    }
     if (mCollectingDumpRound) {
         mDumpRoundKeys.push_back(key);
     }

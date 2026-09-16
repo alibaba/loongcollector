@@ -138,6 +138,11 @@ private:
     CheckPointManager()
         : mLastCheckTime(time(NULL)), mLastDumpTime(time(NULL)), mLoadVersion(NO_CHECKPOINT_VERSION), mReaderCount(0) {}
 
+    // A checkpoint's physical file still exists when its path currently resolves to the
+    // same (dev, inode). After a fake rotation the deleted file's path is gone or points
+    // to a different inode, so such a checkpoint is treated as stale. Host / real /
+    // resolved paths are probed so a rotated-but-present file is not misjudged.
+    static bool CheckPointFileStillExists(const CheckPoint& checkPoint);
     static bool getCheckPointSearchDepth(const CheckPoint& checkPoint, uint16_t& searchDepth);
 
 public:

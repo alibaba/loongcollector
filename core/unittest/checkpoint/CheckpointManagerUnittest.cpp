@@ -73,6 +73,10 @@ public:
     }
 
     void TestSearchFilePathByDevInodeInDirectory();
+    void TestAddCheckPointStaleFileNotOverwriteActive();
+    void TestAddCheckPointActiveOverwriteStale();
+    void TestAddCheckPointBothExistLastWriterWins();
+    void TestAddCheckPointNeitherExistLastWriterWins();
     void TestPendingSurvivesDumpRound();
     void TestPendingSurvivesTwoDumpRounds();
     void TestConsumeDeletesPending();
@@ -92,10 +96,13 @@ public:
     void TestGcRespectsCheckInterval();
 
 private:
+    // Ownership is transferred to AddCheckPoint via release(); unique_ptr keeps construction
+    // exception-safe until that hand-off.
     static std::unique_ptr<CheckPoint> MakeCheckPoint(const std::string& fileName,
                                                       const DevInode& devInode,
                                                       int64_t offset,
-                                                      const std::string& configName) {
+                                                      const std::string& configName,
+                                                      const std::string& realFileName = "") {
         return std::unique_ptr<CheckPoint>(new CheckPoint(fileName,
                                                           "" /* resolvedFileName */,
                                                           offset,
@@ -103,7 +110,7 @@ private:
                                                           0 /* signatureHash */,
                                                           devInode,
                                                           configName,
-                                                          "" /* realFileName */,
+                                                          realFileName,
                                                           false /* fileOpenFlag */,
                                                           false /* containerStopped */,
                                                           "" /* containerID */,
@@ -124,6 +131,10 @@ FileDiscoveryOptions CheckpointManagerUnittest::sDiscoveryOpts;
 CollectionPipelineContext CheckpointManagerUnittest::sCtx;
 
 UNIT_TEST_CASE(CheckpointManagerUnittest, TestSearchFilePathByDevInodeInDirectory);
+UNIT_TEST_CASE(CheckpointManagerUnittest, TestAddCheckPointStaleFileNotOverwriteActive);
+UNIT_TEST_CASE(CheckpointManagerUnittest, TestAddCheckPointActiveOverwriteStale);
+UNIT_TEST_CASE(CheckpointManagerUnittest, TestAddCheckPointBothExistLastWriterWins);
+UNIT_TEST_CASE(CheckpointManagerUnittest, TestAddCheckPointNeitherExistLastWriterWins);
 UNIT_TEST_CASE(CheckpointManagerUnittest, TestPendingSurvivesDumpRound);
 UNIT_TEST_CASE(CheckpointManagerUnittest, TestPendingSurvivesTwoDumpRounds);
 UNIT_TEST_CASE(CheckpointManagerUnittest, TestConsumeDeletesPending);
@@ -203,6 +214,122 @@ void CheckpointManagerUnittest::TestSearchFilePathByDevInodeInDirectory() {
         EXPECT_EQ(cache.at(devInode).mFileDir, kSubDir.string());
         EXPECT_EQ(cache.at(devInode).mFileName, kRotateFileName);
     }
+}
+
+// Fake rotation: a new file B reuses the inode of a deleted file A. Both readers dump a
+// checkpoint under the same (dev, inode, config) key. The stale checkpoint of the deleted
+// file A must not overwrite the active checkpoint of the still-existing file B.
+void CheckpointManagerUnittest::TestAddCheckPointStaleFileNotOverwriteActive() {
+    CheckPointManager::Instance()->RemoveAllCheckPoint();
+    const std::string configName = "test-config";
+    const std::string activeFile = (bfs::path(kTestRootDir) / "active.log").string();
+    const std::string deletedFile = (bfs::path(kTestRootDir) / "deleted.log").string();
+    std::ofstream(activeFile) << "active";
+    // deletedFile is never created on disk -> its checkpoint is stale.
+
+    fsutil::PathStat ps;
+    EXPECT_TRUE(fsutil::PathStat::stat(activeFile, ps));
+    const DevInode reusedDevInode = ps.GetDevInode();
+
+    // Active reader dumps first, then the stale reader of the deleted file (same inode).
+    CheckPointManager::Instance()->AddCheckPoint(
+        MakeCheckPoint(activeFile, reusedDevInode, 1000, configName).release());
+    CheckPointManager::Instance()->AddCheckPoint(MakeCheckPoint(deletedFile, reusedDevInode, 0, configName).release());
+
+    CheckPointPtr cpt;
+    EXPECT_TRUE(CheckPointManager::Instance()->GetCheckPoint(reusedDevInode, configName, cpt));
+    EXPECT_EQ(cpt->mFileName, activeFile);
+    EXPECT_EQ(cpt->mOffset, 1000);
+    EXPECT_EQ(CheckPointManager::Instance()->GetAllFileCheckPoint().size(), 1UL);
+
+    CheckPointManager::Instance()->RemoveAllCheckPoint();
+    bfs::remove(activeFile);
+}
+
+// Order independence: even when the stale checkpoint is added first, the later active
+// checkpoint of the still-existing file must win.
+void CheckpointManagerUnittest::TestAddCheckPointActiveOverwriteStale() {
+    CheckPointManager::Instance()->RemoveAllCheckPoint();
+    const std::string configName = "test-config";
+    const std::string activeFile = (bfs::path(kTestRootDir) / "active2.log").string();
+    const std::string deletedFile = (bfs::path(kTestRootDir) / "deleted2.log").string();
+    std::ofstream(activeFile) << "active";
+
+    fsutil::PathStat ps;
+    EXPECT_TRUE(fsutil::PathStat::stat(activeFile, ps));
+    const DevInode reusedDevInode = ps.GetDevInode();
+
+    CheckPointManager::Instance()->AddCheckPoint(MakeCheckPoint(deletedFile, reusedDevInode, 0, configName).release());
+    CheckPointManager::Instance()->AddCheckPoint(
+        MakeCheckPoint(activeFile, reusedDevInode, 2000, configName).release());
+
+    CheckPointPtr cpt;
+    EXPECT_TRUE(CheckPointManager::Instance()->GetCheckPoint(reusedDevInode, configName, cpt));
+    EXPECT_EQ(cpt->mFileName, activeFile);
+    EXPECT_EQ(cpt->mOffset, 2000);
+    EXPECT_EQ(CheckPointManager::Instance()->GetAllFileCheckPoint().size(), 1UL);
+
+    CheckPointManager::Instance()->RemoveAllCheckPoint();
+    bfs::remove(activeFile);
+}
+
+// Both files exist (e.g. hard links sharing an inode): legacy last-writer-wins is preserved.
+void CheckpointManagerUnittest::TestAddCheckPointBothExistLastWriterWins() {
+    CheckPointManager::Instance()->RemoveAllCheckPoint();
+    const std::string configName = "test-config";
+    const std::string file1 = (bfs::path(kTestRootDir) / "link1.log").string();
+    const std::string file2 = (bfs::path(kTestRootDir) / "link2.log").string();
+    std::ofstream(file1) << "data";
+    try {
+        bfs::create_hard_link(file1, file2);
+    } catch (const bfs::filesystem_error& e) {
+        // Some filesystems / container overlays / permission setups reject hard links. Skip
+        // rather than abort so CI without hard-link support stays green. The bundled gtest
+        // predates GTEST_SKIP, so fall back to a logged early return (see BPFWrapperUnittest).
+#if defined(GTEST_HAS_SKIP) && GTEST_HAS_SKIP
+        GTEST_SKIP() << "hard link not supported in this environment: " << e.what();
+#else
+        GTEST_LOG_(INFO) << "Skipped: hard link not supported in this environment "
+                            "(no GTEST_SKIP in this gtest build): "
+                         << e.what();
+        return;
+#endif
+    }
+
+    fsutil::PathStat ps;
+    EXPECT_TRUE(fsutil::PathStat::stat(file1, ps));
+    const DevInode devInode = ps.GetDevInode();
+
+    CheckPointManager::Instance()->AddCheckPoint(MakeCheckPoint(file1, devInode, 100, configName).release());
+    CheckPointManager::Instance()->AddCheckPoint(MakeCheckPoint(file2, devInode, 200, configName).release());
+
+    CheckPointPtr cpt;
+    EXPECT_TRUE(CheckPointManager::Instance()->GetCheckPoint(devInode, configName, cpt));
+    EXPECT_EQ(cpt->mFileName, file2);
+    EXPECT_EQ(cpt->mOffset, 200);
+
+    CheckPointManager::Instance()->RemoveAllCheckPoint();
+    bfs::remove(file1);
+    bfs::remove(file2);
+}
+
+// Neither file exists (both stale): fall back to legacy last-writer-wins, no state dropped.
+void CheckpointManagerUnittest::TestAddCheckPointNeitherExistLastWriterWins() {
+    CheckPointManager::Instance()->RemoveAllCheckPoint();
+    const std::string configName = "test-config";
+    const std::string gone1 = (bfs::path(kTestRootDir) / "gone1.log").string();
+    const std::string gone2 = (bfs::path(kTestRootDir) / "gone2.log").string();
+    const DevInode devInode(12345, 67890); // does not match any real file
+
+    CheckPointManager::Instance()->AddCheckPoint(MakeCheckPoint(gone1, devInode, 100, configName).release());
+    CheckPointManager::Instance()->AddCheckPoint(MakeCheckPoint(gone2, devInode, 200, configName).release());
+
+    CheckPointPtr cpt;
+    EXPECT_TRUE(CheckPointManager::Instance()->GetCheckPoint(devInode, configName, cpt));
+    EXPECT_EQ(cpt->mFileName, gone2);
+    EXPECT_EQ(cpt->mOffset, 200);
+
+    CheckPointManager::Instance()->RemoveAllCheckPoint();
 }
 
 // A pending handoff entry (written outside any dump round) must survive a periodic
