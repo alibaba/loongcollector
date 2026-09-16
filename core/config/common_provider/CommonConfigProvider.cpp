@@ -23,6 +23,7 @@
 #include "app_config/AppConfig.h"
 #include "application/Application.h"
 #include "common/LogtailCommonFlags.h"
+#include "common/SafeThread.h"
 #include "common/StringTools.h"
 #include "common/TimeUtil.h"
 #include "common/UUIDUtil.h"
@@ -113,7 +114,7 @@ void CommonConfigProvider::Init(const string& dir) {
 
     GetConfigUpdate();
 
-    mThreadRes = async(launch::async, &CommonConfigProvider::CheckUpdateThread, this);
+    LaunchAsync(mThreadRes, "CommonConfigProvider", &CommonConfigProvider::CheckUpdateThread, this);
 }
 
 void CommonConfigProvider::Stop() {

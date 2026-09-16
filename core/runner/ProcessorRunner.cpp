@@ -18,6 +18,7 @@
 #include "batch/TimeoutFlushManager.h"
 #include "collection_pipeline/CollectionPipelineManager.h"
 #include "common/Flags.h"
+#include "common/SafeThread.h"
 #include "go_pipeline/LogtailPlugin.h"
 #include "models/EventPool.h"
 #include "monitor/AlarmManager.h"
@@ -48,7 +49,7 @@ ProcessorRunner::ProcessorRunner()
 
 void ProcessorRunner::Init() {
     for (uint32_t threadNo = 0; threadNo < mThreadCount; ++threadNo) {
-        mThreadRes[threadNo] = async(launch::async, &ProcessorRunner::Run, this, threadNo);
+        LaunchAsync(mThreadRes[threadNo], "ProcessorRunner", &ProcessorRunner::Run, this, threadNo);
     }
     mIsFlush = false;
 }

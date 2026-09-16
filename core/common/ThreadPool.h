@@ -23,6 +23,8 @@
 #include <thread>
 #include <vector>
 
+#include "common/SafeThread.h"
+
 namespace logtail {
 
 class ThreadPool {
@@ -40,7 +42,9 @@ public:
     void Start() {
         mIsRunning = true;
         for (size_t i = 0; i < mThreadNum; i++) {
-            mThreads.emplace_back(std::thread(&ThreadPool::execute, this));
+            std::thread worker;
+            LaunchStdThread(worker, "ThreadPool", &ThreadPool::execute, this);
+            mThreads.emplace_back(std::move(worker));
         }
     }
 

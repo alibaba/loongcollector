@@ -29,7 +29,7 @@ namespace logtail {
 
 HistoryFileImporter::HistoryFileImporter() {
     LOG_INFO(sLogger, ("HistoryFileImporter", "init"));
-    mThread = CreateThread([this]() { Run(); });
+    mThread = CreateThread("HistoryFileImporter", [this]() { Run(); });
 }
 
 void HistoryFileImporter::PushEvent(const HistoryFileEvent& event) {

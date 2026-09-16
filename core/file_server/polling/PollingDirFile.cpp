@@ -74,7 +74,7 @@ void PollingDirFile::Start() {
     mPollingFileCacheSize
         = FileServer::GetInstance()->GetMetricsRecordRef().CreateIntGauge(METRIC_RUNNER_FILE_POLLING_FILE_CACHE_SIZE);
     mRuningFlag = true;
-    mThreadPtr = CreateThread([this]() { Polling(); });
+    mThreadPtr = CreateThread("PollingDirFile", [this]() { Polling(); });
 }
 
 void PollingDirFile::Stop() {

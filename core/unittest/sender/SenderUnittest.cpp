@@ -2340,7 +2340,7 @@ public:
 
         Sender::Instance()->MockGetRealIp = SenderUnittest::MockGetRealIp;
         // start real ip update thread
-        gRealIpSendThread = CreateThread(std::bind(&Sender::RealIpUpdateThread, Sender::Instance()));
+        gRealIpSendThread = CreateThread("RealIpUpdate", std::bind(&Sender::RealIpUpdateThread, Sender::Instance()));
 
         string aliuid = "1234567890";
         string region = AppConfig::GetInstance()->GetDefaultRegion();
@@ -2389,7 +2389,7 @@ public:
 
         Sender::Instance()->MockGetRealIp = SenderUnittest::MockGetEmptyRealIp;
         // start real ip update thread
-        gRealIpSendThread = CreateThread(std::bind(&Sender::RealIpUpdateThread, Sender::Instance()));
+        gRealIpSendThread = CreateThread("RealIpUpdate", std::bind(&Sender::RealIpUpdateThread, Sender::Instance()));
 
         string aliuid = "1234567890";
         string region = AppConfig::GetInstance()->GetDefaultRegion();
@@ -2439,7 +2439,7 @@ public:
         Sender::Instance()->MockGetRealIp = SenderUnittest::MockGetRealIp;
         // start real ip update thread
         gStartIp = 0;
-        gRealIpSendThread = CreateThread(std::bind(&Sender::RealIpUpdateThread, Sender::Instance()));
+        gRealIpSendThread = CreateThread("RealIpUpdate", std::bind(&Sender::RealIpUpdateThread, Sender::Instance()));
 
         string aliuid = "1234567890";
         string region = AppConfig::GetInstance()->GetDefaultRegion();

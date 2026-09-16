@@ -28,6 +28,7 @@
 #include "common/Flags.h"
 #include "common/LogtailCommonFlags.h"
 #include "common/MachineInfoUtil.h"
+#include "common/SafeThread.h"
 #include "common/TimeKeeper.h"
 #include "common/http/AsynCurlRunner.h"
 #include "common/magic_enum.hpp"
@@ -270,8 +271,8 @@ void EBPFServer::Init() {
 
     AsynCurlRunner::GetInstance()->Init();
     mEBPFAdapter->Init(); // Idempotent; loads optional AgentSight symbols before poller threads run.
-    mPoller = async(std::launch::async, &EBPFServer::pollPerfBuffers, this);
-    mHandler = async(std::launch::async, &EBPFServer::handlerEvents, this);
+    LaunchAsync(mPoller, "EBPFServerPoller", &EBPFServer::pollPerfBuffers, this);
+    LaunchAsync(mHandler, "EBPFServerHandler", &EBPFServer::handlerEvents, this);
     LOG_INFO(sLogger, ("eBPF server", "started"));
 }
 

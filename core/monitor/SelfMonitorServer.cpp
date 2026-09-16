@@ -20,6 +20,7 @@
 #include "Monitor.h"
 #include "collection_pipeline/CollectionPipelineManager.h"
 #include "common/LogtailCommonFlags.h"
+#include "common/SafeThread.h"
 #include "go_pipeline/LogtailPlugin.h"
 #include "monitor/AlarmManager.h"
 #include "protobuf/models/ProtocolConversion.h"
@@ -45,7 +46,7 @@ SelfMonitorServer* SelfMonitorServer::GetInstance() {
 }
 
 void SelfMonitorServer::Init() {
-    mThreadRes = async(launch::async, &SelfMonitorServer::Monitor, this);
+    LaunchAsync(mThreadRes, "SelfMonitorServer", &SelfMonitorServer::Monitor, this);
 }
 
 void SelfMonitorServer::Monitor() {

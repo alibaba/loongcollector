@@ -32,6 +32,7 @@
 #include "application/Application.h"
 #include "common/Flags.h"
 #include "common/MachineInfoUtil.h"
+#include "common/SafeThread.h"
 #include "common/StringView.h"
 #include "common/timer/Timer.h"
 #include "host_monitor/Constants.h"
@@ -194,7 +195,7 @@ void HostMonitorInputRunner::Stop() {
     }
 
     // Start ThreadPool stop operation asynchronously
-    mStopFuture = std::async(std::launch::async, [this]() {
+    LaunchAsync(mStopFuture, "HostMonitorStop", [this]() {
         try {
             if (mThreadPool) {
                 mThreadPool->Stop();
