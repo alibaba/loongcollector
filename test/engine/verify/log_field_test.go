@@ -141,3 +141,25 @@ func TestExactKVDocstringParsing(t *testing.T) {
 		require.Truef(t, matched, "record %v not located", expect)
 	}
 }
+
+func TestLogFieldNoDuplicates(t *testing.T) {
+	unique := []*protocol.LogGroup{{
+		Logs: []*protocol.Log{
+			metricLog("content", "old-1"),
+			metricLog("content", "new-1"),
+			nil,
+		},
+	}, nil}
+	require.NoError(t, logFieldNoDuplicates(unique, "content"))
+
+	dups := []*protocol.LogGroup{{
+		Logs: []*protocol.Log{
+			metricLog("content", "new-1"),
+			metricLog("content", "old-1"),
+			metricLog("content", "new-1"),
+		},
+	}}
+	require.EqualError(t, logFieldNoDuplicates(dups, "content"), "duplicate values in field content: new-1 x2")
+	require.EqualError(t, logFieldNoDuplicates(nil, "content"), "want field content in collected logs, but not found")
+	require.EqualError(t, logFieldNoDuplicates(unique, "missing"), "want field missing in collected logs, but not found")
+}

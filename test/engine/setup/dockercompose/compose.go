@@ -240,6 +240,13 @@ func (c *ComposeBooter) createComposeFile(ctx context.Context) error {
 	}
 	loongcollector["volumes"] = loongcollectorMount
 	loongcollector["ports"] = loongcollectorPort
+	if envs, ok := ctx.Value(config.ContainerEnvKey).([]string); ok {
+		envList, _ := loongcollector["environment"].([]interface{})
+		for _, env := range envs {
+			envList = append(envList, env)
+		}
+		loongcollector["environment"] = envList
+	}
 	yml, err := yaml.Marshal(cfg)
 	if err != nil {
 		return err
