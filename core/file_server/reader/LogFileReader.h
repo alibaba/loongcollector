@@ -601,6 +601,7 @@ protected:
     IntGaugePtr mSourceReadOffsetBytes;
 
 private:
+    void appendContainerMetricLabels();
     bool mHasReadContainerBom = false;
     void checkContainerType(LogFileOperator& op);
 

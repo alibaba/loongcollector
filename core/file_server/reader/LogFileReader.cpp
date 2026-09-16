@@ -241,10 +241,27 @@ LogFileReader::LogFileReader(const std::string& hostLogPathDir,
     mLineParsers.emplace_back(baseLineParsePtr);
 }
 
+void LogFileReader::appendContainerMetricLabels() {
+    if (mTagConfig.first != nullptr) {
+        for (const auto& metadata : mContainerMetadatas) {
+            const auto& key = mTagConfig.first->GetFileTagKeyName(metadata.first);
+            if (!key.empty()) {
+                mMetricLabels.emplace_back(std::string(key.data(), key.size()), metadata.second);
+            }
+        }
+    }
+    for (const auto& tag : mContainerExtraTags) {
+        if (!tag.first.empty()) {
+            mMetricLabels.emplace_back(tag.first, tag.second);
+        }
+    }
+}
+
 void LogFileReader::SetMetrics() {
     mMetricLabels = {{METRIC_LABEL_KEY_FILE_NAME, GetConvertedPath()},
                      {METRIC_LABEL_KEY_FILE_DEV, std::to_string(GetDevInode().dev)},
                      {METRIC_LABEL_KEY_FILE_INODE, std::to_string(GetDevInode().inode)}};
+    appendContainerMetricLabels();
     mMetricsRecordRef = FileServer::GetInstance()->GetOrCreateReentrantMetricsRecordRef(GetConfigName(), mMetricLabels);
     if (mMetricsRecordRef == nullptr) {
         LOG_ERROR(sLogger,
@@ -2792,6 +2809,9 @@ bool LogFileReader::UpdateContainerInfo() {
         mContainerExtraTags.clear();
         SetContainerMetadatas(containerInfo->mRawContainerInfo->mMetadatas);
         SetContainerExtraTags(containerInfo->mExtraTags);
+        FileServer::GetInstance()->ReleaseReentrantMetricsRecordRef(GetConfigName(), mMetricLabels);
+        SetMetrics();
+        InitMetricGauges();
         return true;
     }
     return false;

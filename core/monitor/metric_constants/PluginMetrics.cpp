@@ -14,6 +14,7 @@
 
 #include "MetricCommonConstants.h"
 #include "MetricConstants.h"
+#include "constants/TagConstants.h"
 
 using namespace std;
 
@@ -40,6 +41,12 @@ const string& METRIC_PLUGIN_TOTAL_PROCESS_TIME_MS = METRIC_TOTAL_PROCESS_TIME_MS
 const string METRIC_LABEL_KEY_FILE_DEV = "file_dev";
 const string METRIC_LABEL_KEY_FILE_INODE = "file_inode";
 const string METRIC_LABEL_KEY_FILE_NAME = "file_name";
+const string METRIC_LABEL_KEY_K8S_NAMESPACE = DEFAULT_LOG_TAG_NAMESPACE;
+const string METRIC_LABEL_KEY_K8S_POD_NAME = DEFAULT_LOG_TAG_POD_NAME;
+const string METRIC_LABEL_KEY_K8S_POD_UID = DEFAULT_LOG_TAG_POD_UID;
+const string METRIC_LABEL_KEY_CONTAINER_NAME = DEFAULT_LOG_TAG_CONTAINER_NAME;
+const string METRIC_LABEL_KEY_CONTAINER_IP = DEFAULT_LOG_TAG_CONTAINER_IP;
+const string METRIC_LABEL_KEY_CONTAINER_IMAGE_NAME = DEFAULT_LOG_TAG_IMAGE_NAME;
 
 const string METRIC_PLUGIN_MONITOR_FILE_TOTAL = "monitor_file_total";
 const string METRIC_PLUGIN_SOURCE_READ_OFFSET_BYTES = "read_offset_bytes";
