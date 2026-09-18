@@ -195,3 +195,29 @@ func TestTagDeleteV2(t *testing.T) {
 	processorTag.ProcessV2(in)
 	assert.Equal(t, 0, in.Group.Tags.Len())
 }
+
+func TestTagNilDefenseV2(t *testing.T) {
+	helper.EnvTags = []string{
+		"test_env_tag",
+		"test_env_tag_value",
+	}
+	processorTag := NewProcessorTag(make(map[string]string), true, make(map[string]string))
+
+	// nil in / nil Group must not panic and must be a no-op.
+	assert.NotPanics(t, func() { processorTag.ProcessV2(nil) })
+	assert.NotPanics(t, func() { processorTag.ProcessV2(&models.PipelineGroupEvents{}) })
+
+	// A bare GroupInfo has a nil Tags interface; ProcessV2 must not panic and
+	// must materialize a writable Tags so configured tags actually land.
+	in := &models.PipelineGroupEvents{Group: &models.GroupInfo{}}
+	assert.NotPanics(t, func() { processorTag.ProcessV2(in) })
+	assert.NotNil(t, in.Group.Tags)
+	assert.Equal(t, util.GetHostName(), in.Group.Tags.Get(hostNameDefaultTagKey))
+	assert.Equal(t, "test_env_tag_value", in.Group.Tags.Get("test_env_tag"))
+
+	// The shared Nil sentinel silently drops on Add; it must be replaced too.
+	in = &models.PipelineGroupEvents{Group: &models.GroupInfo{Tags: models.NilStringValues}}
+	assert.NotPanics(t, func() { processorTag.ProcessV2(in) })
+	assert.False(t, in.Group.Tags.IsNil())
+	assert.Equal(t, util.GetHostName(), in.Group.Tags.Get(hostNameDefaultTagKey))
+}

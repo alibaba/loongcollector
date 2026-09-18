@@ -84,6 +84,17 @@ func (p *ProcessorTag) ProcessV1(logCtx *pipeline.LogWithContext) {
 }
 
 func (p *ProcessorTag) ProcessV2(in *models.PipelineGroupEvents) {
+	if in == nil || in.Group == nil {
+		return
+	}
+	// A v2 input may emit a group whose Tags is a nil interface or the shared
+	// Nil sentinel (e.g. a bare &models.GroupInfo{}). Add would panic on the
+	// former and silently drop on the latter, so ensure a writable Tags first.
+	// The `== nil` check must come first to short-circuit before IsNil() is
+	// called on a nil interface.
+	if in.Group.Tags == nil || in.Group.Tags.IsNil() {
+		in.Group.Tags = models.NewTags()
+	}
 	tagsMap := make(map[string]string)
 	p.addAllConfigurableTags(tagsMap)
 	for k, v := range tagsMap {

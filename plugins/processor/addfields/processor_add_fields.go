@@ -17,6 +17,7 @@ package addfields
 import (
 	"fmt"
 
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 )
@@ -80,6 +81,22 @@ func (p *ProcessorAddFields) processLog(log *protocol.Log) {
 			}
 			log.Contents = append(log.Contents, newContent)
 		}
+	}
+}
+
+// Process implements the v2 ProcessorV2 interface: it appends Fields to each
+// Log event and passes Metric/Span events through unchanged.
+func (p *ProcessorAddFields) Process(in *models.PipelineGroupEvents, context pipeline.PipelineContext) {
+	pipeline.ProcessLogEventsOnly(in, context, p.processLogEvent)
+}
+
+func (p *ProcessorAddFields) processLogEvent(log *models.Log) {
+	contents := log.GetIndices()
+	for k, v := range p.Fields {
+		if p.IgnoreIfExist && contents.Contains(k) {
+			continue
+		}
+		contents.Add(k, v)
 	}
 }
 
