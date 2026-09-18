@@ -26,14 +26,18 @@
 
 #include "collection_pipeline/queue/ProcessQueueItem.h"
 #include "collection_pipeline/queue/ProcessQueueManager.h"
+#include "common/FileSystemUtil.h"
 #include "common/StringView.h"
 #include "common/UUIDUtil.h"
 #include "common/magic_enum.hpp"
+#include "constants/TagConstants.h"
+#include "container_manager/ContainerManager.h"
 #include "ebpf/Config.h"
 #include "ebpf/EBPFServer.h"
 #include "ebpf/plugin/agentsight/AgentsightEvents.h"
 #include "ebpf/plugin/agentsight/AgentsightMessageUtil.h"
 #include "ebpf/type/table/BaseElements.h"
+#include "file_server/ContainerInfo.h"
 #include "logger/Logger.h"
 #include "models/LogEvent.h"
 #include "models/PipelineEventGroup.h"
@@ -814,14 +818,49 @@ void FillAgentsightHttpResponseLog(const AgentsightHttpsRecord& rec,
     EmitHttpBody(log, "http.response.body", rec.mResponseBody);
 }
 
+/// Resolves @containerId against the process-wide container inventory maintained by
+/// ContainerManager (its polling loop is started by InputAgentSight in containerized deployments)
+/// and attaches the standard container metadata tags to @group — the same channel and keys
+/// input_file / input_container_stdio use, so downstream can join agentsight data with
+/// file/stdio data on identical tag names.
+///
+/// Silently no-ops when the id is empty (host process) or unknown (container already removed from
+/// the snapshot, or the event raced the first snapshot after startup): the record keeps its
+/// `container.id` content field and nothing else changes. Deliberately no IsPurageContainerMode
+/// gate here — the inventory is simply empty when the manager was never started, and the mode flag
+/// is fixed at AppConfig construction, which would keep this path out of unit tests.
+void AttachAgentsightContainerTags(PipelineEventGroup& group, const std::string& containerId) {
+    if (containerId.empty()) {
+        return;
+    }
+    const auto info = ContainerManager::GetInstance()->GetContainerInfoById(containerId);
+    if (!info) {
+        LOG_DEBUG(sLogger, ("Agentsight container meta not found", "")("containerId", containerId));
+        return;
+    }
+    AttachAgentsightContainerTagsFromInfo(group, *info);
+}
+
 } // namespace
+
+void AttachAgentsightContainerTagsFromInfo(PipelineEventGroup& group, const RawContainerInfo& info) {
+    for (const auto& md : info.mMetadatas) {
+        group.SetTag(GetDefaultTagKeyString(md.first), md.second);
+    }
+    for (const auto& md : info.mCustomMetadatas) {
+        group.SetTag(md.first, md.second);
+    }
+}
 
 AgentsightManager::AgentsightManager(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
                                      const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
                                      moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
                                      EventPool* pool,
+                                     std::string hostRootPath,
                                      const size_t sessionInputCacheMaxSize)
-    : AbstractManager(processCacheManager, eBPFAdapter, queue, pool), mSessionInputCache(sessionInputCacheMaxSize, 0) {
+    : AbstractManager(processCacheManager, eBPFAdapter, queue, pool),
+      mHostRootPath(std::move(hostRootPath)),
+      mSessionInputCache(sessionInputCacheMaxSize, 0) {
 }
 
 int AgentsightManager::Init() {
@@ -889,6 +928,25 @@ bool AgentsightManager::RestartAgentSightLocked(const SecurityOptions& opts) {
     sym->config_set_verbose(cfg, static_cast<int>(opts.mVerbose));
     if (!opts.mLogPath.empty()) {
         sym->config_set_log_path(cfg, opts.mLogPath.c_str());
+    }
+
+    // In container mode, point the library's pid lookups at the host procfs. Left alone it reads its
+    // own /proc, which lists only processes sharing our pid namespace — agents in other pods stay
+    // invisible unless the pod runs with hostPID. This mirrors what ProcessCacheManager already does
+    // for the driver-based plugins (mHostPathPrefix / "proc"); no user configuration is involved.
+    // Skipped on a host install, where mHostRootPath is "/" and the library's own default is /proc.
+    if (!mHostRootPath.empty() && mHostRootPath != "/") {
+        const std::string procfsRoot = PathJoin(mHostRootPath, "proc");
+        if (sym->config_set_procfs_root) {
+            sym->config_set_procfs_root(cfg, procfsRoot.c_str());
+            LOG_INFO(sLogger, ("AgentSight", "pid lookups resolve through")("procfs_root", procfsRoot));
+        } else {
+            LOG_WARNING(sLogger,
+                        ("AgentSight",
+                         "running in container mode but agentsight_config_set_procfs_root symbol not found; pid "
+                         "lookups keep using our own /proc and require hostPID to discover processes in other pid "
+                         "namespaces (requires libagentsight >= 0.11.0)")("procfs_root", procfsRoot));
+        }
     }
 
     // Raw HTTPS fallback is opt-in on both sides: the Rust FfiEventSender drops these events unless
@@ -1242,6 +1300,8 @@ int AgentsightManager::HandleHttpsEvent(const AgentsightHttpsRecord* rec) {
             *rec, eventGroup.AddLogEvent(true, mEventPool), CalculateRandomUUID(), exchangeId);
     }
 
+    AttachAgentsightContainerTags(eventGroup, rec->mContainerId);
+
     std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(eventGroup), pluginIndex);
     if (QueueStatus::OK == ProcessQueueManager::GetInstance()->PushQueue(queueKey, std::move(item))) {
         ADD_COUNTER(mRawHttpMetrics.pushLogsTotal, logCount);
@@ -1340,6 +1400,8 @@ int AgentsightManager::HandleLlmEvent(AgentsightLlmRecord* rec) {
             FillAgentsightCombinedLlmLog(*rec, log, messageDeltaOnly, emitPayload);
         }
     }
+
+    AttachAgentsightContainerTags(eventGroup, rec->mContainerId);
 
     std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(eventGroup), pluginIndex);
     if (QueueStatus::OK == ProcessQueueManager::GetInstance()->PushQueue(queueKey, std::move(item))) {
