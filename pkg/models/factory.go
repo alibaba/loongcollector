@@ -16,9 +16,37 @@ package models
 
 import "github.com/alibaba/ilogtail/pkg/constraints"
 
+// strKeyValuesMapImpl implements Tags.
+// It is actually a wrapper of keyValuesMapImpl[string] with extra Size() and Clone() method.
+type strKeyValuesMapImpl struct {
+	keyValuesMapImpl[string]
+}
+
+func (s *strKeyValuesMapImpl) Size() int {
+	if s == nil || s.IsNil() {
+		return 0
+	}
+	size := 0
+	for k, v := range s.keyValues {
+		size += len(k) + len(v)
+	}
+	return size
+}
+
+func (s *strKeyValuesMapImpl) Clone() KeyValues[string] {
+	if s == nil {
+		return nil
+	}
+	newTags := NewTags()
+	newTags.AddAll(s.keyValues)
+	return newTags
+}
+
 func NewTagsWithMap(tags map[string]string) Tags {
-	return &keyValuesImpl[string]{
-		keyValues: tags,
+	return &strKeyValuesMapImpl{
+		keyValuesMapImpl: keyValuesMapImpl[string]{
+			keyValues: tags,
+		},
 	}
 }
 
@@ -30,18 +58,26 @@ func NewTagsWithKeyValues(keyValues ...string) Tags {
 	for i := 0; i < len(keyValues); i += 2 {
 		tags[keyValues[i]] = keyValues[i+1]
 	}
-	return &keyValuesImpl[string]{
-		keyValues: tags,
+	return &strKeyValuesMapImpl{
+		keyValuesMapImpl: keyValuesMapImpl[string]{
+			keyValues: tags,
+		},
 	}
 }
 
 func NewTags() Tags {
-	return NewKeyValues[string]()
+	return &strKeyValuesMapImpl{
+		keyValuesMapImpl: keyValuesMapImpl[string]{
+			keyValues: make(map[string]string),
+		},
+	}
 }
 
 func NewMetadataWithMap(md map[string]string) Metadata {
-	return &keyValuesImpl[string]{
-		keyValues: md,
+	return &strKeyValuesMapImpl{
+		keyValuesMapImpl: keyValuesMapImpl[string]{
+			keyValues: md,
+		},
 	}
 }
 
@@ -53,13 +89,15 @@ func NewMetadataWithKeyValues(keyValues ...string) Metadata {
 	for i := 0; i < len(keyValues); i += 2 {
 		md[keyValues[i]] = keyValues[i+1]
 	}
-	return &keyValuesImpl[string]{
-		keyValues: md,
+	return &strKeyValuesMapImpl{
+		keyValuesMapImpl: keyValuesMapImpl[string]{
+			keyValues: md,
+		},
 	}
 }
 
 func NewMetadata() Metadata {
-	return NewKeyValues[string]()
+	return NewMetadataWithMap(map[string]string{})
 }
 
 func NewGroup(meta Metadata, tags Tags) *GroupInfo {
@@ -103,7 +141,7 @@ func NewMultiValuesMetric(name string, metricType MetricType, tags Tags, timesta
 
 func NewMetricMultiValue() *MetricMultiValue {
 	return &MetricMultiValue{
-		Values: &keyValuesImpl[float64]{
+		Values: &keyValuesMapImpl[float64]{
 			keyValues: make(map[string]float64),
 		},
 	}
@@ -111,20 +149,20 @@ func NewMetricMultiValue() *MetricMultiValue {
 
 func NewMetricMultiValueWithMap(keyValues map[string]float64) *MetricMultiValue {
 	return &MetricMultiValue{
-		Values: &keyValuesImpl[float64]{
+		Values: &keyValuesMapImpl[float64]{
 			keyValues: keyValues,
 		},
 	}
 }
 
 func NewMetricTypedValues() MetricTypedValues {
-	return &keyValuesImpl[*TypedValue]{
+	return &keyValuesMapImpl[*TypedValue]{
 		keyValues: make(map[string]*TypedValue),
 	}
 }
 
 func NewMetricTypedValueWithMap(keyValues map[string]*TypedValue) MetricTypedValues {
-	return &keyValuesImpl[*TypedValue]{
+	return &keyValuesMapImpl[*TypedValue]{
 		keyValues: keyValues,
 	}
 }
