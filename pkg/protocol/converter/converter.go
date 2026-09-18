@@ -29,6 +29,7 @@ const (
 	ProtocolCustomSingle        = "custom_single"
 	ProtocolCustomSingleFlatten = "custom_single_flatten"
 	ProtocolOtlpV1              = "otlp_v1"
+	ProtocolOtlpLogV1           = "otlp_log_v1"
 	ProtocolInfluxdb            = "influxdb"
 	ProtocolJsonline            = "jsonline"
 	ProtocolRaw                 = "raw"
@@ -107,7 +108,8 @@ var supportedEncodingMap = map[string]map[string]bool{
 		EncodingProtobuf: false,
 	},
 	ProtocolOtlpV1: {
-		EncodingNone: true,
+		EncodingNone:     true,
+		EncodingProtobuf: true,
 	},
 	ProtocolInfluxdb: {
 		EncodingCustom: true,
@@ -142,6 +144,7 @@ func NewConverterWithSep(protocol, encoding, sep string, ignoreUnExpectedData bo
 }
 
 func NewConverter(protocol, encoding string, tagKeyRenameMap, protocolKeyRenameMap map[string]string, globalConfig *config.GlobalConfig) (*Converter, error) {
+	protocol = NormalizeProtocol(protocol)
 	enc, ok := supportedEncodingMap[protocol]
 	if !ok {
 		return nil, fmt.Errorf("unsupported protocol: %s", protocol)
@@ -156,6 +159,17 @@ func NewConverter(protocol, encoding string, tagKeyRenameMap, protocolKeyRenameM
 		ProtocolKeyRenameMap: protocolKeyRenameMap,
 		GlobalConfig:         globalConfig,
 	}, nil
+}
+
+// NormalizeProtocol maps documented protocol aliases to the internal protocol name.
+func NormalizeProtocol(protocol string) string {
+	normalized := strings.TrimSpace(protocol)
+	switch strings.ToLower(normalized) {
+	case ProtocolOtlpLogV1:
+		return ProtocolOtlpV1
+	default:
+		return normalized
+	}
 }
 
 func (c *Converter) Do(logGroup *protocol.LogGroup) (logs interface{}, err error) {
@@ -191,6 +205,8 @@ func (c *Converter) ToByteStreamWithSelectedFields(logGroup *protocol.LogGroup, 
 		return c.ConvertToInfluxdbProtocolStream(logGroup, targetFields)
 	case ProtocolJsonline:
 		return c.ConvertToJsonlineProtocolStreamFlatten(logGroup)
+	case ProtocolOtlpV1:
+		return c.ConvertToOtlpLogStream(logGroup, targetFields)
 	default:
 		return nil, nil, fmt.Errorf("unsupported protocol: %s", c.Protocol)
 	}
@@ -204,6 +220,8 @@ func (c *Converter) ToByteStreamWithSelectedFieldsV2(groupEvents *models.Pipelin
 		return c.ConvertToSingleProtocolStreamFlattenV2(groupEvents, targetFields)
 	case ProtocolJsonline:
 		return c.ConvertToJsonlineProtocolStreamV2(groupEvents)
+	case ProtocolOtlpV1:
+		return c.ConvertToOtlpLogStreamV2(groupEvents, targetFields)
 	case ProtocolRaw:
 		return c.ConvertToRawStream(groupEvents, targetFields)
 	case ProtocolInfluxdb:
