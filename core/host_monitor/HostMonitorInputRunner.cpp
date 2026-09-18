@@ -37,7 +37,10 @@
 #include "host_monitor/Constants.h"
 #include "host_monitor/HostMonitorTimerEvent.h"
 #include "host_monitor/collector/CPUCollector.h"
+#include "host_monitor/collector/CgroupCollector.h"
+#include "host_monitor/collector/DentryCollector.h"
 #include "host_monitor/collector/DiskCollector.h"
+#include "host_monitor/collector/FsStatCollector.h"
 #include "host_monitor/collector/GPUCollector.h"
 #include "host_monitor/collector/MemCollector.h"
 #include "host_monitor/collector/NetCollector.h"
@@ -70,14 +73,17 @@ HostMonitorInputRunner::HostMonitorInputRunner() {
     RegisterCollector<DiskCollector>();
     RegisterCollector<ProcessCollector>();
     RegisterCollector<NetCollector>();
-    RegisterCollector<GPUCollector>();
+    RegisterCollector<CgroupCollector>();
+    RegisterCollector<DentryCollector>();
+    RegisterCollector<FsStatCollector>();
 
     size_t threadPoolSize = 1;
     // threadPoolSize should be greater than 0
     if (INT32_FLAG(host_monitor_thread_pool_size) > 0) {
         threadPoolSize = INT32_FLAG(host_monitor_thread_pool_size);
     }
-    // threadPoolSize should be less than or equal to the number of registered collectors
+    // threadPoolSize should be less than or equal to the number of registered
+    // collectors
     mThreadPool = std::make_unique<ThreadPool>(threadPoolSize);
 }
 
@@ -187,7 +193,8 @@ void HostMonitorInputRunner::Stop() {
 
     RemoveAllCollector();
 #ifndef APSARA_UNIT_TEST_MAIN
-    // If previous stop operation is still running, just return (avoid duplicate stop)
+    // If previous stop operation is still running, just return (avoid duplicate
+    // stop)
     if (IsStopping()) {
         LOG_WARNING(sLogger, ("Stop", "previous stop operation still running, return directly"));
         return;
@@ -367,7 +374,6 @@ void HostMonitorInputRunner::PushNextTimerEvent(CollectContextPtr context) {
     auto event = std::make_unique<HostMonitorTimerEvent>(context);
     Timer::GetInstance()->PushEvent(std::move(event));
 }
-
 
 void HostMonitorInputRunner::AddHostLabels(PipelineEventGroup& group) {
 #ifdef __ENTERPRISE__
