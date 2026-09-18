@@ -18,7 +18,9 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/avast/retry-go/v4"
@@ -258,6 +260,74 @@ func LogFieldExactKV(ctx context.Context, expectRecordsStr string) (context.Cont
 		}
 	}
 	return ctx, nil
+}
+
+// LogFieldNoDuplicates asserts that values of the given field are unique across
+// all collected logs. Used by the fake-rotation gate to prove a line was not
+// re-collected after inode reuse + config reload.
+func LogFieldNoDuplicates(ctx context.Context, field string) (context.Context, error) {
+	var from int32
+	value := ctx.Value(config.StartTimeContextKey)
+	if value != nil {
+		from = value.(int32)
+	} else {
+		return ctx, fmt.Errorf("no start time")
+	}
+
+	timeoutCtx, cancel := context.WithTimeout(context.TODO(), config.TestConfig.RetryTimeout)
+	defer cancel()
+	var err error
+	var groups []*protocol.LogGroup
+	err = retry.Do(
+		func() error {
+			groups, err = subscriber.TestSubscriber.GetData(control.GetQuery(ctx), from)
+			return err
+		},
+		retry.Context(timeoutCtx),
+		retry.Delay(5*time.Second),
+		retry.DelayType(retry.FixedDelay),
+	)
+	if err != nil {
+		return ctx, err
+	}
+	if err = logFieldNoDuplicates(groups, field); err != nil {
+		return ctx, err
+	}
+	return ctx, nil
+}
+
+func logFieldNoDuplicates(groups []*protocol.LogGroup, field string) error {
+	seen := make(map[string]int)
+	for _, group := range groups {
+		if group == nil {
+			continue
+		}
+		for _, log := range group.Logs {
+			if log == nil {
+				continue
+			}
+			for _, content := range log.Contents {
+				if content.Key == field {
+					seen[content.Value]++
+					break
+				}
+			}
+		}
+	}
+	if len(seen) == 0 {
+		return fmt.Errorf("want field %s in collected logs, but not found", field)
+	}
+	var dups []string
+	for value, n := range seen {
+		if n > 1 {
+			dups = append(dups, fmt.Sprintf("%s x%d", value, n))
+		}
+	}
+	sort.Strings(dups)
+	if len(dups) > 0 {
+		return fmt.Errorf("duplicate values in field %s: %s", field, strings.Join(dups, ", "))
+	}
+	return nil
 }
 
 // logContainsExactKV reports whether the log contains every expected key with
