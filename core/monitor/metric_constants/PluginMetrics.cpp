@@ -40,6 +40,15 @@ const string& METRIC_PLUGIN_TOTAL_PROCESS_TIME_MS = METRIC_TOTAL_PROCESS_TIME_MS
 const string METRIC_LABEL_KEY_FILE_DEV = "file_dev";
 const string METRIC_LABEL_KEY_FILE_INODE = "file_inode";
 const string METRIC_LABEL_KEY_FILE_NAME = "file_name";
+// Keep these literals identical to DEFAULT_LOG_TAG_* in TagConstants.cpp.
+// Do not assign from those std::string objects: they live in another TU and
+// C++ does not guarantee dynamic initialization order across TUs.
+const string METRIC_LABEL_KEY_K8S_NAMESPACE = "_namespace_";
+const string METRIC_LABEL_KEY_K8S_POD_NAME = "_pod_name_";
+const string METRIC_LABEL_KEY_K8S_POD_UID = "_pod_uid_";
+const string METRIC_LABEL_KEY_CONTAINER_NAME = "_container_name_";
+const string METRIC_LABEL_KEY_CONTAINER_IP = "_container_ip_";
+const string METRIC_LABEL_KEY_CONTAINER_IMAGE_NAME = "_image_name_";
 
 const string METRIC_PLUGIN_MONITOR_FILE_TOTAL = "monitor_file_total";
 const string METRIC_PLUGIN_SOURCE_READ_OFFSET_BYTES = "read_offset_bytes";

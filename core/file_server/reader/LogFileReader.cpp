@@ -241,11 +241,41 @@ LogFileReader::LogFileReader(const std::string& hostLogPathDir,
     mLineParsers.emplace_back(baseLineParsePtr);
 }
 
+void LogFileReader::appendContainerMetricLabels() {
+    if (mTagConfig.first != nullptr) {
+        for (const auto& metadata : mContainerMetadatas) {
+            const auto& key = mTagConfig.first->GetFileTagKeyName(metadata.first);
+            if (!key.empty()) {
+                mMetricLabels.emplace_back(std::string(key.data(), key.size()), metadata.second);
+            }
+        }
+    }
+    for (const auto& metadata : mContainerCustomMetadatas) {
+        if (!metadata.first.empty()) {
+            mMetricLabels.emplace_back(metadata.first, metadata.second);
+        }
+    }
+    for (const auto& tag : mContainerExtraTags) {
+        if (!tag.first.empty()) {
+            mMetricLabels.emplace_back(tag.first, tag.second);
+        }
+    }
+}
+
 void LogFileReader::SetMetrics() {
     mMetricLabels = {{METRIC_LABEL_KEY_FILE_NAME, GetConvertedPath()},
                      {METRIC_LABEL_KEY_FILE_DEV, std::to_string(GetDevInode().dev)},
                      {METRIC_LABEL_KEY_FILE_INODE, std::to_string(GetDevInode().inode)}};
-    mMetricsRecordRef = FileServer::GetInstance()->GetOrCreateReentrantMetricsRecordRef(GetConfigName(), mMetricLabels);
+    appendContainerMetricLabels();
+    mMetricsRecordRef = FileServer::GetInstance()->GetOrCreateReentrantMetricsRecordRef(
+        GetConfigName(), mMetricLabels, [this](ReentrantMetricsRecord& rec) {
+            mOutEventsTotal = rec.GetCounter(METRIC_PLUGIN_OUT_EVENTS_TOTAL);
+            mOutEventGroupsTotal = rec.GetCounter(METRIC_PLUGIN_OUT_EVENT_GROUPS_TOTAL);
+            mOutSizeBytes = rec.GetCounter(METRIC_PLUGIN_OUT_SIZE_BYTES);
+            mSourceSizeBytes = rec.GetIntGauge(METRIC_PLUGIN_SOURCE_SIZE_BYTES);
+            mSourceReadOffsetBytes = rec.GetIntGauge(METRIC_PLUGIN_SOURCE_READ_OFFSET_BYTES);
+            InitMetricGauges();
+        });
     if (mMetricsRecordRef == nullptr) {
         LOG_ERROR(sLogger,
                   ("failed to init metrics", "cannot get config's metricRecordRef")("config name", GetConfigName()));
@@ -2789,9 +2819,13 @@ bool LogFileReader::UpdateContainerInfo() {
         SetContainerID(containerInfo->mRawContainerInfo->mID);
         mContainerStopped = containerInfo->mRawContainerInfo->mStopped.load();
         mContainerMetadatas.clear();
+        mContainerCustomMetadatas.clear();
         mContainerExtraTags.clear();
         SetContainerMetadatas(containerInfo->mRawContainerInfo->mMetadatas);
+        SetContainerCustomMetadatas(containerInfo->mRawContainerInfo->mCustomMetadatas);
         SetContainerExtraTags(containerInfo->mExtraTags);
+        FileServer::GetInstance()->ReleaseReentrantMetricsRecordRef(GetConfigName(), mMetricLabels);
+        SetMetrics();
         return true;
     }
     return false;

@@ -253,11 +253,11 @@ void FileServer::RemovePluginMetricManager(const std::string& name) {
 }
 
 // 获取“ReentrantMetricsRecordRef”指标记录对象
-ReentrantMetricsRecordRef FileServer::GetOrCreateReentrantMetricsRecordRef(const std::string& name,
-                                                                           MetricLabels& labels) {
+ReentrantMetricsRecordRef FileServer::GetOrCreateReentrantMetricsRecordRef(
+    const std::string& name, MetricLabels& labels, const ReentrantMetricsRecord::PrepareFn& beforeCommit) {
     PluginMetricManagerPtr filePluginMetricManager = GetPluginMetricManager(name);
     if (filePluginMetricManager != nullptr) {
-        return filePluginMetricManager->GetOrCreateReentrantMetricsRecordRef(labels);
+        return filePluginMetricManager->GetOrCreateReentrantMetricsRecordRef(labels, {}, beforeCommit);
     }
     return nullptr;
 }
