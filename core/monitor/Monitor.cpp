@@ -36,6 +36,7 @@
 #include "common/LogtailCommonFlags.h"
 #include "common/MachineInfoUtil.h"
 #include "common/RuntimeUtil.h"
+#include "common/SafeThread.h"
 #include "common/StringTools.h"
 #include "common/TimeUtil.h"
 #include "common/version.h"
@@ -128,7 +129,7 @@ bool LogtailMonitor::Init() {
 #endif
 
     // Initialize monitor thread.
-    mThreadRes = async(launch::async, &LogtailMonitor::Monitor, this);
+    LaunchAsync(mThreadRes, "LogtailMonitor", &LogtailMonitor::Monitor, this);
     return true;
 }
 

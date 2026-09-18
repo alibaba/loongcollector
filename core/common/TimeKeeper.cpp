@@ -14,6 +14,7 @@
 
 #include "common/TimeKeeper.h"
 
+#include "common/SafeThread.h"
 #include "common/TimeUtil.h"
 
 namespace logtail {
@@ -24,7 +25,7 @@ TimeKeeper* TimeKeeper::GetInstance() {
 }
 
 TimeKeeper::TimeKeeper() {
-    mUpdateThread = std::thread([this]() {
+    LaunchStdThread(mUpdateThread, "TimeKeeper", [this]() {
         while (!mShouldStop) {
             UpdateTime();
             std::this_thread::sleep_for(std::chrono::milliseconds(200));

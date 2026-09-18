@@ -20,8 +20,11 @@
 #include <functional>
 #include <mutex>
 #include <queue>
+#include <string>
 #include <thread>
 #include <vector>
+
+#include "common/SafeThread.h"
 
 namespace logtail {
 
@@ -40,7 +43,10 @@ public:
     void Start() {
         mIsRunning = true;
         for (size_t i = 0; i < mThreadNum; i++) {
-            mThreads.emplace_back(std::thread(&ThreadPool::execute, this));
+            std::thread worker;
+            const std::string workerName = "ThreadPool-" + std::to_string(i);
+            LaunchStdThread(worker, workerName.c_str(), &ThreadPool::execute, this);
+            mThreads.emplace_back(std::move(worker));
         }
     }
 

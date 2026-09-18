@@ -22,6 +22,7 @@
 #include "common/HashUtil.h"
 #include "common/LogtailCommonFlags.h"
 #include "common/RuntimeUtil.h"
+#include "common/SafeThread.h"
 #include "common/StringTools.h"
 #include "common/TimeUtil.h"
 #include "file_server/ConfigManager.h"
@@ -91,7 +92,7 @@ void LogInput::Start() {
     mEnableFileIncludedByMultiConfigs = FileServer::GetInstance()->GetMetricsRecordRef().CreateIntGauge(
         METRIC_RUNNER_FILE_ENABLE_FILE_INCLUDED_BY_MULTI_CONFIGS_FLAG);
 
-    mThreadRes = async(launch::async, &LogInput::ProcessLoop, this);
+    LaunchAsync(mThreadRes, "LogInput", &LogInput::ProcessLoop, this);
 }
 
 void LogInput::Resume() {

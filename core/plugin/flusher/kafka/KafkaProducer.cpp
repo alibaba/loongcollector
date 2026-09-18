@@ -21,6 +21,7 @@
 #include <thread>
 #include <vector>
 
+#include "common/SafeThread.h"
 #include "common/StringTools.h"
 #include "logger/Logger.h"
 #include "plugin/flusher/kafka/KafkaConfig.h"
@@ -576,7 +577,7 @@ private:
         mConf = nullptr;
 
         mIsRunning = true;
-        mPollThread = std::thread([this]() {
+        LaunchStdThread(mPollThread, "KafkaProducerPoll", [this]() {
             while (mIsRunning.load(std::memory_order_relaxed)) {
                 rd_kafka_poll(mProducer, KAFKA_POLL_INTERVAL_MS);
             }
