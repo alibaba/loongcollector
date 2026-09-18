@@ -41,10 +41,22 @@ func (c *Converter) ConvertToSingleProtocolLogs(logGroup *protocol.LogGroup, tar
 		desiredValues[i] = desiredValue
 
 		customSingleLog := make(map[string]interface{}, numProtocolKeys)
-		if newKey, ok := c.ProtocolKeyRenameMap[protocolKeyTime]; ok {
-			customSingleLog[newKey] = log.Time
+		// Set timestamp with nanosecond precision if enabled
+		timestamp := log.Time
+		if c.GlobalConfig != nil && c.GlobalConfig.EnableTimestampNanosecond {
+			// Combine seconds and nanoseconds
+			timestampNs := uint64(timestamp) * 1000000000 + uint64(log.GetTimeNs())
+			if newKey, ok := c.ProtocolKeyRenameMap[protocolKeyTime]; ok {
+				customSingleLog[newKey] = timestampNs
+			} else {
+				customSingleLog[protocolKeyTime] = timestampNs
+			}
 		} else {
-			customSingleLog[protocolKeyTime] = log.Time
+			if newKey, ok := c.ProtocolKeyRenameMap[protocolKeyTime]; ok {
+				customSingleLog[newKey] = timestamp
+			} else {
+				customSingleLog[protocolKeyTime] = timestamp
+			}
 		}
 		if newKey, ok := c.ProtocolKeyRenameMap[protocolKeyContent]; ok {
 			customSingleLog[newKey] = contents
