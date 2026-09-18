@@ -40,6 +40,12 @@ static std::string CopyProcessName(const char name[16]) {
     return std::string(name, strnlen(name, 16U));
 }
 
+static std::string CopyCmdline(const char cmdline[128]) {
+    // agentsight.h: cmdline is a fixed char[128] buffer, space-joined argv truncated to 127 bytes
+    // and NUL-terminated (empty when the process has already exited). Bound the read to the buffer.
+    return std::string(cmdline, strnlen(cmdline, 128U));
+}
+
 AgentsightLlmRecord::AgentsightLlmRecord(std::string pipelineConfigName, const AgentsightLLMData& d)
     : CommonEvent(KernelEventType::AGENTSIGHT_LLM_RECORD), mPipelineConfigName(std::move(pipelineConfigName)) {
     mSessionId = CopyCStr(d.session_id);
@@ -57,7 +63,9 @@ AgentsightLlmRecord::AgentsightLlmRecord(std::string pipelineConfigName, const A
     mCacheCreationInputTokens = d.cache_creation_input_tokens;
     mCacheReadInputTokens = d.cache_read_input_tokens;
     mProcessName = CopyProcessName(d.process_name);
+    mCmdline = CopyCmdline(d.cmdline);
     mAgentType = CopyCStr(d.agent_name);
+    mContainerId = CopyCStr(d.container_id);
     mRequestUrl = CopyCStr(d.request_url);
     mProvider = CopyCStr(d.provider);
     mModel = CopyCStr(d.model);
@@ -66,6 +74,26 @@ AgentsightLlmRecord::AgentsightLlmRecord(std::string pipelineConfigName, const A
     mInputMessageDeltaJson = CopyBuffer(d.input_message_delta, d.input_message_delta_len);
     mResponseMessagesJson = CopyBuffer(d.response_messages, d.response_messages_len);
     mToolDefinitionsJson = CopyBuffer(d.tools, d.tools_len);
+}
+
+AgentsightHttpsRecord::AgentsightHttpsRecord(std::string pipelineConfigName, const AgentsightHttpsData& d)
+    : CommonEvent(KernelEventType::AGENTSIGHT_HTTPS_RECORD), mPipelineConfigName(std::move(pipelineConfigName)) {
+    mPid = d.pid;
+    mProcessName = CopyProcessName(d.process_name);
+    mCmdline = CopyCmdline(d.cmdline);
+    mAgentType = CopyCStr(d.agent_name);
+    mContainerId = CopyCStr(d.container_id);
+    mTimestampNs = d.timestamp_ns;
+    mDurationNs = d.duration_ns;
+    // agentsight.h: method / path are NUL-terminated C strings; the four payloads are (ptr, len).
+    mMethod = CopyCStr(d.method);
+    mPath = CopyCStr(d.path);
+    mStatusCode = d.status_code;
+    mIsSse = d.is_sse;
+    mRequestHeaders = CopyBuffer(d.request_headers, d.request_headers_len);
+    mRequestBody = CopyBuffer(d.request_body, d.request_body_len);
+    mResponseHeaders = CopyBuffer(d.response_headers, d.response_headers_len);
+    mResponseBody = CopyBuffer(d.response_body, d.response_body_len);
 }
 
 } // namespace logtail::ebpf

@@ -21,6 +21,7 @@
 #include <set>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 #include "boost/optional.hpp"
 #include "json/json.h"
@@ -54,6 +55,10 @@ public:
     std::string mResolvedFileName;
     std::string mRealFileName;
     int32_t mIdxInReaderArray = LogFileReader::CHECKPOINT_IDX_UNDEFINED;
+    // In-memory residency start. Set on AddCheckPoint (reset on overwrite and on rescue
+    // in AddExistedCheckPointFileEvents), never serialized. Only used by
+    // CheckTimeoutCheckPoint to evict pending entries that nobody consumes.
+    int32_t mMemInsertTime = 0;
 
     CheckPoint() {}
 
@@ -121,12 +126,24 @@ public:
 private:
     DevInodeCheckPointHashMap mDevInodeCheckPointPtrMap;
     std::unordered_map<std::string, DirCheckPointPtr> mDirNameMap;
+    // Keys written by AddCheckPoint during the current dump round (i.e. snapshots of
+    // live readers from DumpAllHandlersMeta). EndDumpRound erases exactly these, so
+    // pending handoff entries survive periodic dumps.
+    std::vector<CheckPointKey> mDumpRoundKeys;
+    bool mCollectingDumpRound = false;
     int32_t mLastCheckTime;
     int32_t mLastDumpTime;
     int32_t mLoadVersion;
     int32_t mReaderCount;
     CheckPointManager()
         : mLastCheckTime(time(NULL)), mLastDumpTime(time(NULL)), mLoadVersion(NO_CHECKPOINT_VERSION), mReaderCount(0) {}
+
+    // A checkpoint's physical file still exists when its path currently resolves to the
+    // same (dev, inode). After a fake rotation the deleted file's path is gone or points
+    // to a different inode, so such a checkpoint is treated as stale. Host / real /
+    // resolved paths are probed so a rotated-but-present file is not misjudged.
+    static bool CheckPointFileStillExists(const CheckPoint& checkPoint);
+    static bool getCheckPointSearchDepth(const CheckPoint& checkPoint, uint16_t& searchDepth);
 
 public:
     bool CheckVersion();
@@ -142,6 +159,10 @@ public:
     bool GetCheckPoint(DevInode devInode, const std::string& configName, CheckPointPtr& checkPointPtr);
     bool GetDirCheckPoint(const std::string& filename, DirCheckPointPtr& checkPointPtr);
     void RemoveAllCheckPoint();
+    // Dump-round bracket for periodic dump: keys added between Begin and End (live
+    // reader snapshots) are erased by EndDumpRound; other entries stay pending.
+    void BeginDumpRound();
+    void EndDumpRound();
     void CheckTimeoutCheckPoint();
     bool NeedDump(int32_t curTime);
     void ResetLastDumpTime();
@@ -169,11 +190,17 @@ public:
 //  checkpoint_find_max_file_count.
 //
 // @cache [out]: cache iterated files if not nullptr.
+// @searchTruncated [out]: set to true if the file-count limit stops the scan.
 //
 // @return the path of the file with devInode if find.
 boost::optional<std::string> SearchFilePathByDevInodeInDirectory(const std::string& dirPath,
                                                                  const uint16_t searchDepth,
                                                                  const DevInode& devInode,
                                                                  std::map<DevInode, SplitedFilePath>* cache);
+boost::optional<std::string> SearchFilePathByDevInodeInDirectory(const std::string& dirPath,
+                                                                 const uint16_t searchDepth,
+                                                                 const DevInode& devInode,
+                                                                 std::map<DevInode, SplitedFilePath>* cache,
+                                                                 bool* searchTruncated);
 
 } // namespace logtail

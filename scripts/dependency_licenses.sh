@@ -42,7 +42,11 @@ function find_go_dependencies() {
   do
     module=`echo $dep|awk -F '@@@' '{print $1}'`
     replace=`echo $dep|awk -F '@@@' '{print $2}'|awk '{print $1}'`
-       if [[ "$module" == *ilogtail* || "$replace" == ./* ]]; then
+       if [[ "$module" == github.com/alibaba/ilogtail* ]]; then
+           continue
+       fi
+       if [[ "$replace" == ./* ]]; then
+           echo "$module" >>"${output_file}"
            continue
        fi
        if [[ "$replace" = '<nil>' || "$replace" != *iLogtail* ]]; then

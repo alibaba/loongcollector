@@ -13,8 +13,11 @@
 // limitations under the License.
 
 #include <algorithm>
+#include <exception>
 #include <filesystem>
 #include <fstream>
+#include <map>
+#include <thread>
 
 #include "collection_pipeline/CollectionPipelineManager.h"
 #include "config/ConfigDiff.h"
@@ -38,6 +41,11 @@ public:
     void IgnoreNewLowerPrioritySingletonConfig() const;
     void IgnoreModifiedLowerPrioritySingletonConfig() const;
     void HigherPriorityOverrideLowerPrioritySingletonConfig() const;
+    void ConfigDirMutatedDuringScanDoesNotThrow() const;
+    void IterateErrorOnRunningPipelinesYieldsEmptyDiff() const;
+    void StatusErrorOnRunningPipelinesYieldsEmptyDiff() const;
+    void RealDeletedConfigStillRemoved() const;
+    void MissingOptionalConfigDirDoesNotAbort() const;
 
 protected:
     static void SetUpTestCase() {
@@ -53,17 +61,58 @@ protected:
     }
 
     void TearDown() override {
-        PipelineConfigWatcher::GetInstance()->ClearEnvironment();
+        auto* watcher = PipelineConfigWatcher::GetInstance();
+        watcher->SetForceIterateError(false);
+        watcher->SetForceStatusError(false);
+        watcher->ClearEnvironment();
         CollectionPipelineManager::GetInstance()->ClearAllPipelines();
+        filesystem::remove_all(configDir);
+        filesystem::remove_all(instanceConfigDir);
+        filesystem::remove_all(kMissingOptionalDir);
     }
 
 private:
+    static size_t builtinPipelineCount();
+    static void writeMockPipeline(const filesystem::path& path);
+    void startTwoRunningPipelines() const;
+
     static const filesystem::path configDir;
     static const filesystem::path instanceConfigDir;
+    static const filesystem::path kMissingOptionalDir;
+    static const char* kMockPipelineJson;
 };
 
 const filesystem::path ConfigWatcherUnittest::configDir = "./continuous_pipeline_config";
 const filesystem::path ConfigWatcherUnittest::instanceConfigDir = "./instance_config";
+const filesystem::path ConfigWatcherUnittest::kMissingOptionalDir = "./onetime_pipeline_config_absent";
+const char* ConfigWatcherUnittest::kMockPipelineJson = R"(
+{
+    "inputs": [{"Type": "input_mock"}],
+    "flushers": [{"Type": "flusher_mock"}]
+}
+)";
+
+size_t ConfigWatcherUnittest::builtinPipelineCount() {
+    size_t builtinPipelineCnt = 0;
+#ifdef __ENTERPRISE__
+    builtinPipelineCnt += EnterpriseConfigProvider::GetInstance()->GetAllBuiltInPipelineConfigs().size();
+#endif
+    return builtinPipelineCnt;
+}
+
+void ConfigWatcherUnittest::writeMockPipeline(const filesystem::path& path) {
+    ofstream fout(path);
+    fout << kMockPipelineJson;
+}
+
+void ConfigWatcherUnittest::startTwoRunningPipelines() const {
+    filesystem::create_directories(configDir);
+    writeMockPipeline(configDir / "a.json");
+    writeMockPipeline(configDir / "b.json");
+    auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
+    APSARA_TEST_EQUAL(2U + builtinPipelineCount(), diff.first.mAdded.size());
+    CollectionPipelineManager::GetInstance()->UpdatePipelines(diff.first);
+}
 
 void ConfigWatcherUnittest::InvalidConfigDirFound() const {
     {
@@ -428,12 +477,142 @@ void ConfigWatcherUnittest::HigherPriorityOverrideLowerPrioritySingletonConfig()
     filesystem::remove_all("continuous_pipeline_config");
 }
 
+void ConfigWatcherUnittest::ConfigDirMutatedDuringScanDoesNotThrow() const {
+    filesystem::create_directories(configDir);
+    filesystem::create_directories(instanceConfigDir);
+
+    const string validPipeline = R"(
+        {
+            "inputs": [{"Type": "input_file"}],
+            "flushers": [{"Type": "flusher_sls"}]
+        }
+    )";
+    const string validInstance = R"(
+        {
+            "enable": true,
+            "max_bytes_per_sec": 1234
+        }
+    )";
+    for (int i = 0; i < 16; ++i) {
+        ofstream fout(configDir / ("p" + to_string(i) + ".json"));
+        fout << validPipeline;
+        ofstream fout2(instanceConfigDir / ("i" + to_string(i) + ".json"));
+        fout2 << validInstance;
+    }
+
+    auto mutate = [](const filesystem::path& dir, const string& prefix) {
+        for (int i = 0; i < 80; ++i) {
+            error_code ec;
+            auto path = dir / (prefix + "0.json");
+            auto tmp = dir / (prefix + "0.json.new");
+            filesystem::remove(path, ec);
+            {
+                ofstream fout(tmp);
+                fout << "{}";
+            }
+            filesystem::rename(tmp, path, ec);
+            filesystem::remove(dir / (prefix + "1.json"), ec);
+        }
+    };
+
+    thread pipelineMutator(mutate, configDir, string("p"));
+    thread instanceMutator(mutate, instanceConfigDir, string("i"));
+    bool threw = false;
+    try {
+        for (int i = 0; i < 30; ++i) {
+            (void)PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
+            (void)InstanceConfigWatcher::GetInstance()->CheckConfigDiff();
+        }
+    } catch (const exception&) {
+        threw = true;
+    } catch (...) {
+        threw = true;
+    }
+    if (pipelineMutator.joinable()) {
+        pipelineMutator.join();
+    }
+    if (instanceMutator.joinable()) {
+        instanceMutator.join();
+    }
+    APSARA_TEST_FALSE(threw);
+
+    filesystem::remove_all(configDir);
+    filesystem::remove_all(instanceConfigDir);
+    InstanceConfigWatcher::GetInstance()->ClearEnvironment();
+}
+
+void ConfigWatcherUnittest::IterateErrorOnRunningPipelinesYieldsEmptyDiff() const {
+    startTwoRunningPipelines();
+    writeMockPipeline(configDir / "c.json");
+    auto* watcher = PipelineConfigWatcher::GetInstance();
+    const auto fileInfoSnapshot = watcher->GetFileInfoMap();
+    APSARA_TEST_FALSE(fileInfoSnapshot.empty());
+
+    watcher->SetForceIterateError(true);
+    auto diff = watcher->CheckConfigDiff();
+    APSARA_TEST_FALSE(diff.first.HasDiff());
+    APSARA_TEST_TRUE(diff.first.mRemoved.empty());
+    APSARA_TEST_TRUE(diff.first.mAdded.empty());
+    APSARA_TEST_FALSE(diff.second.HasDiff());
+    APSARA_TEST_TRUE(fileInfoSnapshot == watcher->GetFileInfoMap());
+}
+
+void ConfigWatcherUnittest::StatusErrorOnRunningPipelinesYieldsEmptyDiff() const {
+    startTwoRunningPipelines();
+    auto* watcher = PipelineConfigWatcher::GetInstance();
+    const auto fileInfoSnapshot = watcher->GetFileInfoMap();
+    APSARA_TEST_FALSE(fileInfoSnapshot.empty());
+
+    watcher->SetForceStatusError(true);
+    auto diff = watcher->CheckConfigDiff();
+    APSARA_TEST_FALSE(diff.first.HasDiff());
+    APSARA_TEST_TRUE(diff.first.mRemoved.empty());
+    APSARA_TEST_TRUE(diff.first.mAdded.empty());
+    APSARA_TEST_FALSE(diff.second.HasDiff());
+    APSARA_TEST_TRUE(fileInfoSnapshot == watcher->GetFileInfoMap());
+}
+
+void ConfigWatcherUnittest::RealDeletedConfigStillRemoved() const {
+    startTwoRunningPipelines();
+    filesystem::remove(configDir / "b.json");
+
+    auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
+    APSARA_TEST_TRUE(diff.first.HasDiff());
+    APSARA_TEST_EQUAL(0U, diff.first.mAdded.size());
+    APSARA_TEST_EQUAL(0U, diff.first.mModified.size());
+    APSARA_TEST_EQUAL(1U, diff.first.mRemoved.size());
+    APSARA_TEST_TRUE(find(diff.first.mRemoved.begin(), diff.first.mRemoved.end(), string("b"))
+                     != diff.first.mRemoved.end());
+    APSARA_TEST_FALSE(diff.second.HasDiff());
+}
+
+void ConfigWatcherUnittest::MissingOptionalConfigDirDoesNotAbort() const {
+    filesystem::create_directories(configDir);
+    writeMockPipeline(configDir / "a.json");
+    PipelineConfigWatcher::GetInstance()->AddSource(kMissingOptionalDir.string());
+
+    auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
+    APSARA_TEST_TRUE(diff.first.HasDiff());
+    APSARA_TEST_EQUAL(1U + builtinPipelineCount(), diff.first.mAdded.size());
+    APSARA_TEST_TRUE(find_if(diff.first.mAdded.begin(),
+                             diff.first.mAdded.end(),
+                             [](const CollectionConfig& c) { return c.mName == "a"; })
+                     != diff.first.mAdded.end());
+    APSARA_TEST_TRUE(diff.first.mRemoved.empty());
+    APSARA_TEST_FALSE(diff.second.HasDiff());
+}
+
 UNIT_TEST_CASE(ConfigWatcherUnittest, InvalidConfigDirFound)
 UNIT_TEST_CASE(ConfigWatcherUnittest, InvalidConfigFileFound)
 UNIT_TEST_CASE(ConfigWatcherUnittest, DuplicateConfigs)
 UNIT_TEST_CASE(ConfigWatcherUnittest, IgnoreNewLowerPrioritySingletonConfig)
 UNIT_TEST_CASE(ConfigWatcherUnittest, IgnoreModifiedLowerPrioritySingletonConfig)
 UNIT_TEST_CASE(ConfigWatcherUnittest, HigherPriorityOverrideLowerPrioritySingletonConfig)
+UNIT_TEST_CASE(ConfigWatcherUnittest, ConfigDirMutatedDuringScanDoesNotThrow)
+UNIT_TEST_CASE(ConfigWatcherUnittest, IterateErrorOnRunningPipelinesYieldsEmptyDiff)
+UNIT_TEST_CASE(ConfigWatcherUnittest, StatusErrorOnRunningPipelinesYieldsEmptyDiff)
+UNIT_TEST_CASE(ConfigWatcherUnittest, RealDeletedConfigStillRemoved)
+UNIT_TEST_CASE(ConfigWatcherUnittest, MissingOptionalConfigDirDoesNotAbort)
 
 } // namespace logtail
 

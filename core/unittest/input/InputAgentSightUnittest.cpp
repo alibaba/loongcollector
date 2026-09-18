@@ -29,6 +29,7 @@ public:
     void TestNameAndQueueType();
     void TestInitWithProbeConfig();
     void TestInitWithHttpsAndHttp();
+    void TestMetricKeysCoverManagerCounters();
 
 protected:
     void SetUp() override {
@@ -91,9 +92,45 @@ void InputAgentSightUnittest::TestInitWithHttpsAndHttp() {
     APSARA_TEST_EQUAL("model-svc.default.svc", input.mSecurityOptions.mAgentsightHttp[1]);
 }
 
+void InputAgentSightUnittest::TestMetricKeysCoverManagerCounters() {
+    // Guards a failure mode that is silent end to end: AgentsightManager fetches counters by key from
+    // the ref this input's kMetricKeys builds, ReentrantMetricsRecord only creates counters for keys in
+    // that map, GetCounter returns nullptr for the rest, and ADD_COUNTER null-checks. A key missing
+    // from kMetricKeys therefore turns every increment of it into a no-op — no build error, no runtime
+    // error, just a metric stuck at zero. That is exactly how the loss counters shipped dead.
+    //
+    // The assertions deliberately go through the input's own kMetricKeys rather than a copy of the key
+    // list: a local copy would keep passing while production stayed broken.
+    std::string err;
+    Json::Value configJson;
+    Json::Value optionalGoPipeline;
+    APSARA_TEST_TRUE(ParseJsonTable(R"({"Type":"input_agentsight","ProbeConfig":{"Verbose":0}})", configJson, err));
+    InputAgentSight input;
+    input.SetContext(mContex);
+    input.CreateMetricsRecordRef("t", "1");
+    APSARA_TEST_TRUE(input.Init(configJson, optionalGoPipeline));
+    input.CommitMetricsRecordRef();
+    APSARA_TEST_TRUE(input.mPluginMetricPtr != nullptr);
+
+    // Same label sets AgentsightManager::AddOrUpdateConfig builds, one per stream.
+    for (const auto& recordType : {METRIC_LABEL_VALUE_RECORD_TYPE_RAW_HTTP, METRIC_LABEL_VALUE_RECORD_TYPE_GEN_AI}) {
+        MetricLabels labels = {{METRIC_LABEL_KEY_EVENT_TYPE, METRIC_LABEL_VALUE_EVENT_TYPE_LOG},
+                               {METRIC_LABEL_KEY_RECORD_TYPE, recordType}};
+        auto ref = input.mPluginMetricPtr->GetOrCreateReentrantMetricsRecordRef(labels);
+        APSARA_TEST_TRUE(ref != nullptr);
+        // Every key AgentsightManager reads must resolve to a real counter.
+        APSARA_TEST_TRUE(ref->GetCounter(METRIC_PLUGIN_IN_EVENTS_TOTAL) != nullptr);
+        APSARA_TEST_TRUE(ref->GetCounter(METRIC_PLUGIN_OUT_EVENTS_TOTAL) != nullptr);
+        APSARA_TEST_TRUE(ref->GetCounter(METRIC_PLUGIN_OUT_EVENT_GROUPS_TOTAL) != nullptr);
+        APSARA_TEST_TRUE(ref->GetCounter(METRIC_PLUGIN_EBPF_LOSS_KERNEL_EVENTS_TOTAL) != nullptr);
+        input.mPluginMetricPtr->ReleaseReentrantMetricsRecordRef(labels);
+    }
+}
+
 UNIT_TEST_CASE(InputAgentSightUnittest, TestNameAndQueueType)
 UNIT_TEST_CASE(InputAgentSightUnittest, TestInitWithProbeConfig)
 UNIT_TEST_CASE(InputAgentSightUnittest, TestInitWithHttpsAndHttp)
+UNIT_TEST_CASE(InputAgentSightUnittest, TestMetricKeysCoverManagerCounters)
 
 } // namespace logtail
 

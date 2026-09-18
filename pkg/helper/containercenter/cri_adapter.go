@@ -25,9 +25,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/containerd/containerd"
-	containerdcriserver "github.com/containerd/containerd/pkg/cri/server"
-	"github.com/docker/docker/api/types/container"
+	containerd "github.com/containerd/containerd/v2/client"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/storage"
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 
 	"github.com/alibaba/ilogtail/pkg/flags"
 	"github.com/alibaba/ilogtail/pkg/logger"
@@ -47,6 +48,27 @@ type innerContainerInfo struct {
 	Pid    int
 	Name   string
 	Status string
+}
+
+// containerdContainerInfo mirrors the stable JSON payload returned in
+// ContainerStatusResponse.Info["info"] without importing containerd's internal
+// CRI server package.
+type containerdContainerInfo struct {
+	SandboxID   string                     `json:"sandboxID"`
+	Pid         uint32                     `json:"pid"`
+	SnapshotKey string                     `json:"snapshotKey"`
+	Snapshotter string                     `json:"snapshotter"`
+	Config      *containerdContainerConfig `json:"config"`
+	RuntimeSpec *runtimespec.Spec          `json:"runtimeSpec"`
+}
+
+type containerdContainerConfig struct {
+	Envs []*containerdKeyValue `json:"envs"`
+}
+
+type containerdKeyValue struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
 }
 
 type CRIRuntimeWrapper struct {
@@ -127,7 +149,7 @@ func (cw *CRIRuntimeWrapper) createContainerInfo(containerID string) (detail *Do
 		return nil, "", ContainerStateContainerUnknown, err
 	}
 
-	var ci containerdcriserver.ContainerInfo
+	var ci containerdContainerInfo
 	foundInfo := false
 	if statusinfo := status.Info; statusinfo != nil {
 		if info, ok := statusinfo["info"]; ok {
@@ -163,20 +185,18 @@ func (cw *CRIRuntimeWrapper) createContainerInfo(containerID string) (detail *Do
 		stateStatus = ContainerStatusRunning
 	}
 	dockerContainer := container.InspectResponse{
-		ContainerJSONBase: &container.ContainerJSONBase{
-			ID:      containerID,
-			Created: time.Unix(0, status.Status.CreatedAt).Format(time.RFC3339Nano),
-			LogPath: status.Status.LogPath,
-			State: &container.State{
-				Status: stateStatus,
-				Pid:    int(ci.Pid),
-			},
-			HostConfig: &container.HostConfig{
-				VolumeDriver: ci.Snapshotter,
-				Runtime:      cw.runtimeInfo.RuntimeName,
-				LogConfig: container.LogConfig{
-					Type: "json-file",
-				},
+		ID:      containerID,
+		Created: time.Unix(0, status.Status.CreatedAt).Format(time.RFC3339Nano),
+		LogPath: status.Status.LogPath,
+		State: &container.State{
+			Status: container.ContainerState(stateStatus),
+			Pid:    int(ci.Pid),
+		},
+		HostConfig: &container.HostConfig{
+			VolumeDriver: ci.Snapshotter,
+			Runtime:      cw.runtimeInfo.RuntimeName,
+			LogConfig: container.LogConfig{
+				Type: "json-file",
 			},
 		},
 		Config: &container.Config{
@@ -191,7 +211,7 @@ func (cw *CRIRuntimeWrapper) createContainerInfo(containerID string) (detail *Do
 
 	if ci.RuntimeSpec != nil && ci.RuntimeSpec.Process != nil {
 		dockerContainer.Config.Env = ci.RuntimeSpec.Process.Env
-	} else {
+	} else if ci.Config != nil {
 		var envs []string
 		for _, kv := range ci.Config.Envs {
 			envs = append(envs, kv.Key+"="+kv.Value)
@@ -219,8 +239,10 @@ func (cw *CRIRuntimeWrapper) createContainerInfo(containerID string) (detail *Do
 	if ci.Snapshotter != "" && ci.SnapshotKey != "" {
 		uppDir := cw.getContainerUpperDir(ci.SnapshotKey, ci.Snapshotter)
 		if uppDir != "" {
-			dockerContainer.GraphDriver.Data = map[string]string{
-				"UpperDir": uppDir,
+			dockerContainer.GraphDriver = &storage.DriverData{
+				Data: map[string]string{
+					"UpperDir": uppDir,
+				},
 			}
 		}
 	}
@@ -275,7 +297,7 @@ func (cw *CRIRuntimeWrapper) fetchAll() error {
 			logger.Warningf(context.Background(), selfmonitor.CreateContainerdInfoAlarm, "Create container info from cri-runtime error, Container Info: %+v, err: %v", c, err)
 			continue
 		}
-		if dockerContainer == nil || dockerContainer.ContainerInfo.ContainerJSONBase == nil {
+		if dockerContainer == nil || dockerContainer.ContainerInfo.ID == "" {
 			logger.Warning(context.Background(), selfmonitor.CreateContainerdInfoAlarm, "Create container info from cri-runtime error, Container Info:%+v", c)
 			continue
 		}
@@ -477,8 +499,8 @@ func getContextWithTimeout(timeout time.Duration) (context.Context, context.Canc
 	return context.WithTimeout(context.Background(), timeout)
 }
 
-func parseContainerInfo(data string) (containerdcriserver.ContainerInfo, error) {
-	var ci containerdcriserver.ContainerInfo
+func parseContainerInfo(data string) (containerdContainerInfo, error) {
+	var ci containerdContainerInfo
 	err := json.Unmarshal([]byte(data), &ci)
 	return ci, err
 }

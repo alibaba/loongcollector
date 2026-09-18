@@ -69,7 +69,7 @@ GO_PATH = $$($(GO) env GOPATH)
 GO_BUILD = $(GO) build
 GO_GET = $(GO) get
 GO_TEST = $(GO) test
-GO_LINT = golangci-lint
+GO_LINT = PATH=$(GO_PATH)/bin:$$PATH golangci-lint
 GO_ADDLICENSE = $(GO_PATH)/bin/addlicense
 GO_PACKR = $(GO_PATH)/bin/packr2
 GO_BUILD_FLAGS = -v
@@ -83,7 +83,7 @@ DIST_FILE = $(DIST_DIR)/loongcollector-$(VERSION).linux-$(ARCH).tar.gz
 
 .PHONY: tools
 tools:
-	$(GO_LINT) version || curl -sfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(GO_PATH)/bin v1.64.8
+	$(GO_LINT) version 2>/dev/null | grep -q 'version 2.4.0 ' || curl -sfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(GO_PATH)/bin v2.4.0
 	$(GO_ADDLICENSE) version || go install github.com/google/addlicense@latest
 
 .PHONY: clean

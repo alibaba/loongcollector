@@ -46,6 +46,7 @@
     * [转发输入插件](plugins/input/native/input-forward.md)
     * [主机元数据采集](plugins/input/native/input-host-meta.md)
     * [主机监控数据](plugins/input/native/input-host-monitor.md)
+    * [本机诊断日志（一次性）](plugins/input/native/input-internal-agent-logs.md)
     * [自监控告警数据](plugins/input/native/input-internal-alarms.md)
     * [自监控指标数据](plugins/input/native/input-internal-metrics.md)
     * [eBPF网络可观测数据](plugins/input/native/input-network-observer.md)

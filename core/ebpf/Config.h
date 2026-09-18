@@ -71,6 +71,10 @@ public:
     bool mAgentsightEventStreamFormat = true;
     /// When true, omit system instructions, tool definitions, and full input messages (per dedup).
     bool mAgentsightMessageDeltaOnly = true;
+    /// When true, traffic that AgentSight cannot parse into LLM semantics is reported as raw HTTP
+    /// (AgentsightHttpsData) instead of being dropped. Off by default: the payload is unredacted
+    /// request/response bytes, and it requires libagentsight >= 0.9.0.
+    bool mAgentsightRawHttpsFallback = false;
 };
 
 /////////////////////  /////////////////////

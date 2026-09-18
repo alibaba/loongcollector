@@ -26,8 +26,13 @@ namespace logtail {
 const std::string InputAgentSight::sName = "input_agentsight";
 
 bool InputAgentSight::Init(const Json::Value& config, Json::Value&) {
+    // Only keys listed here get a counter: ReentrantMetricsRecord::Init builds mCounters from this map
+    // alone, and GetCounter returns nullptr for anything else. Since ADD_COUNTER null-checks, a metric
+    // the manager reads but this map omits degrades to a silent no-op rather than a build or run error
+    // — so every key AgentsightManager fetches must appear here.
     static const std::unordered_map<std::string, MetricType> kMetricKeys = {
         {METRIC_PLUGIN_IN_EVENTS_TOTAL, MetricType::METRIC_TYPE_COUNTER},
+        {METRIC_PLUGIN_EBPF_LOSS_KERNEL_EVENTS_TOTAL, MetricType::METRIC_TYPE_COUNTER},
         {METRIC_PLUGIN_OUT_EVENTS_TOTAL, MetricType::METRIC_TYPE_COUNTER},
         {METRIC_PLUGIN_OUT_EVENT_GROUPS_TOTAL, MetricType::METRIC_TYPE_COUNTER},
     };

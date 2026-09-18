@@ -32,6 +32,27 @@ func metricLog(kv ...string) *protocol.Log {
 	return log
 }
 
+func TestLogFieldGreaterThanEqual(t *testing.T) {
+	groups := []*protocol.LogGroup{{
+		Logs: []*protocol.Log{
+			metricLog("count", "9"),
+			metricLog("count", "10"),
+		},
+	}}
+
+	require.NoError(t, logFieldGreaterThanEqual(groups, "count", 10))
+	require.EqualError(t, logFieldGreaterThanEqual(groups, "count", 11), "want count >= 11, but got 10")
+	negativeGroups := []*protocol.LogGroup{{Logs: []*protocol.Log{metricLog("count", "-10")}}}
+	require.NoError(t, logFieldGreaterThanEqual(negativeGroups, "count", -10))
+	require.EqualError(t, logFieldGreaterThanEqual(groups, "missing", 1), "want contains key missing, but not found")
+	require.EqualError(t, logFieldGreaterThanEqual(nil, "count", 1), "want contains key count, but not found")
+	require.ErrorContains(
+		t,
+		logFieldGreaterThanEqual([]*protocol.LogGroup{{Logs: []*protocol.Log{metricLog("count", "invalid")}}}, "count", 1),
+		`parse field count value "invalid"`,
+	)
+}
+
 func TestLogContainsExactKV(t *testing.T) {
 	// A canonical multi-value metric-log row produced by metric_mock via the v2
 	// export path: __name__/__value__/__labels__ carry exact values.
@@ -119,4 +140,26 @@ func TestExactKVDocstringParsing(t *testing.T) {
 		}
 		require.Truef(t, matched, "record %v not located", expect)
 	}
+}
+
+func TestLogFieldNoDuplicates(t *testing.T) {
+	unique := []*protocol.LogGroup{{
+		Logs: []*protocol.Log{
+			metricLog("content", "old-1"),
+			metricLog("content", "new-1"),
+			nil,
+		},
+	}, nil}
+	require.NoError(t, logFieldNoDuplicates(unique, "content"))
+
+	dups := []*protocol.LogGroup{{
+		Logs: []*protocol.Log{
+			metricLog("content", "new-1"),
+			metricLog("content", "old-1"),
+			metricLog("content", "new-1"),
+		},
+	}}
+	require.EqualError(t, logFieldNoDuplicates(dups, "content"), "duplicate values in field content: new-1 x2")
+	require.EqualError(t, logFieldNoDuplicates(nil, "content"), "want field content in collected logs, but not found")
+	require.EqualError(t, logFieldNoDuplicates(unique, "missing"), "want field missing in collected logs, but not found")
 }

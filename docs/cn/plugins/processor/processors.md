@@ -56,6 +56,7 @@
 | [`input_forward`](../input/native/input-forward.md) | 转发输入插件 |
 | [`input_host_meta`](../input/native/input-host-meta.md) | 主机元数据采集 |
 | [`input_host_monitor`](../input/native/input-host-monitor.md) | 主机监控数据采集 |
+| [`input_internal_agent_logs_onetime`](../input/native/input-internal-agent-logs.md) | 本机诊断日志（一次性） |
 | [`input_internal_alarms`](../input/native/input-internal-alarms.md) | 自监控告警 |
 | [`input_internal_metrics`](../input/native/input-internal-metrics.md) | 自监控指标 |
 | [`input_network_observer`](../input/native/input-network-observer.md) | eBPF 网络可观测 |

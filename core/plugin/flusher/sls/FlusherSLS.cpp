@@ -1139,13 +1139,32 @@ bool FlusherSLS::SerializeAndPush(BatchedEventsList&& groupList) {
             }
         }
     }
-    if (enablePackageList) {
+    // all groups in the list may fail to be serialized or compressed, in which case nothing should be sent, otherwise
+    // an empty package list would be sent, which can never succeed and would be retried repeatedly
+    if (enablePackageList && !compressedLogGroups.empty()) {
         string errorMsg;
-        mGroupListSerializer->DoSerialize(std::move(compressedLogGroups), serializedData, errorMsg);
-        allSucceeded
-            = Flusher::PushToQueue(make_unique<SLSSenderQueueItem>(
-                  std::move(serializedData), packageSize, this, mQueueKey, mLogstore, RawDataType::EVENT_GROUP_LIST))
-            && allSucceeded;
+        if (!mGroupListSerializer->DoSerialize(std::move(compressedLogGroups), serializedData, errorMsg)) {
+            LOG_WARNING(mContext->GetLogger(),
+                        ("failed to serialize event group list",
+                         errorMsg)("action", "discard data")("plugin", sName)("config", mContext->GetConfigName()));
+            mContext->GetAlarm().SendAlarmWarning(SERIALIZE_FAIL_ALARM,
+                                                  "failed to serialize event group list: " + errorMsg
+                                                      + "\taction: discard data\tplugin: " + sName
+                                                      + "\tconfig: " + mContext->GetConfigName(),
+                                                  mContext->GetRegion(),
+                                                  mContext->GetProjectName(),
+                                                  mContext->GetConfigName(),
+                                                  mContext->GetLogstoreName());
+            allSucceeded = false;
+        } else {
+            allSucceeded = Flusher::PushToQueue(make_unique<SLSSenderQueueItem>(std::move(serializedData),
+                                                                                packageSize,
+                                                                                this,
+                                                                                mQueueKey,
+                                                                                mLogstore,
+                                                                                RawDataType::EVENT_GROUP_LIST))
+                && allSucceeded;
+        }
     }
     return allSucceeded;
 }

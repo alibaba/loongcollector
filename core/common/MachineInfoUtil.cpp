@@ -339,6 +339,17 @@ std::string GetHostIpByInterface(const std::string& intf) {
 }
 
 std::string GetHostIp(const std::string& intf) {
+#if defined(__linux__)
+    // When working_interface is configured, resolve the IP from that interface first;
+    // if it yields no valid IP, fall through to the existing hostname + interface fallback.
+    if (!STRING_FLAG(working_interface).empty()) {
+        std::string ip = GetHostIpByInterface(STRING_FLAG(working_interface));
+        if (!ip.empty() && ip.find("127.") != 0) {
+            return ip;
+        }
+        // interface yielded no valid IP, fall through to hostname + interface fallback below
+    }
+#endif
     std::string ip = GetHostIpByHostName();
 #if defined(__linux__)
     if (ip.empty() || ip.find("127.") == 0) {
@@ -516,6 +527,19 @@ bool IsDigitsDotsHostname(const char* hostname) {
         return true;
     }
     return false;
+}
+
+bool IsLoopbackAddress(const std::string& host) {
+    if (host.empty()) {
+        return false;
+    }
+    // Accept the URL-style bracketed IPv6 form, e.g. "[::1]".
+    std::string normalized = host;
+    if (normalized.size() >= 2 && normalized.front() == '[' && normalized.back() == ']') {
+        normalized = normalized.substr(1, normalized.size() - 2);
+    }
+    normalized = ToLowerCaseString(normalized);
+    return StartWith(normalized, "127.") || normalized == "::1" || normalized == "localhost";
 }
 
 InstanceIdentity::InstanceIdentity() {

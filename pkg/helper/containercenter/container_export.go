@@ -21,9 +21,9 @@ import (
 	"time"
 
 	"github.com/dlclark/regexp2"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/events"
-	docker "github.com/docker/docker/client"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/events"
+	docker "github.com/moby/moby/client"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
 )
@@ -200,11 +200,10 @@ func CreateDockerClient(opt ...docker.Opt) (client *docker.Client, err error) {
 	// add dockerClient connectivity tests
 	pingCtx, cancel := getContextWithTimeout(time.Second * 5)
 	defer cancel()
-	ping, err := client.Ping(pingCtx)
+	_, err = client.Ping(pingCtx, docker.PingOptions{NegotiateAPIVersion: true})
 	if err != nil {
 		return nil, err
 	}
-	client.NegotiateAPIVersionPing(ping)
 	return
 }
 

@@ -20,10 +20,6 @@ import (
 	"os"
 	"path/filepath"
 
-	containertypes "github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/client"
-	composeModule "github.com/testcontainers/testcontainers-go/modules/compose"
 	"gopkg.in/yaml.v3"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
@@ -54,7 +50,6 @@ services:
 
 // ComposeBooter control docker-compose to start or stop containers.
 type ComposeBenchmarkBooter struct {
-	cli        *client.Client
 	cadvisorID string
 }
 
@@ -68,68 +63,53 @@ func (c *ComposeBenchmarkBooter) Start(ctx context.Context) error {
 	if err := c.createComposeFile(); err != nil {
 		return err
 	}
-	compose := composeModule.NewLocalDockerCompose([]string{config.CaseHome + finalFileName}, benchmarkIdentifier).WithCommand([]string{"up", "-d", "--build"})
-	strategyWrappers := withExposedService(compose)
-	execError := compose.Invoke()
-	if execError.Error != nil {
-		logger.Error(context.Background(), selfmonitor.StartDockerComposeError, "stdout", execError.Error.Error())
-		return execError.Error
-	}
-	cli, err := CreateDockerClient()
-	if err != nil {
+	composeFile := config.CaseHome + finalFileName
+	if err := runComposeCommandWithTimeout(
+		ctx,
+		composeStartupTimeout,
+		composeFile,
+		benchmarkIdentifier,
+		"up",
+		"-d",
+		"--build",
+	); err != nil {
+		logger.Error(context.Background(), selfmonitor.StartDockerComposeError, "stdout", err.Error())
 		return err
 	}
-	c.cli = cli
 
-	list, err := cli.ContainerList(context.Background(), containertypes.ListOptions{
-		Filters: filters.NewArgs(filters.Arg("name", "benchmark-cadvisor")),
-	})
-	if len(list) != 1 {
-		logger.Errorf(context.Background(), selfmonitor.CadvisorComposeAlarm, "cadvisor container size is not equal 1, got %d count", len(list))
+	var err error
+	c.cadvisorID, err = findSingleContainer(ctx, "benchmark-cadvisor")
+	if err != nil {
+		logger.Error(context.Background(), selfmonitor.CadvisorComposeAlarm, "err", err)
 		return err
 	}
-	c.cadvisorID = list[0].ID
 
 	// the docker engine cannot access host on the linux platform, more details please see: https://github.com/docker/for-linux/issues/264
 	cmd := []string{
 		"sh",
 		"-c",
-		"env |grep HOST_OS|grep Linux && ip -4 route list match 0/0|awk '{print $3\" host.docker.internal\"}' >> /etc/hosts",
+		"if env | grep HOST_OS | grep -q Linux; then ip -4 route list match 0/0 | awk '{print $3\" host.docker.internal\"}' >> /etc/hosts; fi",
 	}
 	if err = c.exec(c.cadvisorID, cmd); err != nil {
 		return err
 	}
-	err = registerDockerNetMapping(strategyWrappers)
+	err = registerComposePortMappings(ctx, composeFile, benchmarkIdentifier)
 	logger.Debugf(context.Background(), "registered net mapping: %v", networkMapping)
 	return err
 }
 
 func (c *ComposeBenchmarkBooter) Stop() error {
-	execError := composeModule.NewLocalDockerCompose([]string{config.CaseHome + finalFileName}, benchmarkIdentifier).Down()
-	if execError.Error != nil {
-		logger.Error(context.Background(), selfmonitor.StopDockerComposeError, "err", execError.Error.Error())
-		return execError.Error
+	if err := composeDown(config.CaseHome, benchmarkIdentifier); err != nil {
+		logger.Error(context.Background(), selfmonitor.StopDockerComposeError, "err", err)
+		return err
 	}
-	_ = os.Remove(config.CaseHome + finalFileName)
+	c.cadvisorID = ""
 	return nil
 }
 
 func (c *ComposeBenchmarkBooter) exec(id string, cmd []string) error {
-	cfg := containertypes.ExecOptions{
-		User: "root",
-		Cmd:  cmd,
-	}
-	resp, err := c.cli.ContainerExecCreate(context.Background(), id, cfg)
-	if err != nil {
-		logger.Errorf(context.Background(), selfmonitor.DockerExecAlarm, "cannot create exec config: %v", err)
-		return err
-	}
-	err = c.cli.ContainerExecStart(context.Background(), resp.ID, containertypes.ExecStartOptions{
-		Detach: false,
-		Tty:    false,
-	})
-	if err != nil {
-		logger.Errorf(context.Background(), selfmonitor.DockerExecAlarm, "cannot start exec config: %v", err)
+	if err := execInContainer(id, cmd); err != nil {
+		logger.Errorf(context.Background(), selfmonitor.DockerExecAlarm, "cannot exec command: %v", err)
 		return err
 	}
 	return nil
