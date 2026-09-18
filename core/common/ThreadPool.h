@@ -20,6 +20,7 @@
 #include <functional>
 #include <mutex>
 #include <queue>
+#include <string>
 #include <thread>
 #include <vector>
 
@@ -43,7 +44,8 @@ public:
         mIsRunning = true;
         for (size_t i = 0; i < mThreadNum; i++) {
             std::thread worker;
-            LaunchStdThread(worker, "ThreadPool", &ThreadPool::execute, this);
+            const std::string workerName = "ThreadPool-" + std::to_string(i);
+            LaunchStdThread(worker, workerName.c_str(), &ThreadPool::execute, this);
             mThreads.emplace_back(std::move(worker));
         }
     }

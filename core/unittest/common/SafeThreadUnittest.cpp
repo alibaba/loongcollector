@@ -36,8 +36,10 @@ class SafeThreadUnittest : public ::testing::Test {
 public:
     void TestLaunchAsyncSuccess();
     void TestLaunchAsyncFailureDoesNotTerminate();
+    void TestLaunchAsyncFailureResetsExistingFuture();
     void TestLaunchStdThreadFailureDoesNotTerminate();
     void TestCreateThreadFailureDoesNotTerminate();
+    void TestMakeStdThreadFailureReturnsNull();
 
 protected:
     void TearDown() override {
@@ -66,6 +68,21 @@ void SafeThreadUnittest::TestLaunchAsyncFailureDoesNotTerminate() {
     APSARA_TEST_FALSE(fut.valid());
 }
 
+void SafeThreadUnittest::TestLaunchAsyncFailureResetsExistingFuture() {
+    future<void> fut;
+    LaunchAsync(fut, "ok-async", []() {});
+    APSARA_TEST_TRUE(fut.valid());
+    fut.wait();
+
+    gLastFailedThread.clear();
+    SetThreadCreateFailHandlerForTest(&RecordFailure);
+    SetForceThreadCreateFailureForTest(true);
+    LaunchAsync(fut, "test-async-reset", []() {});
+
+    APSARA_TEST_EQUAL(string("test-async-reset"), gLastFailedThread);
+    APSARA_TEST_FALSE(fut.valid());
+}
+
 void SafeThreadUnittest::TestLaunchStdThreadFailureDoesNotTerminate() {
     gLastFailedThread.clear();
     SetThreadCreateFailHandlerForTest(&RecordFailure);
@@ -89,10 +106,23 @@ void SafeThreadUnittest::TestCreateThreadFailureDoesNotTerminate() {
     APSARA_TEST_TRUE(ptr == nullptr);
 }
 
+void SafeThreadUnittest::TestMakeStdThreadFailureReturnsNull() {
+    gLastFailedThread.clear();
+    SetThreadCreateFailHandlerForTest(&RecordFailure);
+    SetForceThreadCreateFailureForTest(true);
+
+    auto ptr = MakeStdThread("test-make-thread", []() {});
+
+    APSARA_TEST_EQUAL(string("test-make-thread"), gLastFailedThread);
+    APSARA_TEST_TRUE(ptr == nullptr);
+}
+
 UNIT_TEST_CASE(SafeThreadUnittest, TestLaunchAsyncSuccess)
 UNIT_TEST_CASE(SafeThreadUnittest, TestLaunchAsyncFailureDoesNotTerminate)
+UNIT_TEST_CASE(SafeThreadUnittest, TestLaunchAsyncFailureResetsExistingFuture)
 UNIT_TEST_CASE(SafeThreadUnittest, TestLaunchStdThreadFailureDoesNotTerminate)
 UNIT_TEST_CASE(SafeThreadUnittest, TestCreateThreadFailureDoesNotTerminate)
+UNIT_TEST_CASE(SafeThreadUnittest, TestMakeStdThreadFailureReturnsNull)
 
 } // namespace logtail
 

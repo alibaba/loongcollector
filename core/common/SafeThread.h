@@ -30,20 +30,25 @@ using ThreadCreateFailHandler = void (*)(const char* threadName, const std::exce
 void SetThreadCreateFailHandlerForTest(ThreadCreateFailHandler handler);
 void SetForceThreadCreateFailureForTest(bool enable);
 bool IsForceThreadCreateFailureForTest();
+
+inline std::system_error ForcedThreadCreateError() {
+    return std::system_error(std::make_error_code(std::errc::resource_unavailable_try_again));
+}
 #endif
 
 template <typename R, typename F, typename... Args>
 void LaunchAsync(std::future<R>& dest, const char* name, F&& f, Args&&... args) {
 #ifdef APSARA_UNIT_TEST_MAIN
     if (IsForceThreadCreateFailureForTest()) {
-        HandleThreadCreateFailure(
-            name, std::system_error(std::make_error_code(std::errc::resource_unavailable_try_again)));
+        dest = std::future<R>();
+        HandleThreadCreateFailure(name, ForcedThreadCreateError());
         return;
     }
 #endif
     try {
         dest = std::async(std::launch::async, std::forward<F>(f), std::forward<Args>(args)...);
     } catch (const std::system_error& e) {
+        dest = std::future<R>();
         HandleThreadCreateFailure(name, e);
     }
 }
@@ -52,8 +57,7 @@ template <typename F, typename... Args>
 void LaunchStdThread(std::thread& dest, const char* name, F&& f, Args&&... args) {
 #ifdef APSARA_UNIT_TEST_MAIN
     if (IsForceThreadCreateFailureForTest()) {
-        HandleThreadCreateFailure(
-            name, std::system_error(std::make_error_code(std::errc::resource_unavailable_try_again)));
+        HandleThreadCreateFailure(name, ForcedThreadCreateError());
         return;
     }
 #endif
@@ -68,6 +72,9 @@ template <typename F, typename... Args>
 std::unique_ptr<std::thread> MakeStdThread(const char* name, F&& f, Args&&... args) {
     std::thread t;
     LaunchStdThread(t, name, std::forward<F>(f), std::forward<Args>(args)...);
+    if (!t.joinable()) {
+        return nullptr;
+    }
     return std::make_unique<std::thread>(std::move(t));
 }
 

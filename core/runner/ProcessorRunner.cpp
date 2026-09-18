@@ -49,7 +49,8 @@ ProcessorRunner::ProcessorRunner()
 
 void ProcessorRunner::Init() {
     for (uint32_t threadNo = 0; threadNo < mThreadCount; ++threadNo) {
-        LaunchAsync(mThreadRes[threadNo], "ProcessorRunner", &ProcessorRunner::Run, this, threadNo);
+        const string threadName = "ProcessorRunner-" + ToString(threadNo);
+        LaunchAsync(mThreadRes[threadNo], threadName.c_str(), &ProcessorRunner::Run, this, threadNo);
     }
     mIsFlush = false;
 }
