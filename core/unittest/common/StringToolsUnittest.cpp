@@ -57,6 +57,12 @@ TEST_F(StringToolsUnittest, TestEndWith) {
     EXPECT_FALSE(EndWith("a.json.bak", ".json"));
     EXPECT_FALSE(EndWith("a.json", "xxx.json"));
     EXPECT_FALSE(EndWith("a.json ", ".json"));
+    EXPECT_FALSE(EndWith("", "shennong_metrics"));
+    EXPECT_FALSE(EndWith("logtail_alarm", "shennong_metrics"));
+    EXPECT_TRUE(EndWith("shennong_metrics", "shennong_metrics"));
+    EXPECT_TRUE(EndWith("xxx_shennong_metrics", "shennong_metrics"));
+    EXPECT_TRUE(EndWith("xxshennong_metrics", "shennong_metrics"));
+    EXPECT_FALSE(EndWith("shennong_metrics_bak", "shennong_metrics"));
 }
 
 TEST_F(StringToolsUnittest, TestReplaceString) {
