@@ -55,13 +55,12 @@ using ThreadPtr = std::shared_ptr<Thread>;
 
 template <class Function, class... Args>
 ThreadPtr CreateThread(const char* name, Function&& f, Args&&... args) {
-#ifdef APSARA_UNIT_TEST_MAIN
-    if (IsForceThreadCreateFailureForTest()) {
-        HandleThreadCreateFailure(name, boost::thread_resource_error());
-        return nullptr;
-    }
-#endif
     try {
+#ifdef APSARA_UNIT_TEST_MAIN
+        if (IsForceThreadCreateFailureForTest()) {
+            throw boost::thread_resource_error();
+        }
+#endif
         return ThreadPtr(new Thread(std::forward<Function>(f), std::forward<Args>(args)...));
     } catch (const boost::thread_resource_error& e) {
         HandleThreadCreateFailure(name, e);

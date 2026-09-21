@@ -14,10 +14,16 @@
 
 #include "common/SafeThread.h"
 
-#include <cstdio>
 #include <cstdlib>
-
-#include "logger/Logger.h"
+#include <cstring>
+#if defined(_MSC_VER)
+#include <io.h>
+#ifndef STDERR_FILENO
+#define STDERR_FILENO 2
+#endif
+#else
+#include <unistd.h>
+#endif
 
 namespace logtail {
 
@@ -40,22 +46,42 @@ bool IsForceThreadCreateFailureForTest() {
 }
 #endif
 
+namespace {
+void writeFd(int fd, const char* data, size_t len) {
+    while (len > 0) {
+#if defined(_MSC_VER)
+        const int n = _write(fd, data, static_cast<unsigned int>(len));
+#else
+        const ssize_t n = write(fd, data, len);
+#endif
+        if (n <= 0) {
+            return;
+        }
+        data += static_cast<size_t>(n);
+        len -= static_cast<size_t>(n);
+    }
+}
+
+void writeLiteral(int fd, const char* data) {
+    writeFd(fd, data, strlen(data));
+}
+} // namespace
+
 void HandleThreadCreateFailure(const char* threadName, const std::exception& ex) {
     const char* name = threadName != nullptr ? threadName : "unknown";
-    if (sLogger) {
-        LOG_ERROR(sLogger, ("failed to create thread", name)("error", ex.what()));
-        sLogger->flush();
-    } else {
-        fprintf(stderr, "failed to create thread %s: %s\n", name, ex.what());
-        fflush(stderr);
-    }
+    const char* err = ex.what() != nullptr ? ex.what() : "";
 #ifdef APSARA_UNIT_TEST_MAIN
     if (sThreadCreateFailHandlerForTest != nullptr) {
         sThreadCreateFailHandlerForTest(name, ex);
         return;
     }
 #endif
-    exit(1);
+    writeLiteral(STDERR_FILENO, "failed to create thread ");
+    writeLiteral(STDERR_FILENO, name);
+    writeLiteral(STDERR_FILENO, ": ");
+    writeLiteral(STDERR_FILENO, err);
+    writeLiteral(STDERR_FILENO, "\n");
+    _Exit(1);
 }
 
 } // namespace logtail

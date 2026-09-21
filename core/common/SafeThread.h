@@ -38,14 +38,12 @@ inline std::system_error ForcedThreadCreateError() {
 
 template <typename R, typename F, typename... Args>
 void LaunchAsync(std::future<R>& dest, const char* name, F&& f, Args&&... args) {
-#ifdef APSARA_UNIT_TEST_MAIN
-    if (IsForceThreadCreateFailureForTest()) {
-        dest = std::future<R>();
-        HandleThreadCreateFailure(name, ForcedThreadCreateError());
-        return;
-    }
-#endif
     try {
+#ifdef APSARA_UNIT_TEST_MAIN
+        if (IsForceThreadCreateFailureForTest()) {
+            throw ForcedThreadCreateError();
+        }
+#endif
         dest = std::async(std::launch::async, std::forward<F>(f), std::forward<Args>(args)...);
     } catch (const std::system_error& e) {
         dest = std::future<R>();
@@ -55,13 +53,12 @@ void LaunchAsync(std::future<R>& dest, const char* name, F&& f, Args&&... args) 
 
 template <typename F, typename... Args>
 void LaunchStdThread(std::thread& dest, const char* name, F&& f, Args&&... args) {
-#ifdef APSARA_UNIT_TEST_MAIN
-    if (IsForceThreadCreateFailureForTest()) {
-        HandleThreadCreateFailure(name, ForcedThreadCreateError());
-        return;
-    }
-#endif
     try {
+#ifdef APSARA_UNIT_TEST_MAIN
+        if (IsForceThreadCreateFailureForTest()) {
+            throw ForcedThreadCreateError();
+        }
+#endif
         dest = std::thread(std::forward<F>(f), std::forward<Args>(args)...);
     } catch (const std::system_error& e) {
         HandleThreadCreateFailure(name, e);
