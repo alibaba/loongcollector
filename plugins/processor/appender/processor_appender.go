@@ -23,6 +23,7 @@ import (
 
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/helper/platformmeta"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/util"
@@ -85,13 +86,20 @@ func (p *ProcessorAppender) processLog(log *protocol.Log) {
 }
 
 func (p *ProcessorAppender) processField(c *protocol.Log_Content) {
+	c.Value = p.appendValue(c.Value)
+}
+
+// appendValue appends the (variable-substituted) configured Value onto base and,
+// when SortLabels is enabled, normalizes the result as sorted metric labels.
+// Shared by the v1 (protocol.Log) and v2 (models.Log) processing paths.
+func (p *ProcessorAppender) appendValue(base string) string {
 	r := p.realValue
 	for _, replaceFunc := range p.replaceFuncs {
 		r = replaceFunc(r)
 	}
-	c.Value += r
+	v := base + r
 	if p.SortLabels {
-		labels := strings.Split(c.Value, "|")
+		labels := strings.Split(v, "|")
 		var keyValue helper.MetricLabels
 		for _, labelStr := range labels {
 			kv := strings.SplitN(labelStr, "#$#", 2)
@@ -100,9 +108,26 @@ func (p *ProcessorAppender) processField(c *protocol.Log_Content) {
 			}
 		}
 		if keyValue.Len() > 0 {
-			c.Value = keyValue.String()
+			v = keyValue.String()
 		}
 	}
+	return v
+}
+
+// Process implements the v2 ProcessorV2 interface: it appends the configured
+// value to the target Key of each Log event (creating the key if absent);
+// Metric/Span events pass through unchanged.
+func (p *ProcessorAppender) Process(in *models.PipelineGroupEvents, context pipeline.PipelineContext) {
+	pipeline.ProcessLogEventsOnly(in, context, p.processLogEvent)
+}
+
+func (p *ProcessorAppender) processLogEvent(log *models.Log) {
+	contents := log.GetIndices()
+	base := ""
+	if contents.Contains(p.Key) {
+		base = pipeline.GetStringValue(contents.Get(p.Key))
+	}
+	contents.Add(p.Key, p.appendValue(base))
 }
 
 func (p *ProcessorAppender) find(log *protocol.Log, key string) *protocol.Log_Content {

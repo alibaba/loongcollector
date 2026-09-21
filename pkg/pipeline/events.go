@@ -15,6 +15,8 @@
 package pipeline
 
 import (
+	"fmt"
+
 	"github.com/alibaba/ilogtail/pkg/models"
 )
 
@@ -126,6 +128,24 @@ func CollectGroupEvents(ctx PipelineContext, in *models.PipelineGroupEvents) {
 		return
 	}
 	ctx.Collector().Collect(in.Group, in.Events...)
+}
+
+// GetStringValue converts a v2 LogContents value to a string. A v2 log body is
+// stored under the "content" key as []byte (see models.Log.SetBody and the
+// C++->Go bridge in pluginv2Runner.convertToPipelineEvent), so callers that
+// treat a field as text MUST handle []byte: fmt.Sprintf("%v", []byte(...))
+// renders the byte numbers (e.g. "[108 101 ...]") instead of the string, which
+// silently breaks text-parsing processors (csv/grok/regex/split_*). Non-string,
+// non-[]byte values fall back to fmt.Sprint to preserve prior behavior.
+func GetStringValue(v interface{}) string {
+	switch tv := v.(type) {
+	case string:
+		return tv
+	case []byte:
+		return string(tv)
+	default:
+		return fmt.Sprint(tv)
+	}
 }
 
 // ProcessLogEventsOnly runs processLog on Log events and collects all events (Metric/Span pass through).

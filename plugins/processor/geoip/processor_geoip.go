@@ -21,6 +21,7 @@ import (
 	"github.com/oschwald/geoip2-golang"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
@@ -120,15 +121,24 @@ func inetNtoa(ipValueStr string) net.IP {
 }
 
 func (p *ProcessorGeoIP) ProcessGeoIP(log *protocol.Log, val *string) {
+	p.addGeoFields(*val, func(key, value string) {
+		log.Contents = append(log.Contents, &protocol.Log_Content{Key: key, Value: value})
+	})
+}
+
+// addGeoFields resolves the geographical information for val and emits the
+// derived key/value pairs via add. It is shared by the v1 (ProcessGeoIP) and
+// v2 (processLogEvent) paths so both stay behaviorally identical.
+func (p *ProcessorGeoIP) addGeoFields(val string, add func(key, value string)) {
 	var ip net.IP
 	if p.IPValueFlag {
-		ip = inetNtoa(*val)
+		ip = inetNtoa(val)
 	} else {
-		ip = net.ParseIP(*val)
+		ip = net.ParseIP(val)
 	}
 	if ip == nil {
 		if p.NoMatchError {
-			logger.Warning(p.context.GetRuntimeContext(), selfmonitor.GeoipAlarm, "invalid ip", *val)
+			logger.Warning(p.context.GetRuntimeContext(), selfmonitor.GeoipAlarm, "invalid ip", val)
 		}
 		return
 	}
@@ -140,29 +150,28 @@ func (p *ProcessorGeoIP) ProcessGeoIP(log *protocol.Log, val *string) {
 
 	if !p.NoCity && len(record.City.Names) > 0 {
 		if city, ok := record.City.Names[p.Language]; ok {
-			log.Contents = append(log.Contents, &protocol.Log_Content{Key: p.SourceKey + "_city_", Value: city})
+			add(p.SourceKey+"_city_", city)
 		}
 	}
 
 	if !p.NoProvince && len(record.Subdivisions) > 0 && len(record.Subdivisions[0].Names) > 0 {
 		if province, ok := record.Subdivisions[0].Names[p.Language]; ok {
-			log.Contents = append(log.Contents, &protocol.Log_Content{Key: p.SourceKey + "_province_", Value: province})
+			add(p.SourceKey+"_province_", province)
 		}
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: p.SourceKey + "_province_code_", Value: record.Subdivisions[0].IsoCode})
+		add(p.SourceKey+"_province_code_", record.Subdivisions[0].IsoCode)
 	}
 
 	if !p.NoCountry && len(record.Country.Names) > 0 {
 		if country, ok := record.Country.Names[p.Language]; ok {
-			log.Contents = append(log.Contents, &protocol.Log_Content{Key: p.SourceKey + "_country_", Value: country})
+			add(p.SourceKey+"_country_", country)
 		}
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: p.SourceKey + "_country_code_", Value: record.Country.IsoCode})
+		add(p.SourceKey+"_country_code_", record.Country.IsoCode)
 	}
 
 	if !p.NoCoordinate {
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: p.SourceKey + "_longitude_", Value: strconv.FormatFloat(record.Location.Longitude, 'f', 8, 64)})
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: p.SourceKey + "_latitude_", Value: strconv.FormatFloat(record.Location.Latitude, 'f', 8, 64)})
+		add(p.SourceKey+"_longitude_", strconv.FormatFloat(record.Location.Longitude, 'f', 8, 64))
+		add(p.SourceKey+"_latitude_", strconv.FormatFloat(record.Location.Latitude, 'f', 8, 64))
 	}
-
 }
 
 func init() {
@@ -172,4 +181,40 @@ func init() {
 			Language:   "zh-CN",
 		}
 	}
+}
+
+// Process implements the v2 ProcessorV2 interface: for each Log event it inserts
+// the geographical information derived from the SourceKey value; Metric/Span
+// events pass through unchanged. When the GeoIP database is not loaded the v1
+// path is a no-op, and this path preserves that by guarding on p.db == nil.
+func (p *ProcessorGeoIP) Process(in *models.PipelineGroupEvents, context pipeline.PipelineContext) {
+	if p.db == nil {
+		pipeline.CollectGroupEvents(context, in)
+		return
+	}
+	pipeline.ProcessLogEventsOnly(in, context, p.processLogEvent)
+}
+
+func (p *ProcessorGeoIP) processLogEvent(log *models.Log) {
+	contents := log.GetIndices()
+	if p.sourceIP {
+		ip := util.GetIPAddress()
+		p.addGeoFields(ip, func(key, value string) {
+			contents.Add(key, value)
+		})
+		return
+	}
+	if !contents.Contains(p.SourceKey) {
+		if p.NoKeyError {
+			logger.Warning(p.context.GetRuntimeContext(), selfmonitor.GeoipAlarm, "cannot find key", p.SourceKey)
+		}
+		return
+	}
+	value := pipeline.GetStringValue(contents.Get(p.SourceKey))
+	if !p.KeepSource {
+		contents.Delete(p.SourceKey)
+	}
+	p.addGeoFields(value, func(key, val string) {
+		contents.Add(key, val)
+	})
 }

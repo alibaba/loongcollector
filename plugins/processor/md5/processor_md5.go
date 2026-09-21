@@ -19,6 +19,7 @@ import (
 	"fmt"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
@@ -62,6 +63,26 @@ func (p *ProcessorMD5) ProcessLogs(logArray []*protocol.Log) []*protocol.Log {
 		}
 	}
 	return logArray
+}
+
+// Process implements the v2 ProcessorV2 interface: it computes the MD5 of the
+// SourceKey value on each Log event and stores it under MD5Key; Metric/Span
+// events pass through unchanged.
+func (p *ProcessorMD5) Process(in *models.PipelineGroupEvents, context pipeline.PipelineContext) {
+	pipeline.ProcessLogEventsOnly(in, context, p.processLogEvent)
+}
+
+func (p *ProcessorMD5) processLogEvent(log *models.Log) {
+	contents := log.GetIndices()
+	if !contents.Contains(p.SourceKey) {
+		if p.NoKeyError {
+			logger.Warning(p.context.GetRuntimeContext(), selfmonitor.MD5FindAlarm, "cannot find key", p.SourceKey)
+		}
+		return
+	}
+	src := pipeline.GetStringValue(contents.Get(p.SourceKey))
+	newVal := fmt.Sprintf("%x", md5.Sum([]byte(src))) //nolint:gosec
+	contents.Add(p.MD5Key, newVal)
 }
 
 func init() {

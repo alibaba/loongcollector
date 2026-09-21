@@ -19,9 +19,12 @@ import (
 	"testing"
 
 	"github.com/pingcap/check"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/plugins/test"
@@ -306,4 +309,98 @@ func (s *processorTestSuite) TestKeepSourceIfParseError(c *check.C) {
 		c.Assert(outLogs[0].Contents[0].GetKey(), check.Equals, sourceKeyName)
 		c.Assert(outLogs[0].Contents[0].GetValue(), check.Equals, sourceValue)
 	}
+}
+
+// ---- v2 (PipelineEvent / SendPb) Process path tests ----
+
+// TestProcessorRegex_ProcessV2Parse verifies the v2 Process path extracts the
+// configured capture groups from the SourceKey value into new keys.
+func TestProcessorRegex_ProcessV2Parse(t *testing.T) {
+	processor := &ProcessorRegex{
+		Regex:      `(\w+)\s(\w+)\s(\w+)`,
+		Keys:       []string{"key1", "key2", "key3"},
+		SourceKey:  "content",
+		KeepSource: true,
+	}
+	require.NoError(t, processor.Init(mock.NewEmptyContext("p", "l", "c")))
+
+	log := models.NewLog("", nil, "", "", "", models.NewTags(), 0)
+	log.GetIndices().Add("content", "xxxx yyyy zzzz")
+
+	context := helper.NewObservePipelineContext(10)
+	processor.Process(&models.PipelineGroupEvents{Events: []models.PipelineEvent{log}}, context)
+
+	contents := log.GetIndices()
+	assert.Equal(t, "xxxx", contents.Get("key1"))
+	assert.Equal(t, "yyyy", contents.Get("key2"))
+	assert.Equal(t, "zzzz", contents.Get("key3"))
+	// KeepSource=true keeps the original field.
+	assert.Equal(t, "xxxx yyyy zzzz", contents.Get("content"))
+}
+
+// TestProcessorRegex_ProcessV2KeepSourceFalse verifies the source field is
+// dropped on a successful parse when KeepSource is false.
+func TestProcessorRegex_ProcessV2KeepSourceFalse(t *testing.T) {
+	processor := &ProcessorRegex{
+		Regex:      `(\w+)\s(\w+)\s(\w+)`,
+		Keys:       []string{"key1", "key2", "key3"},
+		SourceKey:  "content",
+		KeepSource: false,
+	}
+	require.NoError(t, processor.Init(mock.NewEmptyContext("p", "l", "c")))
+
+	log := models.NewLog("", nil, "", "", "", models.NewTags(), 0)
+	log.GetIndices().Add("content", "xxxx yyyy zzzz")
+
+	context := helper.NewObservePipelineContext(10)
+	processor.Process(&models.PipelineGroupEvents{Events: []models.PipelineEvent{log}}, context)
+
+	contents := log.GetIndices()
+	assert.False(t, contents.Contains("content"), "source key must be removed when KeepSource is false")
+	assert.Equal(t, "xxxx", contents.Get("key1"))
+	assert.Equal(t, "zzzz", contents.Get("key3"))
+}
+
+// TestProcessorRegex_ProcessV2NoMatchKeepsSource verifies that on a parse
+// failure the source is kept (KeepSourceIfParseError) and no keys are added.
+func TestProcessorRegex_ProcessV2NoMatchKeepsSource(t *testing.T) {
+	processor := &ProcessorRegex{
+		Regex:                  `(\d+)\s(\w+)\s(\w+)`,
+		Keys:                   []string{"key1", "key2", "key3"},
+		SourceKey:              "content",
+		KeepSource:             false,
+		KeepSourceIfParseError: true,
+	}
+	require.NoError(t, processor.Init(mock.NewEmptyContext("p", "l", "c")))
+
+	log := models.NewLog("", nil, "", "", "", models.NewTags(), 0)
+	log.GetIndices().Add("content", "xxxx yyyy zzzz")
+
+	context := helper.NewObservePipelineContext(10)
+	processor.Process(&models.PipelineGroupEvents{Events: []models.PipelineEvent{log}}, context)
+
+	contents := log.GetIndices()
+	assert.True(t, contents.Contains("content"), "source kept on parse error (KeepSourceIfParseError)")
+	assert.False(t, contents.Contains("key1"), "no keys extracted on no-match")
+}
+
+// TestProcessorRegex_ProcessV2PassesThroughMetric verifies a Metric event is
+// emitted unchanged (not dropped) by the log-only processor.
+func TestProcessorRegex_ProcessV2PassesThroughMetric(t *testing.T) {
+	processor := &ProcessorRegex{
+		Regex:     `(\w+)`,
+		Keys:      []string{"key1"},
+		SourceKey: "content",
+	}
+	require.NoError(t, processor.Init(mock.NewEmptyContext("p", "l", "c")))
+
+	metric := models.NewSingleValueMetric("m", models.MetricTypeGauge, models.NewTags(), 0, 1.0)
+	context := helper.NewObservePipelineContext(10)
+	processor.Process(&models.PipelineGroupEvents{Events: []models.PipelineEvent{metric}}, context)
+
+	results := context.Collector().ToArray()
+	require.Len(t, results, 1)
+	require.Len(t, results[0].Events, 1)
+	_, ok := results[0].Events[0].(*models.Metric)
+	assert.True(t, ok, "metric event must pass through unchanged")
 }

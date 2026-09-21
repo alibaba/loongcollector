@@ -18,6 +18,7 @@ import (
 	"strings"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
@@ -129,7 +130,7 @@ func (p *ProcessorAnchor) ProcessLog(log *protocol.Log) {
 }
 
 type ExpondParam struct {
-	log       *protocol.Log
+	add       func(key, value string)
 	preKey    string
 	nowDepth  int
 	maxDepth  int
@@ -142,22 +143,13 @@ func (p *ExpondParam) ExpondJSONCallBack(key []byte, value []byte, dataType json
 		if dataType == jsonparser.String {
 			// unescape string
 			if strValue, err := jsonparser.ParseString(value); err == nil {
-				p.log.Contents = append(p.log.Contents, &protocol.Log_Content{
-					Key:   p.preKey + p.connector + (string)(key),
-					Value: strValue,
-				})
+				p.add(p.preKey+p.connector+(string)(key), strValue)
 			} else {
-				p.log.Contents = append(p.log.Contents, &protocol.Log_Content{
-					Key:   p.preKey + p.connector + (string)(key),
-					Value: (string)(value),
-				})
+				p.add(p.preKey+p.connector+(string)(key), (string)(value))
 			}
 
 		} else {
-			p.log.Contents = append(p.log.Contents, &protocol.Log_Content{
-				Key:   p.preKey + p.connector + (string)(key),
-				Value: (string)(value),
-			})
+			p.add(p.preKey+p.connector+(string)(key), (string)(value))
 		}
 	} else {
 		backKey := p.preKey
@@ -170,25 +162,34 @@ func (p *ExpondParam) ExpondJSONCallBack(key []byte, value []byte, dataType json
 }
 
 func (p *ProcessorAnchor) ProcessAnchor(log *protocol.Log, val *string) {
+	p.applyAnchors(*val, func(key, value string) {
+		log.Contents = append(log.Contents, &protocol.Log_Content{Key: key, Value: value})
+	})
+}
+
+// applyAnchors runs every configured anchor against val and emits the extracted
+// key/value pairs via add. It is shared by the v1 (ProcessAnchor) and v2
+// (processLogEvent) paths so both stay behaviorally identical.
+func (p *ProcessorAnchor) applyAnchors(val string, add func(key, value string)) {
 	for _, anchor := range p.Anchors {
 		// Start is "", startIndex is 0
-		startIndex := strings.Index(*val, anchor.Start)
+		startIndex := strings.Index(val, anchor.Start)
 		if startIndex < 0 {
 			if p.NoAnchorError {
-				logger.Warning(p.context.GetRuntimeContext(), selfmonitor.AnchorFindAlarm, "anchor no start", anchor.Start, "content", util.CutString(*val, 1024))
+				logger.Warning(p.context.GetRuntimeContext(), selfmonitor.AnchorFindAlarm, "anchor no start", anchor.Start, "content", util.CutString(val, 1024))
 			}
 			continue
 		}
 		startIndex += len(anchor.Start)
-		stopIndex := strings.Index((*val)[startIndex:], anchor.Stop)
+		stopIndex := strings.Index(val[startIndex:], anchor.Stop)
 		if stopIndex < 0 {
 			if p.NoAnchorError {
-				logger.Warning(p.context.GetRuntimeContext(), selfmonitor.AnchorFindAlarm, "anchor no stop", anchor.Stop, "content", util.CutString(*val, 1024))
+				logger.Warning(p.context.GetRuntimeContext(), selfmonitor.AnchorFindAlarm, "anchor no stop", anchor.Stop, "content", util.CutString(val, 1024))
 			}
 			continue
 		} else {
 			if len(anchor.Stop) == 0 {
-				stopIndex = len(*val)
+				stopIndex = len(val)
 			} else {
 				stopIndex += startIndex
 			}
@@ -196,29 +197,26 @@ func (p *ProcessorAnchor) ProcessAnchor(log *protocol.Log, val *string) {
 
 		switch anchor.innerType {
 		case StringType:
-			log.Contents = append(log.Contents, &protocol.Log_Content{Key: anchor.FieldName, Value: (*val)[startIndex:stopIndex]})
+			add(anchor.FieldName, val[startIndex:stopIndex])
 		case JSONType:
 			var err error
 			if anchor.ExpondJSON {
 				param := ExpondParam{
-					log:       log,
+					add:       add,
 					preKey:    anchor.FieldName,
 					nowDepth:  0,
 					maxDepth:  anchor.MaxExpondDepth,
 					connector: anchor.ExpondConnecter,
 				}
-				err = jsonparser.ObjectEach(([]byte)((*val)[startIndex:stopIndex]), param.ExpondJSONCallBack)
+				err = jsonparser.ObjectEach(([]byte)(val[startIndex:stopIndex]), param.ExpondJSONCallBack)
 			} else {
-				err = jsonparser.ObjectEach(([]byte)((*val)[startIndex:stopIndex]), func(key []byte, value []byte, dataType jsonparser.ValueType, offset int) error {
-					log.Contents = append(log.Contents, &protocol.Log_Content{
-						Key:   anchor.FieldName + anchor.ExpondConnecter + (string)(key),
-						Value: (string)(value),
-					})
+				err = jsonparser.ObjectEach(([]byte)(val[startIndex:stopIndex]), func(key []byte, value []byte, dataType jsonparser.ValueType, offset int) error {
+					add(anchor.FieldName+anchor.ExpondConnecter+(string)(key), (string)(value))
 					return nil
 				})
 			}
 			if err != nil && !anchor.IgnoreJSONError {
-				logger.Warning(p.context.GetRuntimeContext(), selfmonitor.AnchorJSONAlarm, "process json error", err, "content", (*val)[startIndex:stopIndex])
+				logger.Warning(p.context.GetRuntimeContext(), selfmonitor.AnchorJSONAlarm, "process json error", err, "content", val[startIndex:stopIndex])
 			}
 		}
 	}
@@ -228,4 +226,28 @@ func init() {
 	pipeline.Processors["processor_anchor"] = func() pipeline.Processor {
 		return &ProcessorAnchor{}
 	}
+}
+
+// Process implements the v2 ProcessorV2 interface: for each Log event it applies
+// every configured anchor to the SourceKey value and writes the extracted
+// fields into the log contents; Metric/Span events pass through unchanged.
+func (p *ProcessorAnchor) Process(in *models.PipelineGroupEvents, context pipeline.PipelineContext) {
+	pipeline.ProcessLogEventsOnly(in, context, p.processLogEvent)
+}
+
+func (p *ProcessorAnchor) processLogEvent(log *models.Log) {
+	contents := log.GetIndices()
+	beginLen := contents.Len()
+	if contents.Contains(p.SourceKey) {
+		value := pipeline.GetStringValue(contents.Get(p.SourceKey))
+		if !p.KeepSource {
+			contents.Delete(p.SourceKey)
+		}
+		p.applyAnchors(value, func(key, val string) {
+			contents.Add(key, val)
+		})
+	} else if p.NoKeyError {
+		logger.Warning(p.context.GetRuntimeContext(), selfmonitor.AnchorFindAlarm, "anchor cannot find key", p.SourceKey)
+	}
+	p.logPairMetric.Add(int64(contents.Len() - beginLen + 1))
 }
