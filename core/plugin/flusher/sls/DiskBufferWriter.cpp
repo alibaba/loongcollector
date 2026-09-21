@@ -27,6 +27,7 @@
 #include "common/FileEncryption.h"
 #include "common/FileSystemUtil.h"
 #include "common/RuntimeUtil.h"
+#include "common/SafeThread.h"
 #include "common/StringTools.h"
 #include "common/TimeUtil.h"
 #include "logger/Logger.h"
@@ -111,8 +112,8 @@ void DiskBufferWriter::Init() {
     mCheckPeriod = INT32_FLAG(buffer_check_period);
     SetBufferFilePath(AppConfig::GetInstance()->GetBufferFilePath());
 
-    mBufferSenderThreadRes = async(launch::async, &DiskBufferWriter::BufferSenderThread, this);
-    mBufferWriterThreadRes = async(launch::async, &DiskBufferWriter::BufferWriterThread, this);
+    LaunchAsync(mBufferSenderThreadRes, "DiskBufferSender", &DiskBufferWriter::BufferSenderThread, this);
+    LaunchAsync(mBufferWriterThreadRes, "DiskBufferWriter", &DiskBufferWriter::BufferWriterThread, this);
 }
 
 void DiskBufferWriter::Stop() {

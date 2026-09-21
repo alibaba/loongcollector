@@ -23,6 +23,8 @@
 
 #include "boost/thread.hpp"
 
+#include "common/SafeThread.h"
+
 namespace logtail {
 
 class Thread {
@@ -52,15 +54,27 @@ public:
 using ThreadPtr = std::shared_ptr<Thread>;
 
 template <class Function, class... Args>
-ThreadPtr CreateThread(Function&& f, Args&&... args) {
-    return ThreadPtr(new Thread(std::forward<Function>(f), std::forward<Args>(args)...));
+ThreadPtr CreateThread(const char* name, Function&& f, Args&&... args) {
+    try {
+#ifdef APSARA_UNIT_TEST_MAIN
+        if (IsForceThreadCreateFailureForTest()) {
+            throw boost::thread_resource_error();
+        }
+#endif
+        return ThreadPtr(new Thread(std::forward<Function>(f), std::forward<Args>(args)...));
+    } catch (const boost::thread_resource_error& e) {
+        HandleThreadCreateFailure(name, e);
+        return nullptr;
+    }
 }
 
 class JThread {
 public:
     JThread() noexcept = default;
     template <typename Callable, typename... Args>
-    explicit JThread(Callable&& func, Args&&... args) : t(std::forward<Callable>(func), std::forward<Args>(args)...) {}
+    explicit JThread(Callable&& func, Args&&... args) {
+        LaunchStdThread(t, "JThread", std::forward<Callable>(func), std::forward<Args>(args)...);
+    }
     explicit JThread(std::thread t_) noexcept : t(std::move(t_)) {}
     ~JThread() noexcept {
         if (Joinable()) {

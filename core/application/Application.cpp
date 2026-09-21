@@ -32,6 +32,7 @@
 #include "common/Flags.h"
 #include "common/MachineInfoUtil.h"
 #include "common/RuntimeUtil.h"
+#include "common/SafeThread.h"
 #include "common/StringTools.h"
 #include "common/TimeKeeper.h"
 #include "common/TimeUtil.h"
@@ -413,7 +414,9 @@ void Application::GenerateInstanceId() {
 }
 
 bool Application::TryGetUUID() {
-    mUUIDThread = thread([this] { GetUUIDThread(); });
+    thread uuidThread;
+    LaunchStdThread(uuidThread, "TryGetUUID", [this] { GetUUIDThread(); });
+    mUUIDThread = std::move(uuidThread);
     // wait 1000 ms
     for (int i = 0; i < 100; ++i) {
         this_thread::sleep_for(chrono::milliseconds(10));

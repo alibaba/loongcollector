@@ -23,6 +23,7 @@
 #include "application/Application.h"
 #include "common/Flags.h"
 #include "common/JsonUtil.h"
+#include "common/SafeThread.h"
 #include "common/StringTools.h"
 #include "common/http/AsynCurlRunner.h"
 #include "common/http/Constant.h"
@@ -148,7 +149,7 @@ void PrometheusInputRunner::Init() {
     // empty service host means in host only mode
     if (!mServiceHost.empty()) {
         mIsThreadRunning.store(true);
-        mThreadRes = std::async(launch::async, [this]() {
+        LaunchAsync(mThreadRes, "PrometheusRegister", [this]() {
             std::lock_guard<mutex> lock(mRegisterMutex);
             int retry = 0;
             while (mIsThreadRunning.load()) {
@@ -220,7 +221,8 @@ void PrometheusInputRunner::Stop() {
     // only unregister when operator exist
     if (!mServiceHost.empty()) {
         LOG_INFO(sLogger, ("PrometheusInputRunner", "unregister"));
-        auto res = std::async(launch::async, [this]() {
+        std::future<void> res;
+        LaunchAsync(res, "PrometheusUnregister", [this]() {
             std::lock_guard<mutex> lock(mRegisterMutex);
             for (int retry = 0; retry < 3; ++retry) {
                 auto httpResponse = SendRegisterMessage(prometheus::UNREGISTER_COLLECTOR_PATH);
