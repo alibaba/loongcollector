@@ -23,6 +23,7 @@ import (
 
 	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/plog"
+	"go.opentelemetry.io/collector/pdata/plog/plogotlp"
 	"go.opentelemetry.io/collector/pdata/pmetric"
 	"go.opentelemetry.io/collector/pdata/ptrace"
 
@@ -100,6 +101,66 @@ func (c *Converter) ConvertToOtlpResourseLogs(logGroup *protocol.LogGroup, targe
 	}
 
 	return rsLogs, desiredValues, nil
+}
+
+func (c *Converter) ConvertToOtlpLogStream(logGroup *protocol.LogGroup, targetFields []string) ([][]byte, []map[string]string, error) {
+	if logGroup == nil || len(logGroup.Logs) == 0 {
+		return nil, nil, nil
+	}
+
+	rsLogs, _, err := c.ConvertToOtlpResourseLogs(logGroup, nil)
+	if err != nil {
+		return nil, nil, err
+	}
+	if rsLogs.ScopeLogs().Len() == 0 {
+		return nil, nil, nil
+	}
+
+	payload, err := marshalOtlpResourceLogs(rsLogs)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var desiredValue map[string]string
+	if len(targetFields) > 0 {
+		desiredValue = findTargetValuesInLogTags(targetFields, logGroup.LogTags)
+	}
+	return [][]byte{payload}, []map[string]string{desiredValue}, nil
+}
+
+func (c *Converter) ConvertToOtlpLogStreamV2(groupEvents *models.PipelineGroupEvents, targetFields []string) ([][]byte, []map[string]string, error) {
+	if groupEvents == nil || len(groupEvents.Events) == 0 {
+		return nil, nil, nil
+	}
+
+	rsLogs, _, _, err := ConvertPipelineEventToOtlpEvent[plog.ResourceLogs, pmetric.ResourceMetrics, ptrace.ResourceSpans](c, groupEvents)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	scopeLogs := rsLogs.ScopeLogs()
+	if scopeLogs.Len() == 0 {
+		return nil, nil, nil
+	}
+
+	payload, err := marshalOtlpResourceLogs(rsLogs)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var desiredValue map[string]string
+	if len(targetFields) > 0 {
+		desiredValue = findTargetFieldsInGroup(targetFields, groupEvents.Group)
+	}
+
+	return [][]byte{payload}, []map[string]string{desiredValue}, nil
+}
+
+func marshalOtlpResourceLogs(rsLogs plog.ResourceLogs) ([]byte, error) {
+	logs := plog.NewLogs()
+	newResource := logs.ResourceLogs().AppendEmpty()
+	rsLogs.MoveTo(newResource)
+	return plogotlp.NewExportRequestFromLogs(logs).MarshalProto()
 }
 
 func ConvertPipelineEventToOtlpEvent[
