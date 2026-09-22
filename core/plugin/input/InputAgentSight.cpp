@@ -16,6 +16,8 @@
 
 #include <unordered_map>
 
+#include "app_config/AppConfig.h"
+#include "container_manager/ContainerManager.h"
 #include "ebpf/EBPFServer.h"
 #include "ebpf/include/export.h"
 #include "logger/Logger.h"
@@ -46,6 +48,13 @@ bool InputAgentSight::Start() {
     ebpf::EBPFServer::GetInstance()->Init();
     if (!ebpf::EBPFServer::GetInstance()->IsSupportedEnv(logtail::ebpf::PluginType::AGENTSIGHT_OBSERVE)) {
         return false;
+    }
+    // Containerized deployment (k8s DaemonSet / docker): keep the process-wide container inventory
+    // running so HandleLlmEvent / HandleHttpsEvent can enrich event groups with container metadata
+    // tags by container ID, the same source input_file / input_container_stdio use. Init is
+    // idempotent; host-mode deployments skip it and enrichment silently degrades to container.id only.
+    if (AppConfig::GetInstance()->IsPurageContainerMode()) {
+        ContainerManager::GetInstance()->Init();
     }
     return ebpf::EBPFServer::GetInstance()->EnablePlugin(mContext->GetConfigName(),
                                                          mIndex,
