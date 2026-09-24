@@ -241,25 +241,66 @@ LogFileReader::LogFileReader(const std::string& hostLogPathDir,
     mLineParsers.emplace_back(baseLineParsePtr);
 }
 
+bool LogFileReader::hasMetricLabelKey(const MetricLabels& labels, const std::string& key) {
+    return std::any_of(labels.begin(), labels.end(), [&key](const auto& label) { return label.first == key; });
+}
+
+bool LogFileReader::isReservedPluginSourceLabelKey(const std::string& key) {
+    return key == METRIC_LABEL_KEY_FILE_NAME || key == METRIC_LABEL_KEY_FILE_DEV || key == METRIC_LABEL_KEY_FILE_INODE
+        || key == METRIC_LABEL_KEY_PROJECT || key == METRIC_LABEL_KEY_PIPELINE_NAME || key == METRIC_LABEL_KEY_LOGSTORE
+        || key == METRIC_LABEL_KEY_PLUGIN_TYPE || key == METRIC_LABEL_KEY_PLUGIN_ID;
+}
+
+bool LogFileReader::metricLabelsEqual(const MetricLabels& lhs, const MetricLabels& rhs) {
+    MetricLabels a = lhs;
+    MetricLabels b = rhs;
+    std::sort(a.begin(), a.end());
+    std::sort(b.begin(), b.end());
+    return a == b;
+}
+
+void LogFileReader::tryAppendContainerMetricLabel(MetricLabels& labels,
+                                                  const std::string& key,
+                                                  const std::string& value) const {
+    if (key.empty()) {
+        return;
+    }
+    if (hasMetricLabelKey(labels, key) || isReservedPluginSourceLabelKey(key)) {
+        LOG_WARNING(
+            sLogger,
+            ("skip container metric label", key)("reason", "conflicts with reserved or existing plugin_source label")(
+                "config", GetConfigName())("file", GetConvertedPath()));
+        return;
+    }
+    labels.emplace_back(key, value);
+}
+
 void LogFileReader::appendContainerMetricLabels() {
+    appendContainerMetricLabels(mMetricLabels);
+}
+
+void LogFileReader::appendContainerMetricLabels(MetricLabels& labels) const {
     if (mTagConfig.first != nullptr) {
         for (const auto& metadata : mContainerMetadatas) {
             const auto& key = mTagConfig.first->GetFileTagKeyName(metadata.first);
             if (!key.empty()) {
-                mMetricLabels.emplace_back(std::string(key.data(), key.size()), metadata.second);
+                tryAppendContainerMetricLabel(labels, std::string(key.data(), key.size()), metadata.second);
             }
         }
     }
     for (const auto& metadata : mContainerCustomMetadatas) {
-        if (!metadata.first.empty()) {
-            mMetricLabels.emplace_back(metadata.first, metadata.second);
-        }
+        tryAppendContainerMetricLabel(labels, metadata.first, metadata.second);
     }
     for (const auto& tag : mContainerExtraTags) {
-        if (!tag.first.empty()) {
-            mMetricLabels.emplace_back(tag.first, tag.second);
-        }
+        tryAppendContainerMetricLabel(labels, tag.first, tag.second);
     }
+}
+
+void LogFileReader::seedMetricGaugesFromReaderState() {
+    int64_t readOffset = GetLastFilePos();
+    int64_t fileSize = std::max(GetFileSize(), readOffset);
+    SET_GAUGE(mSourceReadOffsetBytes, readOffset);
+    SET_GAUGE(mSourceSizeBytes, fileSize);
 }
 
 void LogFileReader::SetMetrics() {
@@ -274,7 +315,8 @@ void LogFileReader::SetMetrics() {
             mOutSizeBytes = rec.GetCounter(METRIC_PLUGIN_OUT_SIZE_BYTES);
             mSourceSizeBytes = rec.GetIntGauge(METRIC_PLUGIN_SOURCE_SIZE_BYTES);
             mSourceReadOffsetBytes = rec.GetIntGauge(METRIC_PLUGIN_SOURCE_READ_OFFSET_BYTES);
-            InitMetricGauges();
+            // Do not PathStat here: GetOrCreate holds PluginMetricManager mutex.
+            seedMetricGaugesFromReaderState();
         });
     if (mMetricsRecordRef == nullptr) {
         LOG_ERROR(sLogger,
@@ -2824,6 +2866,14 @@ bool LogFileReader::UpdateContainerInfo() {
         SetContainerMetadatas(containerInfo->mRawContainerInfo->mMetadatas);
         SetContainerCustomMetadatas(containerInfo->mRawContainerInfo->mCustomMetadatas);
         SetContainerExtraTags(containerInfo->mExtraTags);
+
+        MetricLabels newLabels = {{METRIC_LABEL_KEY_FILE_NAME, GetConvertedPath()},
+                                  {METRIC_LABEL_KEY_FILE_DEV, std::to_string(GetDevInode().dev)},
+                                  {METRIC_LABEL_KEY_FILE_INODE, std::to_string(GetDevInode().inode)}};
+        appendContainerMetricLabels(newLabels);
+        if (metricLabelsEqual(newLabels, mMetricLabels)) {
+            return true;
+        }
         FileServer::GetInstance()->ReleaseReentrantMetricsRecordRef(GetConfigName(), mMetricLabels);
         SetMetrics();
         return true;

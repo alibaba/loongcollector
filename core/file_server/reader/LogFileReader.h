@@ -602,6 +602,12 @@ protected:
 
 private:
     void appendContainerMetricLabels();
+    void appendContainerMetricLabels(MetricLabels& labels) const;
+    void tryAppendContainerMetricLabel(MetricLabels& labels, const std::string& key, const std::string& value) const;
+    void seedMetricGaugesFromReaderState();
+    static bool hasMetricLabelKey(const MetricLabels& labels, const std::string& key);
+    static bool isReservedPluginSourceLabelKey(const std::string& key);
+    static bool metricLabelsEqual(const MetricLabels& lhs, const MetricLabels& rhs);
     bool mHasReadContainerBom = false;
     void checkContainerType(LogFileOperator& op);
 

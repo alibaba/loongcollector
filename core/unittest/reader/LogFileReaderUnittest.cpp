@@ -80,6 +80,8 @@ public:
     void TestReloadMetricsGaugeTruncatedFile();
     void TestContainerMetricLabels();
     void TestContainerMetricLabelsRebind();
+    void TestContainerMetricLabelsKeepOnSameLabels();
+    void TestContainerMetricLabelConstants();
 
     std::unique_ptr<char[]> expectedContent;
     static std::string logPathDir;
@@ -100,6 +102,8 @@ UNIT_TEST_CASE(LogFileReaderUnittest, TestReloadMetricsGaugeNoZeroDrop);
 UNIT_TEST_CASE(LogFileReaderUnittest, TestReloadMetricsGaugeTruncatedFile);
 UNIT_TEST_CASE(LogFileReaderUnittest, TestContainerMetricLabels);
 UNIT_TEST_CASE(LogFileReaderUnittest, TestContainerMetricLabelsRebind);
+UNIT_TEST_CASE(LogFileReaderUnittest, TestContainerMetricLabelsKeepOnSameLabels);
+UNIT_TEST_CASE(LogFileReaderUnittest, TestContainerMetricLabelConstants);
 
 std::string LogFileReaderUnittest::logPathDir;
 std::string LogFileReaderUnittest::gbkFile;
@@ -1020,6 +1024,46 @@ void LogFileReaderUnittest::TestContainerMetricLabels() {
         APSARA_TEST_FALSE_FATAL(HasMetricLabelKey(reader.mMetricLabels, METRIC_LABEL_KEY_K8S_POD_NAME));
         APSARA_TEST_FALSE_FATAL(HasMetricLabelKey(reader.mMetricLabels, "app_name"));
     }
+
+    {
+        Json::Value configJson;
+        std::string errorMsg;
+        APSARA_TEST_TRUE_FATAL(ParseJsonTable(R"({
+            "Tags": {
+                "K8sPodNameTagKey": "file_name",
+                "K8sNamespaceTagKey": "project"
+            }
+        })",
+                                              configJson,
+                                              errorMsg));
+        FileTagOptions tagOpts;
+        APSARA_TEST_TRUE_FATAL(tagOpts.Init(configJson, metricCtx, "input_file", true));
+
+        LogFileReader reader(logPathDir,
+                             utf8File,
+                             DevInode(1114, 2225),
+                             std::make_pair(&metricReaderOpts, &metricCtx),
+                             std::make_pair(&multilineOpts, &metricCtx),
+                             std::make_pair(&tagOpts, &metricCtx));
+        reader.SetContainerMetadatas(MakeContainerMetadatas("test_pod_uid"));
+        reader.SetContainerCustomMetadatas({{METRIC_LABEL_KEY_FILE_INODE, "should_not_overwrite"}});
+        reader.SetContainerExtraTags({{METRIC_LABEL_KEY_PROJECT, "hijack_project"},
+                                      {METRIC_LABEL_KEY_PIPELINE_NAME, "hijack_pipeline"},
+                                      {"app_name", "hago"}});
+        reader.SetMetrics();
+
+        APSARA_TEST_TRUE_FATAL(
+            HasMetricLabel(reader.mMetricLabels, METRIC_LABEL_KEY_FILE_NAME, reader.GetConvertedPath()));
+        APSARA_TEST_FALSE_FATAL(HasMetricLabel(reader.mMetricLabels, METRIC_LABEL_KEY_FILE_NAME, "test_pod"));
+        APSARA_TEST_FALSE_FATAL(HasMetricLabelKey(reader.mMetricLabels, METRIC_LABEL_KEY_PROJECT));
+        APSARA_TEST_FALSE_FATAL(HasMetricLabelKey(reader.mMetricLabels, METRIC_LABEL_KEY_PIPELINE_NAME));
+        APSARA_TEST_TRUE_FATAL(HasMetricLabel(
+            reader.mMetricLabels, METRIC_LABEL_KEY_FILE_INODE, std::to_string(reader.GetDevInode().inode)));
+        APSARA_TEST_FALSE_FATAL(
+            HasMetricLabel(reader.mMetricLabels, METRIC_LABEL_KEY_FILE_INODE, "should_not_overwrite"));
+        APSARA_TEST_TRUE_FATAL(HasMetricLabel(reader.mMetricLabels, "app_name", "hago"));
+        APSARA_TEST_TRUE_FATAL(HasMetricLabel(reader.mMetricLabels, METRIC_LABEL_KEY_K8S_POD_UID, "test_pod_uid"));
+    }
 }
 
 void LogFileReaderUnittest::TestContainerMetricLabelsRebind() {
@@ -1082,6 +1126,72 @@ void LogFileReaderUnittest::TestContainerMetricLabelsRebind() {
     APSARA_TEST_TRUE_FATAL(HasMetricLabel(reader.mMetricLabels, "app_name", "new_app"));
     APSARA_TEST_TRUE_FATAL(reader.mSourceReadOffsetBytes != nullptr);
     APSARA_TEST_EQUAL_FATAL(reader.mSourceReadOffsetBytes->GetValue(), (uint64_t)consumedOffset);
+}
+
+void LogFileReaderUnittest::TestContainerMetricLabelsKeepOnSameLabels() {
+    const std::string configName = "container_metric_labels_keep";
+    auto pluginMetricManager = CreateFilePluginMetricManager(configName);
+    FileServer::GetInstance()->AddPluginMetricManager(configName, pluginMetricManager);
+
+    CollectionPipelineContext metricCtx;
+    metricCtx.SetConfigName(configName);
+    FileDiscoveryOptions containerDiscoveryOpts;
+    containerDiscoveryOpts.SetEnableContainerDiscoveryFlag(true);
+    auto containerInfos = std::make_shared<std::vector<ContainerInfo>>();
+    ContainerInfo newContainer;
+    newContainer.mRawContainerInfo = std::make_shared<RawContainerInfo>();
+    newContainer.mRawContainerInfo->mID = "new-container-id";
+    newContainer.mRawContainerInfo->mMetadatas = MakeContainerMetadatas("same_pod_uid");
+    newContainer.mRawContainerInfo->mCustomMetadatas = {{"env_config_tag", "same_custom"}};
+    newContainer.mRealBaseDirs = {logPathDir};
+    newContainer.mExtraTags = {{"app_name", "same_app"}};
+    containerInfos->push_back(newContainer);
+    containerDiscoveryOpts.SetContainerInfo(containerInfos);
+    FileServer::GetInstance()->AddFileDiscoveryConfig(configName, &containerDiscoveryOpts, &metricCtx);
+    std::shared_ptr<void> managerGuard(nullptr, [&configName](void*) {
+        FileServer::GetInstance()->RemovePluginMetricManager(configName);
+        FileServer::GetInstance()->RemoveFileDiscoveryConfig(configName);
+    });
+
+    MultilineOptions multilineOpts;
+    FileReaderOptions metricReaderOpts;
+    metricReaderOpts.mInputType = FileReaderOptions::InputType::InputFile;
+    Json::Value configJson;
+    std::string errorMsg;
+    APSARA_TEST_TRUE_FATAL(ParseJsonTable(R"({})", configJson, errorMsg));
+    FileTagOptions tagOpts;
+    APSARA_TEST_TRUE_FATAL(tagOpts.Init(configJson, metricCtx, "input_file", true));
+
+    LogFileReader reader(logPathDir,
+                         utf8File,
+                         DevInode(5555, 6666),
+                         std::make_pair(&metricReaderOpts, &metricCtx),
+                         std::make_pair(&multilineOpts, &metricCtx),
+                         std::make_pair(&tagOpts, &metricCtx));
+    reader.SetContainerID("old-container-id");
+    reader.SetContainerMetadatas(MakeContainerMetadatas("same_pod_uid"));
+    reader.SetContainerCustomMetadatas({{"env_config_tag", "same_custom"}});
+    reader.SetContainerExtraTags({{"app_name", "same_app"}});
+    reader.SetMetrics();
+    APSARA_TEST_TRUE_FATAL(reader.mOutEventsTotal != nullptr);
+    ADD_COUNTER(reader.mOutEventsTotal, 7);
+    APSARA_TEST_EQUAL_FATAL(reader.mOutEventsTotal->GetValue(), 7ULL);
+    auto* oldRecord = reader.mMetricsRecordRef.get();
+
+    APSARA_TEST_TRUE_FATAL(reader.UpdateContainerInfo());
+    APSARA_TEST_EQUAL_FATAL(reader.GetContainerID(), "new-container-id");
+    APSARA_TEST_EQUAL_FATAL(reader.mMetricsRecordRef.get(), oldRecord);
+    APSARA_TEST_EQUAL_FATAL(reader.mOutEventsTotal->GetValue(), 7ULL);
+    APSARA_TEST_TRUE_FATAL(HasMetricLabel(reader.mMetricLabels, METRIC_LABEL_KEY_K8S_POD_UID, "same_pod_uid"));
+}
+
+void LogFileReaderUnittest::TestContainerMetricLabelConstants() {
+    APSARA_TEST_EQUAL_FATAL(METRIC_LABEL_KEY_K8S_NAMESPACE, DEFAULT_LOG_TAG_NAMESPACE);
+    APSARA_TEST_EQUAL_FATAL(METRIC_LABEL_KEY_K8S_POD_NAME, DEFAULT_LOG_TAG_POD_NAME);
+    APSARA_TEST_EQUAL_FATAL(METRIC_LABEL_KEY_K8S_POD_UID, DEFAULT_LOG_TAG_POD_UID);
+    APSARA_TEST_EQUAL_FATAL(METRIC_LABEL_KEY_CONTAINER_NAME, DEFAULT_LOG_TAG_CONTAINER_NAME);
+    APSARA_TEST_EQUAL_FATAL(METRIC_LABEL_KEY_CONTAINER_IP, DEFAULT_LOG_TAG_CONTAINER_IP);
+    APSARA_TEST_EQUAL_FATAL(METRIC_LABEL_KEY_CONTAINER_IMAGE_NAME, DEFAULT_LOG_TAG_IMAGE_NAME);
 }
 
 class LogMultiBytesUnittest : public ::testing::Test {
