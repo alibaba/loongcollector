@@ -34,3 +34,12 @@ Feature: input docker static file
     """
     content: "^\\d+===="
     """
+    Then the self-monitor plugin_source labels match kv
+    """
+    file_name: ".*/root/test/a/b/c/d/axxxxxxx.log$"
+    file_dev: "^[0-9]+$"
+    file_inode: "^[0-9]+$"
+    _image_name_: ".*[-_]container:latest$"
+    _container_name_: ".*[-_]container[-_]1$"
+    _container_ip_: ^\b(?:(?:2(?:[0-4][0-9]|5[0-5])|[0-1]?[0-9]?[0-9])\.){3}(?:(?:2([0-4][0-9]|5[0-5])|[0-1]?[0-9]?[0-9]))\b$
+    """
