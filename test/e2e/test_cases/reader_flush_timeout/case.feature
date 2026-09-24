@@ -20,3 +20,4 @@ Feature: reader flush timeout
     Given loongcollector container mount {./a.log} to {/root/test/simple.log}
     When start docker-compose {reader_flush_timeout}
     Then there is at least {5} logs
+    Then the self-monitor plugin_source labels do not have container keys

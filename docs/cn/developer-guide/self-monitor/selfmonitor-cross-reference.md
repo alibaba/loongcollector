@@ -62,6 +62,14 @@
 | `METRIC_LABEL_KEY_FILE_DEV` | — | `file_dev` | 采集文件所在设备号 |
 | `METRIC_LABEL_KEY_FILE_INODE` | — | `file_inode` | 采集文件的 inode 号 |
 | `METRIC_LABEL_KEY_FILE_NAME` | — | `file_name` | 采集文件名 |
+| `METRIC_LABEL_KEY_K8S_NAMESPACE` | — | `_namespace_` | 默认 K8s namespace，字面量与 `DEFAULT_LOG_TAG_NAMESPACE` 对齐（不跨 TU 引用，避免 SIOF）；运行期以 FileTagOptions 为准 |
+| `METRIC_LABEL_KEY_K8S_POD_NAME` | — | `_pod_name_` | 默认 K8s Pod 名，字面量与 `DEFAULT_LOG_TAG_POD_NAME` 对齐；运行期以 FileTagOptions 为准 |
+| `METRIC_LABEL_KEY_K8S_POD_UID` | — | `_pod_uid_` | 默认 K8s Pod UID，字面量与 `DEFAULT_LOG_TAG_POD_UID` 对齐；运行期以 FileTagOptions 为准 |
+| `METRIC_LABEL_KEY_CONTAINER_NAME` | — | `_container_name_` | 默认容器名，字面量与 `DEFAULT_LOG_TAG_CONTAINER_NAME` 对齐；运行期以 FileTagOptions 为准 |
+| `METRIC_LABEL_KEY_CONTAINER_IP` | — | `_container_ip_` | 默认容器 IP，字面量与 `DEFAULT_LOG_TAG_CONTAINER_IP` 对齐；运行期以 FileTagOptions 为准 |
+| `METRIC_LABEL_KEY_CONTAINER_IMAGE_NAME` | — | `_image_name_` | 默认镜像名，字面量与 `DEFAULT_LOG_TAG_IMAGE_NAME` 对齐；运行期以 FileTagOptions 为准 |
+
+`ExternalK8sLabelTag` / `ExternalEnvTag` 映射出的 tag 无固定 `METRIC_LABEL_KEY_*` 常量，名称与日志 tag 一致。
 
 ### 2.5 Prometheus 标签
 

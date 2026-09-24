@@ -93,6 +93,12 @@ extern const std::string& METRIC_PLUGIN_TOTAL_PROCESS_TIME_MS;
 extern const std::string METRIC_LABEL_KEY_FILE_DEV;
 extern const std::string METRIC_LABEL_KEY_FILE_INODE;
 extern const std::string METRIC_LABEL_KEY_FILE_NAME;
+extern const std::string METRIC_LABEL_KEY_K8S_NAMESPACE;
+extern const std::string METRIC_LABEL_KEY_K8S_POD_NAME;
+extern const std::string METRIC_LABEL_KEY_K8S_POD_UID;
+extern const std::string METRIC_LABEL_KEY_CONTAINER_NAME;
+extern const std::string METRIC_LABEL_KEY_CONTAINER_IP;
+extern const std::string METRIC_LABEL_KEY_CONTAINER_IMAGE_NAME;
 
 extern const std::string METRIC_PLUGIN_MONITOR_FILE_TOTAL;
 extern const std::string METRIC_PLUGIN_SOURCE_READ_OFFSET_BYTES;

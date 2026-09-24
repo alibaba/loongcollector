@@ -20,3 +20,4 @@ Feature: reader new line after timeout
     Given loongcollector container mount {./a.log} to {/root/test/a.log}
     When start docker-compose {reader_new_line_after_timeout}
     Then there is at least {6} logs
+    Then the self-monitor plugin_source labels do not have container keys

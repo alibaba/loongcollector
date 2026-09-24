@@ -120,6 +120,8 @@ func ScenarioInitializer(ctx *godog.ScenarioContext) {
 
 	// metric
 	ctx.Then(`^there is more than \{(\d+)\} metrics in \{(\d+)\} seconds$`, verify.MetricCount)
+	ctx.Then(`^the self-monitor plugin_source labels match kv`, verify.SelfMonitorPluginSourceLabelsMatchKV)
+	ctx.Then(`^the self-monitor plugin_source labels do not have container keys$`, verify.SelfMonitorPluginSourceLabelsOmitContainerKeys)
 
 	// other
 	ctx.Then(`wait \{(\d+)\} seconds`, func(ctx context.Context, t int) context.Context {

@@ -20,3 +20,4 @@ Feature: reader deleted
     Given loongcollector container mount {./volume} to {/root/test}
     When start docker-compose {reader_deleted}
     Then there is at least {1} logs
+    Then the self-monitor plugin_source labels do not have container keys
