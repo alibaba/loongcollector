@@ -963,10 +963,8 @@ void LogFileReaderUnittest::TestContainerMetricLabels() {
         APSARA_TEST_TRUE_FATAL(HasMetricLabel(reader.mMetricLabels, DEFAULT_LOG_TAG_POD_NAME, "test_pod"));
         APSARA_TEST_TRUE_FATAL(HasMetricLabel(reader.mMetricLabels, DEFAULT_LOG_TAG_POD_UID, "test_pod_uid"));
         APSARA_TEST_TRUE_FATAL(HasMetricLabel(reader.mMetricLabels, DEFAULT_LOG_TAG_CONTAINER_NAME, "test_container"));
-        APSARA_TEST_TRUE_FATAL(
-            HasMetricLabel(reader.mMetricLabels, DEFAULT_LOG_TAG_CONTAINER_IP, "test_container_ip"));
-        APSARA_TEST_TRUE_FATAL(
-            HasMetricLabel(reader.mMetricLabels, DEFAULT_LOG_TAG_IMAGE_NAME, "test_image"));
+        APSARA_TEST_TRUE_FATAL(HasMetricLabel(reader.mMetricLabels, DEFAULT_LOG_TAG_CONTAINER_IP, "test_container_ip"));
+        APSARA_TEST_TRUE_FATAL(HasMetricLabel(reader.mMetricLabels, DEFAULT_LOG_TAG_IMAGE_NAME, "test_image"));
         APSARA_TEST_TRUE_FATAL(HasMetricLabel(reader.mMetricLabels, "env_config_tag", "custom_value"));
         APSARA_TEST_TRUE_FATAL(HasMetricLabel(reader.mMetricLabels, "app_name", "hago"));
         APSARA_TEST_FALSE_FATAL(HasMetricLabelKey(reader.mMetricLabels, ""));
