@@ -36,6 +36,8 @@ const (
 	ValueTypeBoolean
 	ValueTypeArray
 	ValueTypeMap
+	ValueTypeInteger
+	ValueTypeUnsigned
 
 	ContentKey = "content"
 	BodyKey    = ContentKey
