@@ -81,7 +81,6 @@ public:
     void TestContainerMetricLabels();
     void TestContainerMetricLabelsRebind();
     void TestContainerMetricLabelsKeepOnSameLabels();
-    void TestContainerMetricLabelConstants();
 
     std::unique_ptr<char[]> expectedContent;
     static std::string logPathDir;
@@ -103,7 +102,6 @@ UNIT_TEST_CASE(LogFileReaderUnittest, TestReloadMetricsGaugeTruncatedFile);
 UNIT_TEST_CASE(LogFileReaderUnittest, TestContainerMetricLabels);
 UNIT_TEST_CASE(LogFileReaderUnittest, TestContainerMetricLabelsRebind);
 UNIT_TEST_CASE(LogFileReaderUnittest, TestContainerMetricLabelsKeepOnSameLabels);
-UNIT_TEST_CASE(LogFileReaderUnittest, TestContainerMetricLabelConstants);
 
 std::string LogFileReaderUnittest::logPathDir;
 std::string LogFileReaderUnittest::gbkFile;
@@ -961,14 +959,14 @@ void LogFileReaderUnittest::TestContainerMetricLabels() {
         reader.SetContainerExtraTags({{"app_name", "hago"}, {"", "ignored"}});
         reader.SetMetrics();
 
-        APSARA_TEST_TRUE_FATAL(HasMetricLabel(reader.mMetricLabels, METRIC_LABEL_KEY_K8S_NAMESPACE, "test_namespace"));
-        APSARA_TEST_TRUE_FATAL(HasMetricLabel(reader.mMetricLabels, METRIC_LABEL_KEY_K8S_POD_NAME, "test_pod"));
-        APSARA_TEST_TRUE_FATAL(HasMetricLabel(reader.mMetricLabels, METRIC_LABEL_KEY_K8S_POD_UID, "test_pod_uid"));
-        APSARA_TEST_TRUE_FATAL(HasMetricLabel(reader.mMetricLabels, METRIC_LABEL_KEY_CONTAINER_NAME, "test_container"));
+        APSARA_TEST_TRUE_FATAL(HasMetricLabel(reader.mMetricLabels, DEFAULT_LOG_TAG_NAMESPACE, "test_namespace"));
+        APSARA_TEST_TRUE_FATAL(HasMetricLabel(reader.mMetricLabels, DEFAULT_LOG_TAG_POD_NAME, "test_pod"));
+        APSARA_TEST_TRUE_FATAL(HasMetricLabel(reader.mMetricLabels, DEFAULT_LOG_TAG_POD_UID, "test_pod_uid"));
+        APSARA_TEST_TRUE_FATAL(HasMetricLabel(reader.mMetricLabels, DEFAULT_LOG_TAG_CONTAINER_NAME, "test_container"));
         APSARA_TEST_TRUE_FATAL(
-            HasMetricLabel(reader.mMetricLabels, METRIC_LABEL_KEY_CONTAINER_IP, "test_container_ip"));
+            HasMetricLabel(reader.mMetricLabels, DEFAULT_LOG_TAG_CONTAINER_IP, "test_container_ip"));
         APSARA_TEST_TRUE_FATAL(
-            HasMetricLabel(reader.mMetricLabels, METRIC_LABEL_KEY_CONTAINER_IMAGE_NAME, "test_image"));
+            HasMetricLabel(reader.mMetricLabels, DEFAULT_LOG_TAG_IMAGE_NAME, "test_image"));
         APSARA_TEST_TRUE_FATAL(HasMetricLabel(reader.mMetricLabels, "env_config_tag", "custom_value"));
         APSARA_TEST_TRUE_FATAL(HasMetricLabel(reader.mMetricLabels, "app_name", "hago"));
         APSARA_TEST_FALSE_FATAL(HasMetricLabelKey(reader.mMetricLabels, ""));
@@ -998,9 +996,9 @@ void LogFileReaderUnittest::TestContainerMetricLabels() {
         reader.SetMetrics();
 
         APSARA_TEST_TRUE_FATAL(HasMetricLabel(reader.mMetricLabels, "my_pod", "test_pod"));
-        APSARA_TEST_FALSE_FATAL(HasMetricLabelKey(reader.mMetricLabels, METRIC_LABEL_KEY_K8S_POD_NAME));
-        APSARA_TEST_FALSE_FATAL(HasMetricLabelKey(reader.mMetricLabels, METRIC_LABEL_KEY_K8S_POD_UID));
-        APSARA_TEST_TRUE_FATAL(HasMetricLabel(reader.mMetricLabels, METRIC_LABEL_KEY_K8S_NAMESPACE, "test_namespace"));
+        APSARA_TEST_FALSE_FATAL(HasMetricLabelKey(reader.mMetricLabels, DEFAULT_LOG_TAG_POD_NAME));
+        APSARA_TEST_FALSE_FATAL(HasMetricLabelKey(reader.mMetricLabels, DEFAULT_LOG_TAG_POD_UID));
+        APSARA_TEST_TRUE_FATAL(HasMetricLabel(reader.mMetricLabels, DEFAULT_LOG_TAG_NAMESPACE, "test_namespace"));
     }
 
     {
@@ -1021,7 +1019,7 @@ void LogFileReaderUnittest::TestContainerMetricLabels() {
         APSARA_TEST_TRUE_FATAL(HasMetricLabelKey(reader.mMetricLabels, METRIC_LABEL_KEY_FILE_NAME));
         APSARA_TEST_TRUE_FATAL(HasMetricLabelKey(reader.mMetricLabels, METRIC_LABEL_KEY_FILE_DEV));
         APSARA_TEST_TRUE_FATAL(HasMetricLabelKey(reader.mMetricLabels, METRIC_LABEL_KEY_FILE_INODE));
-        APSARA_TEST_FALSE_FATAL(HasMetricLabelKey(reader.mMetricLabels, METRIC_LABEL_KEY_K8S_POD_NAME));
+        APSARA_TEST_FALSE_FATAL(HasMetricLabelKey(reader.mMetricLabels, DEFAULT_LOG_TAG_POD_NAME));
         APSARA_TEST_FALSE_FATAL(HasMetricLabelKey(reader.mMetricLabels, "app_name"));
     }
 
@@ -1062,7 +1060,7 @@ void LogFileReaderUnittest::TestContainerMetricLabels() {
         APSARA_TEST_FALSE_FATAL(
             HasMetricLabel(reader.mMetricLabels, METRIC_LABEL_KEY_FILE_INODE, "should_not_overwrite"));
         APSARA_TEST_TRUE_FATAL(HasMetricLabel(reader.mMetricLabels, "app_name", "hago"));
-        APSARA_TEST_TRUE_FATAL(HasMetricLabel(reader.mMetricLabels, METRIC_LABEL_KEY_K8S_POD_UID, "test_pod_uid"));
+        APSARA_TEST_TRUE_FATAL(HasMetricLabel(reader.mMetricLabels, DEFAULT_LOG_TAG_POD_UID, "test_pod_uid"));
     }
 }
 
@@ -1111,7 +1109,7 @@ void LogFileReaderUnittest::TestContainerMetricLabelsRebind() {
     reader.SetContainerCustomMetadatas({{"env_config_tag", "old_custom"}});
     reader.SetContainerExtraTags({{"app_name", "old_app"}});
     reader.SetMetrics();
-    APSARA_TEST_TRUE_FATAL(HasMetricLabel(reader.mMetricLabels, METRIC_LABEL_KEY_K8S_POD_UID, "old_pod_uid"));
+    APSARA_TEST_TRUE_FATAL(HasMetricLabel(reader.mMetricLabels, DEFAULT_LOG_TAG_POD_UID, "old_pod_uid"));
     APSARA_TEST_TRUE_FATAL(HasMetricLabel(reader.mMetricLabels, "env_config_tag", "old_custom"));
     APSARA_TEST_TRUE_FATAL(HasMetricLabel(reader.mMetricLabels, "app_name", "old_app"));
 
@@ -1120,8 +1118,8 @@ void LogFileReaderUnittest::TestContainerMetricLabelsRebind() {
 
     APSARA_TEST_TRUE_FATAL(reader.UpdateContainerInfo());
     APSARA_TEST_EQUAL_FATAL(reader.GetContainerID(), "new-container-id");
-    APSARA_TEST_TRUE_FATAL(HasMetricLabel(reader.mMetricLabels, METRIC_LABEL_KEY_K8S_POD_UID, "new_pod_uid"));
-    APSARA_TEST_FALSE_FATAL(HasMetricLabel(reader.mMetricLabels, METRIC_LABEL_KEY_K8S_POD_UID, "old_pod_uid"));
+    APSARA_TEST_TRUE_FATAL(HasMetricLabel(reader.mMetricLabels, DEFAULT_LOG_TAG_POD_UID, "new_pod_uid"));
+    APSARA_TEST_FALSE_FATAL(HasMetricLabel(reader.mMetricLabels, DEFAULT_LOG_TAG_POD_UID, "old_pod_uid"));
     APSARA_TEST_TRUE_FATAL(HasMetricLabel(reader.mMetricLabels, "env_config_tag", "new_custom"));
     APSARA_TEST_TRUE_FATAL(HasMetricLabel(reader.mMetricLabels, "app_name", "new_app"));
     APSARA_TEST_TRUE_FATAL(reader.mSourceReadOffsetBytes != nullptr);
@@ -1182,16 +1180,7 @@ void LogFileReaderUnittest::TestContainerMetricLabelsKeepOnSameLabels() {
     APSARA_TEST_EQUAL_FATAL(reader.GetContainerID(), "new-container-id");
     APSARA_TEST_EQUAL_FATAL(reader.mMetricsRecordRef.get(), oldRecord);
     APSARA_TEST_EQUAL_FATAL(reader.mOutEventsTotal->GetValue(), 7ULL);
-    APSARA_TEST_TRUE_FATAL(HasMetricLabel(reader.mMetricLabels, METRIC_LABEL_KEY_K8S_POD_UID, "same_pod_uid"));
-}
-
-void LogFileReaderUnittest::TestContainerMetricLabelConstants() {
-    APSARA_TEST_EQUAL_FATAL(METRIC_LABEL_KEY_K8S_NAMESPACE, DEFAULT_LOG_TAG_NAMESPACE);
-    APSARA_TEST_EQUAL_FATAL(METRIC_LABEL_KEY_K8S_POD_NAME, DEFAULT_LOG_TAG_POD_NAME);
-    APSARA_TEST_EQUAL_FATAL(METRIC_LABEL_KEY_K8S_POD_UID, DEFAULT_LOG_TAG_POD_UID);
-    APSARA_TEST_EQUAL_FATAL(METRIC_LABEL_KEY_CONTAINER_NAME, DEFAULT_LOG_TAG_CONTAINER_NAME);
-    APSARA_TEST_EQUAL_FATAL(METRIC_LABEL_KEY_CONTAINER_IP, DEFAULT_LOG_TAG_CONTAINER_IP);
-    APSARA_TEST_EQUAL_FATAL(METRIC_LABEL_KEY_CONTAINER_IMAGE_NAME, DEFAULT_LOG_TAG_IMAGE_NAME);
+    APSARA_TEST_TRUE_FATAL(HasMetricLabel(reader.mMetricLabels, DEFAULT_LOG_TAG_POD_UID, "same_pod_uid"));
 }
 
 class LogMultiBytesUnittest : public ::testing::Test {

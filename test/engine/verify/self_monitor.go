@@ -71,6 +71,7 @@ func SelfMonitorPluginSourceLabelsMatchKV(ctx context.Context, expectKeyValuesSt
 			return matchPluginSourceLabels(metrics, kvRegexps)
 		},
 		retry.Context(timeoutCtx),
+		retry.Attempts(0),
 		retry.Delay(5*time.Second),
 		retry.DelayType(retry.FixedDelay),
 	)
@@ -92,6 +93,7 @@ func SelfMonitorPluginSourceLabelsOmitContainerKeys(ctx context.Context) (contex
 			return pluginSourceLabelsOmitKeys(metrics, containerPluginSourceLabelKeys)
 		},
 		retry.Context(timeoutCtx),
+		retry.Attempts(0),
 		retry.Delay(5*time.Second),
 		retry.DelayType(retry.FixedDelay),
 	)
@@ -131,7 +133,11 @@ func readSelfMonitorMetrics(category string) ([]selfMonitorMetricLine, error) {
 		return nil, err
 	}
 	if len(metrics) == 0 {
-		return nil, fmt.Errorf("no %s metrics in %s", category, config.SelfMonitorFile)
+		size := int64(0)
+		if info, statErr := os.Stat(config.SelfMonitorFile); statErr == nil {
+			size = info.Size()
+		}
+		return nil, fmt.Errorf("no %s metrics in %s (size=%d)", category, config.SelfMonitorFile, size)
 	}
 	return metrics, nil
 }

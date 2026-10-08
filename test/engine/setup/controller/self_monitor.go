@@ -81,7 +81,8 @@ func hasInputInternalMetricsConfig(dir string) bool {
 		if name == e2eSelfMonitorConfigName {
 			continue
 		}
-		content, err := os.ReadFile(filepath.Join(dir, name))
+		// Names come from ReadDir of the test config directory, not external input.
+		content, err := os.ReadFile(filepath.Join(dir, name)) //nolint:gosec
 		if err != nil {
 			continue
 		}
