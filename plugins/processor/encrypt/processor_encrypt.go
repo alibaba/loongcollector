@@ -28,6 +28,7 @@ import (
 	"strings"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
@@ -115,6 +116,36 @@ func (p *ProcessorEncrypt) processLog(log *protocol.Log) {
 			logger.Warningf(p.context.GetRuntimeContext(), defaultAlarmType, "encrypt field %v error: %v", cont.Key, err)
 			if !p.KeepSourceValueIfError {
 				cont.Value = encryptErrorText
+			}
+		}
+	}
+}
+
+// Process implements the v2 ProcessorV2 interface: it encrypts the configured
+// SourceKeys of each Log event with AES CBC; Metric/Span events pass through
+// unchanged. When the key failed to load, all events pass through untouched
+// (mirroring the v1 guard), never leaking plaintext silently.
+func (p *ProcessorEncrypt) Process(in *models.PipelineGroupEvents, context pipeline.PipelineContext) {
+	if p.key == nil {
+		pipeline.CollectGroupEvents(context, in)
+		return
+	}
+	pipeline.ProcessLogEventsOnly(in, context, p.processLogEvent)
+}
+
+func (p *ProcessorEncrypt) processLogEvent(log *models.Log) {
+	contents := log.GetIndices()
+	for _, key := range p.SourceKeys {
+		if !contents.Contains(key) {
+			continue
+		}
+		ciphertext, err := p.encrypt(pipeline.GetStringValue(contents.Get(key)))
+		if err == nil {
+			contents.Add(key, hex.EncodeToString(ciphertext))
+		} else {
+			logger.Warningf(p.context.GetRuntimeContext(), defaultAlarmType, "encrypt field %v error: %v", key, err)
+			if !p.KeepSourceValueIfError {
+				contents.Add(key, encryptErrorText)
 			}
 		}
 	}

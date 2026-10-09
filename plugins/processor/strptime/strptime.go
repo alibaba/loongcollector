@@ -23,6 +23,7 @@ import (
 	"github.com/knz/strtime"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
@@ -191,5 +192,65 @@ func newStrptime() *Strptime {
 func init() {
 	pipeline.Processors[pluginType] = func() pipeline.Processor {
 		return newStrptime()
+	}
+}
+
+// Process implements the v2 ProcessorV2 interface: it parses the SourceKey value
+// of each Log event and overwrites the log timestamp; Metric/Span events pass
+// through unchanged.
+func (s *Strptime) Process(in *models.PipelineGroupEvents, context pipeline.PipelineContext) {
+	pipeline.ProcessLogEventsOnly(in, context, s.processLogEvent)
+}
+
+// processLogEvent reproduces processLog on the v2 models.Log data model.
+func (s *Strptime) processLogEvent(log *models.Log) {
+	contents := log.GetIndices()
+	logTime := time.Time{}
+	if contents.Contains(s.SourceKey) {
+		rawValue := pipeline.GetStringValue(contents.Get(s.SourceKey))
+		value := rawValue
+		// Truncate if format is Unix timestamp.
+		if s.Format == "%s" {
+			value = value[0:10]
+		}
+
+		var err error
+		logTime, err = strtime.Strptime(value, s.Format)
+		if err != nil || (logTime == time.Time{}) {
+			if s.AlarmIfFail {
+				logger.Warningf(s.context.GetRuntimeContext(), selfmonitor.StrptimeParseAlarm, "strptime(%v, %v) failed: %v, %v",
+					rawValue, s.Format, logTime, err)
+			}
+		} else {
+			if s.location != nil {
+				logTime = logTime.In(s.location).Add(time.Second * time.Duration(-s.UTCOffset))
+			}
+
+			// models.Log.Timestamp is in nanoseconds (see plugin_runner_v2 conversion:
+			// uint64(time.Second * time.Duration(in.Time)) [+ TimeNs]). Reproduce the v1
+			// SetLogTime/SetLogTimeWithNano behavior on that unit.
+			if s.context.GetPipelineScopeConfig().EnableTimestampNanosecond {
+				log.Timestamp = uint64(logTime.Unix())*uint64(time.Second) + uint64(logTime.Nanosecond())
+			} else {
+				log.Timestamp = uint64(logTime.Unix()) * uint64(time.Second)
+			}
+			if !s.KeepSource {
+				contents.Delete(s.SourceKey)
+			}
+		}
+	}
+	if (s.EnablePreciseTimestamp && logTime != time.Time{}) {
+		var timestamp string
+		switch s.PreciseTimestampUnit {
+		case "", timeStampMilliSecond:
+			timestamp = strconv.FormatInt(logTime.UnixNano()/1e6, 10)
+		case timeStampMicroSecond:
+			timestamp = strconv.FormatInt(logTime.UnixNano()/1e3, 10)
+		case timeStampNanoSecond:
+			timestamp = strconv.FormatInt(logTime.UnixNano(), 10)
+		default:
+			timestamp = strconv.FormatInt(logTime.UnixNano()/1e6, 10)
+		}
+		contents.Add(s.PreciseTimestampKey, timestamp)
 	}
 }
