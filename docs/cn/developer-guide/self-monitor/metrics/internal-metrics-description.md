@@ -179,6 +179,13 @@ Runner 是 LoongCollector 内部的独立线程的单例，通常是一整个功
 | file_dev | 被采集的文件设备号 | 仅限文件采集 |
 | file_inode | 被采集的文件inode号 | 仅限文件采集 |
 | file_name | 被采集的文件路径 | 仅限文件采集 |
+| `_namespace_` | Kubernetes namespace | 仅限容器发现；名称随 FileTagOptions 与日志 tag 一致 |
+| `_pod_name_` | Kubernetes Pod 名 | 仅限容器发现；名称随 FileTagOptions 与日志 tag 一致 |
+| `_pod_uid_` | Kubernetes Pod UID | 仅限容器发现；名称随 FileTagOptions 与日志 tag 一致 |
+| `_container_name_` | 容器名 | 仅限容器发现；名称随 FileTagOptions 与日志 tag 一致 |
+| `_container_ip_` | 容器 IP | 仅限容器发现；名称随 FileTagOptions 与日志 tag 一致 |
+| `_image_name_` | 容器镜像名 | 仅限容器发现；名称随 FileTagOptions 与日志 tag 一致 |
+| ExternalK8sLabelTag / ExternalEnvTag 映射名 | 配置映射出的自定义 tag | 仅配置了对应映射时出现，名称与日志一致 |
 
 常见Metric Key：
 

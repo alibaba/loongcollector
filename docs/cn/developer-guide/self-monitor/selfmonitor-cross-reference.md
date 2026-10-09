@@ -63,6 +63,8 @@
 | `METRIC_LABEL_KEY_FILE_INODE` | — | `file_inode` | 采集文件的 inode 号 |
 | `METRIC_LABEL_KEY_FILE_NAME` | — | `file_name` | 采集文件名 |
 
+容器和 K8s 标签不另建 `METRIC_LABEL_KEY_*`。运行时 key 就是日志 tag 名，默认值为 `DEFAULT_LOG_TAG_*`（`_namespace_`、`_pod_name_`、`_pod_uid_`、`_container_name_`、`_container_ip_`、`_image_name_`），由 `FileTagOptions::GetFileTagKeyName` 决定。`ExternalK8sLabelTag` / `ExternalEnvTag` 映射出的 tag 同样直接使用日志 tag 名。
+
 ### 2.5 Prometheus 标签
 
 | C++ 常量 | Go 常量 | 字符串值 | 含义 |

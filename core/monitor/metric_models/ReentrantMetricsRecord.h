@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 #pragma once
+#include <functional>
 #include <mutex>
 #include <unordered_map>
 
@@ -30,10 +31,13 @@ private:
     std::unordered_map<std::string, DoubleGaugePtr> mDoubleGauges;
 
 public:
+    using PrepareFn = std::function<void(ReentrantMetricsRecord&)>;
+
     void Init(const std::string& category,
               MetricLabels& labels,
               DynamicMetricLabels& dynamicLabels,
-              std::unordered_map<std::string, MetricType>& metricKeys);
+              std::unordered_map<std::string, MetricType>& metricKeys,
+              const PrepareFn& beforeCommit = {});
     const MetricLabelsPtr& GetLabels() const;
     const DynamicMetricLabelsPtr& GetDynamicLabels() const;
     CounterPtr GetCounter(const std::string& name);
@@ -54,7 +58,9 @@ public:
           mDefaultCategory(category) {}
 
     ReentrantMetricsRecordRef GetOrCreateReentrantMetricsRecordRef(MetricLabels labels,
-                                                                   DynamicMetricLabels dynamicLabels = {});
+                                                                   DynamicMetricLabels dynamicLabels = {},
+                                                                   const ReentrantMetricsRecord::PrepareFn& beforeCommit
+                                                                   = {});
     void ReleaseReentrantMetricsRecordRef(MetricLabels labels);
 
     void RegisterSizeGauge(IntGaugePtr ptr) { mSizeGauge = ptr; }

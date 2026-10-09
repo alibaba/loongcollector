@@ -40,6 +40,8 @@ const string& METRIC_PLUGIN_TOTAL_PROCESS_TIME_MS = METRIC_TOTAL_PROCESS_TIME_MS
 const string METRIC_LABEL_KEY_FILE_DEV = "file_dev";
 const string METRIC_LABEL_KEY_FILE_INODE = "file_inode";
 const string METRIC_LABEL_KEY_FILE_NAME = "file_name";
+// Container and K8s labels reuse the log tag name from FileTagOptions.
+// There is no parallel METRIC_LABEL_KEY_* for those tags.
 
 const string METRIC_PLUGIN_MONITOR_FILE_TOTAL = "monitor_file_total";
 const string METRIC_PLUGIN_SOURCE_READ_OFFSET_BYTES = "read_offset_bytes";

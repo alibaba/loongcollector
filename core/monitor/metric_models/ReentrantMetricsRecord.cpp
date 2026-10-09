@@ -21,7 +21,8 @@ namespace logtail {
 void ReentrantMetricsRecord::Init(const std::string& category,
                                   MetricLabels& labels,
                                   DynamicMetricLabels& dynamicLabels,
-                                  std::unordered_map<std::string, MetricType>& metricKeys) {
+                                  std::unordered_map<std::string, MetricType>& metricKeys,
+                                  const PrepareFn& beforeCommit) {
     WriteMetrics::GetInstance()->CreateMetricsRecordRef(
         mMetricsRecordRef, category, std::move(labels), std::move(dynamicLabels));
     for (auto metric : metricKeys) {
@@ -41,6 +42,9 @@ void ReentrantMetricsRecord::Init(const std::string& category,
             default:
                 break;
         }
+    }
+    if (beforeCommit) {
+        beforeCommit(*this);
     }
     WriteMetrics::GetInstance()->CommitMetricsRecordRef(mMetricsRecordRef);
 }
@@ -85,8 +89,8 @@ DoubleGaugePtr ReentrantMetricsRecord::GetDoubleGauge(const std::string& name) {
     return nullptr;
 }
 
-ReentrantMetricsRecordRef PluginMetricManager::GetOrCreateReentrantMetricsRecordRef(MetricLabels labels,
-                                                                                    DynamicMetricLabels dynamicLabels) {
+ReentrantMetricsRecordRef PluginMetricManager::GetOrCreateReentrantMetricsRecordRef(
+    MetricLabels labels, DynamicMetricLabels dynamicLabels, const ReentrantMetricsRecord::PrepareFn& beforeCommit) {
     std::lock_guard<std::mutex> lock(mutex);
 
     std::string key = GenerateKey(labels);
@@ -100,7 +104,7 @@ ReentrantMetricsRecordRef PluginMetricManager::GetOrCreateReentrantMetricsRecord
     newLabels.insert(newLabels.end(), labels.begin(), labels.end());
 
     ReentrantMetricsRecordRef ptr = std::make_shared<ReentrantMetricsRecord>();
-    ptr->Init(mDefaultCategory, newLabels, dynamicLabels, mMetricKeys);
+    ptr->Init(mDefaultCategory, newLabels, dynamicLabels, mMetricKeys, beforeCommit);
 
     mReentrantMetricsRecordRefsMap.emplace(key, ptr);
     SET_GAUGE(mSizeGauge, mReentrantMetricsRecordRefsMap.size());

@@ -103,7 +103,10 @@ public:
     void RemovePluginMetricManager(const std::string& name);
 
     // for reader, event_handler ...
-    ReentrantMetricsRecordRef GetOrCreateReentrantMetricsRecordRef(const std::string& name, MetricLabels& labels);
+    ReentrantMetricsRecordRef GetOrCreateReentrantMetricsRecordRef(const std::string& name,
+                                                                   MetricLabels& labels,
+                                                                   const ReentrantMetricsRecord::PrepareFn& beforeCommit
+                                                                   = {});
     void ReleaseReentrantMetricsRecordRef(const std::string& name, MetricLabels& labels);
     MetricsRecordRef& GetMetricsRecordRef() { return mMetricsRecordRef; }
 

@@ -43,3 +43,12 @@ Feature: input container stdio
     _time_: ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?([zZ]|([\+-])([01]\d|2[0-3]):?([0-5]\d)?)?$
     _source_: "^(stdout|stderr)$"
     """
+    Then the self-monitor plugin_source labels match kv
+    """
+    file_name: ".+"
+    file_dev: "^[0-9]+$"
+    file_inode: "^[0-9]+$"
+    _image_name_: ".*[-_]container:latest$"
+    _container_name_: ".*[-_]container[-_]1$"
+    _container_ip_: ^\b(?:(?:2(?:[0-4][0-9]|5[0-5])|[0-1]?[0-9]?[0-9])\.){3}(?:(?:2([0-4][0-9]|5[0-5])|[0-1]?[0-9]?[0-9]))\b$
+    """
