@@ -18,15 +18,15 @@
 
 #include <string>
 
-#include "agentsight.h"
 #include "ebpf/include/export.h"
+#include "ebpf/plugin/agentsight/AgentSightV2Compat.h"
 #include "ebpf/type/CommonDataEvent.h"
 
 namespace logtail::ebpf {
 
 class AgentsightLlmRecord : public CommonEvent {
 public:
-    AgentsightLlmRecord(std::string pipelineConfigName, const AgentsightLLMData& d);
+    AgentsightLlmRecord(std::string pipelineConfigName, const AgentsightLLMData& d, const char* bindingId = nullptr);
 
     PluginType GetPluginType() const override { return PluginType::AGENTSIGHT_OBSERVE; }
 
@@ -53,6 +53,8 @@ public:
     // process has already exited. Maps to AgentsightLLMData.cmdline (char[128]).
     std::string mCmdline;
     std::string mAgentType;
+    /// Enforcer binding UUID shared with correlated security events; empty on older libraries.
+    std::string mBindingId;
     // Container id resolved from the pid on the agentsight side; empty when the process is
     // not in a container (or resolution failed). Maps to AgentsightLLMData.container_id.
     std::string mContainerId;
@@ -130,6 +132,23 @@ public:
     // response header names are a short, known set. See EmitHttpResponseHeaders.
     std::string mResponseHeaders;
     std::string mResponseBody;
+};
+
+class AgentsightSecurityRecord : public CommonEvent {
+public:
+    AgentsightSecurityRecord(std::string pipelineConfigName,
+                             uint64_t timestampNs,
+                             uint16_t schemaVersion,
+                             std::string payloadJson);
+
+    PluginType GetPluginType() const override { return PluginType::AGENTSIGHT_OBSERVE; }
+
+    const std::string& GetPipelineConfigName() const { return mPipelineConfigName; }
+
+    std::string mPipelineConfigName;
+    uint64_t mTimestampNs = 0;
+    uint16_t mSchemaVersion = 0;
+    std::string mPayloadJson;
 };
 
 } // namespace logtail::ebpf

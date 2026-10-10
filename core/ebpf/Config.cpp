@@ -691,6 +691,8 @@ bool SecurityOptions::Init(SecurityProbeType probeType,
         mAgentsightEventStreamFormat = true;
         mAgentsightMessageDeltaOnly = true;
         mAgentsightRawHttpsFallback = false;
+        mAgentsightSecurityAuditEnabled = false;
+        mAgentsightEnforcerSocket = "/run/agentsight/enforcer.sock";
     }
 
     SecurityOption thisSecurityOption;
@@ -755,6 +757,30 @@ bool SecurityOptions::Init(SecurityProbeType probeType,
                 if (innerConfig.isMember("RawHttpsFallback")) {
                     if (!GetOptionalBoolParam(innerConfig, "RawHttpsFallback", mAgentsightRawHttpsFallback, errorMsg)) {
                         warnOptionalParse();
+                    }
+                }
+                if (innerConfig.isMember("SecurityAudit")) {
+                    const auto& securityAudit = innerConfig["SecurityAudit"];
+                    if (!securityAudit.isObject()) {
+                        errorMsg = "ProbeConfig.SecurityAudit must be an object";
+                        warnOptionalParse();
+                        return false;
+                    }
+                    if (securityAudit.isMember("Enabled")
+                        && !GetOptionalBoolParam(securityAudit, "Enabled", mAgentsightSecurityAuditEnabled, errorMsg)) {
+                        warnOptionalParse();
+                        return false;
+                    }
+                    if (securityAudit.isMember("EnforcerSocket")
+                        && !GetOptionalStringParam(
+                            securityAudit, "EnforcerSocket", mAgentsightEnforcerSocket, errorMsg)) {
+                        warnOptionalParse();
+                        return false;
+                    }
+                    if (mAgentsightEnforcerSocket.empty()) {
+                        errorMsg = "ProbeConfig.SecurityAudit.EnforcerSocket must not be empty";
+                        warnOptionalParse();
+                        return false;
                     }
                 }
                 return true;
