@@ -424,7 +424,6 @@ void FillAgentsightCommonCorrelation(const AgentsightLlmRecord& rec,
     setStr(StringView("cmdline"), rec.mCmdline);
     setStr(StringView("container.id"), rec.mContainerId);
     setStr(StringView("gen_ai.agent.type"), rec.mAgentType);
-    setStr(StringView("agentsight.binding.id"), rec.mBindingId);
 }
 
 void FillAgentsightServerFromUrl(const AgentsightLlmRecord& rec, SetLogStrFn setStr) {
@@ -1108,9 +1107,7 @@ void AgentsightManager::OnLlmCallback(const AgentsightLLMData* data, void* user_
     auto* self = static_cast<AgentsightManager*>(user_data);
     // Do not lock mLibMutex here: runs inside handle_read → DrainReadsLocked while OnEpollReadable holds mLibMutex.
     const std::string configName = self->mConfigName;
-    const auto* sym = self->mEBPFAdapter->GetAgentSightSymbols();
-    const char* bindingId = sym && sym->llm_binding_id ? sym->llm_binding_id(data) : nullptr;
-    auto evt = std::make_shared<AgentsightLlmRecord>(configName, *data, bindingId);
+    auto evt = std::make_shared<AgentsightLlmRecord>(configName, *data);
     if (self->mCommonEventQueue.try_enqueue(evt)) {
         ADD_COUNTER(self->mGenAiMetrics.inEventsTotal, 1);
     } else {
