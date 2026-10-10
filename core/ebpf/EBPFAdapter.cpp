@@ -274,6 +274,8 @@ bool EBPFAdapter::tryLoadAgentSightDylib() {
         = reinterpret_cast<decltype(sym.config_add_https)>(tmpLib->LoadMethod("agentsight_config_add_https", symErr));
     sym.config_add_http
         = reinterpret_cast<decltype(sym.config_add_http)>(tmpLib->LoadMethod("agentsight_config_add_http", symErr));
+    sym.llm_binding_id
+        = reinterpret_cast<decltype(sym.llm_binding_id)>(tmpLib->LoadMethod("agentsight_llm_binding_id", optSymErr));
     sym.handle_new = reinterpret_cast<decltype(sym.handle_new)>(tmpLib->LoadMethod("agentsight_new", symErr));
     sym.handle_free = reinterpret_cast<decltype(sym.handle_free)>(tmpLib->LoadMethod("agentsight_free", symErr));
     sym.handle_start = reinterpret_cast<decltype(sym.handle_start)>(tmpLib->LoadMethod("agentsight_start", symErr));
@@ -301,7 +303,8 @@ bool EBPFAdapter::tryLoadAgentSightDylib() {
                  "raw_https_api", sym.config_set_enable_raw_https != nullptr)("procfs_root_api",
                                                                               sym.config_set_procfs_root != nullptr)(
                  "security_audit_api",
-                 sym.config_set_enable_security_audit && sym.config_set_enforcer_socket && sym.handle_read_v2));
+                 sym.config_set_enable_security_audit && sym.config_set_enforcer_socket
+                     && sym.handle_read_v2)("llm_binding_api", sym.llm_binding_id != nullptr));
     if (!sym.config_set_enable_security_audit || !sym.config_set_enforcer_socket || !sym.handle_read_v2) {
         LOG_WARNING(
             sLogger,

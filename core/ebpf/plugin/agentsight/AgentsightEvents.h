@@ -26,7 +26,7 @@ namespace logtail::ebpf {
 
 class AgentsightLlmRecord : public CommonEvent {
 public:
-    AgentsightLlmRecord(std::string pipelineConfigName, const AgentsightLLMData& d);
+    AgentsightLlmRecord(std::string pipelineConfigName, const AgentsightLLMData& d, const char* bindingId = nullptr);
 
     PluginType GetPluginType() const override { return PluginType::AGENTSIGHT_OBSERVE; }
 
@@ -53,6 +53,8 @@ public:
     // process has already exited. Maps to AgentsightLLMData.cmdline (char[128]).
     std::string mCmdline;
     std::string mAgentType;
+    /// Enforcer binding UUID shared with correlated security events; empty on older libraries.
+    std::string mBindingId;
     // Container id resolved from the pid on the agentsight side; empty when the process is
     // not in a container (or resolution failed). Maps to AgentsightLLMData.container_id.
     std::string mContainerId;

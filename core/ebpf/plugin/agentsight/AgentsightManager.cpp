@@ -19,6 +19,7 @@
 #include <algorithm>
 #include <array>
 #include <functional>
+#include <limits>
 #include <utility>
 #include <vector>
 
@@ -233,6 +234,18 @@ void EmitHttpBody(logtail::LogEvent* log, const std::string& prefix, const std::
     log->SetContent(prefix + ".content", body);
 }
 
+bool TryGetProcessId(const Json::Value& value, uint32_t& processId) {
+    if (!value.isUInt64()) {
+        return false;
+    }
+    const auto raw = value.asUInt64();
+    if (raw > std::numeric_limits<uint32_t>::max()) {
+        return false;
+    }
+    processId = static_cast<uint32_t>(raw);
+    return true;
+}
+
 /// Builtin cmdline allow rules used when the user does not configure any whitelist/blacklist.
 /// `agent_type` values follow the LoongSuite naming convention (lowercase + hyphen) and are
 /// kept in sync with the recommended template in
@@ -419,11 +432,13 @@ void FillAgentsightCommonCorrelation(const AgentsightLlmRecord& rec,
     setStr(StringView("gen_ai.turn.id"), rec.mConversationId);
     if (rec.mPid != 0) {
         log->SetContent("pid", std::to_string(rec.mPid));
+        log->SetContent("process.pid", std::to_string(rec.mPid));
     }
     setStr(StringView("comm"), rec.mProcessName);
     setStr(StringView("cmdline"), rec.mCmdline);
     setStr(StringView("container.id"), rec.mContainerId);
     setStr(StringView("gen_ai.agent.type"), rec.mAgentType);
+    setStr(StringView("agentsight.binding.id"), rec.mBindingId);
 }
 
 void FillAgentsightServerFromUrl(const AgentsightLlmRecord& rec, SetLogStrFn setStr) {
@@ -473,6 +488,7 @@ void FillAgentsightCombinedLlmLog(const AgentsightLlmRecord& rec,
     SetLogTimestampFromNs(log, rec.mTimestampNs);
     FillAgentsightOtlpTimeFields(log, rec.mTimestampNs);
     FillAgentsightCommonCorrelation(rec, setStr, log);
+    setStr(StringView("gen_ai.tool.call.id"), ExtractUniqueToolCallId(rec.mResponseMessagesJson));
     setStr(StringView("gen_ai.response.id"), rec.mResponseId);
 
     log->SetContent("gen_ai.response.duration", std::to_string(rec.mDurationNs / 1000000ULL));
@@ -540,6 +556,7 @@ void FillAgentsightModelResponseLog(const AgentsightLlmRecord& rec,
     log->SetContent(StringView("event.name"), StringView("gen_ai.model.response"));
     FillAgentsightCommonCorrelation(rec, setStr, log, eventId);
     setStr(StringView("gen_ai.response.id"), rec.mResponseId);
+    setStr(StringView("gen_ai.tool.call.id"), ExtractUniqueToolCallId(rec.mResponseMessagesJson));
     setStr(StringView("gen_ai.step.id"), payload.stepId);
     if (payload.eventSequenceResponse > 0) {
         log->SetContent("gen_ai.event.sequence", std::to_string(payload.eventSequenceResponse));
@@ -1019,6 +1036,9 @@ bool AgentsightManager::RestartAgentSightLocked(const SecurityOptions& opts) {
             sym->config_set_enforcer_socket(cfg, opts.mAgentsightEnforcerSocket.c_str());
             mSecurityAuditEnabled = true;
         } else {
+            if (sym->config_set_enable_security_audit) {
+                sym->config_set_enable_security_audit(cfg, 0);
+            }
             LOG_WARNING(sLogger,
                         ("AgentSight security audit",
                          "requested but read_v2/configuration symbols are unavailable; continuing with LLM only"));
@@ -1107,7 +1127,9 @@ void AgentsightManager::OnLlmCallback(const AgentsightLLMData* data, void* user_
     auto* self = static_cast<AgentsightManager*>(user_data);
     // Do not lock mLibMutex here: runs inside handle_read → DrainReadsLocked while OnEpollReadable holds mLibMutex.
     const std::string configName = self->mConfigName;
-    auto evt = std::make_shared<AgentsightLlmRecord>(configName, *data);
+    const auto* sym = self->mEBPFAdapter->GetAgentSightSymbols();
+    const char* bindingId = sym && sym->llm_binding_id ? sym->llm_binding_id(data) : nullptr;
+    auto evt = std::make_shared<AgentsightLlmRecord>(configName, *data, bindingId);
     if (self->mCommonEventQueue.try_enqueue(evt)) {
         ADD_COUNTER(self->mGenAiMetrics.inEventsTotal, 1);
     } else {
@@ -1136,9 +1158,8 @@ void AgentsightManager::OnHttpsCallback(const AgentsightHttpsData* data, void* u
 }
 
 void AgentsightManager::OnEventCallback(const AgentsightEvent* data, void* user_data) {
-    static constexpr uint32_t kSecurityEventType = 3;
     static constexpr uint32_t kMaxSecurityPayloadBytes = 4U * 1024U * 1024U;
-    if (!data || !user_data || static_cast<uint32_t>(data->event_type) != kSecurityEventType) {
+    if (!data || !user_data || data->event_type != AGENTSIGHT_EVENT_TYPE_SECURITY) {
         return;
     }
     auto* self = static_cast<AgentsightManager*>(user_data);
@@ -1585,9 +1606,26 @@ int AgentsightManager::HandleSecurityEvent(const AgentsightSecurityRecord& rec) 
             }
             if (identity["conversation_id"].isString()) {
                 log->SetContent("gen_ai.turn.id", identity["conversation_id"].asString());
+                log->SetContent("gen_ai.conversation.id", identity["conversation_id"].asString());
             }
-            if (identity["pid"].isInt()) {
-                log->SetContent("process.pid", std::to_string(identity["pid"].asInt()));
+            if (identity["tool_call_id"].isString()) {
+                log->SetContent("gen_ai.tool.call.id", identity["tool_call_id"].asString());
+            }
+            uint32_t processId = 0;
+            if (TryGetProcessId(identity["pid"], processId)) {
+                log->SetContent("process.pid", std::to_string(processId));
+            }
+            if (identity["process_start_time"].isUInt64()) {
+                log->SetContent("process.start_time", std::to_string(identity["process_start_time"].asUInt64()));
+            }
+            if (TryGetProcessId(identity["ppid"], processId)) {
+                log->SetContent("process.parent.pid", std::to_string(processId));
+            }
+            if (identity["cgroup_id"].isUInt64()) {
+                log->SetContent("container.cgroup.id", std::to_string(identity["cgroup_id"].asUInt64()));
+            }
+            if (identity["binding_id"].isString()) {
+                log->SetContent("agentsight.binding.id", identity["binding_id"].asString());
             }
             FlattenSecurityJson(identity, "agentsight.identity", log);
         }

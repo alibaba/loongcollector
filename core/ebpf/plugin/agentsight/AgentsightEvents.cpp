@@ -46,7 +46,9 @@ static std::string CopyCmdline(const char cmdline[128]) {
     return std::string(cmdline, strnlen(cmdline, 128U));
 }
 
-AgentsightLlmRecord::AgentsightLlmRecord(std::string pipelineConfigName, const AgentsightLLMData& d)
+AgentsightLlmRecord::AgentsightLlmRecord(std::string pipelineConfigName,
+                                         const AgentsightLLMData& d,
+                                         const char* bindingId)
     : CommonEvent(KernelEventType::AGENTSIGHT_LLM_RECORD), mPipelineConfigName(std::move(pipelineConfigName)) {
     mSessionId = CopyCStr(d.session_id);
     mConversationId = CopyCStr(d.conversation_id);
@@ -65,6 +67,7 @@ AgentsightLlmRecord::AgentsightLlmRecord(std::string pipelineConfigName, const A
     mProcessName = CopyProcessName(d.process_name);
     mCmdline = CopyCmdline(d.cmdline);
     mAgentType = CopyCStr(d.agent_name);
+    mBindingId = CopyCStr(bindingId);
     mContainerId = CopyCStr(d.container_id);
     mRequestUrl = CopyCStr(d.request_url);
     mProvider = CopyCStr(d.provider);
