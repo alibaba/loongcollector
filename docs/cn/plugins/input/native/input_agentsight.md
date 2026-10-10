@@ -35,6 +35,9 @@ dev
 |  ProbeConfig.EventStreamFormat  |  bool  |  否  |  `true`  |  为 `true` 时，每次 LLM 调用在同一 `PipelineEventGroup` 内输出两条日志（各有 `event.id`）：`event.name=gen_ai.model.request`（请求开始时间戳）与 `gen_ai.model.response`（请求结束时间戳）。为 `false` 时输出单条合并日志，**无** `event.name` / `event.id`。  |
 |  ProbeConfig.MessageDeltaOnly  |  bool  |  否  |  `true`  |  为 `true` 时**不**输出全量 `gen_ai.input.messages`；仍输出 `gen_ai.input.messages_delta`、`gen_ai.system_instructions_hash` / `gen_ai.tool.definitions_hash`（非空时），以及 hash 相对上一轮变化时的 `gen_ai.system_instructions` / `gen_ai.tool.definitions`。为 `false` 时**每次**输出非空的全量 `gen_ai.input.messages`。**不影响** `gen_ai.output.messages`；`messages_delta` 及 session 状态维护**不受**本开关影响。  |
 |  ProbeConfig.RawHttpsFallback  |  bool  |  否  |  `false`  |  为 `true` 时，**无法解析为 LLM 语义**的流量（未知 API path、非标准 body）不再被丢弃，而是以原始 HTTP 形式上报（`event.name=http.request` / `http.response`，见下文）。需要 `libagentsight >= 0.9.0`；旧版动态库上该开关无效（日志告警后自动降级为关闭）。**默认关闭**：原始 body 未做任何脱敏。  |
+|  ProbeConfig.SecurityAudit  |  object  |  否  |  /  |  AgentSight 系统安全审计采集配置。使用同一个 AgentSight handle、eventfd 和 `input_agentsight` 输出链路，不创建独立 input。  |
+|  ProbeConfig.SecurityAudit.Enabled  |  bool  |  否  |  `false`  |  是否订阅 AgentSight enforcer 归一化后的文件、网络、污点传播、策略判定和执行状态事件。  |
+|  ProbeConfig.SecurityAudit.EnforcerSocket  |  string  |  否  |  `/run/agentsight/enforcer.sock`  |  AgentSight enforcer 本地 Unix socket。开启审计后 enforcer 暂时不可用不会中断 LLM 采集，订阅线程会持续重连。  |
 
 ### 容器元信息标签（自动附加）
 
@@ -173,6 +176,25 @@ dev
 - **不开 `RawHttpsFallback`** —— LLM 调用本身走 `gen_ai.*`，raw 主要捞的是非 LLM 噪音
 
 在多用户共享的机器上尤其要注意：`Https` 里的域名一旦被别人的进程访问，那个进程也会被 attach，其全部流量随之落盘。
+
+### 系统安全审计事件
+
+安全审计显式开启后，`input_agentsight` 除 LLM 日志外还会输出 `event.name=agentsight.security.<event_type>` 的单条日志。事件保留完整 JSON 于 `event.original`，并提取以下公共字段便于检索：
+
+- `event.id`、`event.type`、`time_unix_nano`、`observed_time_unix_nano`
+- `agent.id`、`gen_ai.agent.type`、`gen_ai.session.id`、`gen_ai.turn.id`、`process.pid`
+- 事件载荷中的标量字段以 `security.*` 前缀展开，例如 `security.policy_id`、`security.mode`、`security.risk_score`
+
+```yaml
+inputs:
+  - Type: input_agentsight
+    ProbeConfig:
+      SecurityAudit:
+        Enabled: true
+        EnforcerSocket: /run/agentsight/enforcer.sock
+```
+
+该能力只负责采集 enforcer 已生成的安全事实；策略下发、阻断和案件编排不由 LoongCollector 执行。若运行时 AgentSight 动态库尚未提供 `read_v2` 安全审计 ABI，插件会告警并自动退化为原有 LLM 采集。
 
 ### `AgentType` 取值命名规范
 

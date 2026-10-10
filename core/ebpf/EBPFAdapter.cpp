@@ -257,14 +257,17 @@ bool EBPFAdapter::tryLoadAgentSightDylib() {
         tmpLib->LoadMethod("agentsight_config_set_verbose", symErr));
     sym.config_set_log_path = reinterpret_cast<decltype(sym.config_set_log_path)>(
         tmpLib->LoadMethod("agentsight_config_set_log_path", symErr));
-    // Optional symbol (libagentsight >= 0.9.0). Resolved with its own error string so a miss on an
-    // older library never leaks into the required-symbol diagnostic below, and deliberately kept out
-    // of the `ok` check so older libraries keep working with raw HTTPS fallback simply unavailable.
+    // Resolve optional APIs with their own error string so a miss on an older library never leaks into
+    // required-symbol diagnostics. They stay out of the `ok` check and callers null-check before use.
     std::string optSymErr;
     sym.config_set_enable_raw_https = reinterpret_cast<decltype(sym.config_set_enable_raw_https)>(
         tmpLib->LoadMethod("agentsight_config_set_enable_raw_https", optSymErr));
     sym.config_set_procfs_root = reinterpret_cast<decltype(sym.config_set_procfs_root)>(
         tmpLib->LoadMethod("agentsight_config_set_procfs_root", optSymErr));
+    sym.config_set_enable_security_audit = reinterpret_cast<decltype(sym.config_set_enable_security_audit)>(
+        tmpLib->LoadMethod("agentsight_config_set_enable_security_audit", optSymErr));
+    sym.config_set_enforcer_socket = reinterpret_cast<decltype(sym.config_set_enforcer_socket)>(
+        tmpLib->LoadMethod("agentsight_config_set_enforcer_socket", optSymErr));
     sym.config_add_cmdline_rule = reinterpret_cast<decltype(sym.config_add_cmdline_rule)>(
         tmpLib->LoadMethod("agentsight_config_add_cmdline_rule", symErr));
     sym.config_add_https
@@ -278,6 +281,8 @@ bool EBPFAdapter::tryLoadAgentSightDylib() {
     sym.handle_get_eventfd
         = reinterpret_cast<decltype(sym.handle_get_eventfd)>(tmpLib->LoadMethod("agentsight_get_eventfd", symErr));
     sym.handle_read = reinterpret_cast<decltype(sym.handle_read)>(tmpLib->LoadMethod("agentsight_read", symErr));
+    sym.handle_read_v2
+        = reinterpret_cast<decltype(sym.handle_read_v2)>(tmpLib->LoadMethod("agentsight_read_v2", optSymErr));
 
     const bool ok = sym.last_error && sym.config_new && sym.config_free && sym.config_set_verbose
         && sym.config_set_log_path && sym.handle_new && sym.handle_free && sym.handle_start && sym.handle_stop
@@ -294,7 +299,14 @@ bool EBPFAdapter::tryLoadAgentSightDylib() {
     LOG_INFO(sLogger,
              ("[EBPFAdapter] AgentSight symbols loaded", STRING_FLAG(ebpf_agentsight_dylib_base_name))(
                  "raw_https_api", sym.config_set_enable_raw_https != nullptr)("procfs_root_api",
-                                                                              sym.config_set_procfs_root != nullptr));
+                                                                              sym.config_set_procfs_root != nullptr)(
+                 "security_audit_api",
+                 sym.config_set_enable_security_audit && sym.config_set_enforcer_socket && sym.handle_read_v2));
+    if (!sym.config_set_enable_security_audit || !sym.config_set_enforcer_socket || !sym.handle_read_v2) {
+        LOG_WARNING(
+            sLogger,
+            ("[EBPFAdapter] AgentSight security audit API unavailable", "continuing with legacy LLM collection"));
+    }
     return true;
 }
 

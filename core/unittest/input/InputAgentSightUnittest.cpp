@@ -30,6 +30,10 @@ public:
     void TestInitWithProbeConfig();
     void TestInitWithHttpsAndHttp();
     void TestMetricKeysCoverManagerCounters();
+    void TestInitWithSecurityAudit();
+    void TestInitWithSecurityAuditDefaultSocket();
+    void TestRejectNonObjectSecurityAudit();
+    void TestRejectInvalidSecurityAuditFields();
 
 protected:
     void SetUp() override {
@@ -113,7 +117,9 @@ void InputAgentSightUnittest::TestMetricKeysCoverManagerCounters() {
     APSARA_TEST_TRUE(input.mPluginMetricPtr != nullptr);
 
     // Same label sets AgentsightManager::AddOrUpdateConfig builds, one per stream.
-    for (const auto& recordType : {METRIC_LABEL_VALUE_RECORD_TYPE_RAW_HTTP, METRIC_LABEL_VALUE_RECORD_TYPE_GEN_AI}) {
+    for (const auto& recordType : {METRIC_LABEL_VALUE_RECORD_TYPE_RAW_HTTP,
+                                   METRIC_LABEL_VALUE_RECORD_TYPE_GEN_AI,
+                                   METRIC_LABEL_VALUE_RECORD_TYPE_SECURITY}) {
         MetricLabels labels = {{METRIC_LABEL_KEY_EVENT_TYPE, METRIC_LABEL_VALUE_EVENT_TYPE_LOG},
                                {METRIC_LABEL_KEY_RECORD_TYPE, recordType}};
         auto ref = input.mPluginMetricPtr->GetOrCreateReentrantMetricsRecordRef(labels);
@@ -127,10 +133,82 @@ void InputAgentSightUnittest::TestMetricKeysCoverManagerCounters() {
     }
 }
 
+void InputAgentSightUnittest::TestInitWithSecurityAudit() {
+    std::string err;
+    Json::Value configJson;
+    Json::Value optionalGoPipeline;
+    APSARA_TEST_TRUE(ParseJsonTable(
+        R"({"Type":"input_agentsight","ProbeConfig":{"SecurityAudit":{"Enabled":true,"EnforcerSocket":"/tmp/enforcer.sock"}}})",
+        configJson,
+        err));
+    InputAgentSight input;
+    input.SetContext(mContex);
+    input.CreateMetricsRecordRef("t", "1");
+    APSARA_TEST_TRUE(input.Init(configJson, optionalGoPipeline));
+    input.CommitMetricsRecordRef();
+    APSARA_TEST_TRUE(input.mSecurityOptions.mAgentsightSecurityAuditEnabled);
+    APSARA_TEST_EQUAL("/tmp/enforcer.sock", input.mSecurityOptions.mAgentsightEnforcerSocket);
+}
+
+void InputAgentSightUnittest::TestInitWithSecurityAuditDefaultSocket() {
+    std::string err;
+    Json::Value configJson;
+    Json::Value optionalGoPipeline;
+    APSARA_TEST_TRUE(ParseJsonTable(
+        R"({"Type":"input_agentsight","ProbeConfig":{"SecurityAudit":{"Enabled":true}}})", configJson, err));
+    InputAgentSight input;
+    input.SetContext(mContex);
+    input.CreateMetricsRecordRef("t", "1");
+    APSARA_TEST_TRUE(input.Init(configJson, optionalGoPipeline));
+    input.CommitMetricsRecordRef();
+    APSARA_TEST_TRUE(input.mSecurityOptions.mAgentsightSecurityAuditEnabled);
+    APSARA_TEST_EQUAL("/run/agentsight/enforcer.sock", input.mSecurityOptions.mAgentsightEnforcerSocket);
+}
+
+void InputAgentSightUnittest::TestRejectNonObjectSecurityAudit() {
+    std::string err;
+    Json::Value configJson;
+    Json::Value optionalGoPipeline;
+    APSARA_TEST_TRUE(
+        ParseJsonTable(R"({"Type":"input_agentsight","ProbeConfig":{"SecurityAudit":true}})", configJson, err));
+    InputAgentSight input;
+    input.SetContext(mContex);
+    input.CreateMetricsRecordRef("t", "1");
+    APSARA_TEST_FALSE(input.Init(configJson, optionalGoPipeline));
+}
+
+void InputAgentSightUnittest::TestRejectInvalidSecurityAuditFields() {
+    Json::Value optionalGoPipeline;
+    {
+        std::string err;
+        Json::Value configJson;
+        APSARA_TEST_TRUE(ParseJsonTable(
+            R"({"Type":"input_agentsight","ProbeConfig":{"SecurityAudit":{"Enabled":"yes"}}})", configJson, err));
+        InputAgentSight input;
+        input.SetContext(mContex);
+        input.CreateMetricsRecordRef("t", "1");
+        APSARA_TEST_FALSE(input.Init(configJson, optionalGoPipeline));
+    }
+    {
+        std::string err;
+        Json::Value configJson;
+        APSARA_TEST_TRUE(ParseJsonTable(
+            R"({"Type":"input_agentsight","ProbeConfig":{"SecurityAudit":{"EnforcerSocket":""}}})", configJson, err));
+        InputAgentSight input;
+        input.SetContext(mContex);
+        input.CreateMetricsRecordRef("t", "1");
+        APSARA_TEST_FALSE(input.Init(configJson, optionalGoPipeline));
+    }
+}
+
 UNIT_TEST_CASE(InputAgentSightUnittest, TestNameAndQueueType)
 UNIT_TEST_CASE(InputAgentSightUnittest, TestInitWithProbeConfig)
 UNIT_TEST_CASE(InputAgentSightUnittest, TestInitWithHttpsAndHttp)
 UNIT_TEST_CASE(InputAgentSightUnittest, TestMetricKeysCoverManagerCounters)
+UNIT_TEST_CASE(InputAgentSightUnittest, TestInitWithSecurityAudit)
+UNIT_TEST_CASE(InputAgentSightUnittest, TestInitWithSecurityAuditDefaultSocket)
+UNIT_TEST_CASE(InputAgentSightUnittest, TestRejectNonObjectSecurityAudit)
+UNIT_TEST_CASE(InputAgentSightUnittest, TestRejectInvalidSecurityAuditFields)
 
 } // namespace logtail
 
