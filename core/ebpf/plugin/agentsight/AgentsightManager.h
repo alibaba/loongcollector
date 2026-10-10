@@ -20,11 +20,11 @@
 #include <mutex>
 #include <string>
 
-#include "agentsight.h"
 #include "collection_pipeline/queue/QueueKey.h"
 #include "common/LRUCache.h"
 #include "ebpf/EBPFAdapter.h"
 #include "ebpf/plugin/AbstractManager.h"
+#include "ebpf/plugin/agentsight/AgentSightV2Compat.h"
 #include "ebpf/plugin/agentsight/AgentsightMessageUtil.h"
 #include "monitor/metric_models/ReentrantMetricsRecord.h"
 
@@ -38,6 +38,7 @@ namespace logtail::ebpf {
 // Defined in AgentsightEvents.h; only used through pointers here.
 class AgentsightLlmRecord;
 class AgentsightHttpsRecord;
+class AgentsightSecurityRecord;
 
 /// Sets the standard container metadata tags on @group from @info — the same keys
 /// input_file / input_container_stdio emit (`_container_name_`, `_image_name_`, `_container_ip_`,
@@ -116,6 +117,7 @@ private:
     /// Raw HTTP fallback for traffic AgentSight could not parse as an LLM call. Only registered with
     /// handle_read when mRawHttpsFallback is on; otherwise the Rust side never emits these events.
     static void OnHttpsCallback(const AgentsightHttpsData* data, void* user_data);
+    static void OnEventCallback(const AgentsightEvent* data, void* user_data);
 
     int HandleLlmEvent(AgentsightLlmRecord* rec);
     int HandleHttpsEvent(const AgentsightHttpsRecord* rec);
@@ -126,6 +128,7 @@ private:
     void LogAgentSightError(const char* what);
     void releaseMetricRefs();
     void clearSessionInputState();
+    int HandleSecurityEvent(const AgentsightSecurityRecord& rec);
 
     static constexpr size_t kMaxSessionInputStates = 4096;
 
@@ -154,6 +157,7 @@ private:
     bool mEventStreamFormat = true;
     bool mMessageDeltaOnly = true;
     bool mRawHttpsFallback = false;
+    bool mSecurityAuditEnabled = false;
 
     /// Runner-level aggregates owned by EBPFServer and shared with the other eBPF plugins, so they
     /// stay unlabelled here — narrowing them would change a metric four managers report into.
@@ -162,11 +166,8 @@ private:
 
     /// Per-stream counters, one set per `record_type` label value.
     ///
-    /// AgentSight produces two streams of wildly different volume: once a process is attached, *every*
-    /// non-LLM HTTPS exchange it makes becomes a raw HTTP event, while gen_ai events are one per LLM
-    /// call. Sharing one counter set made it impossible to tell whether a jump came from enabling
-    /// RawHttpsFallback or from real LLM traffic growth, to size capacity for turning the switch on,
-    /// or — when events are dropped — to tell which stream filled the shared mCommonEventQueue.
+    /// AgentSight produces raw HTTP, GenAI, and security streams with different volume profiles.
+    /// Separate counter sets keep capacity and loss attribution visible for each stream.
     struct StreamMetrics {
         CounterPtr inEventsTotal;
         CounterPtr pushLogsTotal;
@@ -183,6 +184,7 @@ private:
     };
     StreamMetrics mRawHttpMetrics;
     StreamMetrics mGenAiMetrics;
+    StreamMetrics mSecurityMetrics;
 
     std::vector<MetricLabels> mRefAndLabels;
     PluginMetricManagerPtr mMetricMgr;

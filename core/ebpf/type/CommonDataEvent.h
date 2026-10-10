@@ -41,6 +41,7 @@ enum class KernelEventType {
 
     AGENTSIGHT_LLM_RECORD,
     AGENTSIGHT_HTTPS_RECORD,
+    AGENTSIGHT_SECURITY_RECORD,
 };
 
 class CommonEvent {

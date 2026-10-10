@@ -22,6 +22,7 @@
 #include <utility>
 #include <vector>
 
+#include "json/json.h"
 #include "rapidjson/document.h"
 
 #include "collection_pipeline/queue/ProcessQueueItem.h"
@@ -841,6 +842,47 @@ void AttachAgentsightContainerTags(PipelineEventGroup& group, const std::string&
     AttachAgentsightContainerTagsFromInfo(group, *info);
 }
 
+std::string JsonScalarToString(const Json::Value& value) {
+    if (value.isString()) {
+        return value.asString();
+    }
+    if (value.isBool()) {
+        return value.asBool() ? "true" : "false";
+    }
+    if (value.isInt64()) {
+        return std::to_string(value.asInt64());
+    }
+    if (value.isUInt64()) {
+        return std::to_string(value.asUInt64());
+    }
+    if (value.isDouble()) {
+        return std::to_string(value.asDouble());
+    }
+    return {};
+}
+
+void FlattenSecurityJson(const Json::Value& value, const std::string& prefix, logtail::LogEvent* log) {
+    if (!value.isObject()) {
+        const std::string scalar = JsonScalarToString(value);
+        if (!scalar.empty()) {
+            log->SetContent(prefix, scalar);
+        }
+        return;
+    }
+    for (const auto& key : value.getMemberNames()) {
+        const auto& child = value[key];
+        const std::string childKey = prefix.empty() ? key : prefix + "." + key;
+        if (child.isObject()) {
+            FlattenSecurityJson(child, childKey, log);
+        } else {
+            const std::string scalar = JsonScalarToString(child);
+            if (!scalar.empty()) {
+                log->SetContent(childKey, scalar);
+            }
+        }
+    }
+}
+
 } // namespace
 
 void AttachAgentsightContainerTagsFromInfo(PipelineEventGroup& group, const RawContainerInfo& info) {
@@ -891,6 +933,7 @@ void AgentsightManager::releaseMetricRefs() {
     mMetricMgr.reset();
     mRawHttpMetrics.reset();
     mGenAiMetrics.reset();
+    mSecurityMetrics.reset();
 }
 
 void AgentsightManager::StopAgentSightLocked() {
@@ -907,6 +950,7 @@ void AgentsightManager::StopAgentSightLocked() {
     }
     mHandle = nullptr;
     mRunning = false;
+    mSecurityAuditEnabled = false;
 }
 
 bool AgentsightManager::RestartAgentSightLocked(const SecurityOptions& opts) {
@@ -968,6 +1012,21 @@ bool AgentsightManager::RestartAgentSightLocked(const SecurityOptions& opts) {
 
     ApplyAgentsightRulesToConfig(cfg, sym, opts);
 
+    mSecurityAuditEnabled = false;
+    if (opts.mAgentsightSecurityAuditEnabled) {
+        if (sym->config_set_enable_security_audit && sym->config_set_enforcer_socket && sym->handle_read_v2) {
+            sym->config_set_enable_security_audit(cfg, 1);
+            sym->config_set_enforcer_socket(cfg, opts.mAgentsightEnforcerSocket.c_str());
+            mSecurityAuditEnabled = true;
+        } else {
+            LOG_WARNING(sLogger,
+                        ("AgentSight security audit",
+                         "requested but read_v2/configuration symbols are unavailable; continuing with LLM only"));
+        }
+    } else if (sym->config_set_enable_security_audit) {
+        sym->config_set_enable_security_audit(cfg, 0);
+    }
+
     mHandle = sym->handle_new(cfg);
     if (sym->config_free) {
         sym->config_free(cfg);
@@ -1007,7 +1066,16 @@ int AgentsightManager::DrainReadsLocked() {
     void* httpsUd = mRawHttpsFallback ? this : nullptr;
     int total = 0;
     for (;;) {
-        const int r = sym->handle_read(mHandle, httpsCb, httpsUd, &AgentsightManager::OnLlmCallback, this, 0);
+        const int r = mSecurityAuditEnabled && sym->handle_read_v2
+            ? sym->handle_read_v2(mHandle,
+                                  httpsCb,
+                                  httpsUd,
+                                  &AgentsightManager::OnLlmCallback,
+                                  this,
+                                  &AgentsightManager::OnEventCallback,
+                                  this,
+                                  0)
+            : sym->handle_read(mHandle, httpsCb, httpsUd, &AgentsightManager::OnLlmCallback, this, 0);
         if (r <= 0) {
             break;
         }
@@ -1067,6 +1135,35 @@ void AgentsightManager::OnHttpsCallback(const AgentsightHttpsData* data, void* u
     }
 }
 
+void AgentsightManager::OnEventCallback(const AgentsightEvent* data, void* user_data) {
+    static constexpr uint32_t kSecurityEventType = 3;
+    static constexpr uint32_t kMaxSecurityPayloadBytes = 4U * 1024U * 1024U;
+    if (!data || !user_data || static_cast<uint32_t>(data->event_type) != kSecurityEventType) {
+        return;
+    }
+    auto* self = static_cast<AgentsightManager*>(user_data);
+    if (data->schema_version != 1 || !data->payload_json || data->payload_json_len == 0
+        || data->payload_json_len > kMaxSecurityPayloadBytes) {
+        ADD_COUNTER(self->mLossKernelEventsTotal, 1);
+        ADD_COUNTER(self->mSecurityMetrics.lossEventsTotal, 1);
+        LOG_WARNING(sLogger,
+                    ("AgentSight security event rejected",
+                     "invalid envelope")("schema", data->schema_version)("payload_bytes", data->payload_json_len));
+        return;
+    }
+    auto event = std::make_shared<AgentsightSecurityRecord>(self->mConfigName,
+                                                            data->timestamp_ns,
+                                                            data->schema_version,
+                                                            std::string(data->payload_json, data->payload_json_len));
+    if (self->mCommonEventQueue.try_enqueue(event)) {
+        ADD_COUNTER(self->mSecurityMetrics.inEventsTotal, 1);
+    } else {
+        ADD_COUNTER(self->mLossKernelEventsTotal, 1);
+        ADD_COUNTER(self->mSecurityMetrics.lossEventsTotal, 1);
+        LOG_WARNING(sLogger, ("AgentSight security event enqueue failed", ""));
+    }
+}
+
 int AgentsightManager::AddOrUpdateConfig(const CollectionPipelineContext* ctx,
                                          uint32_t index,
                                          const PluginMetricManagerPtr& metricMgr,
@@ -1087,9 +1184,8 @@ int AgentsightManager::AddOrUpdateConfig(const CollectionPipelineContext* ctx,
     }
 
     if (metricMgr && mRefAndLabels.empty()) {
-        // One ref per stream so raw HTTP and gen_ai counters are told apart by `record_type`; see
-        // StreamMetrics. Same shape as network_observer's AppDetail, which keeps several labelled refs
-        // in mRefAndLabels and releases them together.
+        // One ref per stream so raw HTTP, GenAI, and security counters are distinguished by
+        // `record_type`; see StreamMetrics. Same shape as network_observer's AppDetail.
         const auto initStreamMetrics = [&metricMgr, this](const std::string& recordType) {
             MetricLabels labels = {{METRIC_LABEL_KEY_EVENT_TYPE, METRIC_LABEL_VALUE_EVENT_TYPE_LOG},
                                    {METRIC_LABEL_KEY_RECORD_TYPE, recordType}};
@@ -1104,6 +1200,7 @@ int AgentsightManager::AddOrUpdateConfig(const CollectionPipelineContext* ctx,
         };
         mRawHttpMetrics = initStreamMetrics(METRIC_LABEL_VALUE_RECORD_TYPE_RAW_HTTP);
         mGenAiMetrics = initStreamMetrics(METRIC_LABEL_VALUE_RECORD_TYPE_GEN_AI);
+        mSecurityMetrics = initStreamMetrics(METRIC_LABEL_VALUE_RECORD_TYPE_SECURITY);
     }
 
     if (mRegisteredConfigCount != 0) {
@@ -1163,6 +1260,7 @@ int AgentsightManager::RemoveConfig(const std::string&) {
     mEventStreamFormat = true;
     mMessageDeltaOnly = true;
     mRawHttpsFallback = false;
+    mSecurityAuditEnabled = false;
     StopAgentSightLocked();
     return 0;
 }
@@ -1180,6 +1278,7 @@ int AgentsightManager::Destroy() {
     mEventStreamFormat = true;
     mMessageDeltaOnly = true;
     mRawHttpsFallback = false;
+    mSecurityAuditEnabled = false;
     mInited = false;
     return 0;
 }
@@ -1242,6 +1341,8 @@ int AgentsightManager::HandleEvent(const std::shared_ptr<CommonEvent>& event) {
             return HandleLlmEvent(static_cast<AgentsightLlmRecord*>(event.get()));
         case KernelEventType::AGENTSIGHT_HTTPS_RECORD:
             return HandleHttpsEvent(static_cast<AgentsightHttpsRecord*>(event.get()));
+        case KernelEventType::AGENTSIGHT_SECURITY_RECORD:
+            return HandleSecurityEvent(*static_cast<AgentsightSecurityRecord*>(event.get()));
         default:
             return 0;
     }
@@ -1414,6 +1515,96 @@ int AgentsightManager::HandleLlmEvent(AgentsightLlmRecord* rec) {
         LOG_WARNING(
             sLogger,
             ("Agentsight push queue failed", "")("config", rec->GetPipelineConfigName())("pluginIdx", pluginIndex));
+    }
+    return 0;
+}
+
+int AgentsightManager::HandleSecurityEvent(const AgentsightSecurityRecord& rec) {
+    logtail::QueueKey queueKey;
+    uint32_t pluginIndex;
+    {
+        std::lock_guard<std::mutex> lock(mLibMutex);
+        if (mPipelineCtx == nullptr || rec.GetPipelineConfigName() != mConfigName) {
+            ADD_COUNTER(mLossKernelEventsTotal, 1);
+            ADD_COUNTER(mSecurityMetrics.lossEventsTotal, 1);
+            LOG_DEBUG(sLogger,
+                      ("Agentsight security event dropped", "config no longer registered")(
+                          "recordConfig", rec.GetPipelineConfigName())("currentConfig", mConfigName));
+            return 0;
+        }
+        queueKey = mQueueKey;
+        pluginIndex = mPluginIndex;
+    }
+
+    auto sourceBuffer = std::make_shared<SourceBuffer>();
+    PipelineEventGroup eventGroup(sourceBuffer);
+    auto* log = eventGroup.AddLogEvent(true, mEventPool);
+    SetLogTimestampFromNs(log, rec.mTimestampNs);
+    log->SetContent("time_unix_nano", std::to_string(rec.mTimestampNs));
+    log->SetContent(StringView("event.name"), StringView("agentsight.security"));
+    log->SetContent(StringView("event.kind"), StringView("event"));
+    log->SetContent(StringView("event.category"), StringView("security"));
+    log->SetContent("agentsight.schema_version", std::to_string(rec.mSchemaVersion));
+    log->SetContent("event.original", rec.mPayloadJson);
+
+    Json::Value root;
+    Json::CharReaderBuilder builder;
+    std::string errors;
+    const std::unique_ptr<Json::CharReader> reader(builder.newCharReader());
+    if (reader->parse(rec.mPayloadJson.data(), rec.mPayloadJson.data() + rec.mPayloadJson.size(), &root, &errors)
+        && root.isObject()) {
+        if (root["event_type"].isString()) {
+            log->SetContent("event.name", "agentsight.security." + root["event_type"].asString());
+            log->SetContent("event.type", root["event_type"].asString());
+        }
+        if (root["event_id"].isString()) {
+            log->SetContent("event.id", root["event_id"].asString());
+        }
+        if (root["observed_at_ns"].isUInt64()) {
+            log->SetContent("observed_time_unix_nano", std::to_string(root["observed_at_ns"].asUInt64()));
+        }
+        const auto& identity = root["identity"];
+        if (identity.isObject()) {
+            if (identity["agent_id"].isString()) {
+                log->SetContent("agent.id", identity["agent_id"].asString());
+            }
+            std::string agentType;
+            if (identity["agent_name"].isString()) {
+                agentType = identity["agent_name"].asString();
+            } else if (identity["agent_id"].isString()) {
+                agentType = identity["agent_id"].asString();
+            }
+            if (!agentType.empty()) {
+                std::transform(agentType.begin(), agentType.end(), agentType.begin(), [](unsigned char c) {
+                    return static_cast<char>(std::tolower(c));
+                });
+                log->SetContent("gen_ai.agent.type", agentType);
+            }
+            if (identity["session_id"].isString()) {
+                log->SetContent("gen_ai.session.id", identity["session_id"].asString());
+            }
+            if (identity["conversation_id"].isString()) {
+                log->SetContent("gen_ai.turn.id", identity["conversation_id"].asString());
+            }
+            if (identity["pid"].isInt()) {
+                log->SetContent("process.pid", std::to_string(identity["pid"].asInt()));
+            }
+            FlattenSecurityJson(identity, "agentsight.identity", log);
+        }
+        FlattenSecurityJson(root["event"], "security", log);
+    } else {
+        LOG_WARNING(sLogger, ("AgentSight security event JSON parse failed", errors));
+    }
+
+    auto item = std::make_unique<ProcessQueueItem>(std::move(eventGroup), pluginIndex);
+    if (QueueStatus::OK == ProcessQueueManager::GetInstance()->PushQueue(queueKey, std::move(item))) {
+        ADD_COUNTER(mSecurityMetrics.pushLogsTotal, 1);
+        ADD_COUNTER(mSecurityMetrics.pushLogGroupTotal, 1);
+    } else {
+        ADD_COUNTER(mPushLogFailedTotal, 1);
+        LOG_WARNING(sLogger,
+                    ("Agentsight security push queue failed", "")("config", rec.GetPipelineConfigName())("pluginIdx",
+                                                                                                         pluginIndex));
     }
     return 0;
 }
