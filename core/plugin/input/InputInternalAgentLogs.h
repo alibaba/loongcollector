@@ -46,6 +46,7 @@ private:
                                RuntimeLogKind runtimeKind,
                                std::unique_ptr<InputInstance>& extra);
     bool appendAgentLogTagProcessor(std::vector<std::unique_ptr<ProcessorInstance>>& processors);
+    bool appendDropEmptyContentProcessor(std::vector<std::unique_ptr<ProcessorInstance>>& processors);
     bool appendAgentLogMicrotimeProcessor(std::vector<std::unique_ptr<ProcessorInstance>>& processors);
     bool appendRuntimeLogProcessors(std::vector<std::unique_ptr<ProcessorInstance>>& processors,
                                     RuntimeLogKind runtimeKind);
