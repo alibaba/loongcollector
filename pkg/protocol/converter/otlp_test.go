@@ -6,6 +6,7 @@ import (
 
 	"github.com/smartystreets/goconvey/convey"
 	"go.opentelemetry.io/collector/pdata/plog"
+	"go.opentelemetry.io/collector/pdata/plog/plogotlp"
 
 	"github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/models"
@@ -142,6 +143,84 @@ func TestNewConvertToOtlpLogs(t *testing.T) {
 				})
 			})
 		})
+	})
+}
+
+func TestConvertToOtlpLogStreamV2(t *testing.T) {
+	convey.Convey("When converting otlp logs to protobuf bytes", t, func() {
+		c, err := NewConverter(ProtocolOtlpLogV1, EncodingProtobuf, nil, nil, &config.GlobalConfig{})
+		convey.So(err, convey.ShouldBeNil)
+
+		groupEvents := &models.PipelineGroupEvents{
+			Group: &models.GroupInfo{
+				Metadata: models.NewMetadata(),
+				Tags:     models.NewTags(),
+			},
+			Events: []models.PipelineEvent{
+				models.NewLog(
+					"log_name",
+					[]byte("hello world"),
+					"INFO",
+					"",
+					"",
+					models.NewTagsWithMap(map[string]string{
+						"app": "demo",
+					}),
+					1662434209,
+				),
+			},
+		}
+		groupEvents.Group.Tags.Add("app", "demo")
+
+		stream, values, err := c.ToByteStreamWithSelectedFieldsV2(groupEvents, []string{"tag.app"})
+		convey.So(err, convey.ShouldBeNil)
+		convey.So(stream, convey.ShouldHaveLength, 1)
+		convey.So(values, convey.ShouldHaveLength, 1)
+		convey.So(values[0]["tag.app"], convey.ShouldEqual, "demo")
+
+		req := plogotlp.NewExportRequest()
+		err = req.UnmarshalProto(stream.([][]byte)[0])
+		convey.So(err, convey.ShouldBeNil)
+		convey.So(req.Logs().ResourceLogs().Len(), convey.ShouldEqual, 1)
+		convey.So(req.Logs().ResourceLogs().At(0).ScopeLogs().Len(), convey.ShouldEqual, 1)
+		convey.So(req.Logs().ResourceLogs().At(0).ScopeLogs().At(0).LogRecords().Len(), convey.ShouldEqual, 1)
+		convey.So(req.Logs().ResourceLogs().At(0).ScopeLogs().At(0).LogRecords().At(0).Body().Bytes().AsRaw(), convey.ShouldResemble, []byte("hello world"))
+		convey.So(req.Logs().ResourceLogs().At(0).ScopeLogs().At(0).LogRecords().At(0).SeverityText(), convey.ShouldEqual, "INFO")
+	})
+}
+
+func TestConvertToOtlpLogStream(t *testing.T) {
+	convey.Convey("When converting log groups to otlp protobuf bytes", t, func() {
+		c, err := NewConverter(ProtocolOtlpLogV1, EncodingProtobuf, nil, nil, &config.GlobalConfig{})
+		convey.So(err, convey.ShouldBeNil)
+
+		logGroup := &protocol.LogGroup{
+			LogTags: []*protocol.LogTag{
+				{Key: "__hostname__", Value: "node-a"},
+			},
+			Logs: []*protocol.Log{
+				{
+					Time: 1662434209,
+					Contents: []*protocol.Log_Content{
+						{Key: "content", Value: "hello log group"},
+						{Key: "level", Value: "INFO"},
+					},
+				},
+			},
+		}
+
+		stream, values, err := c.ToByteStreamWithSelectedFields(logGroup, []string{"__hostname__"})
+		convey.So(err, convey.ShouldBeNil)
+		convey.So(stream, convey.ShouldHaveLength, 1)
+		convey.So(values, convey.ShouldHaveLength, 1)
+		convey.So(values[0]["__hostname__"], convey.ShouldEqual, "node-a")
+
+		req := plogotlp.NewExportRequest()
+		err = req.UnmarshalProto(stream.([][]byte)[0])
+		convey.So(err, convey.ShouldBeNil)
+		record := req.Logs().ResourceLogs().At(0).ScopeLogs().At(0).LogRecords().At(0)
+		convey.So(record.Body().AsString(), convey.ShouldEqual, "hello log group")
+		convey.So(record.SeverityText(), convey.ShouldEqual, "INFO")
 	})
 }
 
