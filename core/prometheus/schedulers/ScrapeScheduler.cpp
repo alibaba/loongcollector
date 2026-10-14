@@ -101,6 +101,8 @@ void ScrapeScheduler::OnMetricResult(HttpResponse& response, uint64_t) {
     streamScraper->mStreamIndex++;
     if (upState) {
         streamScraper->FlushCache();
+    } else {
+        streamScraper->ClearEventGroup();
     }
     streamScraper->SetAutoMetricMeta(scrapeDurationSeconds, upState, scrapeState);
     streamScraper->SendMetrics();
