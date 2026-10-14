@@ -222,6 +222,34 @@ void UpdateSessionOutputState(const std::string& responseMessagesJson, Agentsigh
     }
 }
 
+void CollectToolCallIds(const rapidjson::Value& value, std::string& candidate, bool& seen, bool& invalid) {
+    if (invalid || !value.IsObject()) {
+        return;
+    }
+    if (value.HasMember("type") && value["type"].IsString()
+        && std::strcmp(value["type"].GetString(), "tool_call") == 0) {
+        if (!value.HasMember("id") || !value["id"].IsString() || value["id"].GetStringLength() == 0) {
+            invalid = true;
+            return;
+        }
+        const char* id = value["id"].GetString();
+        const auto idLength = value["id"].GetStringLength();
+        if (!seen) {
+            candidate.assign(id, idLength);
+            seen = true;
+        } else if (candidate.size() != idLength || std::memcmp(candidate.data(), id, idLength) != 0) {
+            invalid = true;
+            return;
+        }
+    }
+    if (!value.HasMember("parts") || !value["parts"].IsArray()) {
+        return;
+    }
+    for (rapidjson::SizeType i = 0; i < value["parts"].Size(); ++i) {
+        CollectToolCallIds(value["parts"][i], candidate, seen, invalid);
+    }
+}
+
 } // namespace
 
 std::string ComputeContentSha256Hex(const std::string& content) {
@@ -364,6 +392,23 @@ std::string FormatFinishReasonsJson(const std::string& responseMessagesJson, con
     }
 
     return SerializeFinishReasonsArray(reasons);
+}
+
+std::string ExtractUniqueToolCallId(const std::string& responseMessagesJson) {
+    rapidjson::Document doc;
+    if (!ParseMessagesArray(responseMessagesJson, doc)) {
+        return {};
+    }
+    std::string candidate;
+    bool seen = false;
+    bool invalid = false;
+    for (rapidjson::SizeType i = 0; i < doc.Size(); ++i) {
+        CollectToolCallIds(doc[i], candidate, seen, invalid);
+    }
+    if (invalid || !seen) {
+        return {};
+    }
+    return candidate;
 }
 
 std::string ComputeInputMessagesDelta(const std::string& fullMessagesJson,

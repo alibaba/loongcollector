@@ -53,7 +53,7 @@ AgentsightHandle* gFakeHandle = reinterpret_cast<AgentsightHandle*>(0x20U);
 struct FakeReadControl {
     int start_ret = 0;
     /// 0: always 0; 1: return 1 once then 0; 2: call LLM callback once then 0;
-    /// 3: call the raw HTTPS callback once then 0
+    /// 3: call the raw HTTPS callback once; 4: call the security callback once via read_v2.
     int read_mode = 0;
     int read_step = 0;
 } gRead;
@@ -89,6 +89,21 @@ int g_ut_cmdline_allow_calls = 0;
 int g_ut_cmdline_deny_calls = 0;
 int g_ut_https_calls = 0;
 int g_ut_http_calls = 0;
+int g_ut_security_enable_calls = 0;
+int g_ut_security_enabled = 0;
+std::string g_ut_enforcer_socket;
+int g_ut_read_v2_calls = 0;
+
+void fake_config_set_enable_security_audit(AgentsightConfigHandle* cfg, int enabled) {
+    (void)cfg;
+    ++g_ut_security_enable_calls;
+    g_ut_security_enabled = enabled;
+}
+
+void fake_config_set_enforcer_socket(AgentsightConfigHandle* cfg, const char* path) {
+    (void)cfg;
+    g_ut_enforcer_socket = path ? path : "";
+}
 
 int g_ut_raw_https_calls = 0;
 int g_ut_raw_https_last_enabled = -1;
@@ -98,6 +113,12 @@ bool g_ut_omit_raw_https_symbol = false;
 /// Whether the last handle_read call was handed a non-null raw HTTPS callback. A null callback is
 /// how the manager tells the Rust dispatcher to drop raw events outright.
 bool g_ut_last_read_had_https_cb = false;
+const char* g_ut_llm_binding_id = nullptr;
+
+const char* fake_llm_binding_id(const AgentsightLLMData* data) {
+    (void)data;
+    return g_ut_llm_binding_id;
+}
 
 void fake_config_set_enable_raw_https(AgentsightConfigHandle* cfg, int enabled) {
     (void)cfg;
@@ -216,6 +237,33 @@ int fake_handle_read(AgentsightHandle* h,
     return 0;
 }
 
+int fake_handle_read_v2(AgentsightHandle* h,
+                        agentsight_https_callback_fn http,
+                        void* http_user_data,
+                        agentsight_llm_callback_fn llm,
+                        void* llm_user_data,
+                        agentsight_event_callback_fn event,
+                        void* event_user_data,
+                        int flags) {
+    ++g_ut_read_v2_calls;
+    if (gRead.read_mode != 4) {
+        return fake_handle_read(h, http, http_user_data, llm, llm_user_data, flags);
+    }
+    static const char payload[]
+        = R"({"event_id":"00000000-0000-0000-0000-000000000001","occurred_at_ns":7,"observed_at_ns":8,"identity":{"agent_id":"agent-1","agent_name":"claude","session_id":"session-1","pid":42},"event_type":"policy_decision","event":{"policy_id":"credential-exfiltration","policy_revision":3,"mode":"audit","risk_score":85,"reason":"test"}})";
+    AgentsightEvent data{};
+    data.event_type = static_cast<AgentsightEventType>(3);
+    data.schema_version = 1;
+    data.timestamp_ns = 7;
+    data.payload_json = payload;
+    data.payload_json_len = sizeof(payload) - 1U;
+    if (event) {
+        event(&data, event_user_data);
+    }
+    gRead.read_mode = 0;
+    return 1;
+}
+
 std::unique_ptr<AgentSightSymbolTable> makeFullSymbolTable() {
     auto t = std::make_unique<AgentSightSymbolTable>();
     t->last_error = fake_last_error;
@@ -224,15 +272,19 @@ std::unique_ptr<AgentSightSymbolTable> makeFullSymbolTable() {
     t->config_set_verbose = fake_config_set_verbose;
     t->config_set_log_path = fake_config_set_log_path;
     t->config_set_enable_raw_https = g_ut_omit_raw_https_symbol ? nullptr : fake_config_set_enable_raw_https;
+    t->config_set_enable_security_audit = fake_config_set_enable_security_audit;
+    t->config_set_enforcer_socket = fake_config_set_enforcer_socket;
     t->config_add_cmdline_rule = fake_config_add_cmdline_rule;
     t->config_add_https = fake_config_add_https;
     t->config_add_http = fake_config_add_http;
+    t->llm_binding_id = fake_llm_binding_id;
     t->handle_new = fake_handle_new;
     t->handle_free = fake_handle_free;
     t->handle_start = fake_handle_start;
     t->handle_stop = fake_handle_stop;
     t->handle_get_eventfd = fake_get_eventfd;
     t->handle_read = fake_handle_read;
+    t->handle_read_v2 = fake_handle_read_v2;
     return t;
 }
 
@@ -399,6 +451,11 @@ public:
         g_ut_raw_https_last_enabled = -1;
         g_ut_omit_raw_https_symbol = false;
         g_ut_last_read_had_https_cb = false;
+        g_ut_llm_binding_id = nullptr;
+        g_ut_security_enable_calls = 0;
+        g_ut_security_enabled = 0;
+        g_ut_enforcer_socket.clear();
+        g_ut_read_v2_calls = 0;
         mAgentSightAdapter = std::make_shared<AgentSightTestEBPFAdapter>();
         mAgentSightAdapter->setAgentSightSymbols(makeFullSymbolTable());
         auto& o = agentsightOptions();
@@ -407,6 +464,8 @@ public:
         o.mAgentsightHttps.clear();
         o.mAgentsightHttp.clear();
         o.mAgentsightRawHttpsFallback = false;
+        o.mAgentsightSecurityAuditEnabled = false;
+        o.mAgentsightEnforcerSocket = "/run/agentsight/enforcer.sock";
     }
 
     void TearDown() override {
@@ -556,6 +615,14 @@ public:
     void TestContainerTagsAttachedForLlmEvent();
     void TestContainerTagsAttachedForHttpsEvent();
     void TestContainerTagsMissDegradesSilently();
+    void TestSecurityAuditUsesReadV2AndEnqueuesSecurityRecord();
+    void TestSecurityAuditFallsBackWhenV2SymbolsAreMissing();
+    void TestSecurityEventProducesSearchableLog();
+    void TestSecurityEventFallsBackToAgentIdType();
+    void TestSecurityFileActionPreservesProductClassification();
+    void TestLlmResponseProducesCrossLayerCorrelationIdentity();
+    void TestSecurityEventOmitsInvalidCorrelationIdentity();
+    void TestMalformedSecurityEventPreservesEnvelope();
 
 protected:
     std::shared_ptr<AgentSightTestEBPFAdapter> mAgentSightAdapter;
@@ -704,6 +771,8 @@ void AgentsightManagerUnittest::TestHandleEventBranches() {
     // No pipeline: mPipelineCtx is null
     auto orphan = std::make_shared<AgentsightLlmRecord>(std::string("orphan"), d0);
     APSARA_TEST_EQUAL(0, mgr->HandleEvent(orphan));
+    auto orphanSecurity = std::make_shared<AgentsightSecurityRecord>("orphan", 1U, 1U, "{}");
+    APSARA_TEST_EQUAL(0, mgr->HandleEvent(orphanSecurity));
 
     CollectionPipelineContext cctx;
     cctx.SetConfigName("p1");
@@ -1609,6 +1678,239 @@ void AgentsightManagerUnittest::TestContainerTagsMissDegradesSilently() {
     mgr->Destroy();
 }
 
+void AgentsightManagerUnittest::TestSecurityAuditUsesReadV2AndEnqueuesSecurityRecord() {
+    auto& options = agentsightOptions();
+    options.mAgentsightRawHttpsFallback = true;
+    options.mAgentsightSecurityAuditEnabled = true;
+    options.mAgentsightEnforcerSocket = "/tmp/enforcer.sock";
+    auto mgr = makeManager();
+    registerConfig(*mgr, "security-pipeline");
+
+    APSARA_TEST_EQUAL(1, g_ut_security_enabled);
+    APSARA_TEST_EQUAL("/tmp/enforcer.sock", g_ut_enforcer_socket);
+
+    // read_v2 must keep the raw HTTPS callback wired when both optional streams are enabled.
+    gRead.read_mode = 3;
+    APSARA_TEST_EQUAL(1, mgr->OnEpollReadable());
+    APSARA_TEST_TRUE(g_ut_last_read_had_https_cb);
+    std::shared_ptr<CommonEvent> rawEvent;
+    APSARA_TEST_TRUE(mEventQueue->try_dequeue(rawEvent));
+    APSARA_TEST_EQUAL(KernelEventType::AGENTSIGHT_HTTPS_RECORD, rawEvent->GetKernelEventType());
+
+    gRead.read_mode = 4;
+    APSARA_TEST_EQUAL(1, mgr->OnEpollReadable());
+    APSARA_TEST_TRUE(g_ut_read_v2_calls >= 2);
+
+    std::shared_ptr<CommonEvent> event;
+    APSARA_TEST_TRUE(mEventQueue->try_dequeue(event));
+    APSARA_TEST_EQUAL(KernelEventType::AGENTSIGHT_SECURITY_RECORD, event->GetKernelEventType());
+    auto* security = static_cast<AgentsightSecurityRecord*>(event.get());
+    APSARA_TEST_EQUAL(1, security->mSchemaVersion);
+    APSARA_TEST_EQUAL(7, security->mTimestampNs);
+    APSARA_TEST_TRUE(security->mPayloadJson.find("credential-exfiltration") != std::string::npos);
+    mgr->Destroy();
+}
+
+void AgentsightManagerUnittest::TestSecurityAuditFallsBackWhenV2SymbolsAreMissing() {
+    auto symbols = makeFullSymbolTable();
+    symbols->handle_read_v2 = nullptr;
+    mAgentSightAdapter->setAgentSightSymbols(std::move(symbols));
+    auto& options = agentsightOptions();
+    options.mAgentsightSecurityAuditEnabled = true;
+    g_ut_security_enabled = 1;
+    auto mgr = makeManager();
+    registerConfig(*mgr, "legacy-pipeline");
+
+    APSARA_TEST_EQUAL(1, g_ut_security_enable_calls);
+    APSARA_TEST_EQUAL(0, g_ut_security_enabled);
+    gRead.read_mode = 2;
+    APSARA_TEST_EQUAL(1, mgr->OnEpollReadable());
+    APSARA_TEST_EQUAL(0, g_ut_read_v2_calls);
+    mgr->Destroy();
+}
+
+void AgentsightManagerUnittest::TestSecurityEventProducesSearchableLog() {
+    static const std::string kConfigName = "security-log-pipeline";
+    static const std::string kPayload
+        = R"({"event_id":"00000000-0000-0000-0000-000000000001","observed_at_ns":8,"identity":{"binding_id":"10000000-0000-0000-0000-000000000001","agent_id":"agent-1","agent_name":"claude","session_id":"session-1","conversation_id":"conversation-1","tool_call_id":"tool-call-1","pid":2147483648,"process_start_time":101,"ppid":4294967295,"cgroup_id":9001},"event_type":"policy_decision","event":{"policy_id":"agentloop-sensitive-data-outbound","policy_revision":4,"rule_id":"cloud-credential-to-public-network","mode":"audit","risk_score":85,"large_counter":9223372036854775808,"blocked":true,"confidence":0.75,"details":{"source":"unit-test"}}})";
+
+    auto mgr = makeManager();
+    registerConfigWithPoppableQueue(*mgr, kConfigName.c_str());
+
+    auto record = std::make_shared<AgentsightSecurityRecord>(kConfigName, 7U, 1U, kPayload);
+    APSARA_TEST_EQUAL(0, mgr->HandleEvent(record));
+
+    std::unique_ptr<ProcessQueueItem> item;
+    std::string configName;
+    APSARA_TEST_TRUE(ProcessQueueManager::GetInstance()->PopItem(0, item, configName));
+    APSARA_TEST_EQUAL(kConfigName, configName);
+    APSARA_TEST_EQUAL(1U, item->mEventGroup.GetEvents().size());
+    const auto& log = item->mEventGroup.GetEvents().at(0).Cast<LogEvent>();
+    APSARA_TEST_EQUAL("7", log.GetContent("time_unix_nano").to_string());
+    APSARA_TEST_EQUAL("agentsight.security.policy_decision", log.GetContent("event.name").to_string());
+    APSARA_TEST_EQUAL("event", log.GetContent("event.kind").to_string());
+    APSARA_TEST_EQUAL("security", log.GetContent("event.category").to_string());
+    APSARA_TEST_EQUAL("policy_decision", log.GetContent("event.type").to_string());
+    APSARA_TEST_EQUAL("00000000-0000-0000-0000-000000000001", log.GetContent("event.id").to_string());
+    APSARA_TEST_EQUAL("8", log.GetContent("observed_time_unix_nano").to_string());
+    APSARA_TEST_EQUAL("1", log.GetContent("agentsight.schema_version").to_string());
+    APSARA_TEST_EQUAL("agent-1", log.GetContent("agent.id").to_string());
+    APSARA_TEST_EQUAL("claude", log.GetContent("gen_ai.agent.type").to_string());
+    APSARA_TEST_EQUAL("session-1", log.GetContent("gen_ai.session.id").to_string());
+    APSARA_TEST_EQUAL("conversation-1", log.GetContent("gen_ai.turn.id").to_string());
+    APSARA_TEST_EQUAL("conversation-1", log.GetContent("gen_ai.conversation.id").to_string());
+    APSARA_TEST_EQUAL("tool-call-1", log.GetContent("gen_ai.tool.call.id").to_string());
+    APSARA_TEST_EQUAL("2147483648", log.GetContent("process.pid").to_string());
+    APSARA_TEST_EQUAL("101", log.GetContent("process.start_time").to_string());
+    APSARA_TEST_EQUAL("4294967295", log.GetContent("process.parent.pid").to_string());
+    APSARA_TEST_EQUAL("9001", log.GetContent("container.cgroup.id").to_string());
+    APSARA_TEST_EQUAL("10000000-0000-0000-0000-000000000001", log.GetContent("agentsight.binding.id").to_string());
+    APSARA_TEST_EQUAL("agent-1", log.GetContent("agentsight.identity.agent_id").to_string());
+    APSARA_TEST_EQUAL("agentloop-sensitive-data-outbound", log.GetContent("security.policy_id").to_string());
+    APSARA_TEST_EQUAL("4", log.GetContent("security.policy_revision").to_string());
+    APSARA_TEST_EQUAL("cloud-credential-to-public-network", log.GetContent("security.rule_id").to_string());
+    APSARA_TEST_EQUAL("audit", log.GetContent("security.mode").to_string());
+    APSARA_TEST_EQUAL("85", log.GetContent("security.risk_score").to_string());
+    APSARA_TEST_EQUAL("9223372036854775808", log.GetContent("security.large_counter").to_string());
+    APSARA_TEST_EQUAL("true", log.GetContent("security.blocked").to_string());
+    APSARA_TEST_EQUAL("0.750000", log.GetContent("security.confidence").to_string());
+    APSARA_TEST_EQUAL("unit-test", log.GetContent("security.details.source").to_string());
+    APSARA_TEST_EQUAL(kPayload, log.GetContent("event.original").to_string());
+
+    mgr->Destroy();
+}
+
+void AgentsightManagerUnittest::TestSecurityEventFallsBackToAgentIdType() {
+    static const std::string kConfigName = "security-agent-type-pipeline";
+    static const std::string kPayload
+        = R"({"event_id":"00000000-0000-0000-0000-000000000003","identity":{"agent_id":"Hermes","session_id":"session-1","pid":42,"process_start_time":101},"event_type":"file_action","event":{"operation":"read","path":"~/.env","succeeded":true}})";
+
+    auto mgr = makeManager();
+    registerConfigWithPoppableQueue(*mgr, kConfigName.c_str());
+    APSARA_TEST_EQUAL(0, mgr->HandleEvent(std::make_shared<AgentsightSecurityRecord>(kConfigName, 9U, 1U, kPayload)));
+
+    std::unique_ptr<ProcessQueueItem> item;
+    std::string configName;
+    APSARA_TEST_TRUE(ProcessQueueManager::GetInstance()->PopItem(0, item, configName));
+    const auto& log = item->mEventGroup.GetEvents().at(0).Cast<LogEvent>();
+    APSARA_TEST_EQUAL("Hermes", log.GetContent("agent.id").to_string());
+    APSARA_TEST_EQUAL("hermes", log.GetContent("gen_ai.agent.type").to_string());
+    mgr->Destroy();
+}
+
+void AgentsightManagerUnittest::TestSecurityFileActionPreservesProductClassification() {
+    static const std::string kConfigName = "security-file-action-pipeline";
+    static const std::string kPayload
+        = R"({"event_id":"00000000-0000-0000-0000-000000000002","occurred_at_ns":9,"observed_at_ns":10,"identity":{"agent_id":"agent-1","session_id":"session-1","pid":42,"process_start_time":101},"event_type":"file_action","event":{"policy_id":"agentloop-sensitive-data-outbound","policy_revision":4,"rule_id":"cloud-credential-to-public-network","operation":"read","path":"~/.aws/credentials","resource_class":"secret.cloud_access_key","succeeded":true}})";
+
+    auto mgr = makeManager();
+    registerConfigWithPoppableQueue(*mgr, kConfigName.c_str());
+    APSARA_TEST_EQUAL(0, mgr->HandleEvent(std::make_shared<AgentsightSecurityRecord>(kConfigName, 9U, 1U, kPayload)));
+
+    std::unique_ptr<ProcessQueueItem> item;
+    std::string configName;
+    APSARA_TEST_TRUE(ProcessQueueManager::GetInstance()->PopItem(0, item, configName));
+    const auto& log = item->mEventGroup.GetEvents().at(0).Cast<LogEvent>();
+    APSARA_TEST_EQUAL("agentsight.security.file_action", log.GetContent("event.name").to_string());
+    APSARA_TEST_EQUAL("agentloop-sensitive-data-outbound", log.GetContent("security.policy_id").to_string());
+    APSARA_TEST_EQUAL("4", log.GetContent("security.policy_revision").to_string());
+    APSARA_TEST_EQUAL("cloud-credential-to-public-network", log.GetContent("security.rule_id").to_string());
+    APSARA_TEST_EQUAL("secret.cloud_access_key", log.GetContent("security.resource_class").to_string());
+    mgr->Destroy();
+}
+
+void AgentsightManagerUnittest::TestLlmResponseProducesCrossLayerCorrelationIdentity() {
+    static const std::string kConfigName = "llm-correlation-pipeline";
+    static const char kResponse[]
+        = R"([{"role":"assistant","parts":[{"type":"tool_call","id":"call-hermes-1","name":"shell"}]}])";
+    static AgentsightLLMData data{};
+    std::memset(&data, 0, sizeof(data));
+    data.pid = 4242;
+    data.session_id = "session-1";
+    data.conversation_id = "conversation-1";
+    data.response_id = "response-1";
+    data.agent_name = "hermes";
+    data.response_messages = kResponse;
+    data.response_messages_len = sizeof(kResponse) - 1U;
+    data.timestamp_ns = 1U;
+    g_ut_llm_binding_id = "10000000-0000-0000-0000-000000000001";
+
+    auto mgr = makeManager();
+    agentsightOptions().mAgentsightEventStreamFormat = true;
+    registerConfigWithPoppableQueue(*mgr, kConfigName.c_str());
+    APSARA_TEST_EQUAL(0,
+                      mgr->HandleEvent(std::make_shared<AgentsightLlmRecord>(kConfigName, data, g_ut_llm_binding_id)));
+
+    std::unique_ptr<ProcessQueueItem> item;
+    std::string configName;
+    APSARA_TEST_TRUE(ProcessQueueManager::GetInstance()->PopItem(0, item, configName));
+    APSARA_TEST_EQUAL(2U, item->mEventGroup.GetEvents().size());
+    const auto& request = item->mEventGroup.GetEvents().at(0).Cast<LogEvent>();
+    const auto& response = item->mEventGroup.GetEvents().at(1).Cast<LogEvent>();
+    APSARA_TEST_TRUE(response.GetContent("agent.id").empty());
+    APSARA_TEST_EQUAL("hermes", response.GetContent("gen_ai.agent.type").to_string());
+    APSARA_TEST_EQUAL("10000000-0000-0000-0000-000000000001", request.GetContent("agentsight.binding.id").to_string());
+    APSARA_TEST_EQUAL("10000000-0000-0000-0000-000000000001", response.GetContent("agentsight.binding.id").to_string());
+    APSARA_TEST_EQUAL("4242", response.GetContent("process.pid").to_string());
+    APSARA_TEST_EQUAL("call-hermes-1", response.GetContent("gen_ai.tool.call.id").to_string());
+    APSARA_TEST_TRUE(request.GetContent("gen_ai.tool.call.id").empty());
+
+    mgr->Destroy();
+}
+
+void AgentsightManagerUnittest::TestSecurityEventOmitsInvalidCorrelationIdentity() {
+    static const std::string kConfigName = "security-invalid-identity-pipeline";
+    static const std::string kPayload
+        = R"({"identity":{"binding_id":1,"conversation_id":null,"tool_call_id":{},"pid":-1,"process_start_time":-1,"ppid":4294967296,"cgroup_id":-1},"event_type":"policy_decision","event":{}})";
+
+    auto mgr = makeManager();
+    registerConfigWithPoppableQueue(*mgr, kConfigName.c_str());
+
+    auto record = std::make_shared<AgentsightSecurityRecord>(kConfigName, 11U, 1U, kPayload);
+    APSARA_TEST_EQUAL(0, mgr->HandleEvent(record));
+
+    std::unique_ptr<ProcessQueueItem> item;
+    std::string configName;
+    APSARA_TEST_TRUE(ProcessQueueManager::GetInstance()->PopItem(0, item, configName));
+    const auto& log = item->mEventGroup.GetEvents().at(0).Cast<LogEvent>();
+    APSARA_TEST_TRUE(log.GetContent("agentsight.binding.id").empty());
+    APSARA_TEST_TRUE(log.GetContent("gen_ai.conversation.id").empty());
+    APSARA_TEST_TRUE(log.GetContent("gen_ai.tool.call.id").empty());
+    APSARA_TEST_TRUE(log.GetContent("process.pid").empty());
+    APSARA_TEST_TRUE(log.GetContent("process.start_time").empty());
+    APSARA_TEST_TRUE(log.GetContent("process.parent.pid").empty());
+    APSARA_TEST_TRUE(log.GetContent("container.cgroup.id").empty());
+    APSARA_TEST_EQUAL(kPayload, log.GetContent("event.original").to_string());
+
+    mgr->Destroy();
+}
+
+void AgentsightManagerUnittest::TestMalformedSecurityEventPreservesEnvelope() {
+    static const std::string kConfigName = "security-malformed-pipeline";
+    static const std::string kPayload = "{not-json";
+
+    auto mgr = makeManager();
+    registerConfigWithPoppableQueue(*mgr, kConfigName.c_str());
+
+    auto record = std::make_shared<AgentsightSecurityRecord>(kConfigName, 9U, 2U, kPayload);
+    APSARA_TEST_EQUAL(0, mgr->HandleEvent(record));
+
+    std::unique_ptr<ProcessQueueItem> item;
+    std::string configName;
+    APSARA_TEST_TRUE(ProcessQueueManager::GetInstance()->PopItem(0, item, configName));
+    APSARA_TEST_EQUAL(1U, item->mEventGroup.GetEvents().size());
+    const auto& log = item->mEventGroup.GetEvents().at(0).Cast<LogEvent>();
+    APSARA_TEST_EQUAL("9", log.GetContent("time_unix_nano").to_string());
+    APSARA_TEST_EQUAL("agentsight.security", log.GetContent("event.name").to_string());
+    APSARA_TEST_EQUAL("event", log.GetContent("event.kind").to_string());
+    APSARA_TEST_EQUAL("security", log.GetContent("event.category").to_string());
+    APSARA_TEST_EQUAL("2", log.GetContent("agentsight.schema_version").to_string());
+    APSARA_TEST_EQUAL(kPayload, log.GetContent("event.original").to_string());
+    APSARA_TEST_TRUE(log.GetContent("event.id").empty());
+
+    mgr->Destroy();
+}
+
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestGetPluginType);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestAddOrUpdateValidation);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestAddOrUpdateNoSymbols);
@@ -1649,5 +1951,13 @@ UNIT_TEST_CASE(AgentsightManagerUnittest, TestAttachAgentsightContainerTagsFromI
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestContainerTagsAttachedForLlmEvent);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestContainerTagsAttachedForHttpsEvent);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestContainerTagsMissDegradesSilently);
+UNIT_TEST_CASE(AgentsightManagerUnittest, TestSecurityAuditUsesReadV2AndEnqueuesSecurityRecord);
+UNIT_TEST_CASE(AgentsightManagerUnittest, TestSecurityAuditFallsBackWhenV2SymbolsAreMissing);
+UNIT_TEST_CASE(AgentsightManagerUnittest, TestSecurityEventProducesSearchableLog);
+UNIT_TEST_CASE(AgentsightManagerUnittest, TestSecurityEventFallsBackToAgentIdType);
+UNIT_TEST_CASE(AgentsightManagerUnittest, TestSecurityFileActionPreservesProductClassification);
+UNIT_TEST_CASE(AgentsightManagerUnittest, TestLlmResponseProducesCrossLayerCorrelationIdentity);
+UNIT_TEST_CASE(AgentsightManagerUnittest, TestSecurityEventOmitsInvalidCorrelationIdentity);
+UNIT_TEST_CASE(AgentsightManagerUnittest, TestMalformedSecurityEventPreservesEnvelope);
 
 UNIT_TEST_MAIN
