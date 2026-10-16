@@ -19,6 +19,7 @@
 IsValidToSendFun gAdapterIsValidToSendFun = NULL;
 SendPbFun gAdapterSendPbFun = NULL;
 SendPbV2Fun gAdapterSendPbV2Fun = NULL;
+SendPipelineEventGroupFun gAdapterSendPipelineEventGroupFun = NULL;
 
 void RegisterLogtailCallBack(IsValidToSendFun checkFun, SendPbFun sendFun) {
     fprintf(stderr, "[GoPluginAdapter] register fun %p %p\n", checkFun, sendFun);
@@ -31,6 +32,11 @@ void RegisterLogtailCallBackV2(IsValidToSendFun checkFun, SendPbFun sendV1Fun, S
     gAdapterIsValidToSendFun = checkFun;
     gAdapterSendPbFun = sendV1Fun;
     gAdapterSendPbV2Fun = sendV2Fun;
+}
+
+void RegisterSendPipelineEventGroup(SendPipelineEventGroupFun sendFun) {
+    fprintf(stderr, "[GoPluginAdapter] register SendPipelineEventGroup %p\n", sendFun);
+    gAdapterSendPipelineEventGroupFun = sendFun;
 }
 
 int LogtailIsValidToSend(long long logstoreKey) {
@@ -69,9 +75,28 @@ int LogtailSendPbV2(const char* configName,
         configName, configNameSize, logstore, logstoreSize, pbBuffer, pbSize, lines, shardHash, shardHashSize);
 }
 
+int LogtailSendPipelineEventGroup(const char* configName,
+                                  int configNameSize,
+                                  const char* logstore,
+                                  int logstoreSize,
+                                  char* pbBuffer,
+                                  int pbSize,
+                                  int eventCount,
+                                  const char* shardHash,
+                                  int shardHashSize) {
+    if (NULL == gAdapterSendPipelineEventGroupFun) {
+        return -1;
+    }
+    return gAdapterSendPipelineEventGroupFun(
+        configName, configNameSize, logstore, logstoreSize, pbBuffer, pbSize, eventCount, shardHash, shardHashSize);
+}
+
 // # 300
 //   - Add LogtailSendPbV2.
 //   - Update RegisterLogtailCallBack to register LogtailSendPBV2.
+// # 400
+//   - Add LogtailSendPipelineEventGroup (coexists with SendPb/V2).
+//   - Add RegisterSendPipelineEventGroup (does not change the V2 ABI).
 int PluginAdapterVersion() {
-    return 300;
+    return 400;
 }

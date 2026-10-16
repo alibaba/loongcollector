@@ -49,6 +49,22 @@ func SendPbV2(configName string, logstore string, pbBuffer []byte, lines int, ha
 	return int(rstVal)
 }
 
+// SendPipelineEventGroup pushes a serialized PipelineEventGroup protobuf into
+// Logtail's sending queue. It is the PEG counterpart of SendPbV2 and coexists
+// with SendPb/SendPbV2; flusher_sls still uses SendPb until C2 switches Export.
+// An empty buffer is rejected in Go so the CGO boundary never sees a nil slice.
+func SendPipelineEventGroup(configName string, logstore string, pbBuffer []byte, eventCount int, hash string) int {
+	if len(pbBuffer) == 0 {
+		return -1
+	}
+	rstVal := C.LogtailSendPipelineEventGroup((*C.char)(util.StringPointer(configName)), C.int(len(configName)),
+		(*C.char)(util.StringPointer(logstore)), C.int(len(logstore)),
+		(*C.char)(unsafe.Pointer(&pbBuffer[0])), C.int(len(pbBuffer)),
+		C.int(eventCount),
+		(*C.char)(util.StringPointer(hash)), C.int(len(hash)))
+	return int(rstVal)
+}
+
 func IsValidToSend(logstoreKey int64) bool {
 	return C.LogtailIsValidToSend(C.longlong(logstoreKey)) == 0
 }

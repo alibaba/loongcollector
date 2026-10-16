@@ -38,6 +38,27 @@ void SendGroupToGoPlugin(const PipelineEventGroup& group, const string& packId) 
     LogtailPlugin::GetInstance()->ProcessPipelineEventGroup("test_config", serialized, packId);
 }
 
+string SerializeGroup(const PipelineEventGroup& group) {
+    models::PipelineEventGroup pb;
+    string errMsg;
+    EXPECT_TRUE(TransferPipelineEventGroupToPB(group, pb, errMsg)) << errMsg;
+    string serialized;
+    EXPECT_TRUE(pb.SerializeToString(&serialized));
+    return serialized;
+}
+
+int CallSendPipelineEventGroup(const string& configName, const string& serialized, const string& logstore = "ls") {
+    return LogtailPlugin::SendPipelineEventGroup(configName.c_str(),
+                                                 static_cast<int32_t>(configName.size()),
+                                                 logstore.c_str(),
+                                                 static_cast<int>(logstore.size()),
+                                                 const_cast<char*>(serialized.data()),
+                                                 static_cast<int32_t>(serialized.size()),
+                                                 1,
+                                                 "",
+                                                 0);
+}
+
 } // namespace
 
 class GoPipelineBridgeUnittest : public ::testing::Test {
@@ -84,6 +105,73 @@ TEST_F(GoPipelineBridgeUnittest, SpanGroupInvokesProcessPipelineEventGroup) {
     ASSERT_TRUE(parsed.ParseFromString(LogtailPluginMock::GetLastPipelineEventGroup()));
     EXPECT_EQ(models::PipelineEventGroup::PipelineEventsCase::kSpans, parsed.PipelineEvents_case());
     EXPECT_EQ("server-op", parsed.spans().events(0).name());
+}
+
+TEST_F(GoPipelineBridgeUnittest, SendPipelineEventGroupRejectsEmptyBuffer) {
+    EXPECT_EQ(-1, LogtailPlugin::SendPipelineEventGroup("cfg", 3, "", 0, nullptr, 0, 0, "", 0));
+    char dummy = 0;
+    EXPECT_EQ(-1, LogtailPlugin::SendPipelineEventGroup(nullptr, 0, "", 0, &dummy, 1, 0, "", 0));
+}
+
+TEST_F(GoPipelineBridgeUnittest, SendPipelineEventGroupRejectsInvalidPB) {
+    char junk[] = "not-a-pipeline-event-group-pb";
+    EXPECT_EQ(-1,
+              LogtailPlugin::SendPipelineEventGroup(
+                  "cfg", 3, "ls", 2, junk, static_cast<int32_t>(sizeof(junk) - 1), 1, "", 0));
+}
+
+TEST_F(GoPipelineBridgeUnittest, SendPipelineEventGroupMissingConfig) {
+    PipelineEventGroup group(mSourceBuffer);
+    auto* log = group.AddLogEvent();
+    log->SetContent(string("k"), string("v"));
+    string serialized = SerializeGroup(group);
+    ASSERT_FALSE(serialized.empty());
+
+    EXPECT_EQ(-2, CallSendPipelineEventGroup("no_such_c1_config", serialized));
+}
+
+TEST_F(GoPipelineBridgeUnittest, SendPbCoexistsAndReturnsMissingConfig) {
+    // C1 must not break the existing SendPb/V2 ABI: unknown config is still -2.
+    char dummy[] = "x";
+    EXPECT_EQ(
+        -2, LogtailPlugin::SendPb("no_such_c1_sendpb", 16, "ls", 2, dummy, static_cast<int32_t>(sizeof(dummy) - 1), 1));
+    EXPECT_EQ(-2,
+              LogtailPlugin::SendPbV2(
+                  "no_such_c1_sendpbv2", 18, "ls", 2, dummy, static_cast<int32_t>(sizeof(dummy) - 1), 1, "", 0));
+}
+
+TEST_F(GoPipelineBridgeUnittest, SendPipelineEventGroupAcceptsMetricAndSpanPB) {
+    {
+        PipelineEventGroup group(mSourceBuffer);
+        auto* metric = group.AddMetricEvent();
+        metric->SetName("cpu");
+        metric->SetValue(UntypedSingleValue{0.5});
+        string serialized = SerializeGroup(group);
+        ASSERT_FALSE(serialized.empty());
+        EXPECT_EQ(-2, CallSendPipelineEventGroup("no_such_c1_metric_config", serialized));
+    }
+    {
+        PipelineEventGroup group(mSourceBuffer);
+        auto* span = group.AddSpanEvent();
+        span->SetName("op");
+        span->SetTraceId("t");
+        span->SetSpanId("s");
+        string serialized = SerializeGroup(group);
+        ASSERT_FALSE(serialized.empty());
+        EXPECT_EQ(-2, CallSendPipelineEventGroup("no_such_c1_span_config", serialized));
+    }
+}
+
+TEST_F(GoPipelineBridgeUnittest, SendPipelineEventGroupContainerConfigEmptyProject) {
+    PipelineEventGroup group(mSourceBuffer);
+    auto* log = group.AddLogEvent();
+    log->SetContent(string("k"), string("v"));
+    string serialized = SerializeGroup(group);
+    ASSERT_FALSE(serialized.empty());
+
+    // Matches LogtailPlugin constructor: mPluginContainerConfig.mLogstore = "logtail_containers".
+    // C1 accepts the PEG and no-ops the profile flusher (still on SendPb).
+    EXPECT_EQ(0, CallSendPipelineEventGroup("logtail_containers", serialized));
 }
 
 } // namespace logtail

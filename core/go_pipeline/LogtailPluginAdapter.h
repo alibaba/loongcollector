@@ -46,11 +46,25 @@ typedef int (*SendPbV2Fun)(const char* configName,
                            int lines,
                            const char* shardHash,
                            int shardHashSize);
+typedef int (*SendPipelineEventGroupFun)(const char* configName,
+                                         int configNameSize,
+                                         const char* logstore,
+                                         int logstoreSize,
+                                         char* pbBuffer,
+                                         int pbSize,
+                                         int eventCount,
+                                         const char* shardHash,
+                                         int shardHashSize);
 
 PLUGIN_ADAPTER_API void RegisterLogtailCallBack(IsValidToSendFun checkFun, SendPbFun sendFun);
 
 PLUGIN_ADAPTER_API void
 RegisterLogtailCallBackV2(IsValidToSendFun checkFun, SendPbFun sendV1Fun, SendPbV2Fun sendV2Fun);
+
+// Additive registration so SendPipelineEventGroup can coexist with SendPb/V2
+// without breaking the V2 adapter ABI. Missing symbol on old adapters is OK:
+// LogtailSendPipelineEventGroup then returns -1.
+PLUGIN_ADAPTER_API void RegisterSendPipelineEventGroup(SendPipelineEventGroupFun sendFun);
 
 PLUGIN_ADAPTER_API int LogtailIsValidToSend(long long logstoreKey);
 
@@ -71,6 +85,16 @@ PLUGIN_ADAPTER_API int LogtailSendPbV2(const char* configName,
                                        int lines,
                                        const char* shardHash,
                                        int shardHashSize);
+
+PLUGIN_ADAPTER_API int LogtailSendPipelineEventGroup(const char* configName,
+                                                     int configNameSize,
+                                                     const char* logstore,
+                                                     int logstoreSize,
+                                                     char* pbBuffer,
+                                                     int pbSize,
+                                                     int eventCount,
+                                                     const char* shardHash,
+                                                     int shardHashSize);
 
 
 // version for logtail plugin adapter, used for check plugin adapter version
