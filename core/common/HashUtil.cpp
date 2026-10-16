@@ -333,8 +333,12 @@ std::string CalcMD5(const std::string& message) {
 }
 
 std::string CalcSHA256Hex(const std::string& message) {
+    return CalcSHA256Hex(message.data(), message.size());
+}
+
+std::string CalcSHA256Hex(const char* data, size_t len) {
     unsigned char digest[SHA256_DIGEST_LENGTH];
-    SHA256(reinterpret_cast<const unsigned char*>(message.data()), message.size(), digest);
+    SHA256(reinterpret_cast<const unsigned char*>(data), len, digest);
     std::ostringstream oss;
     oss << std::hex << std::setfill('0');
     for (const auto b : digest) {

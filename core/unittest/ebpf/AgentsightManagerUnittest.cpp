@@ -236,13 +236,21 @@ std::unique_ptr<AgentSightSymbolTable> makeFullSymbolTable() {
     return t;
 }
 
-std::shared_ptr<AgentsightLlmRecord> makeMinimalLlmRecord(const char* configName, const char* sessionId) {
+std::shared_ptr<AgentsightLlmRecord> makeMinimalLlmRecord(const char* configName,
+                                                          const char* sessionId,
+                                                          const char* containerId = nullptr,
+                                                          const char* requestMessages = nullptr) {
     static AgentsightLLMData data{};
     std::memset(&data, 0, sizeof(data));
     data.session_id = sessionId;
     data.conversation_id = "turn-ut";
     data.response_id = "resp-ut";
     data.timestamp_ns = 1U;
+    // Container id / messages must go through the FFI struct: record string members are views
+    // into the record's own arena, only populated by the constructor.
+    data.container_id = containerId;
+    data.request_messages = requestMessages;
+    data.request_messages_len = requestMessages == nullptr ? 0U : static_cast<uint32_t>(std::strlen(requestMessages));
     return std::make_shared<AgentsightLlmRecord>(std::string(configName), data);
 }
 
@@ -287,7 +295,8 @@ std::shared_ptr<AgentsightHttpsRecord> makeHttpsRecord(const char* configName, c
     d.response_headers_len = static_cast<uint32_t>(s.responseHeaders.size());
     d.response_body = s.responseBody.data();
     d.response_body_len = static_cast<uint32_t>(s.responseBody.size());
-    // The record deep-copies every field, so `s` may die immediately after this returns.
+    // The record copies every field into its own arena, so `s` may die immediately after this
+    // returns; the returned views stay valid for the record's (then the group's) lifetime.
     return std::make_shared<AgentsightHttpsRecord>(std::string(configName), d);
 }
 
@@ -556,6 +565,9 @@ public:
     void TestContainerTagsAttachedForLlmEvent();
     void TestContainerTagsAttachedForHttpsEvent();
     void TestContainerTagsMissDegradesSilently();
+    void TestRecordFieldsEmittedNoCopy();
+    void TestComputedFieldsSurviveRecordDeath();
+    void TestUnemittedComputeFieldsReleasedWithRecord();
 
 protected:
     std::shared_ptr<AgentSightTestEBPFAdapter> mAgentSightAdapter;
@@ -1547,8 +1559,7 @@ void AgentsightManagerUnittest::TestContainerTagsAttachedForLlmEvent() {
     // EventStreamFormat is static state shared across tests; pin the split shape explicitly.
     agentsightOptions().mAgentsightEventStreamFormat = true;
 
-    auto rec = makeMinimalLlmRecord(kConfig, "sess-container");
-    rec->mContainerId = kUtContainerId;
+    auto rec = makeMinimalLlmRecord(kConfig, "sess-container", kUtContainerId);
     APSARA_TEST_EQUAL(0, mgr->HandleEvent(rec));
 
     std::unique_ptr<ProcessQueueItem> item;
@@ -1585,8 +1596,8 @@ void AgentsightManagerUnittest::TestContainerTagsMissDegradesSilently() {
     // Unknown container ID (container gone from the snapshot, or a short/variant form): the event
     // is still pushed and simply carries no container tags.
     {
-        auto rec = makeMinimalLlmRecord(kConfig, "sess-unknown-container");
-        rec->mContainerId = "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
+        auto rec = makeMinimalLlmRecord(
+            kConfig, "sess-unknown-container", "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
         APSARA_TEST_EQUAL(0, mgr->HandleEvent(rec));
         std::unique_ptr<ProcessQueueItem> item;
         const auto logs = popLogEvents(item);
@@ -1606,6 +1617,137 @@ void AgentsightManagerUnittest::TestContainerTagsMissDegradesSilently() {
             APSARA_TEST_FALSE(item->mEventGroup.HasTag(StringView(key)));
         }
     }
+    mgr->Destroy();
+}
+
+/// Zero-copy contract: record fields must be emitted as views into the record's own arena —
+/// pointer equality proves no second copy happened — for both an LLM identity field and the raw
+/// HTTP response body (the largest payload on the raw path).
+void AgentsightManagerUnittest::TestRecordFieldsEmittedNoCopy() {
+    const char* kConfig = "p_nocopy_contract";
+    auto mgr = makeManager();
+    // EventStreamFormat is static state shared across tests; pin the split shape explicitly.
+    agentsightOptions().mAgentsightEventStreamFormat = true;
+    registerConfigWithPoppableQueue(*mgr, kConfig);
+
+    {
+        auto rec = makeMinimalLlmRecord(kConfig, "sess-nocopy");
+        APSARA_TEST_EQUAL(0, mgr->HandleEvent(rec));
+        std::unique_ptr<ProcessQueueItem> item;
+        const auto logs = popLogEvents(item);
+        APSARA_TEST_TRUE(!logs.empty());
+        const StringView emitted = logs[0]->GetContent(StringView("gen_ai.session.id"));
+        APSARA_TEST_EQUAL("sess-nocopy", std::string(emitted.data(), emitted.size()));
+        APSARA_TEST_TRUE(emitted.data() == rec->mSessionId.data());
+    }
+    {
+        HttpsSpec spec;
+        spec.statusCode = 200;
+        spec.responseBody = "hello-nocopy";
+        auto rec = makeHttpsRecord(kConfig, spec);
+        APSARA_TEST_EQUAL(0, mgr->HandleEvent(rec));
+        std::unique_ptr<ProcessQueueItem> item;
+        const auto logs = popLogEvents(item);
+        APSARA_TEST_EQUAL(2UL, logs.size());
+        const StringView emitted = logs[1]->GetContent(StringView("http.response.body.content"));
+        APSARA_TEST_EQUAL("hello-nocopy", std::string(emitted.data(), emitted.size()));
+        APSARA_TEST_TRUE(emitted.data() == rec->mResponseBody.data());
+    }
+    mgr->Destroy();
+}
+
+/// Computed values (delta / step id / UUIDs) are copied into the arena the group co-owns, so every
+/// emitted view stays valid after the record — the arena's original owner — is destroyed. Under
+/// ASAN this catches any NoCopy view that wrongly referenced record-local or stack memory.
+void AgentsightManagerUnittest::TestComputedFieldsSurviveRecordDeath() {
+    const char* kConfig = "p_computed_arena";
+    auto mgr = makeManager();
+    agentsightOptions().mAgentsightEventStreamFormat = true;
+    registerConfigWithPoppableQueue(*mgr, kConfig);
+
+    static const std::string kMessages = R"([{"role":"user","parts":[{"type":"text","text":"hi-survive"}]}])";
+    std::unique_ptr<ProcessQueueItem> item;
+    std::vector<LogEvent*> logs;
+    {
+        auto rec = makeMinimalLlmRecord(kConfig, "sess-survive", nullptr, kMessages.c_str());
+        APSARA_TEST_EQUAL(0, mgr->HandleEvent(rec));
+        logs = popLogEvents(item);
+        // rec (and its arena reference) dies here; the group must keep the bytes alive.
+    }
+    APSARA_TEST_TRUE(!logs.empty());
+    const std::string delta = contentOf(*logs[0], "gen_ai.input.messages_delta");
+    APSARA_TEST_TRUE(delta.find("hi-survive") != std::string::npos);
+    const StringView stepId = logs[0]->GetContent(StringView("gen_ai.step.id"));
+    APSARA_TEST_EQUAL("turn-ut:s1", std::string(stepId.data(), stepId.size()));
+    mgr->Destroy();
+}
+
+/// Memory-lifetime regression for the zero-copy refactor (PR review follow-up): in the default
+/// MessageDeltaOnly mode the full request-messages JSON is compute-only and must NOT be pinned
+/// inside the event group. Multi-round shape mirroring a long LLM session: round 1 commits a large
+/// (~64 KiB) context into the session cache; round 2 resends that context plus one small new
+/// message and emits only the small delta. Asserts the full context is neither emitted nor hidden
+/// in the group's arena (DataSize stays small), and that after the record dies at batch end the
+/// emitted arena-backed views remain valid via the group's co-ownership.
+void AgentsightManagerUnittest::TestUnemittedComputeFieldsReleasedWithRecord() {
+    const char* kConfig = "p_compute_release";
+    auto mgr = makeManager();
+    // Both flags are static state shared across tests; pin the production defaults explicitly.
+    agentsightOptions().mAgentsightEventStreamFormat = true;
+    agentsightOptions().mAgentsightMessageDeltaOnly = true;
+    registerConfigWithPoppableQueue(*mgr, kConfig);
+
+    const std::string fillerText(64 * 1024, 'x');
+    const std::string fillerMsg = R"({"role":"user","parts":[{"type":"text","text":")" + fillerText + R"("}]})";
+    const std::string freshMsg = R"({"role":"user","parts":[{"type":"text","text":"fresh-tail"}]})";
+    const std::string round1 = "[" + fillerMsg + "]";
+    const std::string round2 = "[" + fillerMsg + "," + freshMsg + "]";
+
+    // Round 1: seeds the session cache (messageCount=1, messagesHash over the filler message).
+    {
+        std::unique_ptr<ProcessQueueItem> item;
+        auto rec = makeMinimalLlmRecord(kConfig, "sess-bigctx", nullptr, round1.c_str());
+        APSARA_TEST_EQUAL(0, mgr->HandleEvent(rec));
+        const auto logs = popLogEvents(item);
+        APSARA_TEST_TRUE(!logs.empty());
+        // First round in session: delta is the whole (system-free) array.
+        APSARA_TEST_TRUE(contentOf(*logs[0], "gen_ai.input.messages_delta").find(fillerText) != std::string::npos);
+    }
+
+    // Round 2: same big context + one small new message.
+    std::unique_ptr<ProcessQueueItem> item;
+    std::vector<LogEvent*> logs;
+    std::weak_ptr<SourceBuffer> emitArenaWeak;
+    StringView sessionIdView;
+    {
+        auto rec = makeMinimalLlmRecord(kConfig, "sess-bigctx", nullptr, round2.c_str());
+        emitArenaWeak = rec->GetSourceBuffer();
+        APSARA_TEST_EQUAL(0, mgr->HandleEvent(rec));
+        logs = popLogEvents(item);
+        APSARA_TEST_EQUAL(2UL, logs.size());
+
+        // Delta-only mode: the full request messages are never emitted...
+        APSARA_TEST_TRUE(logs[0]->GetContent(StringView("gen_ai.input.messages")).empty());
+        // ...only the small new tail is.
+        const std::string delta = contentOf(*logs[0], "gen_ai.input.messages_delta");
+        APSARA_TEST_TRUE(delta.find("fresh-tail") != std::string::npos);
+        APSARA_TEST_TRUE(delta.find(fillerText) == std::string::npos);
+        APSARA_TEST_TRUE(delta.size() * 8 < fillerText.size());
+
+        // Accounting: the group only carries what was emitted — the un-emitted 64 KiB context is
+        // not hidden inside its arena, so size-based batching/flush sees the true footprint.
+        APSARA_TEST_TRUE(item->mEventGroup.DataSize() < fillerText.size());
+
+        // Arena-backed fields are emitted zero-copy (pointer identity), checked while rec lives.
+        sessionIdView = logs[0]->GetContent(StringView("gen_ai.session.id"));
+        APSARA_TEST_EQUAL(rec->mSessionId.data(), sessionIdView.data());
+        // rec dies here = end of the handler batch; the compute-only std::strings die with it.
+    }
+
+    // The group co-owns the emit arena: emitted views stay valid after the record's death.
+    APSARA_TEST_TRUE(!emitArenaWeak.expired());
+    APSARA_TEST_EQUAL("sess-bigctx", std::string(sessionIdView.data(), sessionIdView.size()));
+    APSARA_TEST_TRUE(contentOf(*logs[0], "gen_ai.input.messages_delta").find("fresh-tail") != std::string::npos);
     mgr->Destroy();
 }
 
@@ -1649,5 +1791,8 @@ UNIT_TEST_CASE(AgentsightManagerUnittest, TestAttachAgentsightContainerTagsFromI
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestContainerTagsAttachedForLlmEvent);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestContainerTagsAttachedForHttpsEvent);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestContainerTagsMissDegradesSilently);
+UNIT_TEST_CASE(AgentsightManagerUnittest, TestRecordFieldsEmittedNoCopy);
+UNIT_TEST_CASE(AgentsightManagerUnittest, TestComputedFieldsSurviveRecordDeath);
+UNIT_TEST_CASE(AgentsightManagerUnittest, TestUnemittedComputeFieldsReleasedWithRecord);
 
 UNIT_TEST_MAIN
