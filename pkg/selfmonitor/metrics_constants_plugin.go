@@ -30,7 +30,15 @@ const (
 
 // label values
 const (
-	MetricLabelValueMetricCategoryPlugin = "plugin"
+	MetricLabelValueMetricCategoryPlugin       = "plugin"
+	MetricLabelValueMetricCategoryPluginSource = "plugin_source"
+)
+
+// plugin_source label keys (aligned with C++ METRIC_LABEL_KEY_FILE_*)
+const (
+	MetricLabelKeyFileDev   = "file_dev"
+	MetricLabelKeyFileInode = "file_inode"
+	MetricLabelKeyFileName  = "file_name"
 )
 
 // metric keys
@@ -43,6 +51,14 @@ const (
 	MetricPluginOutSizeBytes        = "out_size_bytes"
 	MetricPluginTotalDelayMs        = "total_delay_ms"
 	MetricPluginTotalProcessTimeMs  = "total_process_time_ms"
+)
+
+/**********************************************************
+*   plugin_source (aligned with C++ PluginMetrics.cpp)
+**********************************************************/
+const (
+	MetricPluginSourceReadOffsetBytes = "read_offset_bytes"
+	MetricPluginSourceSizeBytes       = "size_bytes"
 )
 
 /**********************************************************
