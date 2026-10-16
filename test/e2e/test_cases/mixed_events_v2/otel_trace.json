@@ -1,0 +1,1 @@
+{"resourceSpans":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"e2e-mixed"}}]},"scopeSpans":[{"scope":{"name":"e2e.mixed"},"spans":[{"traceId":"5b8aa5a2d2c872e8321cf37308d69df2","spanId":"051581bf3cbd71c1","name":"e2e-mixed-span","kind":1,"startTimeUnixNano":"1689831889338531120","endTimeUnixNano":"1689831889338737020","status":{}}]}]}]}
