@@ -37,6 +37,7 @@ public:
     void TestAgentsightEventStreamFormatParse();
     void TestAgentsightMessageDeltaOnlyDefaultAndParse();
     void TestAgentsightRawHttpsFallbackDefaultAndParse();
+    void TestAgentsightMemoryLimitDefaultAndParse();
 };
 
 void SecurityOptionsUnittest::TestAgentsightNoProbeConfigFallsBackToBuiltin() {
@@ -275,6 +276,87 @@ void SecurityOptionsUnittest::TestAgentsightRawHttpsFallbackDefaultAndParse() {
     APSARA_TEST_FALSE(opt.mAgentsightRawHttpsFallback);
 }
 
+void SecurityOptionsUnittest::TestAgentsightMemoryLimitDefaultAndParse() {
+    CollectionPipelineContext ctx;
+    ctx.SetConfigName("cfg1");
+    Json::Value config;
+    std::string err;
+    SecurityOptions opt;
+    const uint64_t kDefaultBytes = static_cast<uint64_t>(kAgentsightMemoryLimitMBDefault) * 1024 * 1024;
+
+    // TC-01: off by default — absent ProbeConfig and empty ProbeConfig both keep the feature inert.
+    APSARA_TEST_TRUE(opt.Init(SecurityProbeType::AGENTSIGHT_OBSERVE, config, &ctx, "input_agentsight"));
+    APSARA_TEST_FALSE(opt.mAgentsightMemoryLimitEnabled);
+    APSARA_TEST_EQUAL(kDefaultBytes, opt.mAgentsightMemoryLimitBytes);
+
+    APSARA_TEST_TRUE(ParseJsonTable(R"({"ProbeConfig":{}})", config, err));
+    APSARA_TEST_TRUE(opt.Init(SecurityProbeType::AGENTSIGHT_OBSERVE, config, &ctx, "input_agentsight"));
+    APSARA_TEST_FALSE(opt.mAgentsightMemoryLimitEnabled);
+    APSARA_TEST_EQUAL(kDefaultBytes, opt.mAgentsightMemoryLimitBytes);
+
+    // TC-02: switch alone enables with the 256MB default.
+    APSARA_TEST_TRUE(ParseJsonTable(R"({"ProbeConfig":{"MemoryLimitEnabled":true}})", config, err));
+    APSARA_TEST_TRUE(opt.Init(SecurityProbeType::AGENTSIGHT_OBSERVE, config, &ctx, "input_agentsight"));
+    APSARA_TEST_TRUE(opt.mAgentsightMemoryLimitEnabled);
+    APSARA_TEST_EQUAL(kDefaultBytes, opt.mAgentsightMemoryLimitBytes);
+
+    // TC-03: explicit MB value is converted to bytes.
+    APSARA_TEST_TRUE(ParseJsonTable(R"({"ProbeConfig":{"MemoryLimitEnabled":true,"MemoryLimitMB":64}})", config, err));
+    APSARA_TEST_TRUE(opt.Init(SecurityProbeType::AGENTSIGHT_OBSERVE, config, &ctx, "input_agentsight"));
+    APSARA_TEST_TRUE(opt.mAgentsightMemoryLimitEnabled);
+    APSARA_TEST_EQUAL(64ULL * 1024 * 1024, opt.mAgentsightMemoryLimitBytes);
+
+    // TC-04: out-of-range values clamp silently instead of failing the config.
+    APSARA_TEST_TRUE(ParseJsonTable(R"({"ProbeConfig":{"MemoryLimitMB":1}})", config, err));
+    APSARA_TEST_TRUE(opt.Init(SecurityProbeType::AGENTSIGHT_OBSERVE, config, &ctx, "input_agentsight"));
+    APSARA_TEST_EQUAL(static_cast<uint64_t>(kAgentsightMemoryLimitMBMin) * 1024 * 1024,
+                      opt.mAgentsightMemoryLimitBytes);
+
+    APSARA_TEST_TRUE(ParseJsonTable(R"({"ProbeConfig":{"MemoryLimitMB":99999}})", config, err));
+    APSARA_TEST_TRUE(opt.Init(SecurityProbeType::AGENTSIGHT_OBSERVE, config, &ctx, "input_agentsight"));
+    APSARA_TEST_EQUAL(static_cast<uint64_t>(kAgentsightMemoryLimitMBMax) * 1024 * 1024,
+                      opt.mAgentsightMemoryLimitBytes);
+
+    // TC-05: wrong types warn (PARAM_WARNING_IGNORE) and keep the defaults; Init still succeeds.
+    APSARA_TEST_TRUE(
+        ParseJsonTable(R"({"ProbeConfig":{"MemoryLimitEnabled":"true","MemoryLimitMB":"abc"}})", config, err));
+    APSARA_TEST_TRUE(opt.Init(SecurityProbeType::AGENTSIGHT_OBSERVE, config, &ctx, "input_agentsight"));
+    APSARA_TEST_FALSE(opt.mAgentsightMemoryLimitEnabled);
+    APSARA_TEST_EQUAL(kDefaultBytes, opt.mAgentsightMemoryLimitBytes);
+
+    // TC-06: Init resets before parsing, so a config without the keys never inherits a previous
+    // hot-update's values (residue guard).
+    APSARA_TEST_TRUE(ParseJsonTable(R"({"ProbeConfig":{"MemoryLimitEnabled":true,"MemoryLimitMB":64}})", config, err));
+    APSARA_TEST_TRUE(opt.Init(SecurityProbeType::AGENTSIGHT_OBSERVE, config, &ctx, "input_agentsight"));
+    APSARA_TEST_TRUE(opt.mAgentsightMemoryLimitEnabled);
+    APSARA_TEST_EQUAL(64ULL * 1024 * 1024, opt.mAgentsightMemoryLimitBytes);
+
+    APSARA_TEST_TRUE(ParseJsonTable(R"({"ProbeConfig":{}})", config, err));
+    APSARA_TEST_TRUE(opt.Init(SecurityProbeType::AGENTSIGHT_OBSERVE, config, &ctx, "input_agentsight"));
+    APSARA_TEST_FALSE(opt.mAgentsightMemoryLimitEnabled);
+    APSARA_TEST_EQUAL(kDefaultBytes, opt.mAgentsightMemoryLimitBytes);
+    APSARA_TEST_TRUE(opt.mAgentsightRuntimeLimitsJson.empty());
+
+    // TC-07: RuntimeLimitsJson is a verbatim string passthrough (well-formedness is validated where
+    // it is pushed, not here); default empty, wrong type warns and keeps empty, no residue.
+    APSARA_TEST_TRUE(ParseJsonTable(R"({"ProbeConfig":{"RuntimeLimitsJson":"{\"ring_buffer_mb\":8}"}})", config, err));
+    APSARA_TEST_TRUE(opt.Init(SecurityProbeType::AGENTSIGHT_OBSERVE, config, &ctx, "input_agentsight"));
+    APSARA_TEST_EQUAL(std::string(R"({"ring_buffer_mb":8})"), opt.mAgentsightRuntimeLimitsJson);
+    // The field is independent of the byte-gate switch: JSON present, gate still off by default.
+    APSARA_TEST_FALSE(opt.mAgentsightMemoryLimitEnabled);
+
+    APSARA_TEST_TRUE(ParseJsonTable(R"({"ProbeConfig":{"RuntimeLimitsJson":42}})", config, err));
+    APSARA_TEST_TRUE(opt.Init(SecurityProbeType::AGENTSIGHT_OBSERVE, config, &ctx, "input_agentsight"));
+    APSARA_TEST_TRUE(opt.mAgentsightRuntimeLimitsJson.empty());
+
+    APSARA_TEST_TRUE(ParseJsonTable(R"({"ProbeConfig":{"RuntimeLimitsJson":"{\"pid_cache_size\":64}"}})", config, err));
+    APSARA_TEST_TRUE(opt.Init(SecurityProbeType::AGENTSIGHT_OBSERVE, config, &ctx, "input_agentsight"));
+    APSARA_TEST_EQUAL(std::string(R"({"pid_cache_size":64})"), opt.mAgentsightRuntimeLimitsJson);
+    APSARA_TEST_TRUE(ParseJsonTable(R"({"ProbeConfig":{}})", config, err));
+    APSARA_TEST_TRUE(opt.Init(SecurityProbeType::AGENTSIGHT_OBSERVE, config, &ctx, "input_agentsight"));
+    APSARA_TEST_TRUE(opt.mAgentsightRuntimeLimitsJson.empty()); // residue guard
+}
+
 UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightNoProbeConfigFallsBackToBuiltin)
 UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightProbeConfigWrongTypeFallsBackToBuiltin)
 UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightProbeConfigParsesOptionalFields)
@@ -290,5 +372,6 @@ UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightProbeConfigHttpsHttpInvali
 UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightEventStreamFormatParse)
 UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightMessageDeltaOnlyDefaultAndParse)
 UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightRawHttpsFallbackDefaultAndParse)
+UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightMemoryLimitDefaultAndParse)
 
 UNIT_TEST_MAIN

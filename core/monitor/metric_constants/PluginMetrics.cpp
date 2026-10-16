@@ -105,6 +105,10 @@ const string METRIC_LABEL_VALUE_PLUGIN_TYPE_PROCESS_OBSERVER = "process_observer
 const string METRIC_LABEL_VALUE_PLUGIN_TYPE_PROCESS_SECURITY = "process_security";
 
 const string METRIC_PLUGIN_EBPF_LOSS_KERNEL_EVENTS_TOTAL = "ebpf_loss_kernel_events_total";
+const string METRIC_PLUGIN_EBPF_AGENTSIGHT_MEMORY_LIMIT_DROPPED_EVENTS_TOTAL
+    = "ebpf_agentsight_memory_limit_dropped_events_total";
+const string METRIC_PLUGIN_EBPF_AGENTSIGHT_MEMORY_LIMIT_DROPPED_BYTES_TOTAL
+    = "ebpf_agentsight_memory_limit_dropped_bytes_total";
 const string METRIC_PLUGIN_EBPF_NETWORK_OBSERVER_CONNECTION_NUM = "connection_num";
 const string METRIC_PLUGIN_EBPF_NETWORK_OBSERVER_WORKER_HANDLE_EVENTS_TOTAL = "handle_events_total";
 const string METRIC_PLUGIN_EBPF_NETWORK_OBSERVER_PROTOCOL_PARSE_RECORDS_TOTAL = "parse_records_total";

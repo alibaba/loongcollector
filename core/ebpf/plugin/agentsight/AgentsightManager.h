@@ -25,6 +25,7 @@
 #include "common/LRUCache.h"
 #include "ebpf/EBPFAdapter.h"
 #include "ebpf/plugin/AbstractManager.h"
+#include "ebpf/plugin/agentsight/AgentsightMemoryBudget.h"
 #include "ebpf/plugin/agentsight/AgentsightMessageUtil.h"
 #include "monitor/metric_models/ReentrantMetricsRecord.h"
 
@@ -105,6 +106,8 @@ public:
     bool SessionInputCacheContainsForTest(const std::string& sessionKey) const {
         return mSessionInputCache.contains(sessionKey);
     }
+
+    const AgentsightByteBudget& GetMemoryBudgetForTest() const { return *mMemBudget; }
 #endif
 
 protected:
@@ -112,6 +115,8 @@ protected:
     int resume(const PluginOptions& options) override;
 
 private:
+    struct StreamMetrics; // defined below; forward-declared for OnMemoryLimitDrop's signature
+
     static void OnLlmCallback(const AgentsightLLMData* data, void* user_data);
     /// Raw HTTP fallback for traffic AgentSight could not parse as an LLM call. Only registered with
     /// handle_read when mRawHttpsFallback is on; otherwise the Rust side never emits these events.
@@ -126,6 +131,12 @@ private:
     void LogAgentSightError(const char* what);
     void releaseMetricRefs();
     void clearSessionInputState();
+    /// Memory-limit drop bookkeeping: stream + loss counters, then a rate-limited WARNING carrying
+    /// current usage, the limit and cumulative drop totals. Callback-serial domain only (runs
+    /// inside handle_read while the poller holds mLibMutex — same contract as OnLlmCallback).
+    void OnMemoryLimitDrop(uint64_t eventBytes, StreamMetrics& stream, const char* streamName);
+    /// One-shot INFO when events start flowing again after a dropping period. Same domain.
+    void NoteMemoryLimitRecovered();
 
     static constexpr size_t kMaxSessionInputStates = 4096;
 
@@ -173,16 +184,32 @@ private:
         CounterPtr pushLogGroupTotal;
         /// Plugin-level counterpart of mLossKernelEventsTotal: same increments, but attributable.
         CounterPtr lossEventsTotal;
+        /// Events/bytes rejected by the AgentSight memory limit (MemoryLimitEnabled). Also counted
+        /// in the loss counters above; these exist to attribute drops to the limit specifically.
+        CounterPtr memoryLimitDroppedEventsTotal;
+        CounterPtr memoryLimitDroppedBytesTotal;
 
         void reset() {
             inEventsTotal.reset();
             pushLogsTotal.reset();
             pushLogGroupTotal.reset();
             lossEventsTotal.reset();
+            memoryLimitDroppedEventsTotal.reset();
+            memoryLimitDroppedBytesTotal.reset();
         }
     };
     StreamMetrics mRawHttpMetrics;
     StreamMetrics mGenAiMetrics;
+
+    /// Byte budget for C++-side in-flight events (see AgentsightMemoryBudget.h). Shared with the
+    /// records so it outlives the manager when queued records outlive it. limit==0 = disabled.
+    std::shared_ptr<AgentsightByteBudget> mMemBudget;
+    /// Rate-limit state for the memory-limit WARNING. Plain members on purpose: touched only from
+    /// the FFI callbacks, which are serialised (they run inside handle_read while OnEpollReadable
+    /// holds mLibMutex) — the same invariant mConfigName reads rely on. Do NOT touch from other
+    /// threads without revisiting this.
+    int64_t mLastMemLimitLogSec = 0;
+    bool mMemLimitDropping = false;
 
     std::vector<MetricLabels> mRefAndLabels;
     PluginMetricManagerPtr mMetricMgr;

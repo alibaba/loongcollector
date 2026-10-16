@@ -158,6 +158,11 @@ extern const std::string METRIC_LABEL_VALUE_META_TYPE_L7;
 extern const std::string METRIC_LABEL_VALUE_META_TYPE_NET;
 
 extern const std::string METRIC_PLUGIN_EBPF_LOSS_KERNEL_EVENTS_TOTAL;
+// AgentSight memory limit (MemoryLimitEnabled): new events rejected by the C++-side byte budget.
+// Also folded into the loss counters above; these attribute drops to the limit specifically and
+// carry the same `record_type` (raw_http / gen_ai) label as the stream they were dropped from.
+extern const std::string METRIC_PLUGIN_EBPF_AGENTSIGHT_MEMORY_LIMIT_DROPPED_EVENTS_TOTAL;
+extern const std::string METRIC_PLUGIN_EBPF_AGENTSIGHT_MEMORY_LIMIT_DROPPED_BYTES_TOTAL;
 extern const std::string METRIC_PLUGIN_EBPF_NETWORK_OBSERVER_CONNECTION_NUM;
 extern const std::string METRIC_PLUGIN_EBPF_NETWORK_OBSERVER_WORKER_HANDLE_EVENTS_TOTAL;
 extern const std::string METRIC_PLUGIN_EBPF_NETWORK_OBSERVER_PROTOCOL_PARSE_RECORDS_TOTAL;

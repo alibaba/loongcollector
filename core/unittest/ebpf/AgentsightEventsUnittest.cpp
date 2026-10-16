@@ -28,6 +28,8 @@ public:
     void TestLlmRecordCopiesProcessNameAndCmdline();
     void TestHttpsRecordCopiesProcessMetadata();
     void TestHttpsRecordCopiesPayloadsAndIdentity();
+    void TestEstimateRecordBytes();
+    void TestMemoryBudgetAdoptReleaseLifecycle();
 };
 
 void AgentsightEventsUnittest::TestLlmRecordCopiesNonNullSizedBuffers() {
@@ -162,9 +164,89 @@ void AgentsightEventsUnittest::TestHttpsRecordCopiesPayloadsAndIdentity() {
     APSARA_TEST_EQUAL(std::string(kResBody, sizeof(kResBody)), r.mResponseBody);
 }
 
+void AgentsightEventsUnittest::TestEstimateRecordBytes() {
+    // All-zero FFI structs: the estimate must not crash (null C strings, empty (ptr, len) pairs)
+    // and stays non-zero because the fixed record overhead is always counted.
+    {
+        AgentsightLLMData d{};
+        APSARA_TEST_TRUE(EstimateAgentsightLlmRecordBytes(d) >= sizeof(AgentsightLlmRecord));
+        AgentsightHttpsData h{};
+        APSARA_TEST_TRUE(EstimateAgentsightHttpsRecordBytes(h) >= sizeof(AgentsightHttpsRecord));
+    }
+
+    // Payloads are counted by len, not by strlen: an embedded NUL keeps its trailing bytes in the
+    // estimate (same lens the deep copy uses, so acquire and release can never disagree).
+    {
+        static const char kBody[] = {'a', '\0', 'b', 'c'};
+        AgentsightHttpsData h{};
+        h.request_body = kBody;
+        h.request_body_len = sizeof(kBody);
+        const uint64_t withBody = EstimateAgentsightHttpsRecordBytes(h);
+        h.request_body = nullptr;
+        h.request_body_len = 0;
+        const uint64_t without = EstimateAgentsightHttpsRecordBytes(h);
+        APSARA_TEST_EQUAL(withBody - without, static_cast<uint64_t>(sizeof(kBody)));
+    }
+
+    // NUL-terminated fields contribute their content; a full non-terminated cmdline buffer is
+    // bounded to 128 bytes (strnlen), never a scan past the struct.
+    {
+        AgentsightLLMData d{};
+        const uint64_t base = EstimateAgentsightLlmRecordBytes(d);
+        std::memset(d.cmdline, 'x', sizeof(d.cmdline));
+        static const char kSid[] = "sess-estimate";
+        d.session_id = kSid;
+        APSARA_TEST_EQUAL(EstimateAgentsightLlmRecordBytes(d) - base, static_cast<uint64_t>(128 + sizeof(kSid) - 1));
+    }
+}
+
+void AgentsightEventsUnittest::TestMemoryBudgetAdoptReleaseLifecycle() {
+    auto budget = std::make_shared<AgentsightByteBudget>();
+
+    // limit == 0 → disabled: admission never blocks and nothing is accounted.
+    APSARA_TEST_TRUE(budget->TryAcquire(1000) == AgentsightByteBudget::AcquireResult::kDisabled);
+    APSARA_TEST_EQUAL(static_cast<uint64_t>(0), budget->Used());
+
+    budget->SetLimit(10);
+    APSARA_TEST_TRUE(budget->TryAcquire(4) == AgentsightByteBudget::AcquireResult::kAcquired);
+    APSARA_TEST_EQUAL(static_cast<uint64_t>(4), budget->Used());
+    // Over-limit acquire is rejected, rolls back, and bumps the drop counters exactly once.
+    APSARA_TEST_TRUE(budget->TryAcquire(7) == AgentsightByteBudget::AcquireResult::kRejected);
+    APSARA_TEST_EQUAL(static_cast<uint64_t>(4), budget->Used());
+    APSARA_TEST_EQUAL(static_cast<uint64_t>(1), budget->DroppedEvents());
+    APSARA_TEST_EQUAL(static_cast<uint64_t>(7), budget->DroppedBytes());
+
+    // SetLimit never clears Used (hot-update conservation).
+    budget->SetLimit(0);
+    APSARA_TEST_EQUAL(static_cast<uint64_t>(4), budget->Used());
+    budget->SetLimit(10);
+
+    // Release is saturating: an over-release clamps at zero instead of wrapping around.
+    budget->Release(4);
+    APSARA_TEST_EQUAL(static_cast<uint64_t>(0), budget->Used());
+    budget->Release(100);
+    APSARA_TEST_EQUAL(static_cast<uint64_t>(0), budget->Used());
+
+    // RAII round trip: a record that adopted bytes returns exactly them when it dies — even if the
+    // limit was disarmed (SetLimit(0)) while the record was still in flight.
+    budget->SetLimit(1024);
+    APSARA_TEST_TRUE(budget->TryAcquire(100) == AgentsightByteBudget::AcquireResult::kAcquired);
+    {
+        AgentsightLLMData d{};
+        AgentsightLlmRecord r("pipe-mem", d);
+        r.AdoptMemoryAccounting(budget, 100);
+        APSARA_TEST_EQUAL(static_cast<uint64_t>(100), r.GetAccountedBytesForTest());
+        budget->SetLimit(0); // disabled mid-flight: the adopted release must still happen
+        APSARA_TEST_EQUAL(static_cast<uint64_t>(100), budget->Used());
+    }
+    APSARA_TEST_EQUAL(static_cast<uint64_t>(0), budget->Used());
+}
+
 UNIT_TEST_CASE(AgentsightEventsUnittest, TestLlmRecordCopiesNonNullSizedBuffers)
 UNIT_TEST_CASE(AgentsightEventsUnittest, TestLlmRecordCopiesProcessNameAndCmdline)
 UNIT_TEST_CASE(AgentsightEventsUnittest, TestHttpsRecordCopiesProcessMetadata)
 UNIT_TEST_CASE(AgentsightEventsUnittest, TestHttpsRecordCopiesPayloadsAndIdentity)
+UNIT_TEST_CASE(AgentsightEventsUnittest, TestEstimateRecordBytes)
+UNIT_TEST_CASE(AgentsightEventsUnittest, TestMemoryBudgetAdoptReleaseLifecycle)
 
 UNIT_TEST_MAIN

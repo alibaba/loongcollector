@@ -96,4 +96,44 @@ AgentsightHttpsRecord::AgentsightHttpsRecord(std::string pipelineConfigName, con
     mResponseBody = CopyBuffer(d.response_body, d.response_body_len);
 }
 
+namespace {
+
+// Estimate helpers — one per Copy* flavour above so the accounted bytes track exactly what the
+// deep copy would hold: (ptr, len) payloads are counted by len (they may contain embedded NULs),
+// NUL-terminated strings by strlen. See EstimateAgentsight*RecordBytes in the header for the
+// full accounting caveat (payload bytes, not malloc bytes).
+inline uint64_t EstimateCStrBytes(const char* s) {
+    return s ? static_cast<uint64_t>(std::strlen(s)) : 0;
+}
+
+inline uint64_t EstimateFixedBufferBytes(const char* buf, size_t cap) {
+    return static_cast<uint64_t>(strnlen(buf, cap));
+}
+
+} // namespace
+
+uint64_t EstimateAgentsightLlmRecordBytes(const AgentsightLLMData& d) {
+    // Fixed overhead approximation: scalars plus the string headers / SSO buffers of the record.
+    uint64_t bytes = sizeof(AgentsightLlmRecord);
+    bytes += EstimateFixedBufferBytes(d.process_name, 16U);
+    bytes += EstimateFixedBufferBytes(d.cmdline, 128U);
+    bytes += EstimateCStrBytes(d.session_id) + EstimateCStrBytes(d.conversation_id) + EstimateCStrBytes(d.response_id)
+        + EstimateCStrBytes(d.agent_name) + EstimateCStrBytes(d.container_id) + EstimateCStrBytes(d.request_url)
+        + EstimateCStrBytes(d.provider) + EstimateCStrBytes(d.model) + EstimateCStrBytes(d.finish_reason);
+    bytes += static_cast<uint64_t>(d.request_messages_len) + static_cast<uint64_t>(d.input_message_delta_len)
+        + static_cast<uint64_t>(d.response_messages_len) + static_cast<uint64_t>(d.tools_len);
+    return bytes;
+}
+
+uint64_t EstimateAgentsightHttpsRecordBytes(const AgentsightHttpsData& d) {
+    uint64_t bytes = sizeof(AgentsightHttpsRecord);
+    bytes += EstimateFixedBufferBytes(d.process_name, 16U);
+    bytes += EstimateFixedBufferBytes(d.cmdline, 128U);
+    bytes += EstimateCStrBytes(d.method) + EstimateCStrBytes(d.path) + EstimateCStrBytes(d.agent_name)
+        + EstimateCStrBytes(d.container_id);
+    bytes += static_cast<uint64_t>(d.request_headers_len) + static_cast<uint64_t>(d.request_body_len)
+        + static_cast<uint64_t>(d.response_headers_len) + static_cast<uint64_t>(d.response_body_len);
+    return bytes;
+}
+
 } // namespace logtail::ebpf

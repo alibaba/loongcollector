@@ -29,6 +29,7 @@
 #include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "collection_pipeline/queue/QueueKeyManager.h"
 #include "common/FileSystemUtil.h"
+#include "common/JsonUtil.h"
 #include "common/StringView.h"
 #include "constants/TagConstants.h"
 #include "container_manager/ContainerManager.h"
@@ -53,9 +54,14 @@ AgentsightHandle* gFakeHandle = reinterpret_cast<AgentsightHandle*>(0x20U);
 struct FakeReadControl {
     int start_ret = 0;
     /// 0: always 0; 1: return 1 once then 0; 2: call LLM callback once then 0;
-    /// 3: call the raw HTTPS callback once then 0
+    /// 3: call the raw HTTPS callback once then 0;
+    /// 4/5: deliver `payload_events` synthetic LLM/HTTPS events, each carrying a `payload_size`
+    ///      byte request payload (one event per handle_read call, so a single OnEpollReadable
+    ///      delivers the whole batch) — used by the memory-limit tests
     int read_mode = 0;
     int read_step = 0;
+    uint32_t payload_size = 0;
+    int payload_events = 0;
 } gRead;
 
 bool g_config_new_null = false;
@@ -103,6 +109,30 @@ void fake_config_set_enable_raw_https(AgentsightConfigHandle* cfg, int enabled) 
     (void)cfg;
     ++g_ut_raw_https_calls;
     g_ut_raw_https_last_enabled = enabled;
+}
+
+int g_ut_load_config_calls = 0;
+std::string g_ut_load_config_json;
+int g_ut_load_config_ret = 0;
+/// Simulates a libagentsight without agentsight_config_load_config (pre-0.4.x), where EBPFAdapter
+/// leaves the optional symbol null.
+bool g_ut_omit_load_config_symbol = false;
+/// Version reported by fake_agentsight_version. Tests lower it to simulate libraries that HAVE the
+/// load_config symbol but predate (parts of) the runtime_limits schema — symbol presence alone must
+/// not be trusted, because old serde ignores unknown JSON keys and still returns success.
+const char* g_ut_agentsight_version = "0.12.1";
+/// Simulates a library without the agentsight_version symbol (capability unverifiable → degrade).
+bool g_ut_omit_version_symbol = false;
+
+int fake_config_load_config(AgentsightConfigHandle* cfg, const char* json) {
+    (void)cfg;
+    ++g_ut_load_config_calls;
+    g_ut_load_config_json = json ? json : "";
+    return g_ut_load_config_ret;
+}
+
+const char* fake_agentsight_version() {
+    return g_ut_agentsight_version;
 }
 
 void fake_config_add_cmdline_rule(AgentsightConfigHandle* cfg,
@@ -213,6 +243,45 @@ int fake_handle_read(AgentsightHandle* h,
         gRead.read_mode = 0;
         return 1;
     }
+    if (gRead.read_mode == 4 || gRead.read_mode == 5) {
+        // Memory-limit batch mode: deliver payload_events synthetic events, one per call. The
+        // payload buffer is static so the (ptr, len) pair stays valid through the deep copy.
+        if (gRead.payload_events <= 0) {
+            gRead.read_mode = 0;
+            return 0;
+        }
+        --gRead.payload_events;
+        static std::vector<char> sPayload;
+        if (sPayload.size() != gRead.payload_size) {
+            sPayload.assign(gRead.payload_size, 'x');
+        }
+        if (gRead.read_mode == 4) {
+            static const char memSid[] = "sess-mem";
+            std::memset(&sUtLlmData, 0, sizeof(sUtLlmData));
+            std::memcpy(sUtLlmData.process_name, "utp", 3U);
+            sUtLlmData.session_id = memSid;
+            sUtLlmData.timestamp_ns = 1U;
+            sUtLlmData.request_messages = sPayload.data();
+            sUtLlmData.request_messages_len = static_cast<uint32_t>(sPayload.size());
+            if (llm != nullptr) {
+                llm(&sUtLlmData, user_data);
+            }
+        } else {
+            std::memset(&sUtHttpsData, 0, sizeof(sUtHttpsData));
+            std::memcpy(sUtHttpsData.process_name, "raw", 3U);
+            sUtHttpsData.method = "POST";
+            sUtHttpsData.path = "/v1/mem";
+            sUtHttpsData.timestamp_ns = 7U;
+            sUtHttpsData.request_body = sPayload.data();
+            sUtHttpsData.request_body_len = static_cast<uint32_t>(sPayload.size());
+            // Same contract as mode 3: a null callback means the manager never registered for raw
+            // events and the fake Rust side must drop it.
+            if (https != nullptr) {
+                https(&sUtHttpsData, https_user_data);
+            }
+        }
+        return 1;
+    }
     return 0;
 }
 
@@ -224,6 +293,8 @@ std::unique_ptr<AgentSightSymbolTable> makeFullSymbolTable() {
     t->config_set_verbose = fake_config_set_verbose;
     t->config_set_log_path = fake_config_set_log_path;
     t->config_set_enable_raw_https = g_ut_omit_raw_https_symbol ? nullptr : fake_config_set_enable_raw_https;
+    t->config_load_config = g_ut_omit_load_config_symbol ? nullptr : fake_config_load_config;
+    t->version = g_ut_omit_version_symbol ? nullptr : fake_agentsight_version;
     t->config_add_cmdline_rule = fake_config_add_cmdline_rule;
     t->config_add_https = fake_config_add_https;
     t->config_add_http = fake_config_add_http;
@@ -399,6 +470,12 @@ public:
         g_ut_raw_https_last_enabled = -1;
         g_ut_omit_raw_https_symbol = false;
         g_ut_last_read_had_https_cb = false;
+        g_ut_load_config_calls = 0;
+        g_ut_load_config_json.clear();
+        g_ut_load_config_ret = 0;
+        g_ut_omit_load_config_symbol = false;
+        g_ut_agentsight_version = "0.12.1";
+        g_ut_omit_version_symbol = false;
         mAgentSightAdapter = std::make_shared<AgentSightTestEBPFAdapter>();
         mAgentSightAdapter->setAgentSightSymbols(makeFullSymbolTable());
         auto& o = agentsightOptions();
@@ -407,6 +484,9 @@ public:
         o.mAgentsightHttps.clear();
         o.mAgentsightHttp.clear();
         o.mAgentsightRawHttpsFallback = false;
+        o.mAgentsightMemoryLimitEnabled = false;
+        o.mAgentsightMemoryLimitBytes = static_cast<uint64_t>(kAgentsightMemoryLimitMBDefault) * 1024 * 1024;
+        o.mAgentsightRuntimeLimitsJson.clear();
     }
 
     void TearDown() override {
@@ -556,6 +636,21 @@ public:
     void TestContainerTagsAttachedForLlmEvent();
     void TestContainerTagsAttachedForHttpsEvent();
     void TestContainerTagsMissDegradesSilently();
+    void TestMemoryLimitDisabledByDefault();
+    void TestRuntimeLimitsJsonPassthrough();
+    void TestRuntimeLimitsJsonWrappedAndUnknownKeys();
+    void TestRuntimeLimitsJsonBadJsonIgnored();
+    void TestRuntimeLimitsJsonIndependentOfByteGate();
+    void TestMemoryLimitDropsOversizedNewEvents();
+    void TestMemoryLimitRecoversAfterDrain();
+    void TestMemoryLimitMissingLoadConfigSymbol();
+    void TestMemoryLimitLoadConfigFailureDegrades();
+    void TestMemoryLimitHotUpdateKeepsUsedConsistent();
+    void TestMemoryLimitStaleConfigDropReleasesBytes();
+    void TestMemoryLimitHttpsStreamAccounted();
+    void TestMemoryLimitOldLibraryVersionDegrades();
+    void TestMemoryLimitVersionGateBoundary();
+    void TestMemoryLimitMissingVersionSymbolDegrades();
 
 protected:
     std::shared_ptr<AgentSightTestEBPFAdapter> mAgentSightAdapter;
@@ -1609,6 +1704,440 @@ void AgentsightManagerUnittest::TestContainerTagsMissDegradesSilently() {
     mgr->Destroy();
 }
 
+// ================================================================================================
+// Memory limit: C++ byte gate (MemoryLimitEnabled / MemoryLimitMB) and the independent Rust-side
+// runtime_limits passthrough (RuntimeLimitsJson)
+// ================================================================================================
+
+namespace {
+// 4MB payload per event; a 10MB budget accepts exactly 2 and rejects the 3rd regardless of the
+// few-hundred-byte fixed record overhead — keeps the drop arithmetic deterministic.
+constexpr uint32_t kMemLimitTestPayload = 4U * 1024 * 1024;
+constexpr uint64_t kMemLimitTestLimit = 10ULL * 1024 * 1024;
+
+/// Delivers `count` synthetic LLM events of kMemLimitTestPayload bytes through one OnEpollReadable.
+void feedLlmBatch(AgentsightManager& mgr, int count) {
+    gRead.read_mode = 4;
+    gRead.payload_size = kMemLimitTestPayload;
+    gRead.payload_events = count;
+    mgr.OnEpollReadable();
+    gRead = decltype(gRead){};
+}
+} // namespace
+
+void AgentsightManagerUnittest::TestMemoryLimitDisabledByDefault() {
+    auto mgr = makeManager();
+    registerConfig(*mgr, "p_mem_off");
+
+    // Off by default: no runtime_limits JSON is pushed and the budget stays disarmed.
+    APSARA_TEST_EQUAL(0, g_ut_load_config_calls);
+    APSARA_TEST_EQUAL(static_cast<uint64_t>(0), mgr->GetMemoryBudgetForTest().Limit());
+
+    feedLlmBatch(*mgr, 1);
+    std::shared_ptr<CommonEvent> dequeued;
+    APSARA_TEST_TRUE(mEventQueue->try_dequeue(dequeued));
+    APSARA_TEST_EQUAL(KernelEventType::AGENTSIGHT_LLM_RECORD, dequeued->GetKernelEventType());
+    // Disabled path never adopts accounting: no bytes held, nothing stamped on the record.
+    APSARA_TEST_EQUAL(static_cast<uint64_t>(0),
+                      static_cast<AgentsightLlmRecord*>(dequeued.get())->GetAccountedBytesForTest());
+    APSARA_TEST_EQUAL(static_cast<uint64_t>(0), mgr->GetMemoryBudgetForTest().Used());
+    APSARA_TEST_EQUAL(static_cast<uint64_t>(0), mgr->GetMemoryBudgetForTest().DroppedEvents());
+
+    dequeued.reset();
+    mgr->Destroy();
+}
+
+void AgentsightManagerUnittest::TestRuntimeLimitsJsonPassthrough() {
+    auto& o = agentsightOptions();
+    // Verbatim passthrough: exactly the operator's keys are sent, wrapped into the config document
+    // shape. Missing sub-keys are NOT completed from any formula — they fall back to the library
+    // defaults on the Rust side (load_from_json replaces the whole runtime_limits block).
+    o.mAgentsightRuntimeLimitsJson = R"({"event_channel_capacity":2048,"ring_buffer_mb":8})";
+
+    auto mgr = makeManager();
+    registerConfig(*mgr, "p_mem_json");
+
+    APSARA_TEST_EQUAL(1, g_ut_load_config_calls);
+    Json::Value root;
+    std::string err;
+    APSARA_TEST_TRUE(ParseJsonTable(g_ut_load_config_json, root, err));
+    const Json::Value& rl = root["runtime_limits"];
+    APSARA_TEST_EQUAL(2U, rl.size());
+    APSARA_TEST_EQUAL(2048U, rl["event_channel_capacity"].asUInt());
+    APSARA_TEST_EQUAL(8U, rl["ring_buffer_mb"].asUInt());
+    // Independent of the C++ byte gate: gate untouched → budget stays disarmed.
+    APSARA_TEST_EQUAL(static_cast<uint64_t>(0), mgr->GetMemoryBudgetForTest().Limit());
+
+    mgr->Destroy();
+}
+
+void AgentsightManagerUnittest::TestRuntimeLimitsJsonWrappedAndUnknownKeys() {
+    auto& o = agentsightOptions();
+    // The wrapped document form (mirroring the library's own agentsight.json) is accepted and
+    // re-wrapped; unknown sub-keys pass through verbatim (forward compatibility with newer
+    // libraries that add keys) — warned about, never silently dropped.
+    o.mAgentsightRuntimeLimitsJson = R"({"runtime_limits":{"max_connection_body_mb":4,"some_future_key":7}})";
+
+    auto mgr = makeManager();
+    registerConfig(*mgr, "p_mem_wrap");
+
+    APSARA_TEST_EQUAL(1, g_ut_load_config_calls);
+    Json::Value root;
+    std::string err;
+    APSARA_TEST_TRUE(ParseJsonTable(g_ut_load_config_json, root, err));
+    const Json::Value& rl = root["runtime_limits"];
+    APSARA_TEST_EQUAL(2U, rl.size());
+    APSARA_TEST_EQUAL(4U, rl["max_connection_body_mb"].asUInt());
+    APSARA_TEST_EQUAL(7U, rl["some_future_key"].asUInt());
+
+    mgr->Destroy();
+}
+
+void AgentsightManagerUnittest::TestRuntimeLimitsJsonBadJsonIgnored() {
+    {
+        // Malformed JSON: warn and skip the push; registration must still succeed.
+        agentsightOptions().mAgentsightRuntimeLimitsJson = "{not-json";
+        auto mgr = makeManager();
+        registerConfig(*mgr, "p_mem_badjson");
+        APSARA_TEST_EQUAL(1, mgr->RegisteredConfigCount());
+        APSARA_TEST_EQUAL(0, g_ut_load_config_calls);
+        mgr->Destroy();
+    }
+    {
+        // A non-object runtime_limits member is equally unusable — same honest skip.
+        agentsightOptions().mAgentsightRuntimeLimitsJson = R"({"runtime_limits":42})";
+        auto mgr = makeManager();
+        registerConfig(*mgr, "p_mem_badwrap");
+        APSARA_TEST_EQUAL(1, mgr->RegisteredConfigCount());
+        APSARA_TEST_EQUAL(0, g_ut_load_config_calls);
+        mgr->Destroy();
+    }
+}
+
+void AgentsightManagerUnittest::TestRuntimeLimitsJsonIndependentOfByteGate() {
+    auto& o = agentsightOptions();
+    // Both halves at once: the JSON rides to the Rust side while the C++ byte gate arms separately.
+    o.mAgentsightRuntimeLimitsJson = R"({"pending_genai_max_count":256})";
+    o.mAgentsightMemoryLimitEnabled = true;
+    o.mAgentsightMemoryLimitBytes = kMemLimitTestLimit;
+
+    auto mgr = makeManager();
+    registerConfig(*mgr, "p_mem_both");
+
+    APSARA_TEST_EQUAL(1, g_ut_load_config_calls);
+    Json::Value root;
+    std::string err;
+    APSARA_TEST_TRUE(ParseJsonTable(g_ut_load_config_json, root, err));
+    APSARA_TEST_EQUAL(256U, root["runtime_limits"]["pending_genai_max_count"].asUInt());
+    APSARA_TEST_EQUAL(kMemLimitTestLimit, mgr->GetMemoryBudgetForTest().Limit());
+
+    feedLlmBatch(*mgr, 3); // 2 × 4MB fit under 10MB; the 3rd is rejected by the gate
+    APSARA_TEST_EQUAL(static_cast<uint64_t>(1), mgr->GetMemoryBudgetForTest().DroppedEvents());
+
+    std::shared_ptr<CommonEvent> e;
+    while (mEventQueue->try_dequeue(e)) {
+        e.reset();
+    }
+    mgr->Destroy();
+}
+
+void AgentsightManagerUnittest::TestMemoryLimitDropsOversizedNewEvents() {
+    auto& o = agentsightOptions();
+    o.mAgentsightMemoryLimitEnabled = true;
+    o.mAgentsightMemoryLimitBytes = kMemLimitTestLimit;
+
+    auto mgr = makeManager();
+    registerConfig(*mgr, "p_mem_drop");
+
+    feedLlmBatch(*mgr, 3); // 2 × 4MB fit under 10MB; the 3rd is rejected before the deep copy
+    const auto& budget = mgr->GetMemoryBudgetForTest();
+    APSARA_TEST_EQUAL(static_cast<uint64_t>(1), budget.DroppedEvents());
+    APSARA_TEST_TRUE(budget.DroppedBytes() >= kMemLimitTestPayload);
+    APSARA_TEST_TRUE(budget.Used() >= 2 * static_cast<uint64_t>(kMemLimitTestPayload));
+    APSARA_TEST_TRUE(budget.Used() <= kMemLimitTestLimit);
+
+    int accepted = 0;
+    std::shared_ptr<CommonEvent> e;
+    while (mEventQueue->try_dequeue(e)) {
+        ++accepted;
+        APSARA_TEST_TRUE(static_cast<AgentsightLlmRecord*>(e.get())->GetAccountedBytesForTest()
+                         >= kMemLimitTestPayload);
+        e.reset();
+    }
+    APSARA_TEST_EQUAL(2, accepted);
+    // All accepted records destroyed → RAII released everything.
+    APSARA_TEST_EQUAL(static_cast<uint64_t>(0), budget.Used());
+
+    mgr->Destroy();
+}
+
+void AgentsightManagerUnittest::TestMemoryLimitRecoversAfterDrain() {
+    auto& o = agentsightOptions();
+    o.mAgentsightMemoryLimitEnabled = true;
+    o.mAgentsightMemoryLimitBytes = kMemLimitTestLimit;
+
+    auto mgr = makeManager();
+    // Success-path HandleEvent pushes ProcessQueueItems holding LogEvents allocated from the
+    // fixture's EventPool. They must be popped and destroyed BEFORE the fixture dies: the
+    // ProcessQueueManager singleton outlives every fixture, and a residue there is a
+    // heap-use-after-free at process exit (caught by ASan in CI). Hence poppable queue + drain.
+    registerConfigWithPoppableQueue(*mgr, "p_mem_recover");
+
+    feedLlmBatch(*mgr, 3); // 2 accepted, 1 dropped
+    APSARA_TEST_EQUAL(static_cast<uint64_t>(1), mgr->GetMemoryBudgetForTest().DroppedEvents());
+
+    // Drain through the real consumption path (HandleEvent) and destroy the records.
+    std::shared_ptr<CommonEvent> e;
+    while (mEventQueue->try_dequeue(e)) {
+        mgr->HandleEvent(e);
+        e.reset();
+    }
+    drainProcessQueues(); // destroy what HandleEvent pushed, while the EventPool is still alive
+    APSARA_TEST_EQUAL(static_cast<uint64_t>(0), mgr->GetMemoryBudgetForTest().Used());
+
+    // Usage back under the limit → admission resumes with no hysteresis and no extra state.
+    feedLlmBatch(*mgr, 1);
+    APSARA_TEST_TRUE(mEventQueue->try_dequeue(e));
+    APSARA_TEST_TRUE(static_cast<AgentsightLlmRecord*>(e.get())->GetAccountedBytesForTest() >= kMemLimitTestPayload);
+    APSARA_TEST_EQUAL(static_cast<uint64_t>(1), mgr->GetMemoryBudgetForTest().DroppedEvents()); // unchanged
+    e.reset();
+    APSARA_TEST_EQUAL(static_cast<uint64_t>(0), mgr->GetMemoryBudgetForTest().Used());
+
+    mgr->Destroy();
+}
+
+void AgentsightManagerUnittest::TestMemoryLimitMissingLoadConfigSymbol() {
+    // libagentsight without agentsight_config_load_config: registration must still succeed (warn
+    // only, RawHttpsFallback discipline) and the C++-side budget must still enforce the limit.
+    g_ut_omit_load_config_symbol = true;
+    mAgentSightAdapter->setAgentSightSymbols(makeFullSymbolTable());
+    auto& o = agentsightOptions();
+    o.mAgentsightRuntimeLimitsJson = R"({"ring_buffer_mb":8})";
+    o.mAgentsightMemoryLimitEnabled = true;
+    o.mAgentsightMemoryLimitBytes = kMemLimitTestLimit;
+
+    auto mgr = makeManager();
+    CollectionPipelineContext ctx;
+    ctx.SetConfigName("p_mem_nosym");
+    ctx.SetProcessQueueKey(1);
+    APSARA_TEST_EQUAL(0, mgr->AddOrUpdateConfig(&ctx, 0, nullptr, asVariant()));
+    APSARA_TEST_EQUAL(1, mgr->RegisteredConfigCount());
+    APSARA_TEST_EQUAL(0, g_ut_load_config_calls);
+    APSARA_TEST_EQUAL(kMemLimitTestLimit, mgr->GetMemoryBudgetForTest().Limit());
+
+    feedLlmBatch(*mgr, 3);
+    APSARA_TEST_EQUAL(static_cast<uint64_t>(1), mgr->GetMemoryBudgetForTest().DroppedEvents());
+
+    std::shared_ptr<CommonEvent> e;
+    while (mEventQueue->try_dequeue(e)) {
+        e.reset();
+    }
+    mgr->Destroy();
+}
+
+void AgentsightManagerUnittest::TestMemoryLimitLoadConfigFailureDegrades() {
+    // load_config returns < 0 (JSON parse failure inside the library): warn and continue — the
+    // restart must not fail and the C++ budget keeps enforcing.
+    g_ut_load_config_ret = -1;
+    auto& o = agentsightOptions();
+    o.mAgentsightRuntimeLimitsJson = R"({"ring_buffer_mb":8})";
+    o.mAgentsightMemoryLimitEnabled = true;
+    o.mAgentsightMemoryLimitBytes = kMemLimitTestLimit;
+
+    auto mgr = makeManager();
+    registerConfig(*mgr, "p_mem_loadfail");
+    APSARA_TEST_EQUAL(1, g_ut_load_config_calls);
+    APSARA_TEST_EQUAL(kMemLimitTestLimit, mgr->GetMemoryBudgetForTest().Limit());
+
+    feedLlmBatch(*mgr, 3);
+    APSARA_TEST_EQUAL(static_cast<uint64_t>(1), mgr->GetMemoryBudgetForTest().DroppedEvents());
+
+    std::shared_ptr<CommonEvent> e;
+    while (mEventQueue->try_dequeue(e)) {
+        e.reset();
+    }
+    mgr->Destroy();
+}
+
+void AgentsightManagerUnittest::TestMemoryLimitHotUpdateKeepsUsedConsistent() {
+    auto& o = agentsightOptions();
+    o.mAgentsightMemoryLimitEnabled = true;
+    o.mAgentsightMemoryLimitBytes = kMemLimitTestLimit;
+
+    auto mgr = makeManager();
+    // Same lifetime discipline as TestMemoryLimitRecoversAfterDrain: HandleEvent below pushes into
+    // a real queue, so use a poppable one and drain it before the fixture's EventPool dies.
+    const QueueKey queueKey = registerConfigWithPoppableQueue(*mgr, "p_mem_hot");
+    CollectionPipelineContext ctx;
+    ctx.SetConfigName("p_mem_hot");
+    ctx.SetProcessQueueKey(queueKey);
+
+    feedLlmBatch(*mgr, 2); // both accepted, left IN the queue across the hot update
+    const uint64_t usedBefore = mgr->GetMemoryBudgetForTest().Used();
+    APSARA_TEST_TRUE(usedBefore >= 2 * static_cast<uint64_t>(kMemLimitTestPayload));
+
+    // Hot update turning the limit off (update + resume → RestartAgentSightLocked): SetLimit(0)
+    // disarms admission but must NOT clear Used — the in-flight records still own their bytes.
+    o.mAgentsightMemoryLimitEnabled = false;
+    APSARA_TEST_EQUAL(0, mgr->AddOrUpdateConfig(&ctx, 0, nullptr, asVariant()));
+    APSARA_TEST_EQUAL(static_cast<uint64_t>(0), mgr->GetMemoryBudgetForTest().Limit());
+    APSARA_TEST_EQUAL(usedBefore, mgr->GetMemoryBudgetForTest().Used());
+
+    // Draining the old generation returns the accounting to exactly zero — no leak, no underflow.
+    std::shared_ptr<CommonEvent> e;
+    while (mEventQueue->try_dequeue(e)) {
+        mgr->HandleEvent(e);
+        e.reset();
+    }
+    drainProcessQueues(); // destroy pushed items while the fixture's EventPool is still alive
+    APSARA_TEST_EQUAL(static_cast<uint64_t>(0), mgr->GetMemoryBudgetForTest().Used());
+
+    // New events flow unaccounted while disabled.
+    feedLlmBatch(*mgr, 1);
+    APSARA_TEST_TRUE(mEventQueue->try_dequeue(e));
+    APSARA_TEST_EQUAL(static_cast<uint64_t>(0), static_cast<AgentsightLlmRecord*>(e.get())->GetAccountedBytesForTest());
+    APSARA_TEST_EQUAL(static_cast<uint64_t>(0), mgr->GetMemoryBudgetForTest().Used());
+    e.reset();
+
+    mgr->Destroy();
+}
+
+void AgentsightManagerUnittest::TestMemoryLimitStaleConfigDropReleasesBytes() {
+    auto& o = agentsightOptions();
+    o.mAgentsightMemoryLimitEnabled = true;
+    o.mAgentsightMemoryLimitBytes = kMemLimitTestLimit;
+
+    auto mgr = makeManager();
+    registerConfig(*mgr, "p_mem_stale");
+
+    feedLlmBatch(*mgr, 1);
+    APSARA_TEST_TRUE(mgr->GetMemoryBudgetForTest().Used() >= kMemLimitTestPayload);
+
+    // RemoveConfig clears mConfigName and disarms the limit; the queued record becomes stale.
+    APSARA_TEST_EQUAL(0, mgr->RemoveConfig("p_mem_stale"));
+
+    std::shared_ptr<CommonEvent> e;
+    APSARA_TEST_TRUE(mEventQueue->try_dequeue(e));
+    APSARA_TEST_EQUAL(0, mgr->HandleEvent(e)); // stale-config drop branch, no push
+    // Bytes are still held until the record itself dies — the release point is the destructor.
+    APSARA_TEST_TRUE(mgr->GetMemoryBudgetForTest().Used() >= kMemLimitTestPayload);
+    e.reset();
+    APSARA_TEST_EQUAL(static_cast<uint64_t>(0), mgr->GetMemoryBudgetForTest().Used());
+
+    mgr->Destroy();
+}
+
+void AgentsightManagerUnittest::TestMemoryLimitHttpsStreamAccounted() {
+    auto& o = agentsightOptions();
+    o.mAgentsightRawHttpsFallback = true; // otherwise the https callback is never registered
+    o.mAgentsightMemoryLimitEnabled = true;
+    o.mAgentsightMemoryLimitBytes = kMemLimitTestLimit;
+
+    auto mgr = makeManager();
+    registerConfig(*mgr, "p_mem_https");
+
+    gRead.read_mode = 5;
+    gRead.payload_size = kMemLimitTestPayload;
+    gRead.payload_events = 3;
+    mgr->OnEpollReadable();
+    gRead = decltype(gRead){};
+
+    APSARA_TEST_EQUAL(static_cast<uint64_t>(1), mgr->GetMemoryBudgetForTest().DroppedEvents());
+    int accepted = 0;
+    std::shared_ptr<CommonEvent> e;
+    while (mEventQueue->try_dequeue(e)) {
+        ++accepted;
+        APSARA_TEST_EQUAL(KernelEventType::AGENTSIGHT_HTTPS_RECORD, e->GetKernelEventType());
+        APSARA_TEST_TRUE(static_cast<AgentsightHttpsRecord*>(e.get())->GetAccountedBytesForTest()
+                         >= kMemLimitTestPayload);
+        e.reset();
+    }
+    APSARA_TEST_EQUAL(2, accepted);
+    APSARA_TEST_EQUAL(static_cast<uint64_t>(0), mgr->GetMemoryBudgetForTest().Used());
+
+    mgr->Destroy();
+}
+
+void AgentsightManagerUnittest::TestMemoryLimitOldLibraryVersionDegrades() {
+    // 0.6.1 HAS agentsight_config_load_config and even the runtime_limits block, but not
+    // event_channel_max_bytes_mb (0.11.1): its serde would silently ignore that key and return
+    // success. The version gate must refuse to push the JSON at all and degrade honestly — while
+    // the C++-side budget keeps enforcing.
+    g_ut_agentsight_version = "0.6.1";
+    auto& o = agentsightOptions();
+    o.mAgentsightRuntimeLimitsJson = R"({"ring_buffer_mb":8})";
+    o.mAgentsightMemoryLimitEnabled = true;
+    o.mAgentsightMemoryLimitBytes = kMemLimitTestLimit;
+
+    auto mgr = makeManager();
+    registerConfig(*mgr, "p_mem_oldver");
+    APSARA_TEST_EQUAL(1, mgr->RegisteredConfigCount());
+    APSARA_TEST_EQUAL(0, g_ut_load_config_calls); // gated off despite the symbol being present
+    APSARA_TEST_EQUAL(kMemLimitTestLimit, mgr->GetMemoryBudgetForTest().Limit());
+
+    feedLlmBatch(*mgr, 3);
+    APSARA_TEST_EQUAL(static_cast<uint64_t>(1), mgr->GetMemoryBudgetForTest().DroppedEvents());
+
+    std::shared_ptr<CommonEvent> e;
+    while (mEventQueue->try_dequeue(e)) {
+        e.reset();
+    }
+    mgr->Destroy();
+}
+
+void AgentsightManagerUnittest::TestMemoryLimitVersionGateBoundary() {
+    // Just below the floor: rejected. At the floor: accepted and the JSON is pushed.
+    {
+        g_ut_agentsight_version = "0.11.0";
+        agentsightOptions().mAgentsightRuntimeLimitsJson = R"({"ring_buffer_mb":8})";
+        auto mgr = makeManager();
+        registerConfig(*mgr, "p_mem_ver_lo");
+        APSARA_TEST_EQUAL(0, g_ut_load_config_calls);
+        mgr->Destroy();
+    }
+    {
+        g_ut_agentsight_version = "0.11.1";
+        auto mgr = makeManager();
+        registerConfig(*mgr, "p_mem_ver_hi");
+        APSARA_TEST_EQUAL(1, g_ut_load_config_calls);
+        mgr->Destroy();
+    }
+    // Unparsable version strings fail closed (treated as too old), never fail open. The call
+    // counter is cumulative across this test's blocks: still exactly the one call from "0.11.1".
+    {
+        g_ut_agentsight_version = "not-a-version";
+        auto mgr = makeManager();
+        registerConfig(*mgr, "p_mem_ver_bad");
+        APSARA_TEST_EQUAL(1, g_ut_load_config_calls);
+        mgr->Destroy();
+    }
+}
+
+void AgentsightManagerUnittest::TestMemoryLimitMissingVersionSymbolDegrades() {
+    // No agentsight_version symbol → capability unverifiable → same honest degradation as an old
+    // library: no JSON push, C++ accounting still enforced.
+    g_ut_omit_version_symbol = true;
+    mAgentSightAdapter->setAgentSightSymbols(makeFullSymbolTable());
+    auto& o = agentsightOptions();
+    o.mAgentsightRuntimeLimitsJson = R"({"ring_buffer_mb":8})";
+    o.mAgentsightMemoryLimitEnabled = true;
+    o.mAgentsightMemoryLimitBytes = kMemLimitTestLimit;
+
+    auto mgr = makeManager();
+    registerConfig(*mgr, "p_mem_nover");
+    APSARA_TEST_EQUAL(1, mgr->RegisteredConfigCount());
+    APSARA_TEST_EQUAL(0, g_ut_load_config_calls);
+
+    feedLlmBatch(*mgr, 3);
+    APSARA_TEST_EQUAL(static_cast<uint64_t>(1), mgr->GetMemoryBudgetForTest().DroppedEvents());
+
+    std::shared_ptr<CommonEvent> e;
+    while (mEventQueue->try_dequeue(e)) {
+        e.reset();
+    }
+    mgr->Destroy();
+}
+
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestGetPluginType);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestAddOrUpdateValidation);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestAddOrUpdateNoSymbols);
@@ -1649,5 +2178,20 @@ UNIT_TEST_CASE(AgentsightManagerUnittest, TestAttachAgentsightContainerTagsFromI
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestContainerTagsAttachedForLlmEvent);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestContainerTagsAttachedForHttpsEvent);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestContainerTagsMissDegradesSilently);
+UNIT_TEST_CASE(AgentsightManagerUnittest, TestMemoryLimitDisabledByDefault);
+UNIT_TEST_CASE(AgentsightManagerUnittest, TestRuntimeLimitsJsonPassthrough);
+UNIT_TEST_CASE(AgentsightManagerUnittest, TestRuntimeLimitsJsonWrappedAndUnknownKeys);
+UNIT_TEST_CASE(AgentsightManagerUnittest, TestRuntimeLimitsJsonBadJsonIgnored);
+UNIT_TEST_CASE(AgentsightManagerUnittest, TestRuntimeLimitsJsonIndependentOfByteGate);
+UNIT_TEST_CASE(AgentsightManagerUnittest, TestMemoryLimitDropsOversizedNewEvents);
+UNIT_TEST_CASE(AgentsightManagerUnittest, TestMemoryLimitRecoversAfterDrain);
+UNIT_TEST_CASE(AgentsightManagerUnittest, TestMemoryLimitMissingLoadConfigSymbol);
+UNIT_TEST_CASE(AgentsightManagerUnittest, TestMemoryLimitLoadConfigFailureDegrades);
+UNIT_TEST_CASE(AgentsightManagerUnittest, TestMemoryLimitHotUpdateKeepsUsedConsistent);
+UNIT_TEST_CASE(AgentsightManagerUnittest, TestMemoryLimitStaleConfigDropReleasesBytes);
+UNIT_TEST_CASE(AgentsightManagerUnittest, TestMemoryLimitHttpsStreamAccounted);
+UNIT_TEST_CASE(AgentsightManagerUnittest, TestMemoryLimitOldLibraryVersionDegrades);
+UNIT_TEST_CASE(AgentsightManagerUnittest, TestMemoryLimitVersionGateBoundary);
+UNIT_TEST_CASE(AgentsightManagerUnittest, TestMemoryLimitMissingVersionSymbolDegrades);
 
 UNIT_TEST_MAIN

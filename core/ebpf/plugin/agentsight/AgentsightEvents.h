@@ -16,10 +16,12 @@
 
 #include <cstdint>
 
+#include <memory>
 #include <string>
 
 #include "agentsight.h"
 #include "ebpf/include/export.h"
+#include "ebpf/plugin/agentsight/AgentsightMemoryBudget.h"
 #include "ebpf/type/CommonDataEvent.h"
 
 namespace logtail::ebpf {
@@ -27,10 +29,28 @@ namespace logtail::ebpf {
 class AgentsightLlmRecord : public CommonEvent {
 public:
     AgentsightLlmRecord(std::string pipelineConfigName, const AgentsightLLMData& d);
+    /// Memory-limit accounting (RAII): the destructor releases exactly the bytes adopted, so every
+    /// exit path — normal processing, stale-config drop, push failure, plugin-invalid skip, enqueue
+    /// failure, shutdown residue — returns them to the budget without any manual bookkeeping.
+    ~AgentsightLlmRecord() override {
+        if (mMemBudget && mAccountedBytes > 0) {
+            mMemBudget->Release(mAccountedBytes);
+        }
+    }
 
     PluginType GetPluginType() const override { return PluginType::AGENTSIGHT_OBSERVE; }
 
     const std::string& GetPipelineConfigName() const { return mPipelineConfigName; }
+
+    /// MUST be called before the record is enqueued: after try_enqueue the handler thread may
+    /// destroy the record concurrently, so writing these fields later would be a data race.
+    /// The budget is shared-owned because records sit in a queue shared by all eBPF plugins and
+    /// may outlive the AgentsightManager that created the budget.
+    void AdoptMemoryAccounting(std::shared_ptr<AgentsightByteBudget> budget, uint64_t bytes) {
+        mMemBudget = std::move(budget);
+        mAccountedBytes = bytes;
+    }
+    uint64_t GetAccountedBytesForTest() const { return mAccountedBytes; }
 
     std::string mPipelineConfigName;
 
@@ -66,6 +86,10 @@ public:
     std::string mInputMessageDeltaJson;
     std::string mResponseMessagesJson;
     std::string mToolDefinitionsJson;
+
+private:
+    std::shared_ptr<AgentsightByteBudget> mMemBudget; // shared: records may outlive the manager
+    uint64_t mAccountedBytes = 0; // stamped at Adopt, released by the dtor — never recomputed
 };
 
 /// Raw HTTP exchange reported when AgentSight could not parse the traffic into LLM semantics
@@ -87,10 +111,23 @@ public:
 class AgentsightHttpsRecord : public CommonEvent {
 public:
     AgentsightHttpsRecord(std::string pipelineConfigName, const AgentsightHttpsData& d);
+    /// Same memory-limit accounting contract as AgentsightLlmRecord above.
+    ~AgentsightHttpsRecord() override {
+        if (mMemBudget && mAccountedBytes > 0) {
+            mMemBudget->Release(mAccountedBytes);
+        }
+    }
 
     PluginType GetPluginType() const override { return PluginType::AGENTSIGHT_OBSERVE; }
 
     const std::string& GetPipelineConfigName() const { return mPipelineConfigName; }
+
+    /// MUST be called before the record is enqueued (see AgentsightLlmRecord::AdoptMemoryAccounting).
+    void AdoptMemoryAccounting(std::shared_ptr<AgentsightByteBudget> budget, uint64_t bytes) {
+        mMemBudget = std::move(budget);
+        mAccountedBytes = bytes;
+    }
+    uint64_t GetAccountedBytesForTest() const { return mAccountedBytes; }
 
     std::string mPipelineConfigName;
 
@@ -130,6 +167,19 @@ public:
     // response header names are a short, known set. See EmitHttpResponseHeaders.
     std::string mResponseHeaders;
     std::string mResponseBody;
+
+private:
+    std::shared_ptr<AgentsightByteBudget> mMemBudget; // shared: records may outlive the manager
+    uint64_t mAccountedBytes = 0; // stamped at Adopt, released by the dtor — never recomputed
 };
+
+/// Payload-byte estimate of the record that would be built from `d`, for memory-limit admission
+/// BEFORE the deep copy (a rejected event never pays the copy cost). Counted: fixed record
+/// overhead (sizeof — covers scalars and string headers/SSO), inline process_name/cmdline content,
+/// NUL-terminated string content (strlen), and length-delimited payloads by len (embedded NULs are
+/// fine — same lens the deep copy uses). NOT counted: string capacity slack, allocator overhead,
+/// shared_ptr control block; actual RSS runs ~10-20% above the accounted value.
+uint64_t EstimateAgentsightLlmRecordBytes(const AgentsightLLMData& d);
+uint64_t EstimateAgentsightHttpsRecordBytes(const AgentsightHttpsData& d);
 
 } // namespace logtail::ebpf
