@@ -13,13 +13,13 @@
 // limitations under the License.
 
 #if !defined(_MSC_VER)
+#include <cstddef>
+#include <cstring>
 #include <poll.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <unistd.h>
 
-#include <cstddef>
-#include <cstring>
 #include <thread>
 #endif
 
@@ -104,7 +104,8 @@ public:
                 }
                 mRequest.append(buf, n);
             }
-            const string response = "HTTP/1.1 200 OK\r\nContent-Length: " + to_string(mBody.size()) + "\r\n\r\n" + mBody;
+            const string response
+                = "HTTP/1.1 200 OK\r\nContent-Length: " + to_string(mBody.size()) + "\r\n\r\n" + mBody;
             int sendFlags = 0;
 #if defined(MSG_NOSIGNAL)
             sendFlags = MSG_NOSIGNAL;
@@ -148,9 +149,7 @@ public:
     }
 
     bool IsContextValid() const override { return true; }
-    void OnSendDone(HttpResponse& response) override {
-        mOnDone(response);
-    }
+    void OnSendDone(HttpResponse& response) override { mOnDone(response); }
 
     std::function<void(HttpResponse&)> mOnDone;
 };

@@ -763,14 +763,15 @@ void TargetSubscriberSchedulerUnittest::TestUnixSocketLabel() {
     {
         Json::Value config;
         string errMsg;
-        APSARA_TEST_TRUE(ParseJsonTable(R"JSON({
+        string configStr = R"JSON({
             "job_name": "uds-exporter",
             "host_only_mode": true,
             "static_configs": [
                 {"targets": ["localhost:9100"], "labels": {"__unix_socket__": "/run/first.sock"}},
                 {"targets": ["localhost:9100"], "labels": {"__unix_socket__": "/run/second.sock"}}
             ]
-        })JSON", config, errMsg));
+        })JSON";
+        APSARA_TEST_TRUE(ParseJsonTable(configStr, config, errMsg));
         TargetSubscriberScheduler subscriber;
         APSARA_TEST_TRUE(subscriber.Init(config));
         std::vector<PromTargetInfo> targetGroup;
