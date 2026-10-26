@@ -209,14 +209,20 @@ CURL* CreateCurlHandler(const string& method,
     }
 
     if (!unixSocketPath.empty()) {
-        CURLcode rc;
-#if defined(__linux__)
-        if (unixSocketPath.front() == '@') {
-            rc = curl_easy_setopt(curl, CURLOPT_ABSTRACT_UNIX_SOCKET, unixSocketPath.c_str() + 1);
-        } else
+        // Same rule as Go's net package used by Prometheus: a leading '@' or NUL selects the abstract
+        // namespace on Linux and Windows; other platforms treat the value as a literal path.
+#if defined(__linux__) || defined(_WIN32)
+        const bool isAbstract = unixSocketPath.front() == '@' || unixSocketPath.front() == '\0';
+#else
+        const bool isAbstract = false;
 #endif
-        {
-            rc = curl_easy_setopt(curl, CURLOPT_UNIX_SOCKET_PATH, unixSocketPath.c_str());
+        const size_t nameOffset = isAbstract ? 1 : 0;
+        CURLcode rc = CURLE_BAD_FUNCTION_ARGUMENT;
+        // curl takes C strings: an empty name or one with embedded NUL would silently change the target
+        if (unixSocketPath.size() > nameOffset && unixSocketPath.find('\0', nameOffset) == string::npos) {
+            rc = curl_easy_setopt(curl,
+                                  isAbstract ? CURLOPT_ABSTRACT_UNIX_SOCKET : CURLOPT_UNIX_SOCKET_PATH,
+                                  unixSocketPath.c_str() + nameOffset);
         }
         if (rc != CURLE_OK) {
             LOG_ERROR(sLogger, ("failed to set unix socket path", unixSocketPath)("errMsg", curl_easy_strerror(rc)));

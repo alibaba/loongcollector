@@ -163,6 +163,7 @@ public:
     void TestSendHttpRequest();
     void TestCurlTLS();
     void TestFollowRedirect();
+    void TestUnixSocketInvalidName();
 #if !defined(_MSC_VER)
     void TestUnixSocket();
     void TestUnixSocketNotExist();
@@ -243,6 +244,24 @@ void CurlUnittest::TestFollowRedirect() {
     APSARA_TEST_EQUAL(404, res.GetStatusCode());
 }
 
+void CurlUnittest::TestUnixSocketInvalidName() {
+    for (const string& name : {string("/tmp/a\0b", 8), string("@"), string("\0", 1)}) {
+        auto request = std::make_unique<HttpRequest>(
+            "GET", false, "localhost", 9100, "/metrics", "", map<string, string>(), "", 2, 1);
+        request->mUnixSocketPath = name;
+        HttpResponse res;
+#if defined(__linux__) || defined(_WIN32)
+        APSARA_TEST_FALSE(SendHttpRequest(std::move(request), res));
+#else
+        // "@" is a literal relative path here, so only NUL-containing names are rejected
+        if (name != "@") {
+            APSARA_TEST_FALSE(SendHttpRequest(std::move(request), res));
+        }
+#endif
+        APSARA_TEST_EQUAL(0, res.GetStatusCode());
+    }
+}
+
 #if !defined(_MSC_VER)
 void CurlUnittest::TestUnixSocket() {
     UnixSocketTestServer server("metric_a 1\n");
@@ -305,6 +324,7 @@ void CurlUnittest::TestUnixAbstractSocket() {
 UNIT_TEST_CASE(CurlUnittest, TestSendHttpRequest)
 UNIT_TEST_CASE(CurlUnittest, TestCurlTLS)
 UNIT_TEST_CASE(CurlUnittest, TestFollowRedirect)
+UNIT_TEST_CASE(CurlUnittest, TestUnixSocketInvalidName)
 #if !defined(_MSC_VER)
 UNIT_TEST_CASE(CurlUnittest, TestUnixSocket)
 UNIT_TEST_CASE(CurlUnittest, TestUnixSocketNotExist)

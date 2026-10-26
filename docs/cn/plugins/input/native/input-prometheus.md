@@ -112,7 +112,7 @@ ScrapeConfig 兼容绝大部分 [Prometheus 官方配置中的 `scrape_config`](
     1. `__address__` 仍为必填，并照常用于构造请求 URL、`Host` 请求头以及默认的 `instance` 标签，可填写任意有意义的名称，如 `localhost:9100`。
     2. 通过 `__scheme__`（或 `scheme`）指定 Socket 上使用的协议，可选 `http`（默认）或 `https`；`https` 时 TLS 配置照常生效。
     3. 与其他 `__` 前缀标签相同，`__unix_socket__` 不会出现在最终指标标签中。
-    4. 采集器进程需要具备该 Socket 文件的访问权限。Linux 还支持 `@name` 格式的抽象 Socket 地址；不支持 Unix Socket 的 libcurl 构建会使抓取失败，不会回退到 TCP。
+    4. 采集器进程需要具备该 Socket 文件的访问权限。与 Prometheus（Go 运行时）一致，在 Linux 和 Windows 上以 `@` 开头的值（如 `@exporter`）表示抽象 Socket 地址，其他平台按普通文件路径处理；Windows 能否连接抽象地址取决于系统支持。路径无效或 libcurl 不支持 Unix Socket 时抓取会失败，不会回退到 TCP。
 
 ## 样例
 
