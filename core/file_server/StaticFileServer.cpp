@@ -17,6 +17,7 @@
 #include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "common/FileSystemUtil.h"
 #include "common/LogtailCommonFlags.h"
+#include "common/SafeThread.h"
 #include "file_server/checkpoint/CheckPointManager.h"
 #include "file_server/checkpoint/InputStaticFileCheckpointManager.h"
 #include "runner/ProcessorRunner.h"
@@ -43,7 +44,7 @@ StaticFileServer::StaticFileServer() {
 void StaticFileServer::Init() {
     InputStaticFileCheckpointManager::GetInstance()->GetAllCheckpointFileNames();
     mIsThreadRunning = true;
-    mThreadRes = async(launch::async, &StaticFileServer::Run, this);
+    LaunchAsync(mThreadRes, "StaticFileServer", &StaticFileServer::Run, this);
     mStartTime = time(nullptr);
 }
 

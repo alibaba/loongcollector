@@ -29,8 +29,11 @@
 #include "common/compression/CompressorFactory.h"
 #include "file_server/ConfigManager.h"
 #include "logger/Logger.h"
+#include "models/PipelineEventGroup.h"
 #include "monitor/AlarmManager.h"
 #include "monitor/Monitor.h"
+#include "protobuf/models/ProtocolConversion.h"
+#include "protobuf/models/pipeline_event_group.pb.h"
 #include "provider/Provider.h"
 #ifdef APSARA_UNIT_TEST_MAIN
 #include "unittest/pipeline/LogtailPluginMock.h"
@@ -267,6 +270,84 @@ int LogtailPlugin::SendPbV2(const char* configName,
     return pConfig->Send(std::string(pbBuffer, pbSize), shardHashStr, logstore) ? 0 : -1;
 }
 
+int LogtailPlugin::SendPipelineEventGroup(const char* configName,
+                                          int32_t configNameSize,
+                                          const char* logstoreName,
+                                          int logstoreSize,
+                                          char* pbBuffer,
+                                          int32_t pbSize,
+                                          int32_t /*eventCount*/,
+                                          const char* shardHash,
+                                          int shardHashSize) {
+    if (configName == NULL || configNameSize <= 0 || pbBuffer == NULL || pbSize <= 0) {
+        return -1;
+    }
+
+    models::PipelineEventGroup pbGroup;
+    if (!pbGroup.ParseFromArray(pbBuffer, pbSize)) {
+        LOG_WARNING(sLogger,
+                    ("error", "SendPipelineEventGroup invalid PipelineEventGroup PB")("pb size", pbSize)(
+                        "config", std::string(configName, configNameSize)));
+        return -1;
+    }
+
+    static FlusherSLS* containerConfig = &(LogtailPlugin::GetInstance()->mPluginContainerConfig);
+
+    string configNameStr = string(configName, configNameSize);
+
+    string logstore;
+    if (logstoreSize > 0 && logstoreName != NULL) {
+        logstore.assign(logstoreName, (size_t)logstoreSize);
+    }
+
+    if (configNameStr == containerConfig->mLogstore) {
+        // Container profile still uses SendPb (LogGroup). C1 does not push PEG
+        // onto the profile flusher's native batcher; C3 will wire this path.
+        return 0;
+    }
+
+    shared_ptr<CollectionPipeline> p = CollectionPipelineManager::GetInstance()->FindConfigByName(configNameStr);
+    if (!p) {
+        LOG_INFO(sLogger,
+                 ("error", "SendPipelineEventGroup can not find config, maybe config updated")("config", configNameStr)(
+                     "logstore", logstore));
+        return -2;
+    }
+    if (p->GetFlushers().empty() || p->GetFlushers()[0] == nullptr) {
+        LOG_WARNING(sLogger, ("error", "SendPipelineEventGroup config has no flusher")("config", configNameStr));
+        return -2;
+    }
+    const Flusher* plugin = p->GetFlushers()[0]->GetPlugin();
+    if (plugin == NULL || plugin->Name() != FlusherSLS::sName) {
+        LOG_WARNING(sLogger, ("error", "SendPipelineEventGroup flusher is not flusher_sls")("config", configNameStr));
+        return -2;
+    }
+    FlusherSLS* pConfig = const_cast<FlusherSLS*>(static_cast<const FlusherSLS*>(plugin));
+
+    PipelineEventGroup group(std::make_shared<SourceBuffer>());
+    string errMsg;
+    if (!TransferPBToPipelineEventGroup(pbGroup, group, errMsg)) {
+        LOG_WARNING(sLogger,
+                    ("error", "SendPipelineEventGroup transfer PB failed")("err", errMsg)("config", configNameStr));
+        return -1;
+    }
+
+    // C1 delivers via the native object path so C2 can land before C3. logstore
+    // and shardHash are accepted (same ABI as SendPbV2) and will be honored by
+    // C3's byte-oriented FlusherSLS::Send(PipelineEventGroup PB) path.
+    if (!logstore.empty() && logstore != pConfig->mLogstore) {
+        LOG_DEBUG(sLogger,
+                  ("SendPipelineEventGroup logstore override deferred to C3", logstore)("flusher logstore",
+                                                                                        pConfig->mLogstore));
+    }
+    if (shardHashSize > 0 && shardHash != NULL) {
+        LOG_DEBUG(
+            sLogger,
+            ("SendPipelineEventGroup shardHash deferred to C3", string(shardHash, static_cast<size_t>(shardHashSize))));
+    }
+    return pConfig->Send(std::move(group)) ? 0 : -1;
+}
+
 bool LogtailPlugin::LoadPluginBase() {
     if (mPluginValid) {
         return true;
@@ -288,7 +369,7 @@ bool LogtailPlugin::LoadPluginBase() {
             return mPluginValid;
         }
         int version = versionFun();
-        if (!(version / 100 == 2 || version / 100 == 3)) {
+        if (!(version / 100 == 2 || version / 100 == 3 || version / 100 == 4)) {
             LOG_ERROR(sLogger, ("invalid plugin adapter version, version", version));
             return mPluginValid;
         }
@@ -307,6 +388,17 @@ bool LogtailPlugin::LoadPluginBase() {
                 return mPluginValid;
             }
             registerFun(LogtailPlugin::IsValidToSend, LogtailPlugin::SendPb);
+        }
+
+        // Additive: SendPipelineEventGroup coexists with SendPb. Old adapters
+        // without this symbol keep working; Go calls then return -1.
+        auto registerPegFun
+            = (RegisterSendPipelineEventGroupFun)loader.LoadMethod("RegisterSendPipelineEventGroup", error);
+        if (error.empty()) {
+            registerPegFun(LogtailPlugin::SendPipelineEventGroup);
+        } else {
+            LOG_WARNING(sLogger,
+                        ("load RegisterSendPipelineEventGroup failed", error)("SendPipelineEventGroup", "unavailable"));
         }
 
         mPluginAdapterPtr = loader.Release();

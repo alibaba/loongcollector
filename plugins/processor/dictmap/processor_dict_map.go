@@ -21,6 +21,7 @@ import (
 	"os"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 )
@@ -183,6 +184,38 @@ func (p *ProcessorDictMap) processLog(log *protocol.Log) {
 	if p.scanDestKey && !hasDestKey {
 		log.Contents = append(log.Contents, &protocol.Log_Content{Key: p.DestKey, Value: fillIn})
 		return
+	}
+}
+
+// Process implements the v2 ProcessorV2 interface: it maps the SourceKey value
+// of each Log event through MapDict into DestKey (or in place); Metric/Span
+// events pass through unchanged. Mode ("fill"/"overwrite") and HandleMissing
+// follow the same semantics as the v1 path.
+func (p *ProcessorDictMap) Process(in *models.PipelineGroupEvents, context pipeline.PipelineContext) {
+	pipeline.ProcessLogEventsOnly(in, context, p.processLogEvent)
+}
+
+func (p *ProcessorDictMap) processLogEvent(log *models.Log) {
+	contents := log.GetIndices()
+	if contents.Contains(p.SourceKey) {
+		value, exist := p.MapDict[pipeline.GetStringValue(contents.Get(p.SourceKey))]
+		if !exist {
+			return
+		}
+		if !p.scanDestKey {
+			contents.Add(p.SourceKey, value)
+			return
+		}
+		// "fill" keeps an existing DestKey untouched; "overwrite" (and absent) writes.
+		if !contents.Contains(p.DestKey) || p.Mode == "overwrite" {
+			contents.Add(p.DestKey, value)
+		}
+		return
+	}
+	if p.HandleMissing {
+		if !contents.Contains(p.DestKey) || p.Mode == "overwrite" {
+			contents.Add(p.DestKey, p.Missing)
+		}
 	}
 }
 

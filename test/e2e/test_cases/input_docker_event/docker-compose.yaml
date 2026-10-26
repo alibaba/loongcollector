@@ -19,4 +19,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    image: input-docker-event-target:latest
+    container_name: input-docker-event-target
     hostname: container

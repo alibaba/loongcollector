@@ -31,3 +31,36 @@ Feature: input prometheus
     - __time_nano__
     - __value__
     """
+
+  @e2e @docker-compose
+  Scenario: TestInputPrometheusMetricRelabelLabeldrop
+    Given {docker-compose} environment
+    Given subcribe data from {grpc} with config
+    """
+    """
+    Given {input-prometheus-metric-relabel-case} local config as below
+    """
+    enable: true
+    inputs:
+      - Type: service_prometheus
+        Yaml: |-
+          global:
+            scrape_interval: 15s
+            evaluation_interval: 15s
+          scrape_configs:
+            - job_name: "prometheus"
+              static_configs:
+                - targets: ["exporter:18080"]
+              metric_relabel_configs:
+                - action: labeldrop
+                  regex: clusterName
+    """
+    When start docker-compose {input_prometheus}
+    Then there is at least {10} logs
+    Then the log fields match as below
+    """
+    - __name__
+    - __labels__
+    - __time_nano__
+    - __value__
+    """

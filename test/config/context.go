@@ -19,6 +19,7 @@ const (
 	StartTimeContextKey         ContextKey = "startTime"
 	DependOnContainerKey        ContextKey = "dependOnContainer"
 	MountVolumeKey              ContextKey = "mountVolume"
+	ContainerEnvKey             ContextKey = "containerEnv"
 	ExposePortKey               ContextKey = "exposePort"
 	CurrentWorkingDeploymentKey ContextKey = "currentWorkingDeployment"
 	QueryKey                    ContextKey = "query"

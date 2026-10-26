@@ -18,6 +18,8 @@
 #include "gperftools/malloc_extension.h"
 #endif
 
+#include <exception>
+#include <filesystem>
 #include <thread>
 
 #include "app_config/AppConfig.h"
@@ -30,6 +32,7 @@
 #include "common/Flags.h"
 #include "common/MachineInfoUtil.h"
 #include "common/RuntimeUtil.h"
+#include "common/SafeThread.h"
 #include "common/StringTools.h"
 #include "common/TimeKeeper.h"
 #include "common/TimeUtil.h"
@@ -321,35 +324,43 @@ void Application::Start() { // GCOVR_EXCL_START
             lastOnetimeConfigTimeoutCheckTime = curTime;
         }
         if (curTime - lastConfigCheckTime >= INT32_FLAG(config_scan_interval)) {
-            auto configDiff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
-            if (configDiff.first.HasDiff()) {
-                CollectionPipelineManager::GetInstance()->UpdatePipelines(configDiff.first);
-            }
-            // feedback ignored configs after config update ensures ignored configs are set to FAILED status
-            if (configDiff.first.HasIgnored()) {
-                PipelineConfigWatcher::GetInstance()->FeedbackIgnoredConfigs(configDiff.first);
-            }
-            if (configDiff.second.HasDiff()) {
-                TaskPipelineManager::GetInstance()->UpdatePipelines(configDiff.second);
-            }
-            if (configDiff.first.HasDiff() || configDiff.second.HasDiff()) {
-                OnetimeConfigInfoManager::GetInstance()->DumpCheckpointFile();
-            }
-            LoongCollectorMonitor::GetInstance()->SetAgentConfigTotal(
-                CollectionPipelineManager::GetInstance()->GetPipelineCount()
-                + TaskPipelineManager::GetInstance()->GetPipelineCount()
-                + OnetimeConfigInfoManager::GetInstance()->GetConfigCount()
-                - PipelineConfigWatcher::GetInstance()->GetBuiltInPipelineCount());
+            try {
+                auto configDiff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
+                if (configDiff.first.HasDiff()) {
+                    CollectionPipelineManager::GetInstance()->UpdatePipelines(configDiff.first);
+                }
+                // feedback ignored configs after config update ensures ignored configs are set to FAILED status
+                if (configDiff.first.HasIgnored()) {
+                    PipelineConfigWatcher::GetInstance()->FeedbackIgnoredConfigs(configDiff.first);
+                }
+                if (configDiff.second.HasDiff()) {
+                    TaskPipelineManager::GetInstance()->UpdatePipelines(configDiff.second);
+                }
+                if (configDiff.first.HasDiff() || configDiff.second.HasDiff()) {
+                    OnetimeConfigInfoManager::GetInstance()->DumpCheckpointFile();
+                }
+                LoongCollectorMonitor::GetInstance()->SetAgentConfigTotal(
+                    CollectionPipelineManager::GetInstance()->GetPipelineCount()
+                    + TaskPipelineManager::GetInstance()->GetPipelineCount()
+                    + OnetimeConfigInfoManager::GetInstance()->GetConfigCount()
+                    - PipelineConfigWatcher::GetInstance()->GetBuiltInPipelineCount());
 
-            // after every config loaded, set the flag to true
-            if (lastConfigCheckTime == 0) {
-                TaskPipelineManager::GetInstance()->SetFirstCheckConfigExecuted(true);
+                // after every config loaded, set the flag to true
+                if (lastConfigCheckTime == 0) {
+                    TaskPipelineManager::GetInstance()->SetFirstCheckConfigExecuted(true);
+                }
+                InstanceConfigDiff instanceConfigDiff = InstanceConfigWatcher::GetInstance()->CheckConfigDiff();
+                if (instanceConfigDiff.HasDiff()) {
+                    InstanceConfigManager::GetInstance()->UpdateInstanceConfigs(instanceConfigDiff);
+                }
+                lastConfigCheckTime = curTime;
+            } catch (const filesystem::filesystem_error& e) {
+                LOG_ERROR(sLogger,
+                          ("action", "scan config dir")("status", "failed")("error", e.what())(
+                              "error code", e.code().value())("error msg", e.code().message()));
+            } catch (const exception& e) {
+                LOG_ERROR(sLogger, ("action", "scan config dir")("status", "failed")("error", e.what()));
             }
-            InstanceConfigDiff instanceConfigDiff = InstanceConfigWatcher::GetInstance()->CheckConfigDiff();
-            if (instanceConfigDiff.HasDiff()) {
-                InstanceConfigManager::GetInstance()->UpdateInstanceConfigs(instanceConfigDiff);
-            }
-            lastConfigCheckTime = curTime;
         }
 #ifndef LOGTAIL_NO_TC_MALLOC
         if (curTime - gLastTcmallocReleaseMemTime >= INT32_FLAG(tcmalloc_release_memory_interval)) {
@@ -403,7 +414,9 @@ void Application::GenerateInstanceId() {
 }
 
 bool Application::TryGetUUID() {
-    mUUIDThread = thread([this] { GetUUIDThread(); });
+    thread uuidThread;
+    LaunchStdThread(uuidThread, "TryGetUUID", [this] { GetUUIDThread(); });
+    mUUIDThread = std::move(uuidThread);
     // wait 1000 ms
     for (int i = 0; i < 100; ++i) {
         this_thread::sleep_for(chrono::milliseconds(10));

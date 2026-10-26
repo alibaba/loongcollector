@@ -93,8 +93,11 @@ chmod 755 generated_files/gen_build.sh
 if [ "${ENABLE_AGENTSIGHT}" = "ON" ]; then
   cat >> generated_files/gen_build.sh <<AGENTSIGHT_PREGEN
 # ---- AgentSight: generate include/agentsight.h (cbindgen in build.rs) before main CMake build ----
+# --features bpf-build is required: build.rs gates BPF skeleton generation (filewatch.skel.rs etc.)
+# on that feature while src/probes/*.rs include the skeletons unconditionally. Must match the
+# command in coolbpf src/agentsight/CMakeLists.txt (upstream fix 69fb1ee0).
 if [ -d core/_thirdparty/coolbpf/src/agentsight ]; then
-  ( cd core/_thirdparty/coolbpf/src/agentsight && cargo build --release --no-default-features ) || { echo "build_edge_linux: AgentSight cargo build failed" >&2; exit 1; }
+  ( cd core/_thirdparty/coolbpf/src/agentsight && cargo build --release --no-default-features --features bpf-build ) || { echo "build_edge_linux: AgentSight cargo build failed" >&2; exit 1; }
 fi
 AGENTSIGHT_PREGEN
 fi

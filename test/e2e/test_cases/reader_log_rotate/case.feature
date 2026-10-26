@@ -20,3 +20,10 @@ Feature: reader log rotate
     Given loongcollector container mount {./volume} to {/root/test}
     When start docker-compose {reader_log_rotate}
     Then there is at least {6} logs
+    Then the self-monitor plugin_source labels match kv
+    """
+    file_name: ".*/root/test/simple.log$"
+    file_dev: "^[0-9]+$"
+    file_inode: "^[0-9]+$"
+    """
+    Then the self-monitor plugin_source labels do not have container keys

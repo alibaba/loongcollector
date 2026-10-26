@@ -27,11 +27,13 @@
 namespace logtail::ebpf {
 namespace {
 
-bool ParseMessagesArray(const std::string& json, rapidjson::Document& doc) {
+bool ParseMessagesArray(StringView json, rapidjson::Document& doc) {
     if (json.empty()) {
         return false;
     }
-    doc.Parse(json.c_str(), json.size());
+    // Two-argument Parse reads exactly size() bytes (MemoryStream); never use the single-argument
+    // form here — the view may carry embedded NULs (binary payloads) or lack NUL termination.
+    doc.Parse(json.data(), json.size());
     return !doc.HasParseError() && doc.IsArray();
 }
 
@@ -92,7 +94,7 @@ std::string HashNormalizedMessageSlice(const rapidjson::Document& slice) {
     rapidjson::StringBuffer buf;
     rapidjson::Writer<rapidjson::StringBuffer> writer(buf);
     slice.Accept(writer);
-    return logtail::CalcSHA256Hex(std::string(buf.GetString(), buf.GetSize()));
+    return logtail::CalcSHA256Hex(buf.GetString(), buf.GetSize());
 }
 
 // Finite hashPrefixCount: hash the first N non-system messages, set idxAfterHashPrefix, then stop
@@ -207,7 +209,7 @@ HashJsonArrayRangeForOutputHashFromDoc(const rapidjson::Document& doc, size_t st
     return HashNormalizedMessageSlice(slice);
 }
 
-void UpdateSessionOutputState(const std::string& responseMessagesJson, AgentsightSessionInputState& state) {
+void UpdateSessionOutputState(StringView responseMessagesJson, AgentsightSessionInputState& state) {
     rapidjson::Document doc;
     if (!ParseMessagesArray(responseMessagesJson, doc)) {
         state.outputMessageCount = 0;
@@ -224,22 +226,22 @@ void UpdateSessionOutputState(const std::string& responseMessagesJson, Agentsigh
 
 } // namespace
 
-std::string ComputeContentSha256Hex(const std::string& content) {
+std::string ComputeContentSha256Hex(StringView content) {
     if (content.empty()) {
         return {};
     }
-    return logtail::CalcSHA256Hex(content);
+    return logtail::CalcSHA256Hex(content.data(), content.size());
 }
 
-std::string ComputeSystemInstructionsHash(const std::string& requestMessagesJson) {
+std::string ComputeSystemInstructionsHash(StringView requestMessagesJson) {
     return ComputeContentSha256Hex(ExtractSystemInstructionsJson(requestMessagesJson));
 }
 
-std::string ComputeToolDefinitionsHash(const std::string& toolDefinitionsJson) {
+std::string ComputeToolDefinitionsHash(StringView toolDefinitionsJson) {
     return ComputeContentSha256Hex(toolDefinitionsJson);
 }
 
-std::string ExtractSystemInstructionsJson(const std::string& requestMessagesJson) {
+std::string ExtractSystemInstructionsJson(StringView requestMessagesJson) {
     rapidjson::Document doc;
     if (!ParseMessagesArray(requestMessagesJson, doc)) {
         return {};
@@ -308,14 +310,14 @@ void CollectFinishReasonFromMessageObject(const rapidjson::Value& msg,
     }
 }
 
-bool TryMergeFinishReasonsJsonArray(const std::string& raw,
+bool TryMergeFinishReasonsJsonArray(StringView raw,
                                     rapidjson::Document& reasons,
                                     rapidjson::Document::AllocatorType& alloc) {
     if (raw.empty() || raw.front() != '[') {
         return false;
     }
     rapidjson::Document parsed;
-    parsed.Parse(raw.c_str(), raw.size());
+    parsed.Parse(raw.data(), raw.size());
     if (parsed.HasParseError() || !parsed.IsArray()) {
         return false;
     }
@@ -343,7 +345,7 @@ std::string SerializeFinishReasonsArray(const rapidjson::Document& reasons) {
     return out;
 }
 
-std::string FormatFinishReasonsJson(const std::string& responseMessagesJson, const std::string& fallbackFinishReason) {
+std::string FormatFinishReasonsJson(StringView responseMessagesJson, StringView fallbackFinishReason) {
     rapidjson::Document reasons(rapidjson::kArrayType);
     auto& alloc = reasons.GetAllocator();
 
@@ -356,7 +358,8 @@ std::string FormatFinishReasonsJson(const std::string& responseMessagesJson, con
 
     if (reasons.Empty() && !fallbackFinishReason.empty()) {
         if (!TryMergeFinishReasonsJsonArray(fallbackFinishReason, reasons, alloc)) {
-            AppendFinishReasonString(fallbackFinishReason.c_str(),
+            // rapidjson::Value(reason, len, alloc) copies exactly len bytes; no NUL required.
+            AppendFinishReasonString(fallbackFinishReason.data(),
                                      static_cast<rapidjson::SizeType>(fallbackFinishReason.size()),
                                      reasons,
                                      alloc);
@@ -366,8 +369,7 @@ std::string FormatFinishReasonsJson(const std::string& responseMessagesJson, con
     return SerializeFinishReasonsArray(reasons);
 }
 
-std::string ComputeInputMessagesDelta(const std::string& fullMessagesJson,
-                                      const AgentsightSessionInputState* previousState) {
+std::string ComputeInputMessagesDelta(StringView fullMessagesJson, const AgentsightSessionInputState* previousState) {
     rapidjson::Document curDoc;
     if (!ParseMessagesArray(fullMessagesJson, curDoc)) {
         return {};
@@ -415,9 +417,9 @@ std::string ComputeInputMessagesDelta(const std::string& fullMessagesJson,
     return deltaFromStart(0);
 }
 
-void CommitSessionStateAfterEmit(const std::string& requestMessagesJson,
-                                 const std::string& responseMessagesJson,
-                                 const std::string& toolDefinitionsJson,
+void CommitSessionStateAfterEmit(StringView requestMessagesJson,
+                                 StringView responseMessagesJson,
+                                 StringView toolDefinitionsJson,
                                  AgentsightSessionInputState& state) {
     UpdateSessionOutputState(responseMessagesJson, state);
     rapidjson::Document requestDoc;
@@ -433,18 +435,20 @@ void CommitSessionStateAfterEmit(const std::string& requestMessagesJson,
     state.toolDefinitionsHash = ComputeToolDefinitionsHash(toolDefinitionsJson);
 }
 
-std::string ResolveSessionStateKey(const std::string& sessionId, const std::string& turnId) {
+std::string ResolveSessionStateKey(StringView sessionId, StringView turnId) {
+    // The LRU key must own its bytes: the views point into the record's arena, which dies with
+    // the event group, long before the cached entry expires.
     if (!sessionId.empty()) {
-        return sessionId;
+        return sessionId.to_string();
     }
-    return turnId;
+    return turnId.to_string();
 }
 
-std::string FormatGenAiStepId(const std::string& turnId, size_t stepNumber) {
+std::string FormatGenAiStepId(StringView turnId, size_t stepNumber) {
     if (turnId.empty()) {
         return {};
     }
-    return turnId + ":s" + std::to_string(stepNumber);
+    return turnId.to_string() + ":s" + std::to_string(stepNumber);
 }
 
 } // namespace logtail::ebpf

@@ -71,6 +71,7 @@ public:
     void TestClearContainerInfo() const;
     void TestApplyContainerDiffsRefreshAllClearsStaleContainers();
     void TestLoadContainerInfoAfterConfigInit();
+    void TestGetContainerInfoById() const;
     void runTestFile(const std::string& testFilePath) const;
 
 private:
@@ -2792,6 +2793,38 @@ void ContainerManagerUnittest::parseLabelFilters(const Json::Value& filtersJson,
     }
 }
 
+void ContainerManagerUnittest::TestGetContainerInfoById() const {
+    ContainerManager containerManager;
+
+    auto info = std::make_shared<RawContainerInfo>();
+    info->mID = "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2";
+    info->mName = "test-container";
+    info->AddMetadata("_container_name_", "test-container");
+    containerManager.mContainerMap[info->mID] = info;
+
+    {
+        // Known full container ID resolves to the cached info.
+        auto found = containerManager.GetContainerInfoById(info->mID);
+        EXPECT_TRUE(found != nullptr);
+        if (found) {
+            EXPECT_EQ(found->mID, info->mID);
+            EXPECT_EQ(found->mName, "test-container");
+            EXPECT_EQ(found->mMetadatas.size(), 1U);
+        }
+    }
+    {
+        // Unknown ID (e.g. short/variant form, host process id, removed container) resolves to null.
+        EXPECT_TRUE(containerManager.GetContainerInfoById("a1b2c3d4e5f6") == nullptr);
+        EXPECT_TRUE(
+            containerManager.GetContainerInfoById("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")
+            == nullptr);
+    }
+    {
+        // Empty ID resolves to null without touching the map.
+        EXPECT_TRUE(containerManager.GetContainerInfoById("") == nullptr);
+    }
+}
+
 UNIT_TEST_CASE(ContainerManagerUnittest, TestcomputeMatchedContainersDiff)
 UNIT_TEST_CASE(ContainerManagerUnittest, TestrefreshAllContainersSnapshot)
 UNIT_TEST_CASE(ContainerManagerUnittest, TestincrementallyUpdateContainersSnapshot)
@@ -2816,6 +2849,7 @@ UNIT_TEST_CASE(ContainerManagerUnittest, TestRefreshAllContainersFlag)
 UNIT_TEST_CASE(ContainerManagerUnittest, TestClearContainerInfo)
 UNIT_TEST_CASE(ContainerManagerUnittest, TestApplyContainerDiffsRefreshAllClearsStaleContainers)
 UNIT_TEST_CASE(ContainerManagerUnittest, TestLoadContainerInfoAfterConfigInit)
+UNIT_TEST_CASE(ContainerManagerUnittest, TestGetContainerInfoById)
 
 } // namespace logtail
 

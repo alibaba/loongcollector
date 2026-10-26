@@ -47,6 +47,12 @@ public:
     void Init();
     void Stop();
 
+    // Look up cached container info by full container ID. Returns nullptr when the ID is unknown
+    // (e.g. host process, container removed from the snapshot, or the polling loop has not been
+    // started via Init()). The returned info is immutable after publication, so reading it outside
+    // the lock is safe.
+    std::shared_ptr<RawContainerInfo> GetContainerInfoById(const std::string& containerID) const;
+
     void ApplyContainerDiffs();
     bool CheckContainerDiffForAllConfig();
 

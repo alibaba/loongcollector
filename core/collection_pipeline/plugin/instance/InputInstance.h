@@ -41,6 +41,9 @@ public:
     bool Stop(bool isPipelineRemoving) { return mPlugin->Stop(isPipelineRemoving); }
     QueueType GetProcessQueueType() const { return mPlugin->GetProcessQueueType(); }
     std::vector<std::unique_ptr<ProcessorInstance>>& GetInnerProcessors() { return mPlugin->GetInnerProcessors(); }
+    bool ExpandAdditionalInputs(size_t startIdx, std::vector<std::unique_ptr<InputInstance>>& extras) {
+        return mPlugin->ExpandAdditionalInputs(startIdx, extras);
+    }
 
     // just for special treatment of exactly once of input_file, should not be used otherwise!
     const Input* GetPlugin() const { return mPlugin.get(); }

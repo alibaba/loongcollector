@@ -30,6 +30,7 @@
 
 #include "app_config/AppConfig.h"
 #include "common/Flags.h"
+#include "common/MachineInfoUtil.h"
 #include "common/StringTools.h"
 #include "common/http/HttpRequest.h"
 #include "common/http/HttpResponse.h"
@@ -276,7 +277,8 @@ CURL* CreateCurlHandler(const string& method,
     }
 
     curl_easy_setopt(curl, CURLOPT_TIMEOUT, timeout);
-    if (!intf.empty() && unixSocketPath.empty()) {
+    // Loopback traffic must egress via lo; binding it to a physical interface makes it unreachable.
+    if (!intf.empty() && unixSocketPath.empty() && !IsLoopbackAddress(endpoint)) {
         curl_easy_setopt(curl, CURLOPT_INTERFACE, intf.c_str());
     }
 

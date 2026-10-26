@@ -13,6 +13,7 @@
 #include "collection_pipeline/CollectionPipelineContext.h"
 #include "common/FileSystemUtil.h"
 #include "common/JsonUtil.h"
+#include "common/SafeThread.h"
 #include "common/StringTools.h"
 #include "constants/Constants.h"
 #include "constants/TagConstants.h"
@@ -44,7 +45,7 @@ void ContainerManager::Init() {
     }
     mIsRunning = true;
     LOG_INFO(sLogger, ("ContainerManager", "init"));
-    mThreadRes = std::async(std::launch::async, &ContainerManager::pollingLoop, this);
+    LaunchAsync(mThreadRes, "ContainerManager", &ContainerManager::pollingLoop, this);
 }
 
 void ContainerManager::Stop() {
@@ -64,6 +65,12 @@ void ContainerManager::Stop() {
             LOG_ERROR(sLogger, ("stop polling thread failed", ""));
         }
     }
+}
+
+std::shared_ptr<RawContainerInfo> ContainerManager::GetContainerInfoById(const std::string& containerID) const {
+    ReadLock lock(mContainerMapRWLock);
+    auto it = mContainerMap.find(containerID);
+    return it == mContainerMap.end() ? nullptr : it->second;
 }
 
 void ContainerManager::pollingLoop() {

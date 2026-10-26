@@ -14,4 +14,4 @@
 
 FROM busybox
 
-CMD ["sh", "-c","echo \"hello\" && sleep 90"]
+CMD ["sh", "-c", "echo \"target-stdout\" && echo \"target-stderr\" >&2 && sleep 90"]

@@ -69,7 +69,7 @@ GO_PATH = $$($(GO) env GOPATH)
 GO_BUILD = $(GO) build
 GO_GET = $(GO) get
 GO_TEST = $(GO) test
-GO_LINT = golangci-lint
+GO_LINT = PATH=$(GO_PATH)/bin:$$PATH golangci-lint
 GO_ADDLICENSE = $(GO_PATH)/bin/addlicense
 GO_PACKR = $(GO_PATH)/bin/packr2
 GO_BUILD_FLAGS = -v
@@ -83,7 +83,7 @@ DIST_FILE = $(DIST_DIR)/loongcollector-$(VERSION).linux-$(ARCH).tar.gz
 
 .PHONY: tools
 tools:
-	$(GO_LINT) version || curl -sfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(GO_PATH)/bin v1.64.8
+	$(GO_LINT) version 2>/dev/null | grep -q 'version 2.4.0 ' || curl -sfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(GO_PATH)/bin v2.4.0
 	$(GO_ADDLICENSE) version || go install github.com/google/addlicense@latest
 
 .PHONY: clean
@@ -196,6 +196,7 @@ unittest_e2e_engine: clean
 unittest_plugin: clean import_plugins
 	cp pkg/logtail/libGoPluginAdapter.so ./plugin_main
 	cp pkg/logtail/GoPluginAdapter.dll ./plugin_main
+	cp pkg/logtail/libGoPluginAdapter.so ./plugins/flusher/sls
 	@if [ -f ./plugins/input/prometheus/input_prometheus.go ]; then \
 		mv ./plugins/input/prometheus/input_prometheus.go ./plugins/input/prometheus/input_prometheus.go.bak; \
 	fi
@@ -213,6 +214,7 @@ unittest_plugin_clean:
 	rm -rf .testCoverage.txt
 	rm -rf plugin_main/libGoPluginAdapter.so
 	rm -rf plugin_main/GoPluginAdapter.dll
+	rm -rf plugins/flusher/sls/libGoPluginAdapter.so
 	rm -rf plugins/input/jmxfetch/test/
 	@echo "Plugin unittest files cleaned"
 

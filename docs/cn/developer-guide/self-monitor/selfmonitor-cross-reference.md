@@ -63,6 +63,8 @@
 | `METRIC_LABEL_KEY_FILE_INODE` | — | `file_inode` | 采集文件的 inode 号 |
 | `METRIC_LABEL_KEY_FILE_NAME` | — | `file_name` | 采集文件名 |
 
+容器和 K8s 标签不另建 `METRIC_LABEL_KEY_*`。运行时 key 就是日志 tag 名，默认值为 `DEFAULT_LOG_TAG_*`（`_namespace_`、`_pod_name_`、`_pod_uid_`、`_container_name_`、`_container_ip_`、`_image_name_`），由 `FileTagOptions::GetFileTagKeyName` 决定。`ExternalK8sLabelTag` / `ExternalEnvTag` 映射出的 tag 同样直接使用日志 tag 名。
+
 ### 2.5 Prometheus 标签
 
 | C++ 常量 | Go 常量 | 字符串值 | 含义 |
@@ -84,7 +86,7 @@
 | `METRIC_LABEL_KEY_PARSE_STATUS` | — | `parser_status` | 协议解析结果状态 |
 | `METRIC_LABEL_KEY_EVENT_SOURCE` | — | `event_source` | 事件来源 |
 | `METRIC_LABEL_KEY_META_TYPE` | — | `meta_type` | 元数据富化类型 |
-| `METRIC_LABEL_KEY_RECORD_TYPE` | — | `record_type` | 记录类型（应用层/网络层） |
+| `METRIC_LABEL_KEY_RECORD_TYPE` | — | `record_type` | 记录类型（应用层/网络层；AgentSight 用它区分 raw HTTP 与 GenAI 两条流）|
 
 ### 2.7 Component 标签
 
@@ -152,6 +154,8 @@
 | `METRIC_LABEL_VALUE_EVENT_SOURCE_EBPF` | `ebpf` | 事件源：eBPF 子系统 |
 | `METRIC_LABEL_VALUE_RECORD_TYPE_APP` | `app` | 记录类型：应用层 |
 | `METRIC_LABEL_VALUE_RECORD_TYPE_NET` | `net` | 记录类型：网络层 |
+| `METRIC_LABEL_VALUE_RECORD_TYPE_RAW_HTTP` | `raw_http` | 记录类型：AgentSight 原始 HTTP 事件（`RawHttpsFallback`）|
+| `METRIC_LABEL_VALUE_RECORD_TYPE_GEN_AI` | `gen_ai` | 记录类型：AgentSight GenAI 语义事件 |
 | `METRIC_LABEL_VALUE_EVENT_TYPE_CONN_STATS` | `conn_stats` | 事件类型：连接统计 |
 | `METRIC_LABEL_VALUE_EVENT_TYPE_DATA_EVENT` | `data_event` | 事件类型：数据事件 |
 | `METRIC_LABEL_VALUE_EVENT_TYPE_CTRL_EVENT` | `ctrl_event` | 事件类型：控制事件 |
@@ -796,6 +800,7 @@
 | `ProcessorJSONParserAlarm` | `PROCESSOR_JSON_PARSER_ALARM` | JSON 处理器解析异常 |
 | `ProcessorOTELMetricDataFormat` | `PROCESSOR_OTEL_METRIC_DATA_FORMAT` | OTEL Metric 数据格式异常 |
 | `ProcessorOTELMetricFindAlarm` | `PROCESSOR_OTEL_METRIC_FIND_ALARM` | OTEL Metric 查找异常 |
+| `ProcessorOTELMetricParserAlarm` | `PROCESSOR_OTEL_METRIC_PARSER_ALARM` | OTEL Metric 解析异常 |
 | `ProcessorOTELTraceDataFormat` | `PROCESSOR_OTEL_TRACE_DATA_FORMAT` | OTEL Trace 数据格式异常 |
 | `ProcessorOTELTraceFindAlarm` | `PROCESSOR_OTEL_TRACE_FIND_ALARM` | OTEL Trace 查找异常 |
 | `ProcessorOTELTraceParserAlarm` | `PROCESSOR_OTEL_TRACE_PARSER_ALARM` | OTEL Trace 解析异常 |

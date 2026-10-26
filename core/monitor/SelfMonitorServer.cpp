@@ -20,6 +20,7 @@
 #include "Monitor.h"
 #include "collection_pipeline/CollectionPipelineManager.h"
 #include "common/LogtailCommonFlags.h"
+#include "common/SafeThread.h"
 #include "go_pipeline/LogtailPlugin.h"
 #include "monitor/AlarmManager.h"
 #include "protobuf/models/ProtocolConversion.h"
@@ -34,6 +35,7 @@ const string SelfMonitorServer::INTERNAL_DATA_TYPE_ALARM = "__alarm__";
 const string SelfMonitorServer::INTERNAL_DATA_TYPE_METRIC = "__metric__";
 const string SelfMonitorServer::INTERNAL_DATA_TYPE_TASK_STATUS = "__task_status__";
 const string SelfMonitorServer::INTERNAL_DATA_TYPE_CONTAINER = "__container__";
+const string SelfMonitorServer::INTERNAL_DATA_TYPE_AGENT_LOG = "__agent_log__";
 
 SelfMonitorServer::SelfMonitorServer() {
 }
@@ -44,7 +46,7 @@ SelfMonitorServer* SelfMonitorServer::GetInstance() {
 }
 
 void SelfMonitorServer::Init() {
-    mThreadRes = async(launch::async, &SelfMonitorServer::Monitor, this);
+    LaunchAsync(mThreadRes, "SelfMonitorServer", &SelfMonitorServer::Monitor, this);
 }
 
 void SelfMonitorServer::Monitor() {

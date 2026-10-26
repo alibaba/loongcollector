@@ -23,8 +23,6 @@ import (
 	"os/exec"
 	"strings"
 
-	composeModule "github.com/testcontainers/testcontainers-go/modules/compose"
-
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/test/config"
@@ -53,6 +51,10 @@ func ComposeProjectName(caseHome string) string {
 
 // ComposeDown stops and removes containers for the given case compose file.
 func ComposeDown(caseHome string) error {
+	return composeDown(caseHome, ComposeProjectName(caseHome))
+}
+
+func composeDown(caseHome, projectName string) error {
 	ensureComposeBuildEnv()
 	if caseHome == "" {
 		return nil
@@ -64,11 +66,18 @@ func ComposeDown(caseHome string) error {
 		}
 		return err
 	}
-	projectName := ComposeProjectName(caseHome)
-	execError := composeModule.NewLocalDockerCompose([]string{composeFile}, projectName).Down()
-	if execError.Error != nil {
-		logger.Error(context.Background(), selfmonitor.DownDockerComposeError, "stdout", execError.Error.Error())
-		return execError.Error
+	ctx, cancel := context.WithTimeout(context.Background(), dockerCommandTimeout)
+	defer cancel()
+	if _, err := runComposeCommand(
+		ctx,
+		composeFile,
+		projectName,
+		"down",
+		"--volumes",
+		"--remove-orphans",
+	); err != nil {
+		logger.Error(context.Background(), selfmonitor.DownDockerComposeError, "stdout", err.Error())
+		return err
 	}
 	_ = os.Remove(composeFile)
 	return nil
@@ -93,19 +102,30 @@ func removeContainersByNameFilters(filters ...string) error {
 	}
 	var joined error
 	for _, nameFilter := range filters {
-		out, err := exec.Command("docker", "ps", "-aq", "--filter", "name="+nameFilter).CombinedOutput()
+		out, err := runDockerCommandWithTimeout(
+			context.Background(),
+			dockerCommandTimeout,
+			"ps",
+			"-aq",
+			"--filter",
+			"name="+nameFilter,
+		)
 		if err != nil {
 			joined = errors.Join(joined, err)
 			continue
 		}
-		ids := strings.Fields(strings.TrimSpace(string(out)))
+		ids := strings.Fields(out)
 		if len(ids) == 0 {
 			continue
 		}
 		args := append([]string{"rm", "-f"}, ids...)
-		if rmOut, rmErr := exec.Command("docker", args...).CombinedOutput(); rmErr != nil {
+		if rmOut, rmErr := runDockerCommandWithTimeout(
+			context.Background(),
+			dockerCommandTimeout,
+			args...,
+		); rmErr != nil {
 			logger.Warning(context.Background(), selfmonitor.StopDockerComposeError,
-				"filter", nameFilter, "err", rmErr, "output", string(rmOut))
+				"filter", nameFilter, "err", rmErr, "output", rmOut)
 			joined = errors.Join(joined, rmErr)
 		} else {
 			logger.Infof(context.Background(), "removed %d e2e container(s) matching name=%s", len(ids), nameFilter)

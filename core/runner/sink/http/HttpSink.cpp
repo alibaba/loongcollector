@@ -21,6 +21,7 @@
 #include "collection_pipeline/queue/QueueKeyManager.h"
 #include "collection_pipeline/queue/SenderQueueItem.h"
 #include "common/Flags.h"
+#include "common/SafeThread.h"
 #include "common/StringTools.h"
 #include "common/http/Curl.h"
 #include "logger/Logger.h"
@@ -71,7 +72,7 @@ bool HttpSink::Init() {
     // TODO: should be dynamic
     SET_GAUGE(mSendConcurrency, AppConfig::GetInstance()->GetSendRequestGlobalConcurrency());
 
-    mThreadRes = async(launch::async, &HttpSink::Run, this);
+    LaunchAsync(mThreadRes, "HttpSink", &HttpSink::Run, this);
     return true;
 }
 

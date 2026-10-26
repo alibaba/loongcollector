@@ -101,6 +101,10 @@ void GetAllPids(std::unordered_set<int32_t>& pids);
 bool GetKernelInfo(std::string& kernelRelease, int64_t& kernelVersion);
 bool GetRedHatReleaseInfo(std::string& os, int64_t& osVersion, std::string bashPath = "");
 bool IsDigitsDotsHostname(const char* hostname);
+// True for loopback hosts, accepting both bare IPs and URL-style hosts: "127.*", "::1", its bracketed
+// form "[::1]", and the "localhost" name (case-insensitive). Only the compressed IPv6 form is matched,
+// which is what inet_ntop emits.
+bool IsLoopbackAddress(const std::string& host);
 // True if this interface must not supply host-identity IPs: null/empty name, "lo", or a trimmed match in
 // STRING_FLAG(ignored_interfaces) (comma-separated). When the flag list is empty, only the implicit rules apply.
 bool IsIgnoredInterfaceForHostIdentity(const char* ifname);

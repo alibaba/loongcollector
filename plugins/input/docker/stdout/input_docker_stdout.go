@@ -30,7 +30,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/util"
 	"github.com/alibaba/ilogtail/plugins/input"
 
-	"github.com/docker/docker/api/types/container"
+	"github.com/moby/moby/api/types/container"
 )
 
 const serviceDockerStdoutKey = "service_docker_stdout_v2"

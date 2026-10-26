@@ -16,6 +16,8 @@
 
 #include <unordered_map>
 
+#include "app_config/AppConfig.h"
+#include "container_manager/ContainerManager.h"
 #include "ebpf/EBPFServer.h"
 #include "ebpf/include/export.h"
 #include "logger/Logger.h"
@@ -26,8 +28,13 @@ namespace logtail {
 const std::string InputAgentSight::sName = "input_agentsight";
 
 bool InputAgentSight::Init(const Json::Value& config, Json::Value&) {
+    // Only keys listed here get a counter: ReentrantMetricsRecord::Init builds mCounters from this map
+    // alone, and GetCounter returns nullptr for anything else. Since ADD_COUNTER null-checks, a metric
+    // the manager reads but this map omits degrades to a silent no-op rather than a build or run error
+    // — so every key AgentsightManager fetches must appear here.
     static const std::unordered_map<std::string, MetricType> kMetricKeys = {
         {METRIC_PLUGIN_IN_EVENTS_TOTAL, MetricType::METRIC_TYPE_COUNTER},
+        {METRIC_PLUGIN_EBPF_LOSS_KERNEL_EVENTS_TOTAL, MetricType::METRIC_TYPE_COUNTER},
         {METRIC_PLUGIN_OUT_EVENTS_TOTAL, MetricType::METRIC_TYPE_COUNTER},
         {METRIC_PLUGIN_OUT_EVENT_GROUPS_TOTAL, MetricType::METRIC_TYPE_COUNTER},
     };
@@ -41,6 +48,13 @@ bool InputAgentSight::Start() {
     ebpf::EBPFServer::GetInstance()->Init();
     if (!ebpf::EBPFServer::GetInstance()->IsSupportedEnv(logtail::ebpf::PluginType::AGENTSIGHT_OBSERVE)) {
         return false;
+    }
+    // Containerized deployment (k8s DaemonSet / docker): keep the process-wide container inventory
+    // running so HandleLlmEvent / HandleHttpsEvent can enrich event groups with container metadata
+    // tags by container ID, the same source input_file / input_container_stdio use. Init is
+    // idempotent; host-mode deployments skip it and enrichment silently degrades to container.id only.
+    if (AppConfig::GetInstance()->IsPurageContainerMode()) {
+        ContainerManager::GetInstance()->Init();
     }
     return ebpf::EBPFServer::GetInstance()->EnablePlugin(mContext->GetConfigName(),
                                                          mIndex,

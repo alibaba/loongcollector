@@ -36,6 +36,13 @@ struct AgentSightSymbolTable {
     void (*config_free)(AgentsightConfigHandle*) = nullptr;
     void (*config_set_verbose)(AgentsightConfigHandle*, int) = nullptr;
     void (*config_set_log_path)(AgentsightConfigHandle*, const char*) = nullptr;
+    /// Optional (libagentsight >= 0.9.0): opt into raw HTTPS fallback events (AgentsightHttpsData).
+    /// Left null by older libraries; callers must null-check before use.
+    void (*config_set_enable_raw_https)(AgentsightConfigHandle*, int) = nullptr;
+    /// Optional (libagentsight >= 0.11.0): procfs mount point pid lookups resolve through, so a
+    /// container can read a bind-mounted host procfs instead of its own /proc.
+    /// Left null by older libraries; callers must null-check before use.
+    void (*config_set_procfs_root)(AgentsightConfigHandle*, const char*) = nullptr;
     void (*config_add_cmdline_rule)(AgentsightConfigHandle*, const char* const*, const char*, int) = nullptr;
     void (*config_add_https)(AgentsightConfigHandle*, const char*) = nullptr;
     int (*config_add_http)(AgentsightConfigHandle*, const char*) = nullptr;

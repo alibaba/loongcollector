@@ -163,6 +163,32 @@ public:
 UNIT_TEST_CASE(HostnameValidationUnittest, DecHostnameValidationTest);
 UNIT_TEST_CASE(HostnameValidationUnittest, OctHostnameValidationTest);
 
+class LoopbackAddressUnittest : public ::testing::Test {
+public:
+    void TestIsLoopbackAddress() {
+        EXPECT_TRUE(IsLoopbackAddress("127.0.0.1"));
+        EXPECT_TRUE(IsLoopbackAddress("127.0.0.53"));
+        EXPECT_TRUE(IsLoopbackAddress("127.1.2.3"));
+        EXPECT_TRUE(IsLoopbackAddress("::1"));
+        EXPECT_TRUE(IsLoopbackAddress("[::1]"));
+        EXPECT_TRUE(IsLoopbackAddress("localhost"));
+        EXPECT_TRUE(IsLoopbackAddress("LocalHost"));
+
+        EXPECT_FALSE(IsLoopbackAddress(""));
+        EXPECT_FALSE(IsLoopbackAddress("192.168.1.10"));
+        EXPECT_FALSE(IsLoopbackAddress("10.0.0.1"));
+        EXPECT_FALSE(IsLoopbackAddress("1270.0.0.1"));
+        EXPECT_FALSE(IsLoopbackAddress("127001"));
+        EXPECT_FALSE(IsLoopbackAddress("::2"));
+        EXPECT_FALSE(IsLoopbackAddress("[::2]"));
+        EXPECT_FALSE(IsLoopbackAddress("localhost.localdomain"));
+        // Only the compressed IPv6 form is in scope; inet_ntop never emits the expanded spelling.
+        EXPECT_FALSE(IsLoopbackAddress("0:0:0:0:0:0:0:1"));
+    }
+};
+
+UNIT_TEST_CASE(LoopbackAddressUnittest, TestIsLoopbackAddress);
+
 #if defined(__linux__)
 class MachineInfoUtilLinuxUnittest : public ::testing::Test {
 public:

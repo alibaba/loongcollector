@@ -28,7 +28,23 @@
 #include "ebpf/plugin/agentsight/AgentsightMessageUtil.h"
 #include "monitor/metric_models/ReentrantMetricsRecord.h"
 
+namespace logtail {
+class PipelineEventGroup;
+struct RawContainerInfo;
+} // namespace logtail
+
 namespace logtail::ebpf {
+
+// Defined in AgentsightEvents.h; only used through pointers here.
+class AgentsightLlmRecord;
+class AgentsightHttpsRecord;
+
+/// Sets the standard container metadata tags on @group from @info — the same keys
+/// input_file / input_container_stdio emit (`_container_name_`, `_image_name_`, `_container_ip_`,
+/// `_pod_name_`, `_namespace_`, `_pod_uid_` via GetDefaultTagKeyString, plus custom metadatas
+/// verbatim). Pure function with no singleton access, so it is unit-testable on its own; the
+/// ContainerManager lookup wrapper lives in AgentsightManager.cpp.
+void AttachAgentsightContainerTagsFromInfo(PipelineEventGroup& group, const RawContainerInfo& info);
 
 class AgentsightManager : public AbstractManager {
 public:
@@ -37,14 +53,17 @@ public:
                       const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
                       moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
                       EventPool* pool,
+                      std::string hostRootPath,
                       size_t sessionInputCacheMaxSize = kMaxSessionInputStates);
 
     static std::shared_ptr<AgentsightManager>
     Create(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
            const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
            moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
-           EventPool* pool) {
-        return std::make_shared<AgentsightManager>(processCacheManager, eBPFAdapter, queue, pool);
+           EventPool* pool,
+           std::string hostRootPath) {
+        return std::make_shared<AgentsightManager>(
+            processCacheManager, eBPFAdapter, queue, pool, std::move(hostRootPath));
     }
 
     ~AgentsightManager() override = default;
@@ -94,6 +113,12 @@ protected:
 
 private:
     static void OnLlmCallback(const AgentsightLLMData* data, void* user_data);
+    /// Raw HTTP fallback for traffic AgentSight could not parse as an LLM call. Only registered with
+    /// handle_read when mRawHttpsFallback is on; otherwise the Rust side never emits these events.
+    static void OnHttpsCallback(const AgentsightHttpsData* data, void* user_data);
+
+    int HandleLlmEvent(AgentsightLlmRecord* rec);
+    int HandleHttpsEvent(const AgentsightHttpsRecord* rec);
 
     void StopAgentSightLocked();
     bool RestartAgentSightLocked(const SecurityOptions& opts);
@@ -103,6 +128,12 @@ private:
     void clearSessionInputState();
 
     static constexpr size_t kMaxSessionInputStates = 4096;
+
+    // Host root as seen from inside the container ("/logtail_host", or "/" on a host install).
+    // Passed to libagentsight so its pid lookups read <root>/proc instead of our own /proc, which
+    // only lists processes sharing our pid namespace. Declared before mSessionInputCache to match
+    // the constructor's initialisation order.
+    std::string mHostRootPath;
 
     std::string mConfigName;
     const CollectionPipelineContext* mPipelineCtx{nullptr};
@@ -122,12 +153,37 @@ private:
     bool mRunning = false;
     bool mEventStreamFormat = true;
     bool mMessageDeltaOnly = true;
+    bool mRawHttpsFallback = false;
 
+    /// Runner-level aggregates owned by EBPFServer and shared with the other eBPF plugins, so they
+    /// stay unlabelled here — narrowing them would change a metric four managers report into.
     CounterPtr mLossKernelEventsTotal;
     CounterPtr mPushLogFailedTotal;
-    CounterPtr mPluginInEventsTotal;
-    CounterPtr mPushLogsTotal;
-    CounterPtr mPushLogGroupTotal;
+
+    /// Per-stream counters, one set per `record_type` label value.
+    ///
+    /// AgentSight produces two streams of wildly different volume: once a process is attached, *every*
+    /// non-LLM HTTPS exchange it makes becomes a raw HTTP event, while gen_ai events are one per LLM
+    /// call. Sharing one counter set made it impossible to tell whether a jump came from enabling
+    /// RawHttpsFallback or from real LLM traffic growth, to size capacity for turning the switch on,
+    /// or — when events are dropped — to tell which stream filled the shared mCommonEventQueue.
+    struct StreamMetrics {
+        CounterPtr inEventsTotal;
+        CounterPtr pushLogsTotal;
+        CounterPtr pushLogGroupTotal;
+        /// Plugin-level counterpart of mLossKernelEventsTotal: same increments, but attributable.
+        CounterPtr lossEventsTotal;
+
+        void reset() {
+            inEventsTotal.reset();
+            pushLogsTotal.reset();
+            pushLogGroupTotal.reset();
+            lossEventsTotal.reset();
+        }
+    };
+    StreamMetrics mRawHttpMetrics;
+    StreamMetrics mGenAiMetrics;
+
     std::vector<MetricLabels> mRefAndLabels;
     PluginMetricManagerPtr mMetricMgr;
 };

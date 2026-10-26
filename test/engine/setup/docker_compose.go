@@ -98,6 +98,24 @@ func MountVolume(ctx context.Context, source, target string) (context.Context, e
 	return ctx, nil
 }
 
+// SetContainerEnvironment injects KEY=VALUE into the loongcollectorC service so
+// a case can shorten fd-timeout / config-scan flags without changing production defaults.
+func SetContainerEnvironment(ctx context.Context, key, value string) (context.Context, error) {
+	if _, ok := Env.(*DockerComposeEnv); ok {
+		var existEnv []string
+		var ok bool
+		if existEnv, ok = ctx.Value(config.ContainerEnvKey).([]string); ok {
+			existEnv = append(existEnv, key+"="+value)
+		} else {
+			existEnv = []string{key + "=" + value}
+		}
+		ctx = context.WithValue(ctx, config.ContainerEnvKey, existEnv)
+	} else {
+		return ctx, fmt.Errorf("env is not docker-compose")
+	}
+	return ctx, nil
+}
+
 func ExposePort(ctx context.Context, source, target string) (context.Context, error) {
 	if _, ok := Env.(*DockerComposeEnv); ok {
 		var existPort []string

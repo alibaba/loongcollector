@@ -18,6 +18,7 @@
 
 #include "app_config/AppConfig.h"
 #include "common/Flags.h"
+#include "common/SafeThread.h"
 #include "common/ScopeInvoker.h"
 #include "common/TimeUtil.h"
 #include "file_server/checkpoint/CheckPointManager.h"
@@ -96,7 +97,7 @@ CheckpointManagerV2::CheckpointManagerV2() {
     mDefaultWriteOption.sync = AppConfig::GetInstance()->EnableCheckpointSyncWrite();
 
     if (open()) {
-        mGCThreadPtr.reset(new std::thread([&]() { runGCLoop(); }));
+        mGCThreadPtr = MakeStdThread("CheckpointManagerV2GC", [&]() { runGCLoop(); });
     }
 }
 

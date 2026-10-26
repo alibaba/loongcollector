@@ -182,10 +182,20 @@ typedef int (*SendPbV2Fun)(const char* configName,
                            int lines,
                            const char* shardHash,
                            int shardHashSize);
+typedef int (*SendPipelineEventGroupFun)(const char* configName,
+                                         int configNameSize,
+                                         const char* logstore,
+                                         int logstoreSize,
+                                         char* pbBuffer,
+                                         int pbSize,
+                                         int eventCount,
+                                         const char* shardHash,
+                                         int shardHashSize);
 
 
 typedef void (*RegisterLogtailCallBack)(IsValidToSendFun checkFun, SendPbFun sendFun);
 typedef void (*RegisterLogtailCallBackV2)(IsValidToSendFun checkFun, SendPbFun sendFun, SendPbV2Fun sendV2Fun);
+typedef void (*RegisterSendPipelineEventGroupFun)(SendPipelineEventGroupFun sendFun);
 
 typedef int (*PluginAdapterVersion)();
 }
@@ -250,6 +260,20 @@ public:
                         int32_t lines,
                         const char* shardHash,
                         int shardHashSize);
+
+    // SendPipelineEventGroup is the PipelineEventGroup-PB counterpart of SendPbV2.
+    // It coexists with SendPb/SendPbV2 (C1); C3 will honor logstore/shardHash on a
+    // dedicated FlusherSLS byte path. Return codes match SendPbV2: 0 ok, -1 send
+    // or parse failure, -2 config not found.
+    static int SendPipelineEventGroup(const char* configName,
+                                      int32_t configNameSize,
+                                      const char* logstore,
+                                      int logstoreSize,
+                                      char* pbBuffer,
+                                      int32_t pbSize,
+                                      int32_t eventCount,
+                                      const char* shardHash,
+                                      int shardHashSize);
 
     K8sContainerMeta GetContainerMeta(logtail::StringView containerID);
     K8sContainerMeta GetContainerMeta(const std::string& containerID);

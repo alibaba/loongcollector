@@ -1,0 +1,7 @@
+*
+!.gitignore
+!old/
+!old/.gitkeep
+!new/
+!new/sub/
+!new/sub/.gitkeep

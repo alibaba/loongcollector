@@ -19,6 +19,7 @@
 #include <chrono>
 #include <thread>
 
+#include "common/SafeThread.h"
 #include "logger/Logger.h"
 
 namespace logtail {
@@ -36,7 +37,7 @@ void ProcessDiscoveryManager::Start(NotifyFn fn,
     mCallback = std::move(fn);
     mStatsCallback = std::move(statsFn);
     mSleepMilliseconds = milliseconds;
-    mThreadRes = std::async(std::launch::async, &ProcessDiscoveryManager::run, this);
+    LaunchAsync(mThreadRes, "ProcessDiscoveryManager", &ProcessDiscoveryManager::run, this);
     LOG_INFO(sLogger, ("ProcessDiscoveryManager", "start"));
 }
 

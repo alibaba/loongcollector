@@ -57,6 +57,16 @@ func (c *BootController) Start(ctx context.Context) error {
 		logger.Error(context.Background(), selfmonitor.BootStartAlarm, "err", err)
 		return err
 	}
+	if config.SelfMonitorDir != "" {
+		if err := os.MkdirAll(config.SelfMonitorDir, 0750); err != nil {
+			logger.Error(context.Background(), selfmonitor.BootStartAlarm, "err", err)
+			return err
+		}
+	}
+	if err := ensureE2ESelfMonitorConfig(); err != nil {
+		logger.Error(context.Background(), selfmonitor.BootStartAlarm, "err", err, "stage", "self_monitor_config")
+		return err
+	}
 	if err := dockercompose.Start(ctx); err != nil {
 		logger.Error(context.Background(), selfmonitor.BootStartAlarm, "err", err)
 		if stopErr := dockercompose.ShutDown(); stopErr != nil {

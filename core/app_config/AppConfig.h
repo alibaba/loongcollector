@@ -553,6 +553,7 @@ public:
     friend class ProcessorTagNativeUnittest;
     friend class EnterpriseConfigProviderUnittest;
     friend class PollingPreservedDirDepthUnittest;
+    friend class CheckpointManagerUnittest;
     friend class InputStaticFileUnittest;
     friend class LogInputReaderUnittest;
     friend class eBPFServerUnittest;
