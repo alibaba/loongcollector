@@ -67,6 +67,7 @@ struct HttpRequest {
     bool mFollowRedirects = false;
     std::optional<CurlTLS> mTls = std::nullopt;
     std::optional<CurlSocket> mSocket = std::nullopt;
+    std::string mUnixSocketPath;
 
     uint32_t mTryCnt = 1;
     std::chrono::system_clock::time_point mLastSendTime;

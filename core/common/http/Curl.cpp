@@ -201,11 +201,30 @@ CURL* CreateCurlHandler(const string& method,
                         const string& intf,
                         bool followRedirects,
                         const optional<CurlTLS>& tls,
-                        const optional<CurlSocket>& socket // socket is used async, the lifespan must be longer
-) {
+                        const optional<CurlSocket>& socket, // socket is used async, the lifespan must be longer
+                        const string& unixSocketPath) {
     CURL* curl = curl_easy_init();
     if (curl == nullptr) {
         return nullptr;
+    }
+
+    if (!unixSocketPath.empty()) {
+        CURLcode rc;
+#if defined(__linux__)
+        if (unixSocketPath.front() == '@') {
+            rc = curl_easy_setopt(curl, CURLOPT_ABSTRACT_UNIX_SOCKET, unixSocketPath.c_str() + 1);
+        } else
+#endif
+        {
+            rc = curl_easy_setopt(curl, CURLOPT_UNIX_SOCKET_PATH, unixSocketPath.c_str());
+        }
+        if (rc != CURLE_OK) {
+            LOG_ERROR(sLogger, ("failed to set unix socket path", unixSocketPath)("errMsg", curl_easy_strerror(rc)));
+            curl_easy_cleanup(curl);
+            return nullptr;
+        }
+        // Environment proxies must not redirect a local socket request.
+        curl_easy_setopt(curl, CURLOPT_NOPROXY, "*");
     }
 
     string totalUrl = httpsFlag ? "https://" : "http://";
@@ -251,7 +270,7 @@ CURL* CreateCurlHandler(const string& method,
     }
 
     curl_easy_setopt(curl, CURLOPT_TIMEOUT, timeout);
-    if (!intf.empty()) {
+    if (!intf.empty() && unixSocketPath.empty()) {
         curl_easy_setopt(curl, CURLOPT_INTERFACE, intf.c_str());
     }
 
@@ -288,7 +307,8 @@ bool SendHttpRequest(unique_ptr<HttpRequest>&& request, HttpResponse& response) 
                                    AppConfig::GetInstance()->GetBindInterface(),
                                    request->mFollowRedirects,
                                    request->mTls,
-                                   request->mSocket);
+                                   request->mSocket,
+                                   request->mUnixSocketPath);
     if (curl == NULL) {
         LOG_ERROR(sLogger,
                   ("failed to init curl handler", "failed to init curl client")("request address", request.get()));
@@ -348,7 +368,8 @@ bool AddRequestToMultiCurlHandler(CURLM* multiCurl, unique_ptr<AsynHttpRequest>&
                                    AppConfig::GetInstance()->GetBindInterface(),
                                    request->mFollowRedirects,
                                    request->mTls,
-                                   request->mSocket);
+                                   request->mSocket,
+                                   request->mUnixSocketPath);
     if (curl == NULL) {
         request->mResponse.SetNetworkStatus(NetworkCode::Other, "failed to init curl handler");
         LOG_ERROR(sLogger, ("failed to send request", "failed to init curl handler")("request address", request.get()));

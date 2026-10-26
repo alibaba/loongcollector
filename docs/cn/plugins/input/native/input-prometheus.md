@@ -107,6 +107,13 @@ ScrapeConfig 兼容绝大部分 [Prometheus 官方配置中的 `scrape_config`](
     7. __ecs_meta_vpc_id：ECS VPC ID（仅在阿里云 ECS 环境中可用）
     8. __ecs_meta_vswitch_id：ECS 虚拟交换机 ID（仅在阿里云 ECS 环境中可用）
 
+4. **Unix Domain Socket 采集**：与 Prometheus 3.15 一致，支持通过目标标签 `__unix_socket__`（可在 `static_configs.labels` 中设置，或通过 `relabel_configs` 生成）指定 Unix Domain Socket 路径。设置后抓取请求会连接该 Socket，而非 `__address__` 对应的 TCP 地址：
+
+    1. `__address__` 仍为必填，并照常用于构造请求 URL、`Host` 请求头以及默认的 `instance` 标签，可填写任意有意义的名称，如 `localhost:9100`。
+    2. 通过 `__scheme__`（或 `scheme`）指定 Socket 上使用的协议，可选 `http`（默认）或 `https`；`https` 时 TLS 配置照常生效。
+    3. 与其他 `__` 前缀标签相同，`__unix_socket__` 不会出现在最终指标标签中。
+    4. 采集器进程需要具备该 Socket 文件的访问权限。Linux 还支持 `@name` 格式的抽象 Socket 地址；不支持 Unix Socket 的 libcurl 构建会使抓取失败，不会回退到 TCP。
+
 ## 样例
 
 ### 基础配置
@@ -135,4 +142,23 @@ flushers:
     Logstore": "your logstore"
     Region": "cn-beijing"
     TelemetryType": "metrics"
+```
+
+### 通过 Unix Domain Socket 采集
+
+采集监听在 `/var/run/exporter/metrics.sock` 上的 Exporter 指标。
+
+```yaml
+enable: true
+inputs:
+  - Type: input_prometheus
+    ScrapeConfig:
+      job_name: uds-exporter
+      host_only_mode: true
+      scrape_interval: 15s
+      scrape_timeout: 10s
+      static_configs:
+        - targets: ["localhost:9100"]
+          labels:
+            __unix_socket__: /var/run/exporter/metrics.sock
 ```

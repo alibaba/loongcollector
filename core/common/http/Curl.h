@@ -58,7 +58,8 @@ CURL* CreateCurlHandler(const std::string& method,
                         const std::string& intf = "",
                         bool followRedirects = false,
                         const std::optional<CurlTLS>& tls = std::nullopt,
-                        const std::optional<CurlSocket>& socket = std::nullopt);
+                        const std::optional<CurlSocket>& socket = std::nullopt,
+                        const std::string& unixSocketPath = "");
 
 bool SendHttpRequest(std::unique_ptr<HttpRequest>&& request, HttpResponse& response);
 
