@@ -43,7 +43,10 @@ DECLARE_FLAG_STRING(_pod_name_);
 namespace logtail {
 
 PrometheusInputRunner::PrometheusInputRunner()
-    : mServiceHost(STRING_FLAG(operator_service)),
+    : mHttpRequestSender([](unique_ptr<HttpRequest>&& request, HttpResponse& response) {
+          return SendHttpRequest(std::move(request), response);
+      }),
+      mServiceHost(STRING_FLAG(operator_service)),
       mServicePort(INT32_FLAG(operator_service_port)),
       mPodName(STRING_FLAG(_pod_name_)),
       mEventPool(true),
@@ -249,20 +252,23 @@ void PrometheusInputRunner::EventGC() {
     mEventPool.CheckGC();
 }
 
-HttpResponse PrometheusInputRunner::SendRegisterMessage(const string& url) const {
+HttpResponse PrometheusInputRunner::SendOperatorRequest(const string& method,
+                                                        const string& url,
+                                                        const string& query,
+                                                        const map<string, string>& headers,
+                                                        const string& body,
+                                                        uint32_t timeout) const {
     HttpResponse httpResponse;
-#ifdef APSARA_UNIT_TEST_MAIN
-    httpResponse.SetStatusCode(200);
-    return httpResponse;
-#endif
-    map<string, string> httpHeader;
-    if (!SendHttpRequest(
-            make_unique<HttpRequest>(
-                HTTP_GET, false, mServiceHost, mServicePort, url, "pod_name=" + mPodName, httpHeader, "", 10),
-            httpResponse)) {
-        LOG_ERROR(sLogger, ("curl error", "")("url", url)("pod_name", mPodName));
+    if (!mHttpRequestSender(make_unique<HttpRequest>(
+                                method, false, mServiceHost, mServicePort, url, query, headers, body, timeout),
+                            httpResponse)) {
+        LOG_ERROR(sLogger, ("curl error", "")("method", method)("url", url)("query", query));
     }
     return httpResponse;
+}
+
+HttpResponse PrometheusInputRunner::SendRegisterMessage(const string& url) const {
+    return SendOperatorRequest(HTTP_GET, url, "pod_name=" + mPodName, {}, "", 10);
 }
 
 

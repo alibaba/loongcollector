@@ -18,10 +18,13 @@
 
 #include <cstdint>
 
+#include <functional>
+#include <map>
 #include <memory>
 #include <string>
 
 #include "common/Lock.h"
+#include "common/http/HttpRequest.h"
 #include "common/http/HttpResponse.h"
 #include "common/timer/Timer.h"
 #include "monitor/metric_models/MetricTypes.h"
@@ -55,7 +58,15 @@ public:
     void EventGC() override;
 
 private:
+    using HttpRequestSender = std::function<bool(std::unique_ptr<HttpRequest>&&, HttpResponse&)>;
+
     PrometheusInputRunner();
+    HttpResponse SendOperatorRequest(const std::string& method,
+                                     const std::string& url,
+                                     const std::string& query,
+                                     const std::map<std::string, std::string>& headers,
+                                     const std::string& body,
+                                     uint32_t timeout) const;
     HttpResponse SendRegisterMessage(const std::string& url) const;
 
     void CancelAllTargetSubscriber();
@@ -70,6 +81,7 @@ private:
     std::atomic<bool> mIsThreadRunning = true;
     std::future<void> mThreadRes;
 
+    HttpRequestSender mHttpRequestSender;
     std::string mServiceHost;
     int32_t mServicePort;
     std::string mPodName;

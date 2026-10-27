@@ -31,6 +31,10 @@ const std::string EXPORTED_PREFIX = "exported_";
 const char* const PROMETHEUS_PREFIX = "prometheus_";
 const char* const REGISTER_COLLECTOR_PATH = "/register_collector";
 const char* const UNREGISTER_COLLECTOR_PATH = "/unregister_collector";
+const char* const HEARTBEAT_COLLECTOR_PATH = "/heartbeat_collector";
+const char* const PROMETHEUS_COLLECTOR_PROTOCOL_VERSION = "X-Prometheus-Collector-Protocol-Version";
+const char* const PROMETHEUS_COLLECTOR_PROTOCOL_VERSION_V1 = "v1";
+const char* const COLLECTOR_ID = "collector_id";
 const char* const ACCEPT = "Accept";
 const char* const X_PROMETHEUS_REFRESH_INTERVAL_SECONDS = "X-Prometheus-Refresh-Interval-Seconds";
 const char* const USER_AGENT = "User-Agent";
@@ -41,6 +45,9 @@ const char* const APPLICATION_JSON = "application/json";
 const char* const HTTPS = "https";
 const char* const TARGETS = "targets";
 const char* const UNREGISTER_MS = "unRegisterMs";
+const char* const LOAD = "Load";
+const char* const MSG = "msg";
+const char* const NOT_REGISTERED = "NotRegistered";
 
 // scrape config
 const char* const SCRAPE_CONFIG = "ScrapeConfig";

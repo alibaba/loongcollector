@@ -18,6 +18,8 @@
 #include "json/value.h"
 
 #include "common/JsonUtil.h"
+#include "common/http/Constant.h"
+#include "prometheus/Constants.h"
 #include "prometheus/PrometheusInputRunner.h"
 #include "unittest/Unittest.h"
 
@@ -32,15 +34,28 @@ public:
     void TestMulitStartAndStop();
     void TestHostOnlyStartAndStop();
     void TestGetAllProjects();
+    void TestSendOperatorRequest();
+    void TestSendRegisterMessage();
 
 protected:
     void SetUp() override {
-        PrometheusInputRunner::GetInstance()->mServiceHost = "127.0.0.1";
-        PrometheusInputRunner::GetInstance()->mServicePort = 8080;
-        PrometheusInputRunner::GetInstance()->mPodName = "test_pod";
+        auto runner = PrometheusInputRunner::GetInstance();
+        runner->mServiceHost = "127.0.0.1";
+        runner->mServicePort = 8080;
+        runner->mPodName = "test_pod";
+        runner->mHttpRequestSender = [](unique_ptr<HttpRequest>&&, HttpResponse& response) {
+            response.SetStatusCode(200);
+            return true;
+        };
     }
 
-    void TearDown() override {}
+    void TearDown() override {
+        PrometheusInputRunner::GetInstance()->mHttpRequestSender
+            = [](unique_ptr<HttpRequest>&&, HttpResponse& response) {
+                  response.SetStatusCode(200);
+                  return true;
+              };
+    }
 
 private:
 };
@@ -234,11 +249,69 @@ void PrometheusInputRunnerUnittest::TestGetAllProjects() {
     APSARA_TEST_TRUE(PrometheusInputRunner::GetInstance()->GetAllProjects() == "default_project default_project2");
 }
 
+void PrometheusInputRunnerUnittest::TestSendOperatorRequest() {
+    auto runner = PrometheusInputRunner::GetInstance();
+    unique_ptr<HttpRequest> capturedRequest;
+    runner->mHttpRequestSender = [&capturedRequest](unique_ptr<HttpRequest>&& request, HttpResponse& response) {
+        capturedRequest = std::move(request);
+        response.SetStatusCode(204);
+        return true;
+    };
+
+    map<string, string> headers{{prometheus::PROMETHEUS_COLLECTOR_PROTOCOL_VERSION,
+                                 prometheus::PROMETHEUS_COLLECTOR_PROTOCOL_VERSION_V1},
+                                {prometheus::ACCEPT, prometheus::APPLICATION_JSON}};
+    const string body = R"({"AgentInfo":{"Load":1024}})";
+    auto response = runner->SendOperatorRequest(HTTP_POST,
+                                                prometheus::HEARTBEAT_COLLECTOR_PATH,
+                                                "collector_id=test_pod",
+                                                headers,
+                                                body,
+                                                3);
+
+    APSARA_TEST_EQUAL(204, response.GetStatusCode());
+    APSARA_TEST_TRUE(capturedRequest != nullptr);
+    APSARA_TEST_EQUAL(HTTP_POST, capturedRequest->mMethod);
+    APSARA_TEST_FALSE(capturedRequest->mHTTPSFlag);
+    APSARA_TEST_EQUAL("127.0.0.1", capturedRequest->mHost);
+    APSARA_TEST_EQUAL(8080, capturedRequest->mPort);
+    APSARA_TEST_EQUAL(prometheus::HEARTBEAT_COLLECTOR_PATH, capturedRequest->mUrl);
+    APSARA_TEST_EQUAL("collector_id=test_pod", capturedRequest->mQueryString);
+    APSARA_TEST_EQUAL(prometheus::PROMETHEUS_COLLECTOR_PROTOCOL_VERSION_V1,
+                      capturedRequest->mHeader.at(prometheus::PROMETHEUS_COLLECTOR_PROTOCOL_VERSION));
+    APSARA_TEST_EQUAL(prometheus::APPLICATION_JSON, capturedRequest->mHeader.at(prometheus::ACCEPT));
+    APSARA_TEST_EQUAL(body, capturedRequest->mBody);
+    APSARA_TEST_EQUAL(3U, capturedRequest->mTimeout);
+}
+
+void PrometheusInputRunnerUnittest::TestSendRegisterMessage() {
+    auto runner = PrometheusInputRunner::GetInstance();
+    unique_ptr<HttpRequest> capturedRequest;
+    runner->mHttpRequestSender = [&capturedRequest](unique_ptr<HttpRequest>&& request, HttpResponse& response) {
+        capturedRequest = std::move(request);
+        response.SetStatusCode(200);
+        return true;
+    };
+
+    auto response = runner->SendRegisterMessage(prometheus::REGISTER_COLLECTOR_PATH);
+
+    APSARA_TEST_EQUAL(200, response.GetStatusCode());
+    APSARA_TEST_TRUE(capturedRequest != nullptr);
+    APSARA_TEST_EQUAL(HTTP_GET, capturedRequest->mMethod);
+    APSARA_TEST_EQUAL(prometheus::REGISTER_COLLECTOR_PATH, capturedRequest->mUrl);
+    APSARA_TEST_EQUAL("pod_name=test_pod", capturedRequest->mQueryString);
+    APSARA_TEST_TRUE(capturedRequest->mHeader.empty());
+    APSARA_TEST_TRUE(capturedRequest->mBody.empty());
+    APSARA_TEST_EQUAL(10U, capturedRequest->mTimeout);
+}
+
 UNIT_TEST_CASE(PrometheusInputRunnerUnittest, OnSuccessfulStartAndStop)
 UNIT_TEST_CASE(PrometheusInputRunnerUnittest, TestHasRegisteredPlugins)
 UNIT_TEST_CASE(PrometheusInputRunnerUnittest, TestMulitStartAndStop)
 UNIT_TEST_CASE(PrometheusInputRunnerUnittest, TestHostOnlyStartAndStop)
 UNIT_TEST_CASE(PrometheusInputRunnerUnittest, TestGetAllProjects)
+UNIT_TEST_CASE(PrometheusInputRunnerUnittest, TestSendOperatorRequest)
+UNIT_TEST_CASE(PrometheusInputRunnerUnittest, TestSendRegisterMessage)
 
 } // namespace logtail
 
