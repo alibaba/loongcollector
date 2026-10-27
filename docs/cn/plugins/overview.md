@@ -62,6 +62,7 @@
 | `input_command`<br>[脚本执行数据](input/extended/input-command.md) | 社区<br>[didachuxing](https://github.com/didachuxing) | ✓ | — | — | 采集脚本执行数据。 |
 | `metric_debug_file`<br>[文本日志（debug）](input/extended/metric-debug-file.md) | SLS 官方 | ✓ | — | — | 用于调试的读取文件内容的插件。 |
 | `metric_input_example`<br>[MetricInput 示例插件](input/extended/metric-input-example.md) | SLS 官方 | — | ✓ | — | MetricInput 示例插件。 |
+| `metric_input_netping`<br>[网络连通性监控](input/extended/metric-input-netping.md) | 社区 | — | ✓ | — | 通过 ICMP、TCP 和 HTTP 探测网络连通性并输出指标。 |
 | `metric_meta_host`<br>[主机 Meta 数据](input/extended/metric-meta-host.md) | SLS 官方 | — | ✓ | — | 主机 Meta 数据。 |
 | `metric_mock`<br>[Mock 数据-Metric](input/extended/metric-mock.md) | SLS 官方 | — | ✓ | — | 生成 metric 模拟数据的插件。 |
 | `metric_system_v2`<br>[主机监控数据](input/extended/metric-system.md) | SLS 官方 | — | ✓ | — | 主机监控数据。 |
