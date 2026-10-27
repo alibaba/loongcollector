@@ -49,6 +49,8 @@ public:
     void TestBuildScrapeSchedulerSet();
     void TestTargetLabels();
     void TestTargetsInfoToString();
+    void TestCollectLoadAndDrainScrapeDelay();
+    void TestJobStatisticsAreIsolated();
     void TestRaceConditionBetweenCancelAndCallback();
 
 protected:
@@ -690,12 +692,68 @@ void TargetSubscriberSchedulerUnittest::TestTargetsInfoToString() {
     mHttpResponse.SetStatusCode(200);
     targetSubscriber->OnSubscription(mHttpResponse, 0);
     APSARA_TEST_EQUAL(3UL, targetSubscriber->mScrapeSchedulerMap.size());
+    targetSubscriber->mScrapeSchedulerMap.begin()->second->mExecDelayCount = 5;
     auto res = targetSubscriber->TargetsInfoToString();
+    APSARA_TEST_EQUAL(5, targetSubscriber->mScrapeSchedulerMap.begin()->second->mExecDelayCount.load());
     string errorMsg;
     Json::Value data;
     ParseJsonTable(res, data, errorMsg);
     APSARA_TEST_EQUAL(2.0, data[prometheus::AGENT_INFO][prometheus::CPU_LIMIT].asFloat());
     APSARA_TEST_EQUAL((uint64_t)3, data[prometheus::TARGETS_INFO].size());
+}
+
+void TargetSubscriberSchedulerUnittest::TestCollectLoadAndDrainScrapeDelay() {
+    auto targetSubscriber = make_shared<TargetSubscriberScheduler>();
+    APSARA_TEST_TRUE(targetSubscriber->Init(mConfig["ScrapeConfig"]));
+    auto metricLabels = MetricLabels();
+    targetSubscriber->InitSelfMonitor(metricLabels);
+    targetSubscriber->OnSubscription(mHttpResponse, 0);
+    APSARA_TEST_EQUAL(3UL, targetSubscriber->mScrapeSchedulerMap.size());
+
+    auto it = targetSubscriber->mScrapeSchedulerMap.begin();
+    it->second->mScrapeResponseSizeBytes = 90;
+    it->second->mExecDelayCount = 1;
+    ++it;
+    it->second->mScrapeResponseSizeBytes = 89;
+    it->second->mExecDelayCount = 2;
+    ++it;
+    it->second->mScrapeResponseSizeBytes = -1;
+    it->second->mExecDelayCount = 3;
+
+    auto statistics = targetSubscriber->CollectLoadAndDrainScrapeDelay();
+    APSARA_TEST_EQUAL(5UL, statistics.mLoad);
+    APSARA_TEST_EQUAL(6UL, statistics.mScrapeDelaySeconds);
+
+    for (const auto& item : targetSubscriber->mScrapeSchedulerMap) {
+        APSARA_TEST_EQUAL(0, item.second->mExecDelayCount.load());
+    }
+
+    targetSubscriber->mScrapeSchedulerMap.begin()->second->mExecDelayCount = 4;
+    statistics = targetSubscriber->CollectLoadAndDrainScrapeDelay();
+    APSARA_TEST_EQUAL(5UL, statistics.mLoad);
+    APSARA_TEST_EQUAL(4UL, statistics.mScrapeDelaySeconds);
+}
+
+void TargetSubscriberSchedulerUnittest::TestJobStatisticsAreIsolated() {
+    auto firstSubscriber = make_shared<TargetSubscriberScheduler>();
+    auto secondSubscriber = make_shared<TargetSubscriberScheduler>();
+    APSARA_TEST_TRUE(firstSubscriber->Init(mConfig["ScrapeConfig"]));
+    APSARA_TEST_TRUE(secondSubscriber->Init(mConfig["ScrapeConfig"]));
+    auto metricLabels = MetricLabels();
+    firstSubscriber->InitSelfMonitor(metricLabels);
+    secondSubscriber->InitSelfMonitor(metricLabels);
+    firstSubscriber->OnSubscription(mHttpResponse, 0);
+    secondSubscriber->OnSubscription(mHttpResponse, 0);
+
+    firstSubscriber->mScrapeSchedulerMap.begin()->second->mExecDelayCount = 2;
+    secondSubscriber->mScrapeSchedulerMap.begin()->second->mExecDelayCount = 7;
+
+    auto firstStatistics = firstSubscriber->CollectLoadAndDrainScrapeDelay();
+    APSARA_TEST_EQUAL(2UL, firstStatistics.mScrapeDelaySeconds);
+    APSARA_TEST_EQUAL(7, secondSubscriber->mScrapeSchedulerMap.begin()->second->mExecDelayCount.load());
+
+    auto secondStatistics = secondSubscriber->CollectLoadAndDrainScrapeDelay();
+    APSARA_TEST_EQUAL(7UL, secondStatistics.mScrapeDelaySeconds);
 }
 
 void TargetSubscriberSchedulerUnittest::TestRaceConditionBetweenCancelAndCallback() {
@@ -816,6 +874,8 @@ UNIT_TEST_CASE(TargetSubscriberSchedulerUnittest, TestBuildHostOnlyScrapeSchedul
 UNIT_TEST_CASE(TargetSubscriberSchedulerUnittest, TestBuildHostOnlyScrapeSchedulerGroupHostIPFallback)
 UNIT_TEST_CASE(TargetSubscriberSchedulerUnittest, TestTargetLabels)
 UNIT_TEST_CASE(TargetSubscriberSchedulerUnittest, TestTargetsInfoToString)
+UNIT_TEST_CASE(TargetSubscriberSchedulerUnittest, TestCollectLoadAndDrainScrapeDelay)
+UNIT_TEST_CASE(TargetSubscriberSchedulerUnittest, TestJobStatisticsAreIsolated)
 UNIT_TEST_CASE(TargetSubscriberSchedulerUnittest, TestRaceConditionBetweenCancelAndCallback)
 
 } // namespace logtail

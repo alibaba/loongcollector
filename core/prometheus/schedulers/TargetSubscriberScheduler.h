@@ -32,6 +32,11 @@
 
 namespace logtail {
 
+struct TargetSubscriberStatistics {
+    uint64_t mLoad = 0;
+    uint64_t mScrapeDelaySeconds = 0;
+};
+
 class TargetSubscriberScheduler : public BaseScheduler {
 public:
     TargetSubscriberScheduler();
@@ -47,6 +52,7 @@ public:
     void ScheduleHostOnlyTargets();
 
     std::string GetId() const;
+    TargetSubscriberStatistics CollectLoadAndDrainScrapeDelay();
 
     bool ScheduleNext() override;
     void Cancel() override;
@@ -63,8 +69,6 @@ public:
 
     // zero cost upgrade
     uint64_t mUnRegisterMs;
-    static std::chrono::steady_clock::time_point mLastUpdateTime;
-    static uint64_t sDelaySeconds;
 
 private:
     bool ParseScrapeSchedulerGroup(const std::string& content, std::vector<PromTargetInfo>& scrapeSchedulerGroup);

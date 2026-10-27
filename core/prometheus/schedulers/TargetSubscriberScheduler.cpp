@@ -43,8 +43,6 @@ using namespace std;
 
 namespace logtail {
 
-std::chrono::steady_clock::time_point TargetSubscriberScheduler::mLastUpdateTime = std::chrono::steady_clock::now();
-uint64_t TargetSubscriberScheduler::sDelaySeconds = 0;
 TargetSubscriberScheduler::TargetSubscriberScheduler()
     : mQueueKey(0), mInputIndex(0), mServicePort(0), mUnRegisterMs(0) {
 }
@@ -406,6 +404,23 @@ string TargetSubscriberScheduler::GetId() const {
     return mJobName;
 }
 
+TargetSubscriberStatistics TargetSubscriberScheduler::CollectLoadAndDrainScrapeDelay() {
+    TargetSubscriberStatistics statistics;
+    ReadLock lock(mRWLock);
+    for (const auto& item : mScrapeSchedulerMap) {
+        const auto& scheduler = item.second;
+        auto size = scheduler->GetLastScrapeSize();
+        if (size >= 0) {
+            statistics.mLoad += static_cast<uint64_t>(size) / mScrapeConfigPtr->mScrapeIntervalSeconds;
+        }
+        auto delaySeconds = scheduler->mExecDelayCount.exchange(0);
+        if (delaySeconds > 0) {
+            statistics.mScrapeDelaySeconds += static_cast<uint64_t>(delaySeconds);
+        }
+    }
+    return statistics;
+}
+
 bool TargetSubscriberScheduler::ScheduleNext() {
     auto future = std::make_shared<PromFuture<HttpResponse&, uint64_t>>();
     future->AddDoneCallback([this](HttpResponse& response, uint64_t timestampMilliSec) {
@@ -500,17 +515,8 @@ string TargetSubscriberScheduler::TargetsInfoToString() const {
             Json::Value targetInfo;
             targetInfo[prometheus::HASH] = v->GetId();
             targetInfo[prometheus::SIZE] = v->GetLastScrapeSize();
-            sDelaySeconds += v->mExecDelayCount;
-            v->mExecDelayCount = 0;
             root[prometheus::TARGETS_INFO].append(targetInfo);
         }
-    }
-    auto curTime = std::chrono::steady_clock::now();
-    auto needToClear = curTime - mLastUpdateTime >= std::chrono::seconds(prometheus::RefeshIntervalSeconds);
-    root[prometheus::AGENT_INFO][prometheus::SCRAPE_DELAY_SECONDS] = sDelaySeconds;
-    if (needToClear) {
-        sDelaySeconds = 0;
-        mLastUpdateTime = curTime;
     }
     return root.toStyledString();
 }
