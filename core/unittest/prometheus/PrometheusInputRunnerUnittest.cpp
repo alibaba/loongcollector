@@ -18,6 +18,7 @@
 #include "json/value.h"
 
 #include <condition_variable>
+#include <cstdlib>
 #include <thread>
 #include <vector>
 
@@ -52,13 +53,15 @@ public:
     void TestStopDuringHeartbeat();
     void TestStoppedTokenRejectsRequests();
     void TestRestartWaitsForOldLoop();
+    void TestDestructorWaitsForWorker();
+    void TestHeartbeatCadence();
 
 protected:
     void SetUp() override {
         auto runner = PrometheusInputRunner::GetInstance();
         mOriginalAgentInfoSnapshot = runner->GetAgentInfoSnapshot();
         mOriginalUnRegisterMs = runner->mUnRegisterMs.load();
-        runner->mSleepFor = [](chrono::seconds) { this_thread::sleep_for(chrono::milliseconds(1)); };
+        runner->mSleepFor = [](chrono::steady_clock::duration) { this_thread::sleep_for(chrono::milliseconds(1)); };
         runner->mServiceHost = "127.0.0.1";
         runner->mServicePort = 8080;
         runner->mPodName = "test_pod";
@@ -88,6 +91,7 @@ protected:
             return true;
         };
         runner->mSleepFor = nullptr;
+        runner->mSteadyNow = nullptr;
         runner->mUnRegisterMs.store(mOriginalUnRegisterMs);
         WriteLock lock(runner->mAgentInfoRWLock);
         runner->mAgentInfoSnapshot = mOriginalAgentInfoSnapshot;
@@ -623,7 +627,9 @@ void PrometheusInputRunnerUnittest::TestRegistrationAndHeartbeatLoop() {
     int registerCount = 0;
     int heartbeatCount = 0;
     vector<string> requests;
-    vector<chrono::seconds> waits;
+    vector<chrono::steady_clock::duration> waits;
+    auto now = chrono::steady_clock::time_point{};
+    runner->mSteadyNow = [&]() { return now; };
     shared_ptr<PromFuture<HttpResponse&, uint64_t>> initialSubscription;
     runner->mHttpRequestSender = [&](unique_ptr<HttpRequest>&& request, HttpResponse& response) {
         requests.push_back(request->mUrl);
@@ -649,8 +655,9 @@ void PrometheusInputRunnerUnittest::TestRegistrationAndHeartbeatLoop() {
         }
         return true;
     };
-    runner->mSleepFor = [&](chrono::seconds interval) {
+    runner->mSleepFor = [&](chrono::steady_clock::duration interval) {
         waits.push_back(interval);
+        now += interval;
         if (waits.size() == 4) {
             stop->mStopped.store(true);
         }
@@ -668,10 +675,11 @@ void PrometheusInputRunnerUnittest::TestRegistrationAndHeartbeatLoop() {
                                          prometheus::HEARTBEAT_COLLECTOR_PATH,
                                          prometheus::HEARTBEAT_COLLECTOR_PATH};
     APSARA_TEST_TRUE(requests == expectedRequests);
-    const vector<chrono::seconds> expectedWaits{chrono::seconds(1),
-                                              chrono::seconds(1),
-                                              chrono::seconds(prometheus::RefeshIntervalSeconds),
-                                              chrono::seconds(prometheus::RefeshIntervalSeconds)};
+    const vector<chrono::steady_clock::duration> expectedWaits{
+        chrono::seconds(1),
+        chrono::seconds(1),
+        chrono::seconds(prometheus::RefeshIntervalSeconds),
+        chrono::seconds(prometheus::RefeshIntervalSeconds)};
     APSARA_TEST_TRUE(waits == expectedWaits);
     runner->RemoveScrapeInput(subscriber->GetId());
 }
@@ -762,7 +770,7 @@ void PrometheusInputRunnerUnittest::TestRestartWaitsForOldLoop() {
         response.SetStatusCode(request->mUrl == prometheus::HEARTBEAT_COLLECTOR_PATH ? 204 : 200);
         return true;
     };
-    runner->mSleepFor = [&](chrono::seconds) {
+    runner->mSleepFor = [&](chrono::steady_clock::duration) {
         unique_lock<mutex> lock(stateMutex);
         if (!oldLoopSleeping) {
             oldLoopSleeping = true;
@@ -800,6 +808,94 @@ void PrometheusInputRunnerUnittest::TestRestartWaitsForOldLoop() {
     runner->mThreadRes.wait();
 }
 
+void PrometheusInputRunnerUnittest::TestHeartbeatCadence() {
+    auto runner = PrometheusInputRunner::GetInstance();
+    auto stop = make_shared<PrometheusInputRunner::StopToken>();
+    auto now = chrono::steady_clock::time_point{};
+    runner->mSteadyNow = [&]() { return now; };
+    const vector<chrono::milliseconds> requestDurations{
+        chrono::milliseconds(3000),
+        chrono::milliseconds(500),
+        chrono::milliseconds(12000),
+        chrono::milliseconds(5000),
+        chrono::milliseconds(3000)};
+    vector<chrono::steady_clock::duration> starts;
+    vector<chrono::steady_clock::duration> waits;
+    runner->mHttpRequestSender = [&](unique_ptr<HttpRequest>&& request, HttpResponse& response) {
+        if (request->mUrl == prometheus::REGISTER_COLLECTOR_PATH) {
+            response.SetStatusCode(200);
+            return true;
+        }
+        starts.push_back(now.time_since_epoch());
+        now += requestDurations.at(starts.size() - 1);
+        response.SetStatusCode(starts.size() == 2 ? 503 : 204);
+        return true;
+    };
+    runner->mSleepFor = [&](chrono::steady_clock::duration duration) {
+        waits.push_back(duration);
+        now += duration;
+        if (waits.size() == requestDurations.size()) {
+            stop->mStopped.store(true);
+        }
+    };
+    runner->RunRegistrationAndHeartbeat(stop);
+
+    const vector<chrono::steady_clock::duration> expectedStarts{
+        chrono::seconds(0), chrono::seconds(5), chrono::seconds(10), chrono::seconds(25), chrono::seconds(30)};
+    const vector<chrono::steady_clock::duration> expectedWaits{
+        chrono::seconds(2), chrono::milliseconds(4500), chrono::seconds(3), chrono::seconds(0), chrono::seconds(2)};
+    APSARA_TEST_TRUE(starts == expectedStarts);
+    APSARA_TEST_TRUE(waits == expectedWaits);
+}
+
+void PrometheusInputRunnerUnittest::TestDestructorWaitsForWorker() {
+#if GTEST_HAS_DEATH_TEST
+    for (bool alreadyStopped : {false, true}) {
+        EXPECT_EXIT(
+            {
+                auto runner = new PrometheusInputRunner();
+                auto stop = make_shared<PrometheusInputRunner::StopToken>();
+                runner->mStopToken = stop;
+                runner->mAgentInfoSnapshot.mLoad = 42;
+                runner->mHttpRequestSender = [](unique_ptr<HttpRequest>&&, HttpResponse& response) {
+                    response.SetStatusCode(204);
+                    return true;
+                };
+                promise<void> workerStarted;
+                atomic_bool workerFinished = false;
+                runner->mThreadRes = async(launch::async, [runner, stop, &workerStarted, &workerFinished]() {
+                    workerStarted.set_value();
+                    auto deadline = chrono::steady_clock::now() + chrono::seconds(2);
+                    while (!stop->mStopped.load()) {
+                        if (chrono::steady_clock::now() >= deadline) {
+                            std::_Exit(2);
+                        }
+                        this_thread::sleep_for(chrono::milliseconds(1));
+                    }
+                    if (runner->GetAgentInfoSnapshot().mLoad != 42) {
+                        std::_Exit(3);
+                    }
+                    HttpResponse response;
+                    if (!runner->mHttpRequestSender(nullptr, response) || response.GetStatusCode() != 204) {
+                        std::_Exit(4);
+                    }
+                    workerFinished.store(true);
+                });
+                workerStarted.get_future().wait();
+                if (alreadyStopped) {
+                    stop->mStopped.store(true);
+                }
+                delete runner;
+                std::_Exit(workerFinished.load() ? 0 : 1);
+            },
+            ::testing::ExitedWithCode(0),
+            "");
+    }
+#else
+    GTEST_SKIP() << "Subprocess tests are not supported on this platform";
+#endif
+}
+
 UNIT_TEST_CASE(PrometheusInputRunnerUnittest, OnSuccessfulStartAndStop)
 UNIT_TEST_CASE(PrometheusInputRunnerUnittest, TestHasRegisteredPlugins)
 UNIT_TEST_CASE(PrometheusInputRunnerUnittest, TestMulitStartAndStop)
@@ -816,6 +912,8 @@ UNIT_TEST_CASE(PrometheusInputRunnerUnittest, TestRegistrationAndHeartbeatLoop)
 UNIT_TEST_CASE(PrometheusInputRunnerUnittest, TestStopDuringHeartbeat)
 UNIT_TEST_CASE(PrometheusInputRunnerUnittest, TestStoppedTokenRejectsRequests)
 UNIT_TEST_CASE(PrometheusInputRunnerUnittest, TestRestartWaitsForOldLoop)
+UNIT_TEST_CASE(PrometheusInputRunnerUnittest, TestDestructorWaitsForWorker)
+UNIT_TEST_CASE(PrometheusInputRunnerUnittest, TestHeartbeatCadence)
 
 } // namespace logtail
 

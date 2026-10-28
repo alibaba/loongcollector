@@ -86,6 +86,17 @@ PrometheusInputRunner::PrometheusInputRunner()
     WriteMetrics::GetInstance()->CommitMetricsRecordRef(mMetricsRecordRef);
 }
 
+PrometheusInputRunner::~PrometheusInputRunner() {
+    if (mStopToken) {
+        lock_guard<mutex> lock(mStopToken->mRequestMutex);
+        mStopToken->mStopped.store(true);
+    }
+    if (mThreadRes.valid()) {
+        // Join before destroying the sender, snapshot locks, and metrics used by the worker.
+        mThreadRes.wait();
+    }
+}
+
 /// @brief receive scrape jobs from input plugins and update scrape jobs
 void PrometheusInputRunner::UpdateScrapeInput(std::shared_ptr<TargetSubscriberScheduler> targetSubscriber,
                                               const MetricLabels& defaultLabels,
@@ -178,6 +189,8 @@ void PrometheusInputRunner::RunRegistrationAndHeartbeat(const shared_ptr<StopTok
     bool registered = false;
     bool initialRegistration = true;
     int retry = 0;
+    const auto interval = chrono::seconds(prometheus::RefeshIntervalSeconds);
+    chrono::steady_clock::time_point nextHeartbeatTime;
     while (!stop->mStopped.load()) {
         if (!registered) {
             auto response = SendRegisterMessage(prometheus::REGISTER_COLLECTOR_PATH, stop);
@@ -206,6 +219,7 @@ void PrometheusInputRunner::RunRegistrationAndHeartbeat(const shared_ptr<StopTok
             }
             registered = true;
             retry = 0;
+            nextHeartbeatTime = SteadyNow();
             LOG_INFO(sLogger, ("Register Success", mPodName));
         }
         if (stop->mStopped.load()) {
@@ -220,7 +234,16 @@ void PrometheusInputRunner::RunRegistrationAndHeartbeat(const shared_ptr<StopTok
             SET_GAUGE(mPromRegisterState, 0);
             continue;
         }
-        SleepFor(chrono::seconds(prometheus::RefeshIntervalSeconds));
+        nextHeartbeatTime += interval;
+        auto now = SteadyNow();
+        if (nextHeartbeatTime < now) {
+            // Skip missed slots instead of sending a burst of overdue heartbeats.
+            nextHeartbeatTime += interval * ((now - nextHeartbeatTime) / interval);
+            if (nextHeartbeatTime < now) {
+                nextHeartbeatTime += interval;
+            }
+        }
+        SleepFor(nextHeartbeatTime - now);
     }
 }
 
@@ -249,7 +272,16 @@ void PrometheusInputRunner::OnInitialRegistration(const HttpResponse& response) 
     SubscribeOnce();
 }
 
-void PrometheusInputRunner::SleepFor(chrono::seconds interval) const {
+chrono::steady_clock::time_point PrometheusInputRunner::SteadyNow() const {
+#ifdef APSARA_UNIT_TEST_MAIN
+    if (mSteadyNow) {
+        return mSteadyNow();
+    }
+#endif
+    return chrono::steady_clock::now();
+}
+
+void PrometheusInputRunner::SleepFor(chrono::steady_clock::duration interval) const {
 #ifdef APSARA_UNIT_TEST_MAIN
     if (mSleepFor) {
         mSleepFor(interval);

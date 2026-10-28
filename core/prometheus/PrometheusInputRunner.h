@@ -56,7 +56,7 @@ public:
     PrometheusInputRunner(PrometheusInputRunner&&) = delete;
     PrometheusInputRunner& operator=(const PrometheusInputRunner&) = delete;
     PrometheusInputRunner& operator=(PrometheusInputRunner&&) = delete;
-    ~PrometheusInputRunner() override = default;
+    ~PrometheusInputRunner() override;
     static PrometheusInputRunner* GetInstance() {
         static PrometheusInputRunner sInstance;
         return &sInstance;
@@ -89,7 +89,8 @@ private:
     PrometheusInputRunner();
     void RunRegistrationAndHeartbeat(const std::shared_ptr<StopToken>& stop);
     void OnInitialRegistration(const HttpResponse& response);
-    void SleepFor(std::chrono::seconds interval) const;
+    std::chrono::steady_clock::time_point SteadyNow() const;
+    void SleepFor(std::chrono::steady_clock::duration interval) const;
     HttpResponse SendOperatorRequest(const std::string& method,
                                      const std::string& url,
                                      const std::string& query,
@@ -139,7 +140,8 @@ private:
     IntGaugePtr mPromJobNum;
 
 #ifdef APSARA_UNIT_TEST_MAIN
-    std::function<void(std::chrono::seconds)> mSleepFor;
+    std::function<std::chrono::steady_clock::time_point()> mSteadyNow;
+    std::function<void(std::chrono::steady_clock::duration)> mSleepFor;
     friend class PrometheusInputRunnerUnittest;
     friend class TargetSubscriberSchedulerUnittest;
     friend class InputPrometheusUnittest;
