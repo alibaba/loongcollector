@@ -178,8 +178,8 @@
 
 | 名称 | 提供方 | v1 接口 | v2 接口 | Log | Metric | Span | 简介 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `flusher_aliyun_datahub`<br>[DataHub](flusher/extended/flusher-aliyun-datahub.md) | 社区<br>[panjx](https://github.com/panjxhhhhh) | ✓ | — | v1 | — | — | 将采集到的数据，输出到阿里云数据总线 DataHub。 |
-| `flusher_aliyun_odps`<br>[ODPS](flusher/extended/flusher-aliyun-odps.md) | 社区<br>[panjx](https://github.com/panjxhhhhh) | ✓ | — | v1 | — | — | 将采集到的数据，输出到阿里云大数据计算服务 ODPS。 |
+| `flusher_aliyun_datahub`<br>[DataHub](flusher/extended/flusher-aliyun-datahub.md) | 社区<br>[panjx](https://github.com/panjxhhhhh) | — | ✓ | v2 | v2 | v2 | 将采集到的数据，输出到阿里云数据总线 DataHub。 |
+| `flusher_aliyun_odps`<br>[ODPS](flusher/extended/flusher-aliyun-odps.md) | 社区<br>[panjx](https://github.com/panjxhhhhh) | — | ✓ | v2 | v2 | v2 | 将采集到的数据，输出到阿里云大数据计算服务 ODPS。 |
 | `flusher_clickhouse`<br>[ClickHouse](flusher/extended/flusher-clickhouse.md) | 社区<br>[kl7sn](https://github.com/kl7sn) | ✓ | ✓ | v1&v2 | 透传未知 | 透传未知 | 将采集到的数据输出到 ClickHouse。 |
 | `flusher_doris`<br>[Apache Doris](flusher/extended/flusher-doris.md) | 社区 | ✓ | ✓ | v1&v2 | 透传未知 | 透传未知 | 通过 Stream Load 将数据写入 Apache Doris。 |
 | `flusher_elasticsearch`<br>[ElasticSearch](flusher/extended/flusher-elasticsearch.md) | 社区<br>[joeCarf](https://github.com/joeCarf) | ✓ | ✓ | v1&v2 | 透传未知 | 透传未知 | 将采集到的数据输出到 ElasticSearch。 |

@@ -19,8 +19,10 @@ import (
 
 	"github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
+	converter "github.com/alibaba/ilogtail/pkg/protocol/converter"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 
 	"github.com/aliyun/aliyun-datahub-sdk-go/datahub"
 )
@@ -29,6 +31,8 @@ const (
 	compressTypeDefault = datahub.ZSTD
 	extraLevelDefault   = 1
 )
+
+var _ pipeline.FlusherV2 = (*FlusherDatahub)(nil)
 
 type FlusherDatahub struct {
 	AccessKeyID     string
@@ -77,7 +81,7 @@ func (d *FlusherDatahub) Init(context pipeline.Context) error {
 	d.recordBuilder = NewRecordBuilder(d.ProjectName, d.TopicName, extraLevelDefault, client, d.context)
 	err := d.recordBuilder.Init()
 	if err != nil {
-		logger.Errorf(d.context.GetRuntimeContext(), "DATAHUB_FLUSHER_ALARM", "Init datahub(%s/%s) record builder failed, error:%v", d.ProjectName, d.TopicName, err)
+		logger.Errorf(d.context.GetRuntimeContext(), selfmonitor.FlusherInitAlarm, "Init datahub(%s/%s) record builder failed, error:%v", d.ProjectName, d.TopicName, err)
 		return err
 	}
 	logger.Debugf(d.context.GetRuntimeContext(), "Init datahub(%s/%s) record builder success", d.ProjectName, d.TopicName)
@@ -85,7 +89,7 @@ func (d *FlusherDatahub) Init(context pipeline.Context) error {
 	d.producer = NewProducer(d.ProjectName, d.TopicName, client, d.context)
 	err = d.producer.Init()
 	if err != nil {
-		logger.Errorf(d.context.GetRuntimeContext(), "DATAHUB_FLUSHER_ALARM", "Init datahub(%s/%s) producer failed, error:%v", d.ProjectName, d.TopicName, err)
+		logger.Errorf(d.context.GetRuntimeContext(), selfmonitor.FlusherInitAlarm, "Init datahub(%s/%s) producer failed, error:%v", d.ProjectName, d.TopicName, err)
 		return err
 	}
 	logger.Infof(d.context.GetRuntimeContext(), "Init datahub(%s/%s) producer success", d.ProjectName, d.TopicName)
@@ -97,8 +101,15 @@ func (d *FlusherDatahub) Description() string {
 	return "datahub flusher"
 }
 
-func (d *FlusherDatahub) Flush(projectName string, logstoreName string, configName string, logGroupList []*protocol.LogGroup) error {
-	for _, logGroup := range logGroupList {
+func (d *FlusherDatahub) Export(groupEventsList []*models.PipelineGroupEvents, _ pipeline.PipelineContext) error {
+	for _, groupEvents := range groupEventsList {
+		logGroup, err := converter.PipelineGroupEventsToLogGroup(groupEvents)
+		if err != nil {
+			return fmt.Errorf("convert pipeline group events to loggroup: %w", err)
+		}
+		if logGroup == nil || len(logGroup.Logs) == 0 {
+			continue
+		}
 		records := make([]datahub.IRecord, len(logGroup.Logs))
 		for id, log := range logGroup.Logs {
 			record, err := d.recordBuilder.Log2Record(logGroup, log)
@@ -107,7 +118,7 @@ func (d *FlusherDatahub) Flush(projectName string, logstoreName string, configNa
 			}
 			records[id] = record
 		}
-		err := d.producer.Send(records)
+		err = d.producer.Send(records)
 		if err != nil {
 			return err
 		}

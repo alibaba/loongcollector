@@ -19,6 +19,7 @@ import (
 
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 
 	"github.com/aliyun/aliyun-odps-go-sdk/odps/tunnel"
 )
@@ -107,7 +108,7 @@ func (sc *SessionCache) GetWriter(partition string) (*tunnel.StreamUploadSession
 	} else {
 		newSession, err := sc.createSessionItem(partition)
 		if err != nil {
-			logger.Errorf(sc.context.GetRuntimeContext(), "ODPS_FLUSHER_ALAR", "Create odps(%s/%s/%s) session failed, partition: %s",
+			logger.Errorf(sc.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "Create odps(%s/%s/%s) session failed, partition: %s",
 				sc.projectName, sc.schemaName, sc.tableName, partition)
 			return nil, nil, err
 		}

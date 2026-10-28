@@ -20,6 +20,7 @@ import (
 
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 
 	"github.com/aliyun/aliyun-datahub-sdk-go/datahub"
 )
@@ -97,7 +98,7 @@ func (pi *ProducerImpl) freshShardIDs(force bool) error {
 func (pi *ProducerImpl) nextShardID() (string, error) {
 	err := pi.freshShardIDs(false)
 	if err != nil {
-		logger.Warningf(pi.context.GetRuntimeContext(), "DATAHUB_FLUSHER_ALARM", "fresh datahub %s/%s shard failed, error:%v, ingnore error", pi.projectName, pi.topicName, err)
+		logger.Warningf(pi.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "fresh datahub %s/%s shard failed, error:%v, ingnore error", pi.projectName, pi.topicName, err)
 	}
 
 	if len(pi.shardInfo.shardIDs) == 0 {
@@ -124,11 +125,11 @@ func (pi *ProducerImpl) DoSend(records []datahub.IRecord, isRecursive bool) (str
 	}
 
 	if _, ok := err.(*datahub.ShardSealedError); ok {
-		logger.Warningf(pi.context.GetRuntimeContext(), "DATAHUB_FLUSHER_ALARM", "Shard (%s/%s/%s) sealed, try to fresh shard",
+		logger.Warningf(pi.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "Shard (%s/%s/%s) sealed, try to fresh shard",
 			pi.projectName, pi.topicName, shardID)
 		err = pi.freshShardIDs(true)
 		if err != nil {
-			logger.Errorf(pi.context.GetRuntimeContext(), "DATAHUB_FLUSHER_ALARM", "Shard(%s/%s/%s) sealed, and fresh shard failed, error",
+			logger.Errorf(pi.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "Shard(%s/%s/%s) sealed, and fresh shard failed, error:%v",
 				pi.projectName, pi.topicName, shardID, err)
 			return shardID, nil, fmt.Errorf("Flush to datahub(%s/%s) failed because of shard sealed", pi.projectName, pi.topicName)
 		}
@@ -157,7 +158,7 @@ func (pi *ProducerImpl) Send(records []datahub.IRecord) error {
 			return nil
 		}
 
-		logger.Errorf(pi.context.GetRuntimeContext(), "DATAHUB_FLUSHER_ALARM", "Flush datahub(%s/%s/%s) failed, cost:%v, retry:%v, error:%v",
+		logger.Errorf(pi.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "Flush datahub(%s/%s/%s) failed, cost:%v, retry:%v, error:%v",
 			pi.projectName, pi.topicName, shardID, cost, retry, err)
 		time.Sleep(500 * time.Millisecond)
 	}

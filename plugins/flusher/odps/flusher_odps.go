@@ -19,8 +19,10 @@ import (
 
 	"github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
+	converter "github.com/alibaba/ilogtail/pkg/protocol/converter"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 
 	"github.com/aliyun/aliyun-odps-go-sdk/odps"
 	"github.com/aliyun/aliyun-odps-go-sdk/odps/account"
@@ -28,6 +30,8 @@ import (
 )
 
 const extraLevelDefault = 1
+
+var _ pipeline.FlusherV2 = (*FlusherOdps)(nil)
 
 type FlusherOdps struct {
 	AccessKeyID     string
@@ -61,14 +65,14 @@ func (o *FlusherOdps) Init(context pipeline.Context) error {
 
 	tunnelIns, err := o.CreateTunnel()
 	if err != nil {
-		logger.Errorf(o.context.GetRuntimeContext(), "ODPS_FLUSHER_ALAR", "Create (%s/%s/%s) tunnel failed, error:%v",
+		logger.Errorf(o.context.GetRuntimeContext(), selfmonitor.FlusherInitAlarm, "Create (%s/%s/%s) tunnel failed, error:%v",
 			o.ProjectName, o.SchemaName, o.TableName, err)
 		return err
 	}
 
 	o.sender = NewTunnelSender(context, o.ProjectName, o.SchemaName, o.TableName, o.PartitionConfig, o.TimeRange, extraLevelDefault, tunnelIns)
 	if err := o.sender.Init(); err != nil {
-		logger.Errorf(o.context.GetRuntimeContext(), "ODPS_FLUSHER_ALAR", "Init (%s/%s/%s) tunnel sender failed, error:%v",
+		logger.Errorf(o.context.GetRuntimeContext(), selfmonitor.FlusherInitAlarm, "Init (%s/%s/%s) tunnel sender failed, error:%v",
 			o.ProjectName, o.SchemaName, o.TableName, err)
 		return err
 	}
@@ -102,11 +106,18 @@ func (o *FlusherOdps) Description() string {
 	return "odps flusher"
 }
 
-func (o *FlusherOdps) Flush(projectName string, logstoreName string, configName string, logGroupList []*protocol.LogGroup) error {
-	for _, logGroup := range logGroupList {
+func (o *FlusherOdps) Export(groups []*models.PipelineGroupEvents, _ pipeline.PipelineContext) error {
+	for _, groupEvents := range groups {
+		logGroup, err := converter.PipelineGroupEventsToLogGroup(groupEvents)
+		if err != nil {
+			return fmt.Errorf("convert pipeline group events to ODPS logs: %w", err)
+		}
+		if logGroup == nil || len(logGroup.Logs) == 0 {
+			continue
+		}
 		for _, log := range logGroup.Logs {
 			if err := o.sender.Send(logGroup, log); err != nil {
-				logger.Errorf(o.context.GetRuntimeContext(), "ODPS_FLUSHER_ALAR", "Flush odps(%s/%s/%s) failed, error:%v", o.ProjectName, o.SchemaName, o.TableName, err)
+				logger.Errorf(o.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "Flush odps(%s/%s/%s) failed, error:%v", o.ProjectName, o.SchemaName, o.TableName, err)
 				return err
 			}
 		}

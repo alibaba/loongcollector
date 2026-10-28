@@ -18,6 +18,7 @@ import (
 	"regexp"
 	"testing"
 
+	"github.com/aliyun/aliyun-odps-go-sdk/odps/data"
 	"github.com/aliyun/aliyun-odps-go-sdk/odps/datatype"
 	"github.com/aliyun/aliyun-odps-go-sdk/odps/tableschema"
 	"github.com/stretchr/testify/assert"
@@ -170,6 +171,30 @@ func TestGenRecordWithParse(t *testing.T) {
 	assert.Equal(t, 16, record.Len())
 	expect := "[true, 1, 123, 123456, 123456789, 3.140000E+00, 1.234560E+02, 2024-12-04, 2024-12-04 10:00:00, 2024-12-04 10:00:00.000, 2024-12-04 10:00:00.000, aaaa, bbbb, cccc, unhex('64646464'), \"xxxx\"]"
 	assert.Equal(t, expect, record.String())
+}
+
+func TestGenRecordDoublePrecisionAndRange(t *testing.T) {
+	builder := RecordBuilderImpl{}
+	schemaBuilder := tableschema.NewSchemaBuilder()
+	schemaBuilder.Column(tableschema.Column{Name: "value", Type: datatype.DoubleType})
+	schema := schemaBuilder.Build()
+
+	for _, tt := range []struct {
+		input string
+		want  data.Double
+	}{
+		{input: "1.23456789012345", want: data.Double(1.23456789012345)},
+		{input: "1e100", want: data.Double(1e100)},
+		{input: "1e-100", want: data.Double(1e-100)},
+	} {
+		t.Run(tt.input, func(t *testing.T) {
+			log := &protocol.Log{Contents: []*protocol.Log_Content{{Key: "value", Value: tt.input}}}
+			record, err := builder.Log2Record(&protocol.LogGroup{}, log, &schema)
+			if assert.NoError(t, err) && assert.Len(t, record, 1) {
+				assert.Equal(t, tt.want, record[0])
+			}
+		})
+	}
 }
 
 func TestUnsupportType(t *testing.T) {

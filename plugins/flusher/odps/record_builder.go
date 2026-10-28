@@ -152,7 +152,7 @@ func (rb *RecordBuilderImpl) Log2Record(logGroup *protocol.LogGroup, log *protoc
 			}
 			record[idx] = data.Float(fVal)
 		case datatype.DOUBLE:
-			dVal, err := strconv.ParseFloat(*value, 32)
+			dVal, err := strconv.ParseFloat(*value, 64)
 			if err != nil {
 				return nil, err
 			}
