@@ -112,9 +112,9 @@ func (d *FlusherDatahub) Export(groupEventsList []*models.PipelineGroupEvents, _
 		}
 		records := make([]datahub.IRecord, len(logGroup.Logs))
 		for id, log := range logGroup.Logs {
-			record, err := d.recordBuilder.Log2Record(logGroup, log)
-			if err != nil {
-				return err
+			record, buildErr := d.recordBuilder.Log2Record(logGroup, log)
+			if buildErr != nil {
+				return buildErr
 			}
 			records[id] = record
 		}

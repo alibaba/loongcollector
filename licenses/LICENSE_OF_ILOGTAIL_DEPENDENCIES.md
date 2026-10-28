@@ -140,6 +140,7 @@ When distributed in a binary form, iLogtail may contain portions of the followin
 - [github.com/rcrowley/go-metrics](https://pkg.go.dev/github.com/rcrowley/go-metrics?tab=licenses)
 - [github.com/cihub/seelog](https://pkg.go.dev/github.com/cihub/seelog?tab=licenses)
 - [github.com/gogo/protobuf](https://pkg.go.dev/github.com/gogo/protobuf?tab=licenses)
+- [github.com/golang/protobuf](https://pkg.go.dev/github.com/golang/protobuf?tab=licenses)
 - [github.com/golang/snappy](https://pkg.go.dev/github.com/golang/snappy?tab=licenses)
 - [github.com/golang-sql/sqlexp](https://pkg.go.dev/github.com/golang-sql/sqlexp?tab=licenses)
 - [github.com/google/go-cmp](https://pkg.go.dev/github.com/google/go-cmp?tab=licenses)
