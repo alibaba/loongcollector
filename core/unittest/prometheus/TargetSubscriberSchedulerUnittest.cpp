@@ -27,9 +27,12 @@
 #include "ScrapeScheduler.h"
 #include "common/JsonUtil.h"
 #include "common/MachineInfoUtil.h"
+#include "common/http/Constant.h"
 #include "common/http/HttpResponse.h"
+#include "common/timer/HttpRequestTimerEvent.h"
 #include "monitor/Monitor.h"
 #include "prometheus/Constants.h"
+#include "prometheus/PrometheusInputRunner.h"
 #include "prometheus/async/PromFuture.h"
 #include "prometheus/labels/Labels.h"
 #include "prometheus/schedulers/TargetSubscriberScheduler.h"
@@ -49,12 +52,14 @@ public:
     void TestBuildScrapeSchedulerSet();
     void TestTargetLabels();
     void TestTargetsInfoToString();
+    void TestBuildSubscriberTimerEvent();
     void TestCollectLoadAndDrainScrapeDelay();
     void TestJobStatisticsAreIsolated();
     void TestRaceConditionBetweenCancelAndCallback();
 
 protected:
     void SetUp() override {
+        mOriginalAgentInfoSnapshot = PrometheusInputRunner::GetInstance()->GetAgentInfoSnapshot();
         {
             mConfigString = R"JSON(
 {
@@ -273,12 +278,17 @@ protected:
     ])JSON";
         }
     }
-    void TearDown() override {}
+    void TearDown() override {
+        auto runner = PrometheusInputRunner::GetInstance();
+        WriteLock lock(runner->mAgentInfoRWLock);
+        runner->mAgentInfoSnapshot = mOriginalAgentInfoSnapshot;
+    }
 
 private:
     HttpResponse mHttpResponse;
     Json::Value mConfig;
     std::string mConfigString;
+    PrometheusAgentInfo mOriginalAgentInfoSnapshot;
 };
 
 
@@ -684,22 +694,107 @@ void TargetSubscriberSchedulerUnittest::TestTargetLabels() {
 }
 
 void TargetSubscriberSchedulerUnittest::TestTargetsInfoToString() {
-    std::shared_ptr<TargetSubscriberScheduler> targetSubscriber = std::make_shared<TargetSubscriberScheduler>();
+    PrometheusAgentInfo snapshot;
+    snapshot.mCpuLimit = 2.0f;
+    snapshot.mCpuUsage = 0.5;
+    snapshot.mMemLimit = 4096;
+    snapshot.mMemUsage = 1024;
+    snapshot.mLoad = 12345;
+    snapshot.mScrapeDelaySeconds = 7;
+    snapshot.mHttpSinkInItemsTotal = 100;
+    snapshot.mHttpSinkOutFailed = 2;
+    auto runner = PrometheusInputRunner::GetInstance();
+    {
+        WriteLock lock(runner->mAgentInfoRWLock);
+        runner->mAgentInfoSnapshot = snapshot;
+    }
+
+    auto targetSubscriber = make_shared<TargetSubscriberScheduler>();
     auto metricLabels = MetricLabels();
     APSARA_TEST_TRUE(targetSubscriber->Init(mConfig["ScrapeConfig"]));
     targetSubscriber->InitSelfMonitor(metricLabels);
-    // if status code is 200
-    mHttpResponse.SetStatusCode(200);
     targetSubscriber->OnSubscription(mHttpResponse, 0);
     APSARA_TEST_EQUAL(3UL, targetSubscriber->mScrapeSchedulerMap.size());
-    targetSubscriber->mScrapeSchedulerMap.begin()->second->mExecDelayCount = 5;
-    auto res = targetSubscriber->TargetsInfoToString();
-    APSARA_TEST_EQUAL(5, targetSubscriber->mScrapeSchedulerMap.begin()->second->mExecDelayCount.load());
+    auto scheduler = targetSubscriber->mScrapeSchedulerMap.begin()->second;
+    scheduler->mExecDelayCount = 5;
+    scheduler->mScrapeResponseSizeBytes = 900;
+
     string errorMsg;
     Json::Value data;
-    ParseJsonTable(res, data, errorMsg);
-    APSARA_TEST_EQUAL(2.0, data[prometheus::AGENT_INFO][prometheus::CPU_LIMIT].asFloat());
-    APSARA_TEST_EQUAL((uint64_t)3, data[prometheus::TARGETS_INFO].size());
+    APSARA_TEST_TRUE(ParseJsonTable(targetSubscriber->TargetsInfoToString(), data, errorMsg));
+    APSARA_TEST_TRUE(data[prometheus::AGENT_INFO] == snapshot.ToJson());
+    APSARA_TEST_EQUAL(3U, data[prometheus::TARGETS_INFO].size());
+    for (const auto& targetInfo : data[prometheus::TARGETS_INFO]) {
+        const auto& target = targetSubscriber->mScrapeSchedulerMap.at(targetInfo[prometheus::HASH].asString());
+        APSARA_TEST_EQUAL(target->GetLastScrapeSize(), targetInfo[prometheus::SIZE].asInt64());
+    }
+
+    auto secondSubscriber = make_shared<TargetSubscriberScheduler>();
+    auto config = mConfig["ScrapeConfig"];
+    config[prometheus::JOB_NAME] = "second-job";
+    APSARA_TEST_TRUE(secondSubscriber->Init(config));
+    secondSubscriber->InitSelfMonitor(metricLabels);
+    secondSubscriber->OnSubscription(mHttpResponse, 0);
+    auto secondScheduler = secondSubscriber->mScrapeSchedulerMap.begin()->second;
+    secondSubscriber->mScrapeSchedulerMap.clear();
+    secondSubscriber->mScrapeSchedulerMap.emplace(secondScheduler->GetId(), secondScheduler);
+    secondScheduler->mExecDelayCount = 3;
+
+    Json::Value secondData;
+    APSARA_TEST_TRUE(ParseJsonTable(secondSubscriber->TargetsInfoToString(), secondData, errorMsg));
+    APSARA_TEST_TRUE(secondData[prometheus::AGENT_INFO] == data[prometheus::AGENT_INFO]);
+    APSARA_TEST_EQUAL(1U, secondData[prometheus::TARGETS_INFO].size());
+    APSARA_TEST_EQUAL(secondScheduler->GetId(), secondData[prometheus::TARGETS_INFO][0][prometheus::HASH].asString());
+    APSARA_TEST_EQUAL(secondScheduler->GetLastScrapeSize(),
+                      secondData[prometheus::TARGETS_INFO][0][prometheus::SIZE].asInt64());
+
+    Json::Value repeatedData;
+    APSARA_TEST_TRUE(ParseJsonTable(targetSubscriber->TargetsInfoToString(), repeatedData, errorMsg));
+    APSARA_TEST_TRUE(repeatedData[prometheus::AGENT_INFO] == data[prometheus::AGENT_INFO]);
+    APSARA_TEST_TRUE(runner->GetAgentInfoSnapshot().ToJson() == snapshot.ToJson());
+    APSARA_TEST_EQUAL(5, scheduler->mExecDelayCount.load());
+    APSARA_TEST_EQUAL(3, secondScheduler->mExecDelayCount.load());
+}
+
+void TargetSubscriberSchedulerUnittest::TestBuildSubscriberTimerEvent() {
+    auto subscriber = make_shared<TargetSubscriberScheduler>();
+    APSARA_TEST_TRUE(subscriber->Init(mConfig["ScrapeConfig"]));
+    subscriber->mServiceHost = "operator-service";
+    subscriber->mServicePort = 8888;
+    subscriber->mPodName = "collector-pod";
+    subscriber->mETag = "W/\"42\"";
+    auto execTime = chrono::steady_clock::now();
+    auto event = subscriber->BuildSubscriberTimerEvent(execTime);
+    const auto& request = static_cast<HttpRequestTimerEvent*>(event.get())->mRequest;
+
+    APSARA_TEST_TRUE(event->GetExecTime() == execTime);
+    APSARA_TEST_EQUAL(HTTP_GET, request->mMethod);
+    APSARA_TEST_FALSE(request->mHTTPSFlag);
+    APSARA_TEST_EQUAL("operator-service", request->mHost);
+    APSARA_TEST_EQUAL(8888, request->mPort);
+    APSARA_TEST_EQUAL("/jobs/loong-collector%2fdemo-podmonitor-500%2f0/targets", request->mUrl);
+    APSARA_TEST_EQUAL("collector_id=collector-pod", request->mQueryString);
+    APSARA_TEST_EQUAL(prometheus::PROMETHEUS_COLLECTOR_PROTOCOL_VERSION_V1,
+                      request->mHeader.at(prometheus::PROMETHEUS_COLLECTOR_PROTOCOL_VERSION));
+    APSARA_TEST_EQUAL(prometheus::APPLICATION_JSON, request->mHeader.at(prometheus::ACCEPT));
+    APSARA_TEST_EQUAL("5", request->mHeader.at(prometheus::X_PROMETHEUS_REFRESH_INTERVAL_SECONDS));
+    APSARA_TEST_EQUAL("prometheus_collector-pod", request->mHeader.at(prometheus::USER_AGENT));
+    APSARA_TEST_EQUAL("W/\"42\"", request->mHeader.at(prometheus::IF_NONE_MATCH));
+    APSARA_TEST_EQUAL(prometheus::RefeshIntervalSeconds, request->mTimeout);
+    APSARA_TEST_EQUAL(1U, request->mMaxTryCnt);
+
+    Json::Value body;
+    string errorMsg;
+    APSARA_TEST_TRUE(ParseJsonTable(request->mBody, body, errorMsg));
+    APSARA_TEST_TRUE(body[prometheus::AGENT_INFO]
+                     == PrometheusInputRunner::GetInstance()->GetAgentInfoSnapshot().ToJson());
+
+    subscriber->mETag.clear();
+    auto eventWithoutETag = subscriber->BuildSubscriberTimerEvent(execTime);
+    const auto& requestWithoutETag = static_cast<HttpRequestTimerEvent*>(eventWithoutETag.get())->mRequest;
+    APSARA_TEST_EQUAL(0UL, requestWithoutETag->mHeader.count(prometheus::IF_NONE_MATCH));
+    APSARA_TEST_EQUAL(prometheus::PROMETHEUS_COLLECTOR_PROTOCOL_VERSION_V1,
+                      requestWithoutETag->mHeader.at(prometheus::PROMETHEUS_COLLECTOR_PROTOCOL_VERSION));
 }
 
 void TargetSubscriberSchedulerUnittest::TestCollectLoadAndDrainScrapeDelay() {
@@ -874,6 +969,7 @@ UNIT_TEST_CASE(TargetSubscriberSchedulerUnittest, TestBuildHostOnlyScrapeSchedul
 UNIT_TEST_CASE(TargetSubscriberSchedulerUnittest, TestBuildHostOnlyScrapeSchedulerGroupHostIPFallback)
 UNIT_TEST_CASE(TargetSubscriberSchedulerUnittest, TestTargetLabels)
 UNIT_TEST_CASE(TargetSubscriberSchedulerUnittest, TestTargetsInfoToString)
+UNIT_TEST_CASE(TargetSubscriberSchedulerUnittest, TestBuildSubscriberTimerEvent)
 UNIT_TEST_CASE(TargetSubscriberSchedulerUnittest, TestCollectLoadAndDrainScrapeDelay)
 UNIT_TEST_CASE(TargetSubscriberSchedulerUnittest, TestJobStatisticsAreIsolated)
 UNIT_TEST_CASE(TargetSubscriberSchedulerUnittest, TestRaceConditionBetweenCancelAndCallback)

@@ -123,6 +123,7 @@ private:
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class PrometheusInputRunnerUnittest;
+    friend class TargetSubscriberSchedulerUnittest;
     friend class InputPrometheusUnittest;
 
 #endif

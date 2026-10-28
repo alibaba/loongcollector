@@ -23,7 +23,6 @@
 #include <string>
 
 #include "AppConfig.h"
-#include "SelfMonitorMetricEvent.h"
 #include "common/JsonUtil.h"
 #include "common/MachineInfoUtil.h"
 #include "common/StringTools.h"
@@ -34,6 +33,7 @@
 #include "monitor/Monitor.h"
 #include "monitor/metric_constants/MetricConstants.h"
 #include "prometheus/Constants.h"
+#include "prometheus/PrometheusInputRunner.h"
 #include "prometheus/Utils.h"
 #include "prometheus/async/PromFuture.h"
 #include "prometheus/async/PromHttpRequest.h"
@@ -472,6 +472,8 @@ TargetSubscriberScheduler::BuildSubscriberTimerEvent(std::chrono::steady_clock::
     httpHeader[prometheus::ACCEPT] = prometheus::APPLICATION_JSON;
     httpHeader[prometheus::X_PROMETHEUS_REFRESH_INTERVAL_SECONDS] = ToString(prometheus::RefeshIntervalSeconds);
     httpHeader[prometheus::USER_AGENT] = prometheus::PROMETHEUS_PREFIX + mPodName;
+    httpHeader[prometheus::PROMETHEUS_COLLECTOR_PROTOCOL_VERSION]
+        = prometheus::PROMETHEUS_COLLECTOR_PROTOCOL_VERSION_V1;
     if (!mETag.empty()) {
         httpHeader[prometheus::IF_NONE_MATCH] = mETag;
     }
@@ -495,20 +497,7 @@ TargetSubscriberScheduler::BuildSubscriberTimerEvent(std::chrono::steady_clock::
 
 string TargetSubscriberScheduler::TargetsInfoToString() const {
     Json::Value root;
-
-    SelfMonitorMetricEvent wantAgentEvent;
-    LoongCollectorMonitor::GetInstance()->GetAgentMetric(wantAgentEvent);
-    SelfMonitorMetricEvent wantRunnerEvent;
-    LoongCollectorMonitor::GetInstance()->GetRunnerMetric(METRIC_LABEL_VALUE_RUNNER_NAME_HTTP_SINK, wantRunnerEvent);
-
-    root[prometheus::AGENT_INFO][prometheus::CPU_USAGE] = wantAgentEvent.GetGauge(METRIC_AGENT_CPU); // double
-    root[prometheus::AGENT_INFO][prometheus::CPU_LIMIT] = AppConfig::GetInstance()->GetCpuUsageUpLimit(); // float
-    root[prometheus::AGENT_INFO][prometheus::MEM_USAGE] = wantAgentEvent.GetGauge(METRIC_AGENT_MEMORY); // double
-    root[prometheus::AGENT_INFO][prometheus::MEM_LIMIT] = AppConfig::GetInstance()->GetMemUsageUpLimit(); // int64_t
-    root[prometheus::AGENT_INFO][prometheus::HTTP_SINK_IN_ITEMS_TOTAL]
-        = wantRunnerEvent.GetCounter(METRIC_RUNNER_IN_ITEMS_TOTAL); // uint64_t
-    root[prometheus::AGENT_INFO][prometheus::HTTP_SINK_OUT_FAILED]
-        = wantRunnerEvent.GetCounter(METRIC_RUNNER_SINK_OUT_FAILED_ITEMS_TOTAL); // uint64_t
+    root[prometheus::AGENT_INFO] = PrometheusInputRunner::GetInstance()->GetAgentInfoSnapshot().ToJson();
     {
         ReadLock lock(mRWLock);
         for (const auto& [k, v] : mScrapeSchedulerMap) {
