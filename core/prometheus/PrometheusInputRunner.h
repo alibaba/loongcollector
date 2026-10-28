@@ -74,6 +74,8 @@ public:
     PrometheusAgentInfo GetAgentInfoSnapshot() const;
 
 private:
+    enum class HeartbeatResult { Success, NotRegistered, Failed };
+
     using HttpRequestSender = std::function<bool(std::unique_ptr<HttpRequest>&&, HttpResponse&)>;
 
     PrometheusInputRunner();
@@ -82,8 +84,11 @@ private:
                                      const std::string& query,
                                      const std::map<std::string, std::string>& headers,
                                      const std::string& body,
-                                     uint32_t timeout) const;
+                                     uint32_t timeout,
+                                     uint32_t maxTryCnt
+                                     = static_cast<uint32_t>(INT32_FLAG(default_http_request_max_try_cnt))) const;
     HttpResponse SendRegisterMessage(const std::string& url) const;
+    HeartbeatResult SendHeartbeat();
     PrometheusAgentInfo RefreshAgentInfoSnapshot();
 
     void CancelAllTargetSubscriber();

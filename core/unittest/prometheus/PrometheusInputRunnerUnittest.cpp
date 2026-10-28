@@ -41,10 +41,14 @@ public:
     void TestSendRegisterMessage();
     void TestAgentInfoToJson();
     void TestRefreshAgentInfoSnapshot();
+    void TestSendHeartbeatRequest();
+    void TestHeartbeatResponses();
+    void TestHeartbeatFailureDropsScrapeDelay();
 
 protected:
     void SetUp() override {
         auto runner = PrometheusInputRunner::GetInstance();
+        mOriginalAgentInfoSnapshot = runner->GetAgentInfoSnapshot();
         runner->mServiceHost = "127.0.0.1";
         runner->mServicePort = 8080;
         runner->mPodName = "test_pod";
@@ -55,14 +59,17 @@ protected:
     }
 
     void TearDown() override {
-        PrometheusInputRunner::GetInstance()->mHttpRequestSender
-            = [](unique_ptr<HttpRequest>&&, HttpResponse& response) {
-                  response.SetStatusCode(200);
-                  return true;
-              };
+        auto runner = PrometheusInputRunner::GetInstance();
+        runner->mHttpRequestSender = [](unique_ptr<HttpRequest>&&, HttpResponse& response) {
+            response.SetStatusCode(200);
+            return true;
+        };
+        WriteLock lock(runner->mAgentInfoRWLock);
+        runner->mAgentInfoSnapshot = mOriginalAgentInfoSnapshot;
     }
 
 private:
+    PrometheusAgentInfo mOriginalAgentInfoSnapshot;
 };
 
 void PrometheusInputRunnerUnittest::OnSuccessfulStartAndStop() {
@@ -308,6 +315,8 @@ void PrometheusInputRunnerUnittest::TestSendRegisterMessage() {
     APSARA_TEST_TRUE(capturedRequest->mHeader.empty());
     APSARA_TEST_TRUE(capturedRequest->mBody.empty());
     APSARA_TEST_EQUAL(10U, capturedRequest->mTimeout);
+    APSARA_TEST_EQUAL(static_cast<uint32_t>(INT32_FLAG(default_http_request_max_try_cnt)),
+                      capturedRequest->mMaxTryCnt);
 }
 
 void PrometheusInputRunnerUnittest::TestAgentInfoToJson() {
@@ -406,6 +415,158 @@ void PrometheusInputRunnerUnittest::TestRefreshAgentInfoSnapshot() {
     runner->RemoveScrapeInput(secondSubscriber->GetId());
 }
 
+void PrometheusInputRunnerUnittest::TestSendHeartbeatRequest() {
+    auto runner = PrometheusInputRunner::GetInstance();
+    {
+        WriteLock lock(runner->mAgentInfoRWLock);
+        runner->mAgentInfoSnapshot.mScrapeDelaySeconds = 999;
+    }
+    unique_ptr<HttpRequest> capturedRequest;
+    int sendCount = 0;
+    runner->mHttpRequestSender = [&capturedRequest, &sendCount](unique_ptr<HttpRequest>&& request,
+                                                             HttpResponse& response) {
+        ++sendCount;
+        capturedRequest = std::move(request);
+        response.SetStatusCode(204);
+        response.AddHeader(prometheus::PROMETHEUS_COLLECTOR_PROTOCOL_VERSION,
+                           prometheus::PROMETHEUS_COLLECTOR_PROTOCOL_VERSION_V1);
+        return true;
+    };
+
+    auto result = runner->SendHeartbeat();
+    APSARA_TEST_EQUAL(PrometheusInputRunner::HeartbeatResult::Success, result);
+    APSARA_TEST_EQUAL(1, sendCount);
+    APSARA_TEST_EQUAL(HTTP_POST, capturedRequest->mMethod);
+    APSARA_TEST_FALSE(capturedRequest->mHTTPSFlag);
+    APSARA_TEST_EQUAL("127.0.0.1", capturedRequest->mHost);
+    APSARA_TEST_EQUAL(8080, capturedRequest->mPort);
+    APSARA_TEST_EQUAL(prometheus::HEARTBEAT_COLLECTOR_PATH, capturedRequest->mUrl);
+    APSARA_TEST_EQUAL("collector_id=test_pod", capturedRequest->mQueryString);
+    APSARA_TEST_EQUAL(prometheus::PROMETHEUS_COLLECTOR_PROTOCOL_VERSION_V1,
+                      capturedRequest->mHeader.at(prometheus::PROMETHEUS_COLLECTOR_PROTOCOL_VERSION));
+    APSARA_TEST_EQUAL(prometheus::APPLICATION_JSON, capturedRequest->mHeader.at(CONTENT_TYPE));
+    APSARA_TEST_EQUAL(prometheus::APPLICATION_JSON, capturedRequest->mHeader.at(prometheus::ACCEPT));
+    APSARA_TEST_EQUAL(3U, capturedRequest->mTimeout);
+    APSARA_TEST_EQUAL(1U, capturedRequest->mMaxTryCnt);
+
+    Json::Value body;
+    string errorMsg;
+    APSARA_TEST_TRUE(ParseJsonTable(capturedRequest->mBody, body, errorMsg));
+    APSARA_TEST_EQUAL(1U, body.size());
+    APSARA_TEST_TRUE(body[prometheus::AGENT_INFO] == runner->GetAgentInfoSnapshot().ToJson());
+    APSARA_TEST_EQUAL(8U, body[prometheus::AGENT_INFO].size());
+    APSARA_TEST_EQUAL(0UL, body[prometheus::AGENT_INFO][prometheus::SCRAPE_DELAY_SECONDS].asUInt64());
+}
+
+void PrometheusInputRunnerUnittest::TestHeartbeatResponses() {
+    using Result = PrometheusInputRunner::HeartbeatResult;
+    struct TestCase {
+        int status;
+        string version;
+        string body;
+        NetworkCode networkCode;
+        Result expected;
+    };
+    const TestCase cases[] = {
+        {204, "v1", "", NetworkCode::Ok, Result::Success},
+        {204, "", "", NetworkCode::Ok, Result::Success},
+        {404, "v1", R"({"msg":"NotRegistered"})", NetworkCode::Ok, Result::NotRegistered},
+        {404, "", R"({"msg":"NotRegistered"})", NetworkCode::Ok, Result::Failed},
+        {404, "v2", R"({"msg":"NotRegistered"})", NetworkCode::Ok, Result::Failed},
+        {404, "v1", "", NetworkCode::Ok, Result::Failed},
+        {404, "v1", "invalid JSON", NetworkCode::Ok, Result::Failed},
+        {404, "v1", "null", NetworkCode::Ok, Result::Failed},
+        {404, "v1", "[]", NetworkCode::Ok, Result::Failed},
+        {404, "v1", "42", NetworkCode::Ok, Result::Failed},
+        {404, "v1", R"("NotRegistered")", NetworkCode::Ok, Result::Failed},
+        {404, "v1", "{}", NetworkCode::Ok, Result::Failed},
+        {404, "v1", R"({"reason":"NotRegistered"})", NetworkCode::Ok, Result::Failed},
+        {404, "v1", R"({"msg":"OtherError"})", NetworkCode::Ok, Result::Failed},
+        {404, "v1", R"({"msg":null})", NetworkCode::Ok, Result::Failed},
+        {404, "v1", R"({"msg":404})", NetworkCode::Ok, Result::Failed},
+        {404, "v1", R"({"msg":true})", NetworkCode::Ok, Result::Failed},
+        {405, "", R"({"msg":"NotRegistered"})", NetworkCode::Ok, Result::Failed},
+        {405, "v1", R"({"msg":"NotRegistered"})", NetworkCode::Ok, Result::Failed},
+        {400, "v1", R"({"msg":"NotRegistered"})", NetworkCode::Ok, Result::Failed},
+        {500, "v1", R"({"msg":"NotRegistered"})", NetworkCode::Ok, Result::Failed},
+        {503, "v1", "", NetworkCode::Ok, Result::Failed},
+        {200, "v1", R"({"msg":"NotRegistered"})", NetworkCode::Ok, Result::Failed},
+        {0, "", "", NetworkCode::Timeout, Result::Failed},
+        {0, "", "", NetworkCode::ConnectionFailed, Result::Failed},
+        {0, "", "", NetworkCode::Ok, Result::Failed},
+        {404, "v1", R"({"msg":"NotRegistered"})", NetworkCode::Timeout, Result::Failed},
+    };
+    auto runner = PrometheusInputRunner::GetInstance();
+    for (const auto& testCase : cases) {
+        SCOPED_TRACE(to_string(testCase.status) + ":" + testCase.version + ":" + testCase.body);
+        int sendCount = 0;
+        runner->mHttpRequestSender = [&testCase, &sendCount](unique_ptr<HttpRequest>&& request,
+                                                          HttpResponse& response) {
+            ++sendCount;
+            APSARA_TEST_EQUAL(prometheus::HEARTBEAT_COLLECTOR_PATH, request->mUrl);
+            response.SetStatusCode(testCase.status);
+            response.SetNetworkStatus(testCase.networkCode, "test network status");
+            *response.GetBody<string>() = testCase.body;
+            if (!testCase.version.empty()) {
+                response.AddHeader("x-prometheus-collector-protocol-version", testCase.version);
+            }
+            return testCase.networkCode == NetworkCode::Ok && testCase.status != 0;
+        };
+        APSARA_TEST_EQUAL(testCase.expected, runner->SendHeartbeat());
+        APSARA_TEST_EQUAL(1, sendCount);
+    }
+}
+
+void PrometheusInputRunnerUnittest::TestHeartbeatFailureDropsScrapeDelay() {
+    auto runner = PrometheusInputRunner::GetInstance();
+    Json::Value config;
+    config[prometheus::JOB_NAME] = "__heartbeat_delay_job";
+    config[prometheus::SCRAPE_INTERVAL] = "30s";
+    config[prometheus::SCRAPE_TIMEOUT] = "10s";
+    auto subscriber = make_shared<TargetSubscriberScheduler>();
+    APSARA_TEST_TRUE(subscriber->Init(config));
+    PromTargetInfo targetInfo;
+    targetInfo.mHash = "heartbeat-target";
+    auto scheduler = make_shared<ScrapeScheduler>(subscriber->mScrapeConfigPtr,
+                                                  "localhost",
+                                                  80,
+                                                  prometheus::HTTP,
+                                                  "/metrics",
+                                                  30,
+                                                  10,
+                                                  0,
+                                                  0,
+                                                  targetInfo);
+    scheduler->mScrapeResponseSizeBytes = 90;
+    scheduler->mExecDelayCount = 7;
+    subscriber->mScrapeSchedulerMap.emplace(targetInfo.mHash, scheduler);
+    {
+        WriteLock lock(runner->mSubscriberMapRWLock);
+        runner->mTargetSubscriberSchedulerMap[subscriber->GetId()] = subscriber;
+    }
+
+    runner->mHttpRequestSender = [](unique_ptr<HttpRequest>&&, HttpResponse& response) {
+        response.SetNetworkStatus(NetworkCode::Timeout, "heartbeat timeout");
+        return false;
+    };
+    APSARA_TEST_EQUAL(PrometheusInputRunner::HeartbeatResult::Failed, runner->SendHeartbeat());
+    APSARA_TEST_EQUAL(0, scheduler->mExecDelayCount.load());
+    APSARA_TEST_EQUAL(7UL, runner->GetAgentInfoSnapshot().mScrapeDelaySeconds);
+
+    scheduler->mExecDelayCount = 2;
+    runner->mHttpRequestSender = [](unique_ptr<HttpRequest>&& request, HttpResponse& response) {
+        Json::Value body;
+        string errorMsg;
+        APSARA_TEST_TRUE(ParseJsonTable(request->mBody, body, errorMsg));
+        APSARA_TEST_EQUAL(2UL, body[prometheus::AGENT_INFO][prometheus::SCRAPE_DELAY_SECONDS].asUInt64());
+        response.SetStatusCode(204);
+        return true;
+    };
+    APSARA_TEST_EQUAL(PrometheusInputRunner::HeartbeatResult::Success, runner->SendHeartbeat());
+    APSARA_TEST_EQUAL(2UL, runner->GetAgentInfoSnapshot().mScrapeDelaySeconds);
+    runner->RemoveScrapeInput(subscriber->GetId());
+}
+
 UNIT_TEST_CASE(PrometheusInputRunnerUnittest, OnSuccessfulStartAndStop)
 UNIT_TEST_CASE(PrometheusInputRunnerUnittest, TestHasRegisteredPlugins)
 UNIT_TEST_CASE(PrometheusInputRunnerUnittest, TestMulitStartAndStop)
@@ -415,6 +576,9 @@ UNIT_TEST_CASE(PrometheusInputRunnerUnittest, TestSendOperatorRequest)
 UNIT_TEST_CASE(PrometheusInputRunnerUnittest, TestSendRegisterMessage)
 UNIT_TEST_CASE(PrometheusInputRunnerUnittest, TestAgentInfoToJson)
 UNIT_TEST_CASE(PrometheusInputRunnerUnittest, TestRefreshAgentInfoSnapshot)
+UNIT_TEST_CASE(PrometheusInputRunnerUnittest, TestSendHeartbeatRequest)
+UNIT_TEST_CASE(PrometheusInputRunnerUnittest, TestHeartbeatResponses)
+UNIT_TEST_CASE(PrometheusInputRunnerUnittest, TestHeartbeatFailureDropsScrapeDelay)
 
 } // namespace logtail
 

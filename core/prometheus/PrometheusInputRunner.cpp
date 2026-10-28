@@ -307,10 +307,11 @@ HttpResponse PrometheusInputRunner::SendOperatorRequest(const string& method,
                                                         const string& query,
                                                         const map<string, string>& headers,
                                                         const string& body,
-                                                        uint32_t timeout) const {
+                                                        uint32_t timeout,
+                                                        uint32_t maxTryCnt) const {
     HttpResponse httpResponse;
     if (!mHttpRequestSender(make_unique<HttpRequest>(
-                                method, false, mServiceHost, mServicePort, url, query, headers, body, timeout),
+                                method, false, mServiceHost, mServicePort, url, query, headers, body, timeout, maxTryCnt),
                             httpResponse)) {
         LOG_ERROR(sLogger, ("curl error", "")("method", method)("url", url)("query", query));
     }
@@ -319,6 +320,45 @@ HttpResponse PrometheusInputRunner::SendOperatorRequest(const string& method,
 
 HttpResponse PrometheusInputRunner::SendRegisterMessage(const string& url) const {
     return SendOperatorRequest(HTTP_GET, url, "pod_name=" + mPodName, {}, "", 10);
+}
+
+PrometheusInputRunner::HeartbeatResult PrometheusInputRunner::SendHeartbeat() {
+    Json::Value body;
+    body[prometheus::AGENT_INFO] = RefreshAgentInfoSnapshot().ToJson();
+    map<string, string> headers{{prometheus::PROMETHEUS_COLLECTOR_PROTOCOL_VERSION,
+                                prometheus::PROMETHEUS_COLLECTOR_PROTOCOL_VERSION_V1},
+                               {CONTENT_TYPE, prometheus::APPLICATION_JSON},
+                               {prometheus::ACCEPT, prometheus::APPLICATION_JSON}};
+    auto response = SendOperatorRequest(HTTP_POST,
+                                        prometheus::HEARTBEAT_COLLECTOR_PATH,
+                                        string(prometheus::COLLECTOR_ID) + "=" + URLEncode(mPodName),
+                                        headers,
+                                        body.toStyledString(),
+                                        3,
+                                        1);
+    if (response.GetNetworkStatus().mCode != NetworkCode::Ok) {
+        return HeartbeatResult::Failed;
+    }
+    if (response.GetStatusCode() == 204) {
+        return HeartbeatResult::Success;
+    }
+    if (response.GetStatusCode() == 404) {
+        const auto& responseHeaders = response.GetHeader();
+        auto version = responseHeaders.find(prometheus::PROMETHEUS_COLLECTOR_PROTOCOL_VERSION);
+        if (version != responseHeaders.end()
+            && version->second == prometheus::PROMETHEUS_COLLECTOR_PROTOCOL_VERSION_V1) {
+            Json::Value responseBody;
+            string errorMsg;
+            if (ParseJsonTable(*response.GetBody<string>(), responseBody, errorMsg) && responseBody.isObject()
+                && responseBody[prometheus::MSG].isString()
+                && responseBody[prometheus::MSG].asString() == prometheus::NOT_REGISTERED) {
+                return HeartbeatResult::NotRegistered;
+            }
+        }
+    } else if (response.GetStatusCode() == 400) {
+        LOG_WARNING(sLogger, ("heartbeat resource snapshot rejected", mPodName));
+    }
+    return HeartbeatResult::Failed;
 }
 
 
