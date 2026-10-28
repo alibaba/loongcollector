@@ -17,8 +17,11 @@
 #include "json/json.h"
 #include "json/value.h"
 
+#include "app_config/AppConfig.h"
 #include "common/JsonUtil.h"
 #include "common/http/Constant.h"
+#include "monitor/Monitor.h"
+#include "monitor/metric_constants/MetricConstants.h"
 #include "prometheus/Constants.h"
 #include "prometheus/PrometheusInputRunner.h"
 #include "unittest/Unittest.h"
@@ -36,6 +39,8 @@ public:
     void TestGetAllProjects();
     void TestSendOperatorRequest();
     void TestSendRegisterMessage();
+    void TestAgentInfoToJson();
+    void TestRefreshAgentInfoSnapshot();
 
 protected:
     void SetUp() override {
@@ -305,6 +310,102 @@ void PrometheusInputRunnerUnittest::TestSendRegisterMessage() {
     APSARA_TEST_EQUAL(10U, capturedRequest->mTimeout);
 }
 
+void PrometheusInputRunnerUnittest::TestAgentInfoToJson() {
+    PrometheusAgentInfo agentInfo;
+    agentInfo.mCpuLimit = 2.0;
+    agentInfo.mCpuUsage = 0.5;
+    agentInfo.mMemLimit = 4096;
+    agentInfo.mMemUsage = 1024;
+    agentInfo.mLoad = 1048576;
+    agentInfo.mScrapeDelaySeconds = 3;
+    agentInfo.mHttpSinkInItemsTotal = 100;
+    agentInfo.mHttpSinkOutFailed = 2;
+
+    auto value = agentInfo.ToJson();
+
+    APSARA_TEST_EQUAL(2.0, value[prometheus::CPU_LIMIT].asDouble());
+    APSARA_TEST_EQUAL(0.5, value[prometheus::CPU_USAGE].asDouble());
+    APSARA_TEST_EQUAL(4096, value[prometheus::MEM_LIMIT].asInt64());
+    APSARA_TEST_EQUAL(1024, value[prometheus::MEM_USAGE].asDouble());
+    APSARA_TEST_EQUAL(1048576UL, value[prometheus::LOAD].asUInt64());
+    APSARA_TEST_EQUAL(3UL, value[prometheus::SCRAPE_DELAY_SECONDS].asUInt64());
+    APSARA_TEST_EQUAL(100UL, value[prometheus::HTTP_SINK_IN_ITEMS_TOTAL].asUInt64());
+    APSARA_TEST_EQUAL(2UL, value[prometheus::HTTP_SINK_OUT_FAILED].asUInt64());
+}
+
+void PrometheusInputRunnerUnittest::TestRefreshAgentInfoSnapshot() {
+    auto runner = PrometheusInputRunner::GetInstance();
+    auto baseline = runner->RefreshAgentInfoSnapshot();
+
+    auto makeSubscriber = [](const string& jobName,
+                             const string& interval,
+                             uint64_t intervalSeconds,
+                             const string& hash,
+                             int scrapeSize,
+                             int delaySeconds) {
+        Json::Value config;
+        config[prometheus::JOB_NAME] = jobName;
+        config[prometheus::SCRAPE_INTERVAL] = interval;
+        config[prometheus::SCRAPE_TIMEOUT] = "10s";
+        auto subscriber = make_shared<TargetSubscriberScheduler>();
+        APSARA_TEST_TRUE(subscriber->Init(config));
+
+        PromTargetInfo targetInfo;
+        targetInfo.mHash = hash;
+        auto scheduler = make_shared<ScrapeScheduler>(subscriber->mScrapeConfigPtr,
+                                                      "localhost",
+                                                      80,
+                                                      prometheus::HTTP,
+                                                      "/metrics",
+                                                      intervalSeconds,
+                                                      10,
+                                                      0,
+                                                      0,
+                                                      targetInfo);
+        scheduler->mScrapeResponseSizeBytes = scrapeSize;
+        scheduler->mExecDelayCount = delaySeconds;
+        subscriber->mScrapeSchedulerMap.emplace(hash, scheduler);
+        return subscriber;
+    };
+
+    auto firstSubscriber = makeSubscriber("__snapshot_job_1", "30s", 30, "target-1", 90, 2);
+    auto secondSubscriber = makeSubscriber("__snapshot_job_2", "20s", 20, "target-2", 99, 5);
+    {
+        WriteLock lock(runner->mSubscriberMapRWLock);
+        runner->mTargetSubscriberSchedulerMap[firstSubscriber->GetId()] = firstSubscriber;
+        runner->mTargetSubscriberSchedulerMap[secondSubscriber->GetId()] = secondSubscriber;
+    }
+
+    SelfMonitorMetricEvent agentMetric;
+    LoongCollectorMonitor::GetInstance()->GetAgentMetric(agentMetric);
+    SelfMonitorMetricEvent httpSinkMetric;
+    LoongCollectorMonitor::GetInstance()->GetRunnerMetric(METRIC_LABEL_VALUE_RUNNER_NAME_HTTP_SINK, httpSinkMetric);
+
+    auto refreshed = runner->RefreshAgentInfoSnapshot();
+    APSARA_TEST_EQUAL(AppConfig::GetInstance()->GetCpuUsageUpLimit(), refreshed.mCpuLimit);
+    APSARA_TEST_EQUAL(agentMetric.GetGauge(METRIC_AGENT_CPU), refreshed.mCpuUsage);
+    APSARA_TEST_EQUAL(AppConfig::GetInstance()->GetMemUsageUpLimit(), refreshed.mMemLimit);
+    APSARA_TEST_EQUAL(agentMetric.GetGauge(METRIC_AGENT_MEMORY), refreshed.mMemUsage);
+    APSARA_TEST_EQUAL(baseline.mLoad + 7, refreshed.mLoad);
+    APSARA_TEST_EQUAL(7UL, refreshed.mScrapeDelaySeconds);
+    APSARA_TEST_EQUAL(httpSinkMetric.GetCounter(METRIC_RUNNER_IN_ITEMS_TOTAL), refreshed.mHttpSinkInItemsTotal);
+    APSARA_TEST_EQUAL(httpSinkMetric.GetCounter(METRIC_RUNNER_SINK_OUT_FAILED_ITEMS_TOTAL),
+                      refreshed.mHttpSinkOutFailed);
+
+    auto published = runner->GetAgentInfoSnapshot();
+    APSARA_TEST_EQUAL(refreshed.mLoad, published.mLoad);
+    APSARA_TEST_EQUAL(refreshed.mScrapeDelaySeconds, published.mScrapeDelaySeconds);
+    published.mLoad = 0;
+    APSARA_TEST_EQUAL(refreshed.mLoad, runner->GetAgentInfoSnapshot().mLoad);
+
+    firstSubscriber->mScrapeSchedulerMap.begin()->second->mExecDelayCount = 4;
+    refreshed = runner->RefreshAgentInfoSnapshot();
+    APSARA_TEST_EQUAL(4UL, refreshed.mScrapeDelaySeconds);
+
+    runner->RemoveScrapeInput(firstSubscriber->GetId());
+    runner->RemoveScrapeInput(secondSubscriber->GetId());
+}
+
 UNIT_TEST_CASE(PrometheusInputRunnerUnittest, OnSuccessfulStartAndStop)
 UNIT_TEST_CASE(PrometheusInputRunnerUnittest, TestHasRegisteredPlugins)
 UNIT_TEST_CASE(PrometheusInputRunnerUnittest, TestMulitStartAndStop)
@@ -312,6 +413,8 @@ UNIT_TEST_CASE(PrometheusInputRunnerUnittest, TestHostOnlyStartAndStop)
 UNIT_TEST_CASE(PrometheusInputRunnerUnittest, TestGetAllProjects)
 UNIT_TEST_CASE(PrometheusInputRunnerUnittest, TestSendOperatorRequest)
 UNIT_TEST_CASE(PrometheusInputRunnerUnittest, TestSendRegisterMessage)
+UNIT_TEST_CASE(PrometheusInputRunnerUnittest, TestAgentInfoToJson)
+UNIT_TEST_CASE(PrometheusInputRunnerUnittest, TestRefreshAgentInfoSnapshot)
 
 } // namespace logtail
 

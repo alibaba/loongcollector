@@ -17,6 +17,7 @@
 #pragma once
 
 #include <cstdint>
+#include <json/json.h>
 
 #include <functional>
 #include <map>
@@ -32,6 +33,19 @@
 #include "runner/InputRunner.h"
 
 namespace logtail {
+
+struct PrometheusAgentInfo {
+    float mCpuLimit = 0;
+    double mCpuUsage = 0;
+    int64_t mMemLimit = 0;
+    double mMemUsage = 0;
+    uint64_t mLoad = 0;
+    uint64_t mScrapeDelaySeconds = 0;
+    uint64_t mHttpSinkInItemsTotal = 0;
+    uint64_t mHttpSinkOutFailed = 0;
+
+    Json::Value ToJson() const;
+};
 
 class PrometheusInputRunner : public InputRunner {
 public:
@@ -57,6 +71,8 @@ public:
     bool HasRegisteredPlugins() const override;
     void EventGC() override;
 
+    PrometheusAgentInfo GetAgentInfoSnapshot() const;
+
 private:
     using HttpRequestSender = std::function<bool(std::unique_ptr<HttpRequest>&&, HttpResponse&)>;
 
@@ -68,6 +84,7 @@ private:
                                      const std::string& body,
                                      uint32_t timeout) const;
     HttpResponse SendRegisterMessage(const std::string& url) const;
+    PrometheusAgentInfo RefreshAgentInfoSnapshot();
 
     void CancelAllTargetSubscriber();
     void SubscribeOnce();
@@ -90,6 +107,9 @@ private:
 
     mutable ReadWriteLock mSubscriberMapRWLock;
     std::map<std::string, std::shared_ptr<TargetSubscriberScheduler>> mTargetSubscriberSchedulerMap;
+
+    mutable ReadWriteLock mAgentInfoRWLock;
+    PrometheusAgentInfo mAgentInfoSnapshot;
 
     std::atomic<uint64_t> mUnRegisterMs;
 

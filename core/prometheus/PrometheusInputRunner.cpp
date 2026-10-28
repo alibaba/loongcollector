@@ -20,6 +20,7 @@
 #include <memory>
 #include <string>
 
+#include "app_config/AppConfig.h"
 #include "application/Application.h"
 #include "common/Flags.h"
 #include "common/JsonUtil.h"
@@ -30,6 +31,7 @@
 #include "common/http/Curl.h"
 #include "common/timer/Timer.h"
 #include "logger/Logger.h"
+#include "monitor/Monitor.h"
 #include "monitor/metric_constants/MetricConstants.h"
 #include "prometheus/Constants.h"
 #include "prometheus/Utils.h"
@@ -41,6 +43,19 @@ DECLARE_FLAG_INT32(operator_service_port);
 DECLARE_FLAG_STRING(_pod_name_);
 
 namespace logtail {
+
+Json::Value PrometheusAgentInfo::ToJson() const {
+    Json::Value value;
+    value[prometheus::CPU_LIMIT] = mCpuLimit;
+    value[prometheus::CPU_USAGE] = mCpuUsage;
+    value[prometheus::MEM_LIMIT] = mMemLimit;
+    value[prometheus::MEM_USAGE] = mMemUsage;
+    value[prometheus::LOAD] = mLoad;
+    value[prometheus::SCRAPE_DELAY_SECONDS] = mScrapeDelaySeconds;
+    value[prometheus::HTTP_SINK_IN_ITEMS_TOTAL] = mHttpSinkInItemsTotal;
+    value[prometheus::HTTP_SINK_OUT_FAILED] = mHttpSinkOutFailed;
+    return value;
+}
 
 PrometheusInputRunner::PrometheusInputRunner()
     : mHttpRequestSender([](unique_ptr<HttpRequest>&& request, HttpResponse& response) {
@@ -250,6 +265,41 @@ bool PrometheusInputRunner::HasRegisteredPlugins() const {
 
 void PrometheusInputRunner::EventGC() {
     mEventPool.CheckGC();
+}
+
+PrometheusAgentInfo PrometheusInputRunner::RefreshAgentInfoSnapshot() {
+    PrometheusAgentInfo snapshot;
+
+    SelfMonitorMetricEvent agentMetric;
+    LoongCollectorMonitor::GetInstance()->GetAgentMetric(agentMetric);
+    SelfMonitorMetricEvent httpSinkMetric;
+    LoongCollectorMonitor::GetInstance()->GetRunnerMetric(METRIC_LABEL_VALUE_RUNNER_NAME_HTTP_SINK, httpSinkMetric);
+
+    snapshot.mCpuLimit = AppConfig::GetInstance()->GetCpuUsageUpLimit();
+    snapshot.mCpuUsage = agentMetric.GetGauge(METRIC_AGENT_CPU);
+    snapshot.mMemLimit = AppConfig::GetInstance()->GetMemUsageUpLimit();
+    snapshot.mMemUsage = agentMetric.GetGauge(METRIC_AGENT_MEMORY);
+    snapshot.mHttpSinkInItemsTotal = httpSinkMetric.GetCounter(METRIC_RUNNER_IN_ITEMS_TOTAL);
+    snapshot.mHttpSinkOutFailed = httpSinkMetric.GetCounter(METRIC_RUNNER_SINK_OUT_FAILED_ITEMS_TOTAL);
+
+    {
+        ReadLock lock(mSubscriberMapRWLock);
+        for (const auto& item : mTargetSubscriberSchedulerMap) {
+            auto statistics = item.second->CollectLoadAndDrainScrapeDelay();
+            snapshot.mLoad += statistics.mLoad;
+            snapshot.mScrapeDelaySeconds += statistics.mScrapeDelaySeconds;
+        }
+    }
+    {
+        WriteLock lock(mAgentInfoRWLock);
+        mAgentInfoSnapshot = snapshot;
+    }
+    return snapshot;
+}
+
+PrometheusAgentInfo PrometheusInputRunner::GetAgentInfoSnapshot() const {
+    ReadLock lock(mAgentInfoRWLock);
+    return mAgentInfoSnapshot;
 }
 
 HttpResponse PrometheusInputRunner::SendOperatorRequest(const string& method,
