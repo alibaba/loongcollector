@@ -19,9 +19,12 @@
 #include <cstdint>
 #include <json/json.h>
 
+#include <atomic>
+#include <chrono>
 #include <functional>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <string>
 
 #include "common/Lock.h"
@@ -76,9 +79,17 @@ public:
 private:
     enum class HeartbeatResult { Success, NotRegistered, Failed };
 
+    struct StopToken {
+        std::atomic_bool mStopped = false;
+        std::mutex mRequestMutex;
+    };
+
     using HttpRequestSender = std::function<bool(std::unique_ptr<HttpRequest>&&, HttpResponse&)>;
 
     PrometheusInputRunner();
+    void RunRegistrationAndHeartbeat(const std::shared_ptr<StopToken>& stop);
+    void OnInitialRegistration(const HttpResponse& response);
+    void SleepFor(std::chrono::seconds interval) const;
     HttpResponse SendOperatorRequest(const std::string& method,
                                      const std::string& url,
                                      const std::string& query,
@@ -86,9 +97,11 @@ private:
                                      const std::string& body,
                                      uint32_t timeout,
                                      uint32_t maxTryCnt
-                                     = static_cast<uint32_t>(INT32_FLAG(default_http_request_max_try_cnt))) const;
-    HttpResponse SendRegisterMessage(const std::string& url) const;
-    HeartbeatResult SendHeartbeat();
+                                     = static_cast<uint32_t>(INT32_FLAG(default_http_request_max_try_cnt)),
+                                     const std::shared_ptr<StopToken>& stop = nullptr) const;
+    HttpResponse SendRegisterMessage(const std::string& url,
+                                     const std::shared_ptr<StopToken>& stop = nullptr) const;
+    HeartbeatResult SendHeartbeat(const std::shared_ptr<StopToken>& stop = nullptr);
     PrometheusAgentInfo RefreshAgentInfoSnapshot();
 
     void CancelAllTargetSubscriber();
@@ -99,8 +112,7 @@ private:
     bool mIsStarted = false;
     std::mutex mStartMutex;
 
-    std::mutex mRegisterMutex;
-    std::atomic<bool> mIsThreadRunning = true;
+    std::shared_ptr<StopToken> mStopToken;
     std::future<void> mThreadRes;
 
     HttpRequestSender mHttpRequestSender;
@@ -127,6 +139,7 @@ private:
     IntGaugePtr mPromJobNum;
 
 #ifdef APSARA_UNIT_TEST_MAIN
+    std::function<void(std::chrono::seconds)> mSleepFor;
     friend class PrometheusInputRunnerUnittest;
     friend class TargetSubscriberSchedulerUnittest;
     friend class InputPrometheusUnittest;

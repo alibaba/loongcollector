@@ -162,58 +162,101 @@ void PrometheusInputRunner::Init() {
     AsynCurlRunner::GetInstance()->Init();
 #endif
 
-    LOG_INFO(sLogger, ("PrometheusInputRunner", "register"));
-    // only register when operator exist
-    // empty service host means in host only mode
+    if (mThreadRes.valid()) {
+        // Prevent overlapping snapshot producers across runner restarts.
+        mThreadRes.wait();
+    }
     if (!mServiceHost.empty()) {
-        mIsThreadRunning.store(true);
-        LaunchAsync(mThreadRes, "PrometheusRegister", [this]() {
-            std::lock_guard<mutex> lock(mRegisterMutex);
-            int retry = 0;
-            while (mIsThreadRunning.load()) {
-                ++retry;
-                auto httpResponse = SendRegisterMessage(prometheus::REGISTER_COLLECTOR_PATH);
-                if (httpResponse.GetStatusCode() != 200) {
-                    ADD_COUNTER(mPromRegisterRetryTotal, 1);
-                    if (retry % 10 == 0) {
-                        LOG_INFO(sLogger,
-                                 ("register failed, retried", retry)("statusCode", httpResponse.GetStatusCode()));
-                    }
-                } else {
-                    // register success
-                    // response will be { "unRegisterMs": 30000 }
-                    if (!httpResponse.GetBody<string>()->empty()) {
-                        string responseStr = *httpResponse.GetBody<string>();
-                        string errMsg;
-                        Json::Value responseJson;
-                        if (!ParseJsonTable(responseStr, responseJson, errMsg)) {
-                            LOG_ERROR(sLogger, ("register failed, parse response failed", responseStr));
-                        }
-                        if (responseJson.isMember(prometheus::UNREGISTER_MS)
-                            && responseJson[prometheus::UNREGISTER_MS].isString()) {
-                            auto tmpStr = responseJson[prometheus::UNREGISTER_MS].asString();
-                            if (tmpStr.empty()) {
-                                mUnRegisterMs = 0;
-                            } else {
-                                uint64_t unRegisterMs{};
-                                StringTo(tmpStr, unRegisterMs);
-                                mUnRegisterMs.store(unRegisterMs);
-                                // adjust unRegisterMs to scrape targets for zero-cost
-                                mUnRegisterMs -= 1000;
-                                LOG_INFO(sLogger, ("unRegisterMs", ToString(mUnRegisterMs)));
-                            }
-                        }
-                    }
-                    SET_GAUGE(mPromRegisterState, 1);
-                    LOG_INFO(sLogger, ("Register Success", mPodName));
-                    // subscribe immediately
-                    SubscribeOnce();
-                    break;
-                }
-                std::this_thread::sleep_for(std::chrono::seconds(1));
-            }
+        mStopToken = make_shared<StopToken>();
+        LaunchAsync(mThreadRes, "PrometheusHeartbeat", [this, stop = mStopToken]() {
+            RunRegistrationAndHeartbeat(stop);
         });
     }
+}
+
+void PrometheusInputRunner::RunRegistrationAndHeartbeat(const shared_ptr<StopToken>& stop) {
+    bool registered = false;
+    bool initialRegistration = true;
+    int retry = 0;
+    while (!stop->mStopped.load()) {
+        if (!registered) {
+            auto response = SendRegisterMessage(prometheus::REGISTER_COLLECTOR_PATH, stop);
+            if (stop->mStopped.load()) {
+                break;
+            }
+            if (response.GetStatusCode() != 200) {
+                ++retry;
+                ADD_COUNTER(mPromRegisterRetryTotal, 1);
+                if (retry % 10 == 0) {
+                    LOG_INFO(sLogger, ("register failed, retried", retry)("statusCode", response.GetStatusCode()));
+                }
+                SleepFor(chrono::seconds(1));
+                continue;
+            }
+            {
+                lock_guard<mutex> lock(stop->mRequestMutex);
+                if (stop->mStopped.load()) {
+                    break;
+                }
+                if (initialRegistration) {
+                    OnInitialRegistration(response);
+                    initialRegistration = false;
+                }
+                SET_GAUGE(mPromRegisterState, 1);
+            }
+            registered = true;
+            retry = 0;
+            LOG_INFO(sLogger, ("Register Success", mPodName));
+        }
+        if (stop->mStopped.load()) {
+            break;
+        }
+        auto result = SendHeartbeat(stop);
+        if (stop->mStopped.load()) {
+            break;
+        }
+        if (result == HeartbeatResult::NotRegistered) {
+            registered = false;
+            SET_GAUGE(mPromRegisterState, 0);
+            continue;
+        }
+        SleepFor(chrono::seconds(prometheus::RefeshIntervalSeconds));
+    }
+}
+
+void PrometheusInputRunner::OnInitialRegistration(const HttpResponse& response) {
+    const auto& body = *response.GetBody<string>();
+    if (!body.empty()) {
+        string errorMsg;
+        Json::Value responseJson;
+        if (!ParseJsonTable(body, responseJson, errorMsg)) {
+            LOG_ERROR(sLogger, ("register failed, parse response failed", body));
+        }
+        if (responseJson.isObject() && responseJson[prometheus::UNREGISTER_MS].isString()) {
+            const auto& timestamp = responseJson[prometheus::UNREGISTER_MS].asString();
+            if (timestamp.empty()) {
+                mUnRegisterMs = 0;
+            } else {
+                uint64_t unRegisterMs{};
+                StringTo(timestamp, unRegisterMs);
+                mUnRegisterMs.store(unRegisterMs);
+                // Preserve the one-second upgrade compensation before the first subscription.
+                mUnRegisterMs -= 1000;
+                LOG_INFO(sLogger, ("unRegisterMs", ToString(mUnRegisterMs)));
+            }
+        }
+    }
+    SubscribeOnce();
+}
+
+void PrometheusInputRunner::SleepFor(chrono::seconds interval) const {
+#ifdef APSARA_UNIT_TEST_MAIN
+    if (mSleepFor) {
+        mSleepFor(interval);
+        return;
+    }
+#endif
+    this_thread::sleep_for(interval);
 }
 
 /// @brief stop scrape work and clear all scrape jobs
@@ -224,9 +267,9 @@ void PrometheusInputRunner::Stop() {
     }
 
     mIsStarted = false;
-    mIsThreadRunning.store(false);
-    if (mThreadRes.valid()) {
-        mThreadRes.wait_for(chrono::seconds(1));
+    if (mStopToken) {
+        lock_guard<mutex> stopLock(mStopToken->mRequestMutex);
+        mStopToken->mStopped.store(true);
     }
 
     LOG_INFO(sLogger, ("PrometheusInputRunner", "cancel all target subscribers"));
@@ -241,7 +284,6 @@ void PrometheusInputRunner::Stop() {
         LOG_INFO(sLogger, ("PrometheusInputRunner", "unregister"));
         std::future<void> res;
         LaunchAsync(res, "PrometheusUnregister", [this]() {
-            std::lock_guard<mutex> lock(mRegisterMutex);
             for (int retry = 0; retry < 3; ++retry) {
                 auto httpResponse = SendRegisterMessage(prometheus::UNREGISTER_COLLECTOR_PATH);
                 if (httpResponse.GetStatusCode() != 200) {
@@ -308,21 +350,42 @@ HttpResponse PrometheusInputRunner::SendOperatorRequest(const string& method,
                                                         const map<string, string>& headers,
                                                         const string& body,
                                                         uint32_t timeout,
-                                                        uint32_t maxTryCnt) const {
+                                                        uint32_t maxTryCnt,
+                                                        const shared_ptr<StopToken>& stop) const {
     HttpResponse httpResponse;
-    if (!mHttpRequestSender(make_unique<HttpRequest>(
-                                method, false, mServiceHost, mServicePort, url, query, headers, body, timeout, maxTryCnt),
-                            httpResponse)) {
+    auto request = make_unique<HttpRequest>(
+        method, false, mServiceHost, mServicePort, url, query, headers, body, timeout, maxTryCnt);
+    if (stop) {
+        lock_guard<mutex> lock(stop->mRequestMutex);
+        if (stop->mStopped.load()) {
+            return httpResponse;
+        }
+        // Admission precedes Stop; the admitted request may finish after unregister.
+    }
+    if (!mHttpRequestSender(std::move(request), httpResponse)) {
         LOG_ERROR(sLogger, ("curl error", "")("method", method)("url", url)("query", query));
     }
     return httpResponse;
 }
 
-HttpResponse PrometheusInputRunner::SendRegisterMessage(const string& url) const {
-    return SendOperatorRequest(HTTP_GET, url, "pod_name=" + mPodName, {}, "", 10);
+HttpResponse PrometheusInputRunner::SendRegisterMessage(const string& url,
+                                                        const shared_ptr<StopToken>& stop) const {
+    map<string, string> headers{{prometheus::PROMETHEUS_COLLECTOR_PROTOCOL_VERSION,
+                                prometheus::PROMETHEUS_COLLECTOR_PROTOCOL_VERSION_V1}};
+    return SendOperatorRequest(HTTP_GET,
+                               url,
+                               "pod_name=" + mPodName,
+                               headers,
+                               "",
+                               10,
+                               stop ? 1U : static_cast<uint32_t>(INT32_FLAG(default_http_request_max_try_cnt)),
+                               stop);
 }
 
-PrometheusInputRunner::HeartbeatResult PrometheusInputRunner::SendHeartbeat() {
+PrometheusInputRunner::HeartbeatResult PrometheusInputRunner::SendHeartbeat(const shared_ptr<StopToken>& stop) {
+    if (stop && stop->mStopped.load()) {
+        return HeartbeatResult::Failed;
+    }
     Json::Value body;
     body[prometheus::AGENT_INFO] = RefreshAgentInfoSnapshot().ToJson();
     map<string, string> headers{{prometheus::PROMETHEUS_COLLECTOR_PROTOCOL_VERSION,
@@ -335,7 +398,8 @@ PrometheusInputRunner::HeartbeatResult PrometheusInputRunner::SendHeartbeat() {
                                         headers,
                                         body.toStyledString(),
                                         3,
-                                        1);
+                                        1,
+                                        stop);
     if (response.GetNetworkStatus().mCode != NetworkCode::Ok) {
         return HeartbeatResult::Failed;
     }
