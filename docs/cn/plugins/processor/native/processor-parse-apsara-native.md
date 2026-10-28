@@ -4,9 +4,24 @@
 
 `processor_parse_apsara_native` 插件解析飞天格式日志行，提取时间并拆解基础字段（如 level、thread、file、line），并将剩余 `key:value` 形式字段写入事件。
 
+源代码：[ProcessorParseApsaraNative.cpp](https://github.com/alibaba/loongcollector/blob/main/core/plugin/processor/ProcessorParseApsaraNative.cpp)
+
+
+## 事件能力
+
+列含义见 [概览 · 事件能力列说明](../../overview.md#事件能力列说明)。
+
+| Log | Metric | Span |
+| --- | --- | --- |
+| ✓ | — | — |
+
 ## 版本
 
 [Stable](../../stability-level.md)
+
+## 版本说明
+
+* 推荐版本：LoongCollector v3.1.4 及以上
 
 ## 配置参数
 

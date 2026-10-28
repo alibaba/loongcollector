@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/test/config"
 	"github.com/alibaba/ilogtail/test/engine/setup"
 	"github.com/alibaba/ilogtail/test/engine/trigger"
@@ -84,7 +85,7 @@ func generate(ctx context.Context, mode, path string, count, interval int, custo
 	logger.Info(ctx, "Exec command", command)
 	go func() {
 		if _, err := setup.Env.ExecOnSource(ctx, command); err != nil {
-			logger.Error(ctx, "EXEC_ALARM", "ExecOnSource failed", err.Error())
+			logger.Error(ctx, selfmonitor.ExecAlarm, "ExecOnSource failed", err.Error())
 		}
 	}()
 	return ctx, nil
@@ -103,7 +104,7 @@ func generateBenchmark(ctx context.Context, mode, path string, rate, duration in
 	command := trigger.GetRunTriggerCommand("log", "file_benchmark", "mode", mode, "path", path, "rate", strconv.Itoa(rate), "duration", strconv.Itoa(duration), "custom", wrapperCustomArgs(string(jsonStr)))
 	go func() {
 		if _, err := setup.Env.ExecOnSource(ctx, command); err != nil {
-			logger.Error(ctx, "EXEC_ALARM", "ExecOnSource failed", err.Error())
+			logger.Error(ctx, selfmonitor.ExecAlarm, "ExecOnSource failed", err.Error())
 		}
 	}()
 	return ctx, nil

@@ -4,12 +4,21 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	app "k8s.io/api/apps/v1"
 	batch "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	networking "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
+
+// testLinkGenerator returns a LinkGenerator for unit tests (nil metaCacheMu; tests do not
+// concurrently mutate the shared cache map).
+func testLinkGenerator(metaCache map[string]MetaCache) *LinkGenerator {
+	return NewK8sMetaLinkGenerator(metaCache, nil)
+}
 
 func TestGetPodNodeLink(t *testing.T) {
 	podCache := newK8sMetaCache(make(chan struct{}), POD)
@@ -46,7 +55,7 @@ func TestGetPodNodeLink(t *testing.T) {
 		EventType: "add",
 		Object:    pod2,
 	})
-	linkGenerator := NewK8sMetaLinkGenerator(map[string]MetaCache{
+	linkGenerator := testLinkGenerator(map[string]MetaCache{
 		POD:  podCache,
 		NODE: nodeCache,
 	})
@@ -162,7 +171,7 @@ func TestGetPodDeploymentLink(t *testing.T) {
 		EventType: "add",
 		Object:    pod2,
 	})
-	linkGenerator := NewK8sMetaLinkGenerator(map[string]MetaCache{
+	linkGenerator := testLinkGenerator(map[string]MetaCache{
 		POD:        podCache,
 		REPLICASET: replicasetCache,
 		DEPLOYMENT: deploymentCache,
@@ -256,7 +265,7 @@ func TestGetReplicaSetDeploymentLink(t *testing.T) {
 			},
 		},
 	})
-	linkGenerator := NewK8sMetaLinkGenerator(map[string]MetaCache{
+	linkGenerator := testLinkGenerator(map[string]MetaCache{
 		REPLICASET: replicasetCache,
 		DEPLOYMENT: deploymentCache,
 	})
@@ -337,7 +346,7 @@ func TestGetPodReplicaSetLink(t *testing.T) {
 		EventType: "add",
 		Object:    pod2,
 	})
-	linkGenerator := NewK8sMetaLinkGenerator(map[string]MetaCache{
+	linkGenerator := testLinkGenerator(map[string]MetaCache{
 		POD:        podCache,
 		REPLICASET: replicasetCache,
 	})
@@ -404,7 +413,7 @@ func TestGetPodDaemonSetLink(t *testing.T) {
 		EventType: "add",
 		Object:    pod2,
 	})
-	linkGenerator := NewK8sMetaLinkGenerator(map[string]MetaCache{
+	linkGenerator := testLinkGenerator(map[string]MetaCache{
 		POD:       podCache,
 		DAEMONSET: daemonsetCache,
 	})
@@ -471,7 +480,7 @@ func TestGetPodStatefulSetLink(t *testing.T) {
 		EventType: "add",
 		Object:    pod2,
 	})
-	linkGenerator := NewK8sMetaLinkGenerator(map[string]MetaCache{
+	linkGenerator := testLinkGenerator(map[string]MetaCache{
 		POD:         podCache,
 		STATEFULSET: statefulsetCache,
 	})
@@ -538,7 +547,7 @@ func TestGetPodJobLink(t *testing.T) {
 		EventType: "add",
 		Object:    pod2,
 	})
-	linkGenerator := NewK8sMetaLinkGenerator(map[string]MetaCache{
+	linkGenerator := testLinkGenerator(map[string]MetaCache{
 		POD: podCache,
 		JOB: jobCache,
 	})
@@ -619,7 +628,7 @@ func TestGetJobCronJobLink(t *testing.T) {
 		EventType: "add",
 		Object:    job2,
 	})
-	linkGenerator := NewK8sMetaLinkGenerator(map[string]MetaCache{
+	linkGenerator := testLinkGenerator(map[string]MetaCache{
 		JOB:     jobCache,
 		CRONJOB: cronJobCache,
 	})
@@ -694,7 +703,7 @@ func TestGetPodPVCLink(t *testing.T) {
 		EventType: "add",
 		Object:    pod2,
 	})
-	linkGenerator := NewK8sMetaLinkGenerator(map[string]MetaCache{
+	linkGenerator := testLinkGenerator(map[string]MetaCache{
 		POD:                   podCache,
 		PERSISTENTVOLUMECLAIM: pvcCache,
 	})
@@ -773,7 +782,7 @@ func TestGetPodConfigMapLink(t *testing.T) {
 		EventType: "add",
 		Object:    pod2,
 	})
-	linkGenerator := NewK8sMetaLinkGenerator(map[string]MetaCache{
+	linkGenerator := testLinkGenerator(map[string]MetaCache{
 		POD:       podCache,
 		CONFIGMAP: configMapCache,
 	})
@@ -844,7 +853,7 @@ func TestGetPodServiceLink(t *testing.T) {
 		EventType: "add",
 		Object:    pod2,
 	})
-	linkGenerator := NewK8sMetaLinkGenerator(map[string]MetaCache{
+	linkGenerator := testLinkGenerator(map[string]MetaCache{
 		POD:     podCache,
 		SERVICE: serviceCache,
 	})
@@ -874,7 +883,7 @@ func TestGetPodContainerLink(t *testing.T) {
 		EventType: "add",
 		Object:    generateMockPod("2"),
 	})
-	linkGenerator := NewK8sMetaLinkGenerator(map[string]MetaCache{
+	linkGenerator := testLinkGenerator(map[string]MetaCache{
 		POD: podCache,
 	})
 	podList := []*K8sMetaEvent{
@@ -988,7 +997,7 @@ func TestGetIngressServiceLink(t *testing.T) {
 			},
 		},
 	})
-	linkGenerator := NewK8sMetaLinkGenerator(map[string]MetaCache{
+	linkGenerator := testLinkGenerator(map[string]MetaCache{
 		INGRESS: ingressCache,
 		SERVICE: serviceCache,
 	})
@@ -1037,7 +1046,7 @@ func TestGetPodNamespaceLink(t *testing.T) {
 		EventType: "add",
 		Object:    pod3,
 	})
-	linkGenerator := NewK8sMetaLinkGenerator(map[string]MetaCache{
+	linkGenerator := testLinkGenerator(map[string]MetaCache{
 		POD:       podCache,
 		NAMESPACE: namespaceCache,
 	})
@@ -1122,7 +1131,7 @@ func TestGetServiceNamespaceLink(t *testing.T) {
 			Object:    service2,
 		},
 	}
-	linkGenerator := NewK8sMetaLinkGenerator(map[string]MetaCache{
+	linkGenerator := testLinkGenerator(map[string]MetaCache{
 		SERVICE:   serviceCache,
 		NAMESPACE: namespaceCache,
 	})
@@ -1183,7 +1192,7 @@ func TestGetDeploymentNamespaceLink(t *testing.T) {
 			Object:    deployment2,
 		},
 	}
-	linkGenerator := NewK8sMetaLinkGenerator(map[string]MetaCache{
+	linkGenerator := testLinkGenerator(map[string]MetaCache{
 		DEPLOYMENT: deploymentCache,
 		NAMESPACE:  namespaceCache,
 	})
@@ -1244,7 +1253,7 @@ func TestGetDaemonSetNamespaceLink(t *testing.T) {
 			Object:    daemonset2,
 		},
 	}
-	linkGenerator := NewK8sMetaLinkGenerator(map[string]MetaCache{
+	linkGenerator := testLinkGenerator(map[string]MetaCache{
 		DAEMONSET: daemonSetCache,
 		NAMESPACE: namespaceCache,
 	})
@@ -1304,7 +1313,7 @@ func TestGetStatefulSetNamespaceLink(t *testing.T) {
 			Object:    statefulSet2,
 		},
 	}
-	linkGenerator := NewK8sMetaLinkGenerator(map[string]MetaCache{
+	linkGenerator := testLinkGenerator(map[string]MetaCache{
 		DAEMONSET: statefulSetCache,
 		NAMESPACE: namespaceCache,
 	})
@@ -1364,7 +1373,7 @@ func TestGetConfigMapNamespaceLink(t *testing.T) {
 			Object:    configmap2,
 		},
 	}
-	linkGenerator := NewK8sMetaLinkGenerator(map[string]MetaCache{
+	linkGenerator := testLinkGenerator(map[string]MetaCache{
 		CONFIGMAP: configmapCache,
 		NAMESPACE: namespaceCache,
 	})
@@ -1424,7 +1433,7 @@ func TestGetJobNamespaceLink(t *testing.T) {
 			Object:    job2,
 		},
 	}
-	linkGenerator := NewK8sMetaLinkGenerator(map[string]MetaCache{
+	linkGenerator := testLinkGenerator(map[string]MetaCache{
 		JOB:       jobCache,
 		NAMESPACE: namespaceCache,
 	})
@@ -1484,7 +1493,7 @@ func TestGetCronJobNamespaceLink(t *testing.T) {
 			Object:    cronjob2,
 		},
 	}
-	linkGenerator := NewK8sMetaLinkGenerator(map[string]MetaCache{
+	linkGenerator := testLinkGenerator(map[string]MetaCache{
 		CRONJOB:   cronjobCache,
 		NAMESPACE: namespaceCache,
 	})
@@ -1544,7 +1553,7 @@ func TestGetPVCNamespaceLink(t *testing.T) {
 			Object:    pvc2,
 		},
 	}
-	linkGenerator := NewK8sMetaLinkGenerator(map[string]MetaCache{
+	linkGenerator := testLinkGenerator(map[string]MetaCache{
 		PERSISTENTVOLUMECLAIM: pvcCache,
 		NAMESPACE:             namespaceCache,
 	})
@@ -1604,7 +1613,7 @@ func TestGetIngressNamespaceLink(t *testing.T) {
 			Object:    ingress2,
 		},
 	}
-	linkGenerator := NewK8sMetaLinkGenerator(map[string]MetaCache{
+	linkGenerator := testLinkGenerator(map[string]MetaCache{
 		INGRESS:   ingressCache,
 		NAMESPACE: namespaceCache,
 	})
@@ -1646,4 +1655,196 @@ func generateMockPod(index string) *ObjectWrapper {
 			},
 		},
 	}
+}
+
+func testArgoWorkflowCR(name string) *unstructured.Unstructured {
+	u := &unstructured.Unstructured{}
+	u.SetAPIVersion("argoproj.io/v1alpha1")
+	u.SetKind("Workflow")
+	u.SetNamespace("default")
+	u.SetName(name)
+	return u
+}
+
+func testPodCRLinkRuntime() *podCRLinkRuntime {
+	const entityType = "argo.workflow"
+	return &podCRLinkRuntime{
+		entityType:          entityType,
+		ownerKind:           "Workflow",
+		ownerAPIGroupSubstr: "argoproj.io",
+		podLabelKey:         "workflows.argoproj.io/workflow",
+	}
+}
+
+// TestGetPodCustomResourceLinkViaOwnerReference covers Pod→CR resolution when the Pod has a matching Workflow ownerReference.
+func TestGetPodCustomResourceLinkViaOwnerReference(t *testing.T) {
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	entityType := "argo.workflow"
+	linkType := PodLinkTypeForEntity(entityType)
+
+	podCache := newK8sMetaCache(stopCh, POD)
+	crCache := newCRUnifiedCache(stopCh, entityType, schema.GroupVersionResource{Group: "argoproj.io", Version: "v1alpha1", Resource: "workflows"})
+	crCache.metaStore.handleAddOrUpdateEvent(&K8sMetaEvent{
+		EventType: EventTypeAdd,
+		Object: &ObjectWrapper{
+			ResourceType: entityType,
+			Raw:          testArgoWorkflowCR("my-wf"),
+		},
+	})
+
+	podW := generateMockPod("1")
+	podW.ResourceType = POD
+	podW.Raw.(*corev1.Pod).OwnerReferences = []metav1.OwnerReference{{
+		APIVersion: "argoproj.io/v1alpha1",
+		Kind:       "Workflow",
+		Name:       "my-wf",
+		UID:        "uid-wf",
+	}}
+	podCache.metaStore.handleAddOrUpdateEvent(&K8sMetaEvent{EventType: EventTypeAdd, Object: podW})
+
+	lg := testLinkGenerator(map[string]MetaCache{
+		POD:        podCache,
+		entityType: crCache,
+	})
+	lg.registerPodCRLink(linkType, testPodCRLinkRuntime())
+
+	podList := []*K8sMetaEvent{{EventType: EventTypeUpdate, Object: podCache.metaStore.Items["default/pod1"]}}
+	results := lg.GenerateLinks(podList, linkType)
+	require.Len(t, results, 1)
+	pcr, ok := results[0].Object.Raw.(*PodCustomResource)
+	require.True(t, ok)
+	assert.Equal(t, "my-wf", pcr.CR.GetName())
+	assert.Equal(t, "pod1", pcr.Pod.Name)
+	assert.Equal(t, linkType, results[0].Object.ResourceType)
+}
+
+// TestGetPodCustomResourceLinkViaLabelFallback covers Pod→CR when ownerReferences do not match but PodLabelKey is set.
+func TestGetPodCustomResourceLinkViaLabelFallback(t *testing.T) {
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	entityType := "argo.workflow"
+	linkType := PodLinkTypeForEntity(entityType)
+
+	podCache := newK8sMetaCache(stopCh, POD)
+	crCache := newCRUnifiedCache(stopCh, entityType, schema.GroupVersionResource{Group: "argoproj.io", Version: "v1alpha1", Resource: "workflows"})
+	crCache.metaStore.handleAddOrUpdateEvent(&K8sMetaEvent{
+		EventType: EventTypeAdd,
+		Object: &ObjectWrapper{
+			ResourceType: entityType,
+			Raw:          testArgoWorkflowCR("wf-from-label"),
+		},
+	})
+
+	podW := generateMockPod("2")
+	podW.ResourceType = POD
+	pod := podW.Raw.(*corev1.Pod)
+	pod.OwnerReferences = []metav1.OwnerReference{{
+		APIVersion: "apps/v1",
+		Kind:       "ReplicaSet",
+		Name:       "some-rs",
+	}}
+	pod.Labels = map[string]string{"workflows.argoproj.io/workflow": "wf-from-label"}
+	podCache.metaStore.handleAddOrUpdateEvent(&K8sMetaEvent{EventType: EventTypeAdd, Object: podW})
+
+	lg := testLinkGenerator(map[string]MetaCache{
+		POD:        podCache,
+		entityType: crCache,
+	})
+	lg.registerPodCRLink(linkType, testPodCRLinkRuntime())
+
+	podList := []*K8sMetaEvent{{EventType: EventTypeUpdate, Object: podCache.metaStore.Items["default/pod2"]}}
+	results := lg.GenerateLinks(podList, linkType)
+	require.Len(t, results, 1)
+	pcr := results[0].Object.Raw.(*PodCustomResource)
+	assert.Equal(t, "wf-from-label", pcr.CR.GetName())
+}
+
+// TestGetCustomResourceNamespaceLink covers Namespace→namespaced CR links using the namespace cache.
+func TestGetCustomResourceNamespaceLink(t *testing.T) {
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	entityType := "argo.workflow"
+	linkType := NamespaceLinkTypeForEntity(entityType)
+
+	nsCache := newK8sMetaCache(stopCh, NAMESPACE)
+	nsCache.metaStore.handleAddOrUpdateEvent(&K8sMetaEvent{
+		EventType: EventTypeAdd,
+		Object:    generateMockNamespace("default"),
+	})
+
+	wf := testArgoWorkflowCR("ns-linked-wf")
+	events := []*K8sMetaEvent{{
+		EventType: EventTypeAdd,
+		Object: &ObjectWrapper{
+			ResourceType: entityType,
+			Raw:          wf,
+		},
+	}}
+
+	lg := testLinkGenerator(map[string]MetaCache{NAMESPACE: nsCache})
+	results := lg.GenerateLinks(events, linkType)
+	require.Len(t, results, 1)
+	ncr, ok := results[0].Object.Raw.(*NamespaceCustomResource)
+	require.True(t, ok)
+	assert.Equal(t, "default", ncr.Namespace.Name)
+	assert.Equal(t, "ns-linked-wf", ncr.CR.GetName())
+	assert.Equal(t, linkType, results[0].Object.ResourceType)
+}
+
+// TestGetPodCustomResourceLinkMissingCRCache verifies GenerateLinks returns nil when the CR MetaCache entry is absent.
+func TestGetPodCustomResourceLinkMissingCRCache(t *testing.T) {
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	entityType := "argo.workflow"
+	linkType := PodLinkTypeForEntity(entityType)
+
+	podCache := newK8sMetaCache(stopCh, POD)
+	podW := generateMockPod("3")
+	podW.ResourceType = POD
+	podW.Raw.(*corev1.Pod).OwnerReferences = []metav1.OwnerReference{{
+		APIVersion: "argoproj.io/v1alpha1",
+		Kind:       "Workflow",
+		Name:       "ghost",
+	}}
+	podCache.metaStore.handleAddOrUpdateEvent(&K8sMetaEvent{EventType: EventTypeAdd, Object: podW})
+
+	// Intentionally omit entityType from metaCache (no CR cache registered).
+	lg := testLinkGenerator(map[string]MetaCache{POD: podCache})
+	lg.registerPodCRLink(linkType, testPodCRLinkRuntime())
+
+	podList := []*K8sMetaEvent{{EventType: EventTypeUpdate, Object: podCache.metaStore.Items["default/pod3"]}}
+	results := lg.GenerateLinks(podList, linkType)
+	assert.Nil(t, results)
+}
+
+// TestGetPodCustomResourceLinkCRCacheHitMiss verifies no links when the CR is not present in cache (cache exists, Get empty).
+func TestGetPodCustomResourceLinkCRCacheHitMiss(t *testing.T) {
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	entityType := "argo.workflow"
+	linkType := PodLinkTypeForEntity(entityType)
+
+	podCache := newK8sMetaCache(stopCh, POD)
+	crCache := newCRUnifiedCache(stopCh, entityType, schema.GroupVersionResource{Group: "argoproj.io", Version: "v1alpha1", Resource: "workflows"})
+	// CR cache empty: Pod points to a workflow name not in cache.
+
+	podW := generateMockPod("4")
+	podW.ResourceType = POD
+	podW.Raw.(*corev1.Pod).OwnerReferences = []metav1.OwnerReference{{
+		APIVersion: "argoproj.io/v1alpha1",
+		Kind:       "Workflow",
+		Name:       "not-in-cache",
+	}}
+	podCache.metaStore.handleAddOrUpdateEvent(&K8sMetaEvent{EventType: EventTypeAdd, Object: podW})
+
+	lg := testLinkGenerator(map[string]MetaCache{
+		POD:        podCache,
+		entityType: crCache,
+	})
+	lg.registerPodCRLink(linkType, testPodCRLinkRuntime())
+
+	podList := []*K8sMetaEvent{{EventType: EventTypeUpdate, Object: podCache.metaStore.Items["default/pod4"]}}
+	results := lg.GenerateLinks(podList, linkType)
+	assert.Empty(t, results)
 }

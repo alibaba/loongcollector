@@ -27,6 +27,8 @@ import (
 	"github.com/alibaba/ilogtail/pkg/protocol/decoder/common"
 
 	dogstatsd "github.com/narqo/go-dogstatsd-parser"
+
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
 type Decoder struct {
@@ -52,7 +54,7 @@ func (d *Decoder) Decode(data []byte, req *http.Request, tags map[string]string)
 		if err != nil {
 			logger.Debug(context.Background(), "parse statsd error", err)
 			if time.Since(d.Time).Seconds() > 10 {
-				logger.Warning(context.Background(), "STATSD_PARSE_ALARM", "parse err", err)
+				logger.Warning(context.Background(), selfmonitor.StatsdParseAlarm, "parse err", err)
 				d.Time = time.Now()
 			}
 			continue

@@ -260,7 +260,7 @@ int NetworkSecurityManager::Init() {
 int NetworkSecurityManager::AddOrUpdateConfig(const CollectionPipelineContext* ctx,
                                               uint32_t index,
                                               const PluginMetricManagerPtr& metricMgr,
-                                              const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) {
+                                              const PluginOptions& options) {
     if (!ctx) {
         LOG_ERROR(sLogger, ("ctx is null", ""));
         return -1;
@@ -291,7 +291,7 @@ int NetworkSecurityManager::AddOrUpdateConfig(const CollectionPipelineContext* c
         return 0;
     }
     const auto* securityOpts = std::get_if<SecurityOptions*>(&options);
-    if (!securityOpts) {
+    if (!securityOpts || !*securityOpts) {
         LOG_ERROR(sLogger, ("Invalid options type for NetworkSecurityManager", ""));
         return -1;
     }
@@ -299,11 +299,7 @@ int NetworkSecurityManager::AddOrUpdateConfig(const CollectionPipelineContext* c
     std::unique_ptr<PluginConfig> pc = std::make_unique<PluginConfig>();
     pc->mPluginType = PluginType::NETWORK_SECURITY;
     NetworkSecurityConfig config;
-    SecurityOptions* opts = std::get<SecurityOptions*>(options);
-    if (!opts) {
-        LOG_ERROR(sLogger, ("SecurityOptions is null", ""));
-        return -1;
-    }
+    SecurityOptions* opts = *securityOpts;
     config.mOptions = opts->mOptionList;
     config.mPerfBufferSpec
         = {{"sock_secure_output",

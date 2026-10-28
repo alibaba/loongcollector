@@ -17,6 +17,7 @@
 #include <coolbpf/security/type.h>
 
 #include <memory>
+#include <variant>
 
 #include "common/queue/blockingconcurrentqueue.h"
 #include "ebpf/Config.h"
@@ -77,19 +78,21 @@ public:
     int AddOrUpdateConfig(const CollectionPipelineContext*,
                           uint32_t,
                           const PluginMetricManagerPtr&,
-                          const std::variant<SecurityOptions*, ObserverNetworkOption*>&) override;
+                          const PluginOptions&) override;
 
     int RemoveConfig(const std::string&) override;
 
     PluginType GetPluginType() override { return PluginType::FILE_SECURITY; }
 
-    std::unique_ptr<PluginConfig>
-    GeneratePluginConfig(const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) override {
+    std::unique_ptr<PluginConfig> GeneratePluginConfig(const PluginOptions& options) override {
         std::unique_ptr<PluginConfig> pc = std::make_unique<PluginConfig>();
         pc->mPluginType = PluginType::FILE_SECURITY;
         FileSecurityConfig config;
-        SecurityOptions* opts = std::get<SecurityOptions*>(options);
-        config.mOptions = opts->mOptionList;
+        const auto* opts = std::get_if<SecurityOptions*>(&options);
+        if (!opts || !*opts) {
+            return pc;
+        }
+        config.mOptions = (*opts)->mOptionList;
         pc->mConfig = std::move(config);
         return pc;
     }

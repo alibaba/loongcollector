@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/test/engine/setup"
 	"github.com/alibaba/ilogtail/test/engine/trigger"
 )
@@ -56,7 +57,7 @@ func ExecveCommandsParallel(ctx context.Context, commandCnt int, command string)
 		go func() {
 			_, err := setup.Env.ExecOnSource(ctx, command)
 			if err != nil {
-				logger.Error(ctx, "ASYNC_EXEC_FAILED", "error", err, "message", "Error executing command asynchronously")
+				logger.Error(ctx, selfmonitor.AsyncExecFailed, "error", err, "message", "Error executing command asynchronously")
 				errChan <- fmt.Errorf("async exec failed: %w", err)
 				return
 			}
@@ -132,7 +133,7 @@ func ExecuteShellScriptParallel(ctx context.Context, commandCnt int, tempFileNam
 		go func() {
 			result, err := setup.Env.ExecOnSource(ctx, command)
 			if err != nil {
-				logger.Error(ctx, "ASYNC_EXEC_FAILED", "error", err, "message", "Error executing command asynchronously")
+				logger.Error(ctx, selfmonitor.AsyncExecFailed, "error", err, "message", "Error executing command asynchronously")
 				errChan <- fmt.Errorf("async exec failed: %w", err)
 				return
 			}

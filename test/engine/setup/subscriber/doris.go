@@ -29,10 +29,11 @@ import (
 	"github.com/alibaba/ilogtail/pkg/doc"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
 const dorisName = "doris"
-const dorisQuerySQL = "select time, content, value from `%s`.`%s` where time > %v order by time limit 100"
+const dorisQuerySQL = "select time, `__name__`, `__value__`, `__labels__` from `%s`.`%s` where time > %v order by time limit 100"
 
 type DorisSubscriber struct {
 	Address     string `mapstructure:"address" comment:"the doris FE address (format: http://host:port)"`
@@ -79,8 +80,7 @@ func (d *DorisSubscriber) GetData(sqlStr string, startTime int32) ([]*protocol.L
 
 		db, err := sql.Open("mysql", dsn)
 		if err != nil {
-			logger.Warningf(context.Background(), "DORIS_SUBSCRIBER_ALARM",
-				"failed to open doris connection, host %s, err: %s", host, err)
+			logger.Warningf(context.Background(), selfmonitor.DorisSubscriberAlarm, "failed to open doris connection, host %s, err: %s", host, err)
 			return nil, err
 		}
 
@@ -88,8 +88,7 @@ func (d *DorisSubscriber) GetData(sqlStr string, startTime int32) ([]*protocol.L
 		defer cancel()
 
 		if err = db.PingContext(ctx); err != nil {
-			logger.Warningf(context.Background(), "DORIS_SUBSCRIBER_ALARM",
-				"failed to ping doris, host %s, err: %s", host, err)
+			logger.Warningf(context.Background(), selfmonitor.DorisSubscriberAlarm, "failed to ping doris, host %s, err: %s", host, err)
 			_ = db.Close()
 			return nil, err
 		}
@@ -100,7 +99,7 @@ func (d *DorisSubscriber) GetData(sqlStr string, startTime int32) ([]*protocol.L
 
 	logGroup, err := d.queryRecords()
 	if err != nil {
-		logger.Warning(context.Background(), "DORIS_SUBSCRIBER_ALARM", "err", err)
+		logger.Warning(context.Background(), selfmonitor.DorisSubscriberAlarm, "err", err)
 		return nil, err
 	}
 	return []*protocol.LogGroup{logGroup}, nil
@@ -130,8 +129,7 @@ func (d *DorisSubscriber) queryRecords() (logGroup *protocol.LogGroup, err error
 
 	rows, err := d.client.QueryContext(ctx, query)
 	if err != nil {
-		logger.Warningf(context.Background(), "DORIS_SUBSCRIBER_ALARM",
-			"failed to query doris, query: %s, err: %s", query, err)
+		logger.Warningf(context.Background(), selfmonitor.DorisSubscriberAlarm, "failed to query doris, query: %s, err: %s", query, err)
 		return
 	}
 	defer rows.Close()
@@ -139,12 +137,12 @@ func (d *DorisSubscriber) queryRecords() (logGroup *protocol.LogGroup, err error
 	for rows.Next() {
 		var (
 			timestamp int64
-			content   sql.NullString
+			name      sql.NullString
 			value     sql.NullString
+			labels    sql.NullString
 		)
-		if err = rows.Scan(&timestamp, &content, &value); err != nil {
-			logger.Warningf(context.Background(), "DORIS_SUBSCRIBER_ALARM",
-				"failed to scan row, err: %s", err)
+		if err = rows.Scan(&timestamp, &name, &value, &labels); err != nil {
+			logger.Warningf(context.Background(), selfmonitor.DorisSubscriberAlarm, "failed to scan row, err: %s", err)
 			return
 		}
 
@@ -152,19 +150,24 @@ func (d *DorisSubscriber) queryRecords() (logGroup *protocol.LogGroup, err error
 			Time: uint32(timestamp),
 		}
 
-		// Add content field
-		if content.Valid {
+		// v2 Metric events are flushed structurally as canonical metric-log
+		// fields (__name__/__labels__/__value__), never a pass-through blob.
+		if name.Valid {
 			log.Contents = append(log.Contents, &protocol.Log_Content{
-				Key:   "content",
-				Value: content.String,
+				Key:   "__name__",
+				Value: name.String,
 			})
 		}
-
-		// Add value field
 		if value.Valid {
 			log.Contents = append(log.Contents, &protocol.Log_Content{
-				Key:   "value",
+				Key:   "__value__",
 				Value: value.String,
+			})
+		}
+		if labels.Valid {
+			log.Contents = append(log.Contents, &protocol.Log_Content{
+				Key:   "__labels__",
+				Value: labels.String,
 			})
 		}
 
@@ -177,8 +180,7 @@ func (d *DorisSubscriber) queryRecords() (logGroup *protocol.LogGroup, err error
 	}
 
 	if err = rows.Err(); err != nil {
-		logger.Warningf(context.Background(), "DORIS_SUBSCRIBER_ALARM",
-			"rows iteration error: %s", err)
+		logger.Warningf(context.Background(), selfmonitor.DorisSubscriberAlarm, "rows iteration error: %s", err)
 		return
 	}
 

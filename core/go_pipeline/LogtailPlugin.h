@@ -94,6 +94,21 @@ typedef struct {
     int count;
 } InnerPluginMetrics;
 
+typedef struct {
+    char* alarmType;
+    char* alarmLevel;
+    char* alarmMessage;
+    char* projectName;
+    char* category;
+    char* config;
+    int count;
+} InnerGoAlarm;
+
+typedef struct {
+    InnerGoAlarm** alarms;
+    int count;
+} InnerGoAlarms;
+
 struct K8sContainerMeta {
     std::string PodName;
     std::string K8sNamespace;
@@ -141,12 +156,12 @@ typedef void (*StopBuiltInModulesFun)();
 typedef void (*StartFun)(GoString);
 typedef GoInt (*InitPluginBaseFun)();
 typedef GoInt (*InitPluginBaseV2Fun)(GoString cfg);
-typedef GoInt (*ProcessLogsFun)(GoString c, GoSlice l, GoString p, GoString t, GoSlice tags);
-typedef GoInt (*ProcessLogGroupFun)(GoString c, GoSlice l, GoString p);
+typedef GoInt (*ProcessPipelineEventGroupFun)(GoString c, GoSlice l, GoString p);
 typedef struct innerContainerMeta* (*GetContainerMetaFun)(GoString containerID);
 typedef char* (*GetAllContainerMetaFun)();
 typedef char* (*GetDiffContainerMetaFun)();
 typedef InnerPluginMetrics* (*GetGoMetricsFun)(GoString metricType);
+typedef InnerGoAlarms* (*GetGoAlarmsFun)();
 
 // Methods export by adapter.
 typedef int (*IsValidToSendFun)(long long logstoreKey);
@@ -167,10 +182,20 @@ typedef int (*SendPbV2Fun)(const char* configName,
                            int lines,
                            const char* shardHash,
                            int shardHashSize);
+typedef int (*SendPipelineEventGroupFun)(const char* configName,
+                                         int configNameSize,
+                                         const char* logstore,
+                                         int logstoreSize,
+                                         char* pbBuffer,
+                                         int pbSize,
+                                         int eventCount,
+                                         const char* shardHash,
+                                         int shardHashSize);
 
 
 typedef void (*RegisterLogtailCallBack)(IsValidToSendFun checkFun, SendPbFun sendFun);
 typedef void (*RegisterLogtailCallBackV2)(IsValidToSendFun checkFun, SendPbFun sendFun, SendPbV2Fun sendV2Fun);
+typedef void (*RegisterSendPipelineEventGroupFun)(SendPipelineEventGroupFun sendFun);
 
 typedef int (*PluginAdapterVersion)();
 }
@@ -210,13 +235,9 @@ public:
 
     bool IsPluginOpened() { return mPluginValid; }
 
-    void ProcessLog(const std::string& configName,
-                    sls_logs::Log& log,
-                    const std::string& packId,
-                    const std::string& topic,
-                    const std::string& tags);
-
-    void ProcessLogGroup(const std::string& configName, const std::string& logGroup, const std::string& packId);
+    void ProcessPipelineEventGroup(const std::string& configName,
+                                   const std::string& pipelineEventGroup,
+                                   const std::string& packId);
 
     static int IsValidToSend(long long logstoreKey);
 
@@ -240,6 +261,20 @@ public:
                         const char* shardHash,
                         int shardHashSize);
 
+    // SendPipelineEventGroup is the PipelineEventGroup-PB counterpart of SendPbV2.
+    // It coexists with SendPb/SendPbV2 (C1); C3 will honor logstore/shardHash on a
+    // dedicated FlusherSLS byte path. Return codes match SendPbV2: 0 ok, -1 send
+    // or parse failure, -2 config not found.
+    static int SendPipelineEventGroup(const char* configName,
+                                      int32_t configNameSize,
+                                      const char* logstore,
+                                      int logstoreSize,
+                                      char* pbBuffer,
+                                      int32_t pbSize,
+                                      int32_t eventCount,
+                                      const char* shardHash,
+                                      int shardHashSize);
+
     K8sContainerMeta GetContainerMeta(logtail::StringView containerID);
     K8sContainerMeta GetContainerMeta(const std::string& containerID);
 
@@ -247,6 +282,7 @@ public:
     std::string GetDiffContainersMeta();
 
     void GetGoMetrics(std::vector<std::map<std::string, std::string>>& metircsList, const std::string& metricType);
+    void GetGoAlarms();
 
 private:
     void* mPluginBasePtr;
@@ -260,14 +296,13 @@ private:
     StopBuiltInModulesFun mStopBuiltInModulesFun;
     StartFun mStartFun;
     volatile bool mPluginValid;
-    logtail::FlusherSLS mPluginAlarmConfig;
     logtail::FlusherSLS mPluginContainerConfig;
-    ProcessLogsFun mProcessLogsFun;
-    ProcessLogGroupFun mProcessLogGroupFun;
+    ProcessPipelineEventGroupFun mProcessPipelineEventGroupFun;
     GetContainerMetaFun mGetContainerMetaFun;
     GetAllContainerMetaFun mGetAllContainerMetaFun;
     GetDiffContainerMetaFun mGetDiffContainerMetaFun;
     GetGoMetricsFun mGetGoMetricsFun;
+    GetGoAlarmsFun mGetGoAlarmsFun;
 
     // Configuration for plugin system in JSON format.
     Json::Value mPluginCfg;

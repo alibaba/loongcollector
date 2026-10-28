@@ -14,12 +14,12 @@
 go mod init my-repo.com/my_space/my_plugins
 ```
 
-### 2. 引入插件API package
+### 2. 引入插件 API（Go module）
 
-在仓库根目录执行如下目录，引入
+在仓库根目录执行（版本请与主仓库 [`go.mod`](https://github.com/alibaba/loongcollector/blob/main/go.mod) 对齐；当前 module 为 **`github.com/alibaba/ilogtail`**）：
 
 ```shell
-go get github.com/alibaba/loongcollector/pkg
+go get github.com/alibaba/ilogtail@latest
 ```
 
 ### 3. 创建插件目录
@@ -30,7 +30,7 @@ mkdir example_plugin
 
 ### 4. 编写插件代码
 
-我们的插件实现 `ServiceInputV1`、`ServiceInputV2` 这两个接口
+建议明确实现 **`ServiceInputV2`**（`StartService`）；若仍需兼容旧路径，可同时实现 **`ServiceInputV1`**（`Start(Collector)`）。下面示例演示在同一结构体上提供两种启动方式。
 
 ```shell
 cd example_plugin
@@ -43,9 +43,9 @@ package example_plugin
 import (
  "time"
 
- "github.com/alibaba/loongcollector/pkg/models"
- "github.com/alibaba/loongcollector/pkg/pipeline"
- "github.com/alibaba/loongcollector/pkg/protocol"
+ "github.com/alibaba/ilogtail/pkg/models"
+ "github.com/alibaba/ilogtail/pkg/pipeline"
+ "github.com/alibaba/ilogtail/pkg/protocol"
 )
 
 type MyServiceInput struct {
@@ -58,6 +58,7 @@ type MyServiceInput struct {
 
 func (m *MyServiceInput) StartService(context pipeline.PipelineContext) error {
  m.collectorV2 = context.Collector()
+ go m.loop()
  return nil
 }
 
@@ -70,6 +71,9 @@ func (m *MyServiceInput) Description() string {
 }
 
 func (m *MyServiceInput) Stop() error {
+ if m.stopCh != nil {
+  close(m.stopCh) // 生产代码应通过 sync.Once 等保证只关闭一次
+ }
  return nil
 }
 
@@ -162,17 +166,16 @@ plugins:
   common:
     - gomod: my-repo.com/my_space/my_plugins latest
       import: my-repo.com/my_space/my_plugins/example_plugin
-
 ```
 
-若希望导入私有仓库中的所有插件（即引用到all.go文件中的插件），可以写入如下内容：
+若希望导入私有仓库中 **`all.go` 一次性导入的全部插件**，可将 `import` 设为模块根路径（与子包路径相对）：
 
 ```yaml
 plugins:
   common:
     - gomod: my-repo.com/my_space/my_plugins latest
-      import: my-repo.com/my_space/my_plugins  // 相比上述文件，少了example_plugin部分
-
+      # 与上例相比，import 为模块根包，对应 all.go 中的空白 import
+      import: my-repo.com/my_space/my_plugins
 ```
 
 之后可以执行构建：

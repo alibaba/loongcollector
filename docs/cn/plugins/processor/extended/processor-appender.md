@@ -4,6 +4,16 @@
 
 `processor_appender`插件可为指定字段（可以不存在）追加特定的值，且支持模板参数。
 
+## 事件能力
+
+列含义见 [概览 · 事件能力列说明](../../overview.md#事件能力列说明)。
+
+| v1 接口 | v2 接口 | Log | Metric | Span |
+| --- | --- | --- | --- | --- |
+| ✓ | ✓ | v1&v2 | 透传 | 透传 |
+
+> v2 场景下对每条 Log 事件追加字段（输入 Log 输出 Log），Metric/Span 事件显式透传（不处理但不丢弃）。
+
 ## 版本
 
 [Stable](../../stability-level.md)
@@ -26,7 +36,7 @@
 | 模板           | 说明                              | 替换示例                                            |
 | -------------- | --------------------------------- | --------------------------------------------------- |
 | `{{__ip__}}`   | 替换为 LoongCollector 的 IP 地址         | 10.112.31.40                                        |
-| `{{__host__}}` | 替换为 LoongCollector 的主机名           | logtail-ds-xdfaf                                    |
+| `{{__host__}}` | 替换为 LoongCollector 的主机名           | loongcollector-ds-xdfaf                                    |
 | `{{$xxxx}}`    | 以`$`开头则会替换为环境变量的取值 | 例如存在环境变量 `key=value`，则`{{$key}}` 为 value |
 
 ## 示例
@@ -35,8 +45,8 @@
 
 * 输入
 
-```text
-"__labels__":"a#$#b"
+```json
+{"__labels__": "a#$#b"}
 ```
 
 * 配置详情
@@ -50,6 +60,6 @@ processors:
 
 * 配置后结果
 
-```text
-"__labels__":"a#$#b|host#$#david|ip#$#30.40.60.150"
+```json
+{"__labels__": "a#$#b|host#$#david|ip#$#30.40.60.150"}
 ```

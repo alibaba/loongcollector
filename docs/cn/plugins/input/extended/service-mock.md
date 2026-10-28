@@ -4,6 +4,15 @@
 
 `service_mock` 插件是用于模拟采集Service类型输入数据的插件，可以通过调整参数获取不同的模拟输入。[源代码](https://github.com/alibaba/loongcollector/blob/main/plugins/input/mockd/input_mockd.go)
 
+
+## 事件能力
+
+列含义见 [概览 · 事件能力列说明](../../overview.md#事件能力列说明)。
+
+| Log | Metric | Span |
+| --- | --- | --- |
+| ✓ | — | — |
+
 ## 版本
 
 [Stable](../../stability-level.md)
@@ -50,27 +59,29 @@ flushers:
 
 ```json
 {
-    "tag1":"tag1",
-    "tag2":"tag2",
-    "field1":"field1",
-    "field2":"field2",
-    "Index":"101",
-    "__time__":"1658814793"
+    "tag1": "tag1",
+    "tag2": "tag2",
+    "field1": "field1",
+    "field2": "field2",
+    "Index": "101",
+    "__time__": "1658814793"
 }
+
 {
-    "tag1":"tag1",
-    "tag2":"tag2",
-    "field1":"field1",
-    "field2":"field2",
-    "Index":"102",
-    "__time__":"1658814793"
+    "tag1": "tag1",
+    "tag2": "tag2",
+    "field1": "field1",
+    "field2": "field2",
+    "Index": "102",
+    "__time__": "1658814793"
 }
+
 {
-    "tag1":"tag1",
-    "tag2":"tag2",
-    "field1":"field1",
-    "field2":"field2",
-    "Index":"103",
-    "__time__":"1658814794"
+    "tag1": "tag1",
+    "tag2": "tag2",
+    "field1": "field1",
+    "field2": "field2",
+    "Index": "103",
+    "__time__": "1658814794"
 }
 ```

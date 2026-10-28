@@ -4,6 +4,14 @@
 
 `input_static_file_onetime`插件是LoongCollector的OneTime类型输入插件，专门用于一次性文件采集任务。与常规的`input_file`插件不同，该插件执行一次后即完成采集任务，不会持续监控文件变化，适用于历史文件采集、数据迁移、批量数据处理等场景。
 
+## 事件能力
+
+列含义见 [概览 · 事件能力列说明](../../overview.md#事件能力列说明)。
+
+| Log | Metric | Span |
+| --- | --- | --- |
+| ✓ | — | — |
+
 ## 版本
 
 [Beta](../../stability-level.md)

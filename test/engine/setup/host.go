@@ -23,6 +23,7 @@ import (
 	"golang.org/x/crypto/ssh"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/test/config"
 )
 
@@ -62,7 +63,7 @@ func (h *HostEnv) exec(command string) (string, error) {
 func (h *HostEnv) initSSHClient() {
 	client, err := h.initSSHClientByPrivateKey()
 	if err != nil {
-		logger.Warningf(context.TODO(), "SSHExec", "using private key to create ssh client failed, will fallback to password: %v", err)
+		logger.Warningf(context.TODO(), selfmonitor.PluginRuntimeAlarm, "using private key to create ssh client failed, will fallback to password: %v", err)
 	} else {
 		h.sshClient = client
 		return
@@ -70,7 +71,7 @@ func (h *HostEnv) initSSHClient() {
 
 	client, err = h.initSSHClientByPassword()
 	if err != nil {
-		logger.Errorf(context.TODO(), "SSHExec", "error in create ssh client: %v", err)
+		logger.Errorf(context.TODO(), selfmonitor.PluginRuntimeAlarm, "error in create ssh client: %v", err)
 		return
 	}
 	h.sshClient = client
@@ -80,7 +81,7 @@ func (h *HostEnv) initSSHClient() {
 func (h *HostEnv) initSSHClientByPrivateKey() (*goph.Client, error) {
 	auth, err := goph.Key(filepath.Join(os.Getenv("HOME"), ".ssh", "id_rsa"), "")
 	if err != nil {
-		logger.Errorf(context.TODO(), "SSHExec", "error reading private key file: %v", err)
+		logger.Errorf(context.TODO(), selfmonitor.PluginRuntimeAlarm, "error reading private key file: %v", err)
 		return nil, err
 	}
 

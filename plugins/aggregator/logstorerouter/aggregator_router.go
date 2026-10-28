@@ -23,6 +23,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pkg/util"
 	"github.com/alibaba/ilogtail/plugins/aggregator/baseagg"
 )
@@ -105,7 +106,7 @@ func (p *AggregatorRouter) route(log *protocol.Log, value string) error {
 		return p.defaultAgg.Add(log, nil)
 	}
 	if p.NoMatchError {
-		logger.Warning(p.context.GetRuntimeContext(), "NO_MATCH_ROUTER_ALARM", "no match router", "drop this log")
+		logger.Warning(p.context.GetRuntimeContext(), selfmonitor.NoMatchRouterAlarm, "no match router", "drop this log")
 	}
 	return nil
 }
@@ -130,7 +131,7 @@ func (p *AggregatorRouter) Add(log *protocol.Log, ctx map[string]interface{}) er
 		return p.defaultAgg.Add(log, ctx)
 	}
 	if p.NoMatchError {
-		logger.Warning(p.context.GetRuntimeContext(), "NO_MATCH_ROUTER_ALARM", "no match router", "drop this log")
+		logger.Warning(p.context.GetRuntimeContext(), selfmonitor.NoMatchRouterAlarm, "no match router", "drop this log")
 	}
 	return nil
 }

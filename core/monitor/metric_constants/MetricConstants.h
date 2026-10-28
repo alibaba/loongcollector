@@ -134,6 +134,10 @@ extern const std::string METRIC_LABEL_VALUE_EVENT_TYPE_CONN_STATS;
 extern const std::string METRIC_LABEL_VALUE_EVENT_SOURCE_EBPF;
 extern const std::string METRIC_LABEL_VALUE_RECORD_TYPE_APP;
 extern const std::string METRIC_LABEL_VALUE_RECORD_TYPE_NET;
+// AgentSight emits two independent streams whose volumes differ by orders of magnitude — raw HTTP
+// covers *all* non-LLM traffic of an attached process — so their counters must be attributable.
+extern const std::string METRIC_LABEL_VALUE_RECORD_TYPE_RAW_HTTP;
+extern const std::string METRIC_LABEL_VALUE_RECORD_TYPE_GEN_AI;
 extern const std::string METRIC_LABEL_VALUE_EVENT_TYPE_DATA_EVENT;
 extern const std::string METRIC_LABEL_VALUE_EVENT_TYPE_CTRL_EVENT;
 extern const std::string METRIC_LABEL_VALUE_EVENT_TYPE_LOG;
@@ -359,6 +363,7 @@ extern const std::string METRIC_RUNNER_EBPF_POLL_KERNEL_EVENTS_TOTAL;
 extern const std::string METRIC_RUNNER_EBPF_LOST_KERNEL_EVENTS_TOTAL;
 extern const std::string METRIC_RUNNER_EBPF_CONNECTION_CACHE_SIZE;
 extern const std::string METRIC_RUNNER_EBPF_LOST_LOG_EVENTS_TOTAL;
+extern const std::string METRIC_RUNNER_EBPF_CPU_PROFILING_PID_MATCH_CACHE_SIZE;
 
 /**********************************************************
  *   k8s metadata

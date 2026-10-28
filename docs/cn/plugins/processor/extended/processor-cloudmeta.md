@@ -4,6 +4,16 @@
 
 `processor_cloud_meta`插件可以添加为日志增加云平台元数据信息。
 
+## 事件能力
+
+列含义见 [概览 · 事件能力列说明](../../overview.md#事件能力列说明)。
+
+| v1 接口 | v2 接口 | Log | Metric | Span |
+| --- | --- | --- | --- | --- |
+| ✓ | ✓ | v1&v2 | v2 | v2 |
+
+> v2 场景下将云资产元数据加入 PipelineEventGroup 的 Tag（对所有事件类型生效），事件本身透传不修改。
+
 ## 版本
 
 [Alpha](../../stability-level.md)
@@ -86,8 +96,6 @@ flushers:
 2023-03-13 20:42:04 {"content":"{\"a\":{\"b\":{}}}","Index":"4","instance_id_name":"id_xxx","instance_tag_prefix_tag_key":"tag_val","__time__":"1678711324"}
 2023-03-13 20:42:04 {"content":"{\"a\":{\"b\":{}}}","Index":"5","instance_id_name":"id_xxx","instance_tag_prefix_tag_key":"tag_val","__time__":"1678711324"}
 2023-03-13 20:42:04 {"content":"{\"a\":{\"b\":{}}}","Index":"6","instance_id_name":"id_xxx","instance_tag_prefix_tag_key":"tag_val","__time__":"1678711324"}
-}
-
 ```
 
 ### json 模式

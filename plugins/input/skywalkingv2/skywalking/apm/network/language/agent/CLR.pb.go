@@ -24,11 +24,13 @@
 package agent
 
 import (
-	common "github.com/alibaba/ilogtail/plugins/input/skywalkingv2/skywalking/apm/network/common"
-	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
-	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
 	sync "sync"
+
+	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
+	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+
+	common "github.com/alibaba/ilogtail/plugins/input/skywalkingv2/skywalking/apm/network/common"
 )
 
 const (

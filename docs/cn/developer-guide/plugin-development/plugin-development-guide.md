@@ -13,7 +13,7 @@ LoongCollector 原生插件的开发主要有以下步骤：
     * [如何开发原生Input插件](native-plugins/how-to-write-native-input-plugins.md)
     * [如何开发原生Flusher插件](native-plugins/how-to-write-native-flusher-plugins.md)
     * [插件配置项基本原则](extended-plugins/principles-of-plugin-configuration.md)
-3. 进行单测或者E2E测试，请参考[如何使用单测](../test/unit-test.md) 与 [如何使用E2E测试](../test/e2e-test.md).
+3. 进行单元测试或 E2E 测试，请参考 [单元测试](../test/unit-test.md) 与 [E2E测试](../test/e2e-test.md)。
 4. 提交Pull Request。
 
 ## 扩展插件开发流程（go语言）
@@ -23,12 +23,14 @@ LoongCollector 插件的开发主要有以下步骤：
 1. 创建Issue，描述开发插件功能，会有社区同学参与讨论插件开发的可行性，如果社区review 通过，请参考步骤2继续进行。
 2. 实现相应接口。
 3. 通过init函数注册插件。
-4. 将插件加入[插件引用配置文件](https://github.com/alibaba/loongcollector/blob/main/plugins.yml)的`common`配置节, 如果仅运行于指定系统，请添加到`linux`或`windows`配置节.
-5. 进行单测或者E2E测试，请参考[如何使用单测](../test/unit-test.md) 与 [如何使用E2E测试](../test/e2e-test.md).
+4. 将插件加入[插件引用配置文件](https://github.com/alibaba/loongcollector/blob/main/plugins.yml)的 `common` 配置节；若仅运行于指定系统，请添加到 `linux` 或 `windows`。构建时会根据该文件生成 `plugins/all/all.go`（含 `all_linux.go` / `all_windows.go`），**请勿手改生成文件**；改完后执行 `make all`（或你常用的构建目标）以重新生成并完成链接。
+5. 进行单元测试或 E2E 测试，请参考 [单元测试](../test/unit-test.md) 与 [E2E测试](../test/e2e-test.md)。
 6. 使用 *make lint* 检查代码规范。
 7. 提交Pull Request。
 
-在开发时，[Logger接口](plugin-debug/logger-api.md)和[自监控指标接口](plugin-debug/plugin-self-monitor-guide.md)或许能对您有所帮助。此外，可以使用[纯插件模式启动](plugin-debug/pure-plugin-start.md) LoongCollector，用于对插件进行轻量级测试。
+在开发时，[Logger 接口](plugin-debug/logger-api.md)和[自监控指标接口](plugin-debug/plugin-self-monitor-guide.md)或许能对您有所帮助。此外，可以使用[纯插件模式启动](plugin-debug/pure-plugin-start.md) LoongCollector，用于对插件进行轻量级测试。
+
+Go 侧插件注册表与 `Add*Creator` 定义见仓库 [`pkg/pipeline/plugin.go`](https://github.com/alibaba/loongcollector/blob/main/pkg/pipeline/plugin.go)；各插件类型的 **V1 / V2** 扩展接口见同目录下的 `input.go`、`processor.go`、`aggregator.go`、`flusher.go`（旧文档仅描述 V1 时，请以源码为准）。
 
 更详细的开发细节，请参考：
 
@@ -43,10 +45,10 @@ LoongCollector 插件的开发主要有以下步骤：
 
 ## 文档撰写流程
 
-开发完成后，可以参考[如何生成插件文档](plugin-docs/how-to-genernate-plugin-docs.md)生成插件的使用文档，也可以手动编写插件文档。
+开发完成后，可以参考[如何生成插件文档](plugin-docs/how-to-generate-plugin-docs.md)生成插件的使用文档，也可以手动编写插件文档。
 
 文档的编写主要有如下步骤：
 
 1. 遵循[插件文档规范](plugin-docs/plugin-doc-templete.md)，编写插件文档。
-2. 在[数据流水线概览](https://github.com/alibaba/loongcollector/blob/main/docs/cn/plugins/overview.md)中添加插件的信息。所有的插件按英文名字典序升序排列，添加的时候请注意插入的位置。
-3. 在[文档目录](https://github.com/alibaba/loongcollector/blob/main/docs/cn/SUMMARY.md)中添加插件文档的路径，注意与数据流水线概览中保持顺序一致。
+2. 在[插件概览](https://github.com/alibaba/loongcollector/blob/main/docs/cn/plugins/overview.md)中添加插件的信息。所有的插件按英文名字典序升序排列，添加的时候请注意插入的位置。
+3. 在[文档目录](https://github.com/alibaba/loongcollector/blob/main/docs/cn/SUMMARY.md)中添加插件文档的路径，注意与插件概览中保持顺序一致。

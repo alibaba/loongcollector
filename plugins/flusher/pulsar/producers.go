@@ -24,6 +24,7 @@ import (
 	"go.uber.org/multierr"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
 type Producers struct {
@@ -36,7 +37,7 @@ func NewProducers(context context.Context, maxProducers int) *Producers {
 		producer := value
 		err := close(producer)
 		if err != nil {
-			logger.Warning(context, "close pulsar producer error", err)
+			logger.Warning(context, selfmonitor.FlusherStopAlarm, "close pulsar producer error", err)
 			return
 		}
 	})

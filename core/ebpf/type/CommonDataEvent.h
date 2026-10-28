@@ -38,6 +38,9 @@ enum class KernelEventType {
 
     FILE_PERMISSION_EVENT_WRITE,
     FILE_PERMISSION_EVENT_READ,
+
+    AGENTSIGHT_LLM_RECORD,
+    AGENTSIGHT_HTTPS_RECORD,
 };
 
 class CommonEvent {

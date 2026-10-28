@@ -54,9 +54,9 @@ func (p *LogCanal) Levels() []canalLog.Level {
 func (p *LogCanal) Fire(e *canalLog.Entry) error {
 	switch {
 	case e.Level == canalLog.WarnLevel:
-		logger.Warning(context.Background(), "INPUT_CANAL_ALARM", "canal log, level", e.Level.String(), "message", e.Message)
+		logger.Warning(context.Background(), selfmonitor.InputCanalAlarm, "canal log, level", e.Level.String(), "message", e.Message)
 	case e.Level == canalLog.ErrorLevel || e.Level == canalLog.FatalLevel || e.Level == canalLog.PanicLevel:
-		logger.Error(context.Background(), "INPUT_CANAL_ALARM", "canal log, level", e.Level.String(), "message", e.Message)
+		logger.Error(context.Background(), selfmonitor.InputCanalAlarm, "canal log, level", e.Level.String(), "message", e.Message)
 	default:
 		logger.Info(context.Background(), "canal log, level", e.Level.String(), "message", e.Message)
 	}
@@ -254,8 +254,7 @@ ValueLoop:
 			packedData[fieldName] = string(b)
 			return
 		}
-		logger.Warningf(sc.context.GetRuntimeContext(), "CANAL_RUNTIME_ALARM",
-			"json.Marshal on %v failed: %v, %v", fieldName, value, err)
+		logger.Warningf(sc.context.GetRuntimeContext(), selfmonitor.CanalRuntimeAlarm, "json.Marshal on %v failed: %v, %v", fieldName, value, err)
 		packedData[fieldName] = ""
 	}
 	marshal("old_data", oldData)
@@ -364,7 +363,7 @@ func (sc *ServiceCanal) OnRow(e *canal.RowsEvent) error {
 			return nil
 		}
 		if len(e.Rows)%2 != 0 {
-			logger.Warning(sc.context.GetRuntimeContext(), "CANAL_INVALID_ALARM", "invalid update value count", len(e.Rows))
+			logger.Warning(sc.context.GetRuntimeContext(), selfmonitor.CanalInvalidAlarm, "invalid update value count", len(e.Rows))
 			return nil
 		}
 		for i := 0; i < len(e.Rows); i += 2 {
@@ -377,7 +376,7 @@ func (sc *ServiceCanal) OnRow(e *canal.RowsEvent) error {
 					sc.canal.ClearTableCache([]byte(e.Table.Schema), []byte(e.Table.Name))
 					tableMeta, err := sc.canal.GetTable(e.Table.Schema, e.Table.Name)
 					if err != nil || tableMeta == nil {
-						logger.Warning(sc.context.GetRuntimeContext(), "CANAL_INVALID_ALARM", "invalid row values", e.Table.Name,
+						logger.Warning(sc.context.GetRuntimeContext(), selfmonitor.CanalInvalidAlarm, "invalid row values", e.Table.Name,
 							"old columns", len(e.Rows[i]),
 							"new columns", len(e.Rows[i+1]),
 							"table meta columns", len(e.Table.Columns),
@@ -428,7 +427,7 @@ func (sc *ServiceCanal) OnRow(e *canal.RowsEvent) error {
 					sc.canal.ClearTableCache([]byte(e.Table.Schema), []byte(e.Table.Name))
 					tableMeta, err := sc.canal.GetTable(e.Table.Schema, e.Table.Name)
 					if err != nil || tableMeta == nil {
-						logger.Warning(sc.context.GetRuntimeContext(), "CANAL_INVALID_ALARM", "invalid row values", e.Table.Name,
+						logger.Warning(sc.context.GetRuntimeContext(), selfmonitor.CanalInvalidAlarm, "invalid row values", e.Table.Name,
 							"columns", len(rowValues),
 							"table meta columns", len(e.Table.Columns),
 							"error", err)
@@ -589,7 +588,7 @@ func (sc *ServiceCanal) GetBinlogLatestPos() mysql.Position {
 				if errConv != nil {
 					latestPos.Name = valueStr
 				} else {
-					logger.Warning(sc.context.GetRuntimeContext(), "CANAL_INVALID_ALARM", "show binary logs error")
+					logger.Warning(sc.context.GetRuntimeContext(), selfmonitor.CanalInvalidAlarm, "show binary logs error")
 				}
 				offset, conErr := strconv.ParseUint(fmt.Sprint(value[1]), 10, 64)
 				if conErr == nil {
@@ -598,7 +597,7 @@ func (sc *ServiceCanal) GetBinlogLatestPos() mysql.Position {
 			}
 		}
 	} else {
-		logger.Warning(sc.context.GetRuntimeContext(), "CANAL_INVALID_ALARM", "show binary logs error", err)
+		logger.Warning(sc.context.GetRuntimeContext(), selfmonitor.CanalInvalidAlarm, "show binary logs error", err)
 	}
 	logger.Info(sc.context.GetRuntimeContext(), "start from latest binlog position", latestPos)
 	return latestPos
@@ -679,7 +678,7 @@ func (sc *ServiceCanal) newCanal() (bool, error) {
 			return false, err
 		}
 
-		logger.Warning(sc.context.GetRuntimeContext(), "CANAL_START_ALARM", "newCanal failed, error", err, "retry it")
+		logger.Warning(sc.context.GetRuntimeContext(), selfmonitor.CanalStartAlarm, "newCanal failed, error", err, "retry it")
 		if util.RandomSleep(time.Second*5, 0.1, sc.shutdown) {
 			return true, nil
 		}
@@ -696,8 +695,7 @@ func (sc *ServiceCanal) Start(c pipeline.Collector) error {
 
 	shouldShutdown, err := sc.newCanal()
 	if err != nil {
-		logger.Warning(sc.context.GetRuntimeContext(),
-			"CANAL_START_ALARM", "service_canal plugin only supports ROW mode", err)
+		logger.Warning(sc.context.GetRuntimeContext(), selfmonitor.CanalStartAlarm, "service_canal plugin only supports ROW mode", err)
 		return err
 	}
 	if shouldShutdown {
@@ -716,7 +714,7 @@ func (sc *ServiceCanal) Start(c pipeline.Collector) error {
 			break
 		}
 		err = fmt.Errorf("Check GTID mode failed, error: %v", err)
-		logger.Warning(sc.context.GetRuntimeContext(), "CANAL_START_ALARM", err.Error())
+		logger.Warning(sc.context.GetRuntimeContext(), selfmonitor.CanalStartAlarm, err.Error())
 		if shouldRetry {
 			if util.RandomSleep(time.Second*5, 0.1, sc.shutdown) {
 				sc.canal.Close()
@@ -748,7 +746,7 @@ func (sc *ServiceCanal) Start(c pipeline.Collector) error {
 	if sc.checkpoint.GTID != "" {
 		gtid, err = mysql.ParseGTIDSet(sc.Flavor, sc.checkpoint.GTID)
 		if err != nil {
-			logger.Warning(sc.context.GetRuntimeContext(), "CANAL_START_ALARM", "Parse GTID error, clear it",
+			logger.Warning(sc.context.GetRuntimeContext(), selfmonitor.CanalStartAlarm, "Parse GTID error, clear it",
 				sc.checkpoint.GTID, err)
 			gtid = nil
 			sc.checkpoint.GTID = ""
@@ -762,7 +760,7 @@ func (sc *ServiceCanal) Start(c pipeline.Collector) error {
 		if sc.isGTIDEnabled {
 			gtid, err = sc.getLatestGTID()
 			if err != nil {
-				logger.Warning(sc.context.GetRuntimeContext(), "CANAL_START_ALARM", "Call getLatestGTID failed, error", err)
+				logger.Warning(sc.context.GetRuntimeContext(), selfmonitor.CanalStartAlarm, "Call getLatestGTID failed, error", err)
 			}
 		}
 		if gtid == nil {
@@ -800,7 +798,7 @@ ForBlock:
 				break ForBlock
 			}
 			errStr := err.Error()
-			logger.Warning(sc.context.GetRuntimeContext(), "CANAL_RUNTIME_ALARM", "Restart canal because of error", err)
+			logger.Warning(sc.context.GetRuntimeContext(), selfmonitor.CanalRuntimeAlarm, "Restart canal because of error", err)
 
 			// Get latest position from server and restart.
 			//
@@ -822,8 +820,7 @@ ForBlock:
 				if sc.isGTIDEnabled {
 					gtid, err = sc.getLatestGTID()
 					if err != nil {
-						logger.Warning(sc.context.GetRuntimeContext(), "CANAL_RUNTIME_ALARM",
-							"getLatestGTID failed duration restarting", err)
+						logger.Warning(sc.context.GetRuntimeContext(), selfmonitor.CanalRuntimeAlarm, "getLatestGTID failed duration restarting", err)
 					}
 				}
 				if nil == gtid {

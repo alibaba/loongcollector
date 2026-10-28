@@ -15,17 +15,21 @@
 package grpc
 
 import (
+	"encoding/json"
 	"io"
 	"net"
+	"sort"
 	"strconv"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/encoding"
 
 	_ "github.com/alibaba/ilogtail/pkg/logger/test"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/plugins/test"
@@ -99,7 +103,8 @@ func makeTestLogGroupList() *protocol.LogGroupList {
 	}
 	for i := 1; i <= 10; i++ {
 		lg := &protocol.LogGroup{
-			Logs: make([]*protocol.Log, 0, 10),
+			Logs:   make([]*protocol.Log, 0, 10),
+			Source: "",
 		}
 		for j := 1; j <= 10; j++ {
 			f["group"] = strconv.Itoa(i)
@@ -110,4 +115,102 @@ func makeTestLogGroupList() *protocol.LogGroupList {
 		lgl.LogGroupList = append(lgl.LogGroupList, lg)
 	}
 	return lgl
+}
+
+func makeParityLogGroups() ([]*protocol.LogGroup, []*models.PipelineGroupEvents) {
+	v1Groups := makeTestLogGroupList().GetLogGroupList()[:1]
+	return v1Groups, makePipelineGroupEventsFromLogGroups(v1Groups)
+}
+
+func makePipelineGroupEventsFromLogGroups(v1Groups []*protocol.LogGroup) []*models.PipelineGroupEvents {
+	v2Groups := make([]*models.PipelineGroupEvents, 0, len(v1Groups))
+	for _, lg := range v1Groups {
+		groupTags := models.NewTags()
+		groupTags.Add("host.ip", lg.Source)
+		for _, tag := range lg.LogTags {
+			groupTags.Add(tag.Key, tag.Value)
+		}
+		group := models.NewGroup(models.NewMetadata(), groupTags)
+		events := make([]models.PipelineEvent, 0, len(lg.Logs))
+		for _, log := range lg.Logs {
+			ts := uint64(log.GetTime()) * 1e9
+			if log.TimeNs != nil {
+				ts += uint64(*log.TimeNs)
+			}
+			v2Log := models.NewLog("", nil, "", "", "", models.NewTags(), ts)
+			for _, c := range log.Contents {
+				v2Log.GetIndices().Add(c.Key, c.Value)
+			}
+			events = append(events, v2Log)
+		}
+		v2Groups = append(v2Groups, &models.PipelineGroupEvents{Group: group, Events: events})
+	}
+	return v2Groups
+}
+
+func TestFlusherGrpc_FlushExportParity(t *testing.T) {
+	v1Groups, v2Groups := makeParityLogGroups()
+
+	flushLogs := runGrpcCapture(t, func(f *Flusher) error {
+		return f.Flush("", "", "", v1Groups)
+	})
+	exportLogs := runGrpcCapture(t, func(f *Flusher) error {
+		return f.Export(v2Groups, nil)
+	})
+
+	require.Equal(t, len(flushLogs), len(exportLogs))
+	require.Equal(t, normalizedLogGroupsJSON(t, flushLogs), normalizedLogGroupsJSON(t, exportLogs))
+}
+
+func normalizedLogGroupsJSON(t testing.TB, groups []*protocol.LogGroup) []string {
+	t.Helper()
+	out := make([]string, 0)
+	for _, group := range groups {
+		for _, log := range group.Logs {
+			fields := make(map[string]string, len(log.Contents))
+			for _, c := range log.Contents {
+				fields[c.Key] = c.Value
+			}
+			payload, err := json.Marshal(map[string]interface{}{
+				"time":   log.GetTime(),
+				"fields": fields,
+			})
+			require.NoError(t, err)
+			out = append(out, string(payload))
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
+func runGrpcCapture(t *testing.T, run func(*Flusher) error) []*protocol.LogGroup {
+	t.Helper()
+	encoding.RegisterCodec(new(protocol.Codec))
+
+	received := make(chan *protocol.LogGroup, 8)
+	server := grpc.NewServer()
+	service := &TestServerService{ch: received}
+	protocol.RegisterLogReportServiceServer(server, service)
+
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	go func() {
+		_ = server.Serve(listener)
+	}()
+	defer server.Stop()
+
+	flusher := &Flusher{Address: listener.Addr().String()}
+	require.NoError(t, flusher.Init(mock.NewEmptyContext("p", "l", "c")))
+	require.NoError(t, run(flusher))
+
+	time.Sleep(100 * time.Millisecond)
+	close(received)
+
+	var groups []*protocol.LogGroup
+	for group := range received {
+		if group != nil && len(group.Logs) > 0 {
+			groups = append(groups, group)
+		}
+	}
+	return groups
 }

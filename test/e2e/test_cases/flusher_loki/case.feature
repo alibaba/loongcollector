@@ -13,14 +13,36 @@ Feature: flusher loki
       loki_name: hello
       source: loongcollector
     """
+    # Pipeline version switch: global.StructureType=v2 routes metric_mock through
+    # FlusherV2.Export instead of the v1 Flush path. Structures at the flusher boundary:
+    #   v1 pipeline (StructureType absent/v1):
+    #     - input  to flusher: []*protocol.LogGroup. metric_mock.Collect() emits Log
+    #       events via AddData, contents = {Index, value}, tags = {name}.
+    #     - output of flusher: converter.ToByteStreamWithSelectedFields(LogGroup) -> loki
+    #       push stream; log line contents = {Index, value}, labels from DynamicLabels.
+    #   v2 pipeline (StructureType=v2, this case):
+    #     - input  to flusher: []*models.PipelineGroupEvents. metric_mock.Read() emits
+    #       2 Metric events/cycle: single_metrics_mock (counter, single value) and
+    #       multi_values_metrics_mock (untyped; values{Index} + typedValues{value}),
+    #       both tagged {name=hello}.
+    #     - output of flusher: converter.ToByteStreamWithSelectedFieldsV2 converts each
+    #       Metric structurally into canonical metric-log lines
+    #       {__name__, __labels__, __value__, __time_nano__} (one line per value /
+    #       typed-value), never an opaque pass-through blob and never silently dropped. The
+    #       metric tag becomes __labels__=name#$#hello on every line. single_metrics_mock
+    #       -> __name__=single_metrics_mock; multi_values_metrics_mock ->
+    #       __name__=multi_values_metrics_mock_{Index,value}.
     Given {flusher-loki-case} local config as below
     """
     enable: true
+    global:
+      StructureType: v2
+      InputIntervalMs: 100
     inputs:
       - Type: metric_mock
         IntervalMs: 100
         Tags:
-          __tag__:name: "hello"
+          name: "hello"
         Fields:
           value: "log contents"
     flushers:
@@ -44,9 +66,20 @@ Feature: flusher loki
     Given loongcollector depends on containers {["loki"]}
     When start docker-compose {flusher_loki}
     Then there is at least {10} logs
-    Then the log fields match kv
+    # Verify the exact key-value lines produced by the v2 input, not a loose regex.
+    # metric_mock emits two Metric identities per cycle; the converter turns them into
+    # canonical metric-log lines keyed by __name__/__value__, each carrying the configured
+    # tag as __labels__ "name#$#hello":
+    #   - single_metrics_mock             (single-value counter; __value__ is a monotonic
+    #                                       counter, so only its identity + labels are pinned)
+    #   - multi_values_metrics_mock_value -> "log contents" (typed string field value)
+    # Asserting the concrete (__name__, __value__, __labels__) triples proves the Metric
+    # fields and their tag dimension reached the target intact.
+    Then the log fields have exact kv
     """
-    name: "hello"
-    value: "log contents"
+    - __name__: single_metrics_mock
+      __labels__: name#$#hello
+    - __name__: multi_values_metrics_mock_value
+      __value__: log contents
+      __labels__: name#$#hello
     """
-  

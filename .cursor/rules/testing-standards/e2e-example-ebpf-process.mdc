@@ -1,0 +1,108 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# EBPF进程安全-E2E测试
+
+本文档是针对eBPF进程安全采集的E2E测试设计，主要测试基础功能。
+
+## 1 基本说明
+
+### 1.1 配置
+
+eBPF进程安全采集，配置名为`ebpf_process_security_default`，配置为
+
+```plaintext
+enable: true
+inputs:
+  - Type: input_process_security
+```
+
+### 1.2 日志字段
+
+主要日志字段如下：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| call\_name | string | 系统调用函数（execve/clone/exit） |
+| binary | string | 执行的命令，二进制可执行如/bin/sh 等 |
+| arguments | string | 进程参数 |
+| cwd | string | 当前工作路径 |
+| user | string | 用户 |
+
+k8s元数据信息，在k8s环境下有可能包含
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| k8s.namespace | string | 命名空间 |
+| k8s.pod.name | string | pod名称 |
+| k8s.workload.kind | string | workload类型 |
+| k8s.workload.name | string | workload名称 |
+
+若构造k8s环境，请测试k8s元数据信息，其信息如下，其中`k8s.pod.name`只用前缀查找e2e-generator-，其余均可精准查找。
+
+```shell
+k8s.namespace:default
+k8s.pod.name:e2e-generator-7f4666b7c8-f9xx4
+k8s.workload.kind:deployment
+k8s.workload.name:e2e-generator
+```
+
+## 2 测试案例
+
+每个案例对应一个或多个`Scenario`（由环境数量决定）。
+
+由于是进程采集测试，所以日志的生成主要是利用执行命令来执行进程，此处给予一个案例。
+
+普通启动
+
+测试环境：k8s & host
+
+测试数量：1
+
+测试进程：`/bin/echo 1`（会抓取一个binary为`/bin/echo`arguments为`1`的日志）
+
+测试事件类型：`execve`、`exit`（call\_name不一样，其他都一样）
+
+此时需要查询`*| select * from e2e where call_name = 'execve' and binary = '/bin/echo' and arguments = '1'`和`* | select * from e2e where call_name = 'exit' and binary = '/bin/echo' and arguments = '1'`来验证是否成功采集到进程日志
+
+```plaintext
+@e2e @host @ebpf_input
+Scenario: TestEBPFProcessSecurityByNormalStart
+  Given {host} environment
+  Given subcribe data from {sls} with config
+  """
+  """
+  Given {ebpf_process_security_default} local config as below
+  """
+  enable: true
+  inputs:
+    - Type: input_process_security
+  """
+  When begin trigger
+  When execute {1} commands {/bin/echo 1} in sequence
+  When query through {* | select * from e2e where call_name = 'execve' and binary = '/bin/echo' and arguments = '1'}
+  Then there is {1} logs
+  When query through {* | select * from e2e where call_name = 'exit' and binary = '/bin/echo' and arguments = '1'}
+  Then there is {1} logs
+
+@e2e @k8s @ebpf_input
+  Scenario: TestEBPFProcessSecurityByNormalStart
+  Given {daemonset} environment
+  Given subcribe data from {sls} with config
+  """
+  """
+  Given {ebpf_process_security_default} local config as below
+  """
+  enable: true
+  inputs:
+    - Type: input_process_security
+  """
+  When begin trigger
+  When execute {1} commands {/bin/echo 1} in sequence
+  When query through {* | select * from e2e where call_name = 'execve' and binary = '/bin/echo' and arguments = '1' and "k8s.namespace" = 'default' and "k8s.pod.name" like 'e2e-generator-%' and "k8s.workload.kind" = 'deployment' and "k8s.workload.name" = 'e2e-generator'}
+  Then there is {1} logs
+  When query through {* | select * from e2e where call_name = 'exit' and binary = '/bin/echo' and arguments = '1' and "k8s.namespace" = 'default' and "k8s.pod.name" like 'e2e-generator-%' and "k8s.workload.kind" = 'deployment' and "k8s.workload.name" = 'e2e-generator'}
+  Then there is {1} logs
+```

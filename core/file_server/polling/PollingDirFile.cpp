@@ -74,7 +74,7 @@ void PollingDirFile::Start() {
     mPollingFileCacheSize
         = FileServer::GetInstance()->GetMetricsRecordRef().CreateIntGauge(METRIC_RUNNER_FILE_POLLING_FILE_CACHE_SIZE);
     mRuningFlag = true;
-    mThreadPtr = CreateThread([this]() { Polling(); });
+    mThreadPtr = CreateThread("PollingDirFile", [this]() { Polling(); });
 }
 
 void PollingDirFile::Stop() {
@@ -160,8 +160,10 @@ void PollingDirFile::PollingIteration() {
     // Get a copy of config list from ConfigManager and build sorted path items.
     vector<PathItem> sortedPaths; // 所有精确路径（按原始 basePath 排序）
     vector<PathItem> wildcardPaths; // 所有通配符路径
-    auto nameConfigMap = FileServer::GetInstance()->GetAllFileDiscoveryConfigs();
-    BuildAndSortPathItems(nameConfigMap, sortedPaths, wildcardPaths);
+    FileServer::GetInstance()->WithFileDiscoveryConfigs(
+        [&](const std::unordered_map<std::string, FileDiscoveryConfig>& nameConfigMap) {
+            BuildAndSortPathItems(nameConfigMap, sortedPaths, wildcardPaths);
+        });
 
     {
         ScopedSpinLock lock(mCacheLock);

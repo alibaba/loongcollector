@@ -356,7 +356,7 @@ bool InputContainerStdio::CreateInnerProcessors() {
             processor = PluginRegistry::GetInstance()->CreateProcessor(
                 ProcessorSplitLogStringNative::sName, mContext->GetPipeline().GenNextPluginMeta(false));
             detail["SplitChar"] = Json::Value('\0');
-        } else {
+        } else if (mMultiline.mMode == MultilineOptions::Mode::CUSTOM) {
             processor = PluginRegistry::GetInstance()->CreateProcessor(
                 ProcessorMergeMultilineLogNative::sName, mContext->GetPipeline().GenNextPluginMeta(false));
             detail["Mode"] = Json::Value("custom");

@@ -4,27 +4,27 @@
 
 LoongCollector 通过 [插件引用配置文件](https://github.com/alibaba/loongcollector/blob/main/plugins.yml) 来定义要包含在构建产物中的插件，该文件中默认包含了LoongCollector 仓库中的所有插件。
 
-同时，LoongCollector 也以同样的机制支持引入外部私有插件，关于如何开发外部插件，请参阅[如何构建外部私有插件](how-to-write-external-plugins.md)。LoongCollector 默认会检测仓库根目录下的 `external_plugins.yml` 文件来查找外部插件定义。
+同时，LoongCollector 也以同样的机制支持引入外部私有插件，关于如何开发外部插件，请参阅[如何开发外部私有插件](how-to-write-external-plugins.md)。LoongCollector 默认会检测仓库根目录下的 `external_plugins.yml` 文件来查找外部插件定义。
 
 当执行诸如 `make all` 等构建指令时，该配置文件会被解析并生成 go import 文件到 [plugins/all](https://github.com/alibaba/loongcollector/tree/main/plugins/all) 目录下。
 
 插件引用配置文件的格式定义如下：
 
 ```yaml
-plugins:    // 需要注册的plugins，按适用的系统分类
-common:
-  - gomod: code.private.org/private/custom_plugins v1.0.0  // 可选，插件module，仅针对外部插件
-    import: code.private.org/private/custom_plugins        // 可选，代码中import的package路径
-    path: ../custom_plugins                                // 可选，replace 本地路径，用于调试
-windows:
-  
-linux:
+# 需要注册的插件，按适用系统分类（以下为结构说明，# 表示 YAML 注释）
+plugins:
+  common:
+    - gomod: code.private.org/private/custom_plugins v1.0.0  # 可选，外部插件 Go module
+      import: code.private.org/private/custom_plugins        # 可选，代码中 import 的包路径
+      path: ../custom_plugins                                # 可选，replace 本地路径，用于调试
+  windows: []
+  linux: []
 
 project:
-  replaces:       // 可选，array，用于解决多个插件module之间依赖冲突时的问题
-  go_envs:        // 可选，map，插件的repo是私有的时候，可以添加如GOPRIVATE环境等设置
+  replaces: []     # 可选，解决多模块依赖冲突
+  go_envs:         # 可选，如私有仓库 GOPRIVATE
     GOPRIVATE: "*.code.org"
-  git_configs:    // 可选，map，私有插件repo可能需要认证，可以通过设置git url insteadof调整
+  git_configs:     # 可选，私有仓库鉴权 url insteadof 等
     url.https://user:token@github.com/user/.insteadof: https://github.com/user/
 ```
 

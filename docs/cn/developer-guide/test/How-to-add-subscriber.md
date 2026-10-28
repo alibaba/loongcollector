@@ -7,7 +7,7 @@
 - `Name()`：返回订阅器的名字；
 - `Start()`：启动订阅器，不断地从目标存储单元中拉取所需要的数据，在对数据进行转换后，将数据发送至`SubscribeChan()`返回的通道；
 - `Stop()`：停止订阅器；
-- `SubscribeChan()`：返回用于向验证器发送接收到的数据的通道，其中通道的数据类型所对应协议的具体信息可参见[LogGroup](../../docs/cn/developer-guide/data-structure.md)；
+- `SubscribeChan()`：返回用于向验证器发送接收到的数据的通道，其中通道的数据类型所对应协议的具体信息可参见 [Golang 侧数据模型](../data-model-golang.md)；
 - `FlusherConfig()`：返回与该订阅器相对应的 LoongCollector 输出插件的默认配置，可直接返回空字符串。
 
 ```go

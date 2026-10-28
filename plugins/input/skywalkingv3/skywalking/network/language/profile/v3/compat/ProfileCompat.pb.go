@@ -24,11 +24,13 @@
 package compat
 
 import (
-	v31 "github.com/alibaba/ilogtail/plugins/input/skywalkingv3/skywalking/network/common/v3"
-	v3 "github.com/alibaba/ilogtail/plugins/input/skywalkingv3/skywalking/network/language/profile/v3"
+	reflect "reflect"
+
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
-	reflect "reflect"
+
+	v31 "github.com/alibaba/ilogtail/plugins/input/skywalkingv3/skywalking/network/common/v3"
+	v3 "github.com/alibaba/ilogtail/plugins/input/skywalkingv3/skywalking/network/language/profile/v3"
 )
 
 const (

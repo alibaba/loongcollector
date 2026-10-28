@@ -165,6 +165,14 @@ public:
                            const std::string& category = "") {
         SendAlarm(alarmType, ALARM_LEVEL_CRITICAL, message, region, projectName, config, category);
     }
+    void SendExternalAlarm(const std::string& alarmType,
+                           const AlarmLevel& level,
+                           const std::string& message,
+                           int32_t count,
+                           const std::string& region = "",
+                           const std::string& projectName = "",
+                           const std::string& config = "",
+                           const std::string& category = "");
     // only be called when prepare to exit
     void ForceToSend();
     bool IsLowLevelAlarmValid();
@@ -190,6 +198,9 @@ private:
 
     std::vector<std::string> mMessageType;
     std::map<std::string, std::pair<std::shared_ptr<AlarmVector>, std::vector<int32_t>>> mAllAlarmMap;
+    std::map<std::string, std::map<std::string, std::map<std::string, std::unique_ptr<AlarmMessage>>>>
+        mExternalAlarmMap;
+    std::map<std::string, std::map<std::string, int32_t>> mExternalAlarmLastUpdateMap;
     PTMutex mAlarmBufferMutex;
 
     std::atomic_int mLastLowLevelTime{0};

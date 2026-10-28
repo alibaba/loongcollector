@@ -204,6 +204,9 @@ LogFileReader* LogFileReader::CreateLogFileReader(const string& hostLogPathDir,
 
         reader->InitReader(
             readerConfig.first->mTailingAllMatchedFiles, LogFileReader::BACKWARD_TO_FIXED_POS, exactlyonceConcurrency);
+        // Seed gauges after the checkpoint offset is restored so a config reload does not
+        // expose a transient 0 on the shared reentrant metrics record. See #2632.
+        reader->InitMetricGauges();
     }
     return reader;
 }
@@ -238,11 +241,83 @@ LogFileReader::LogFileReader(const std::string& hostLogPathDir,
     mLineParsers.emplace_back(baseLineParsePtr);
 }
 
+bool LogFileReader::hasMetricLabelKey(const MetricLabels& labels, const std::string& key) {
+    return std::any_of(labels.begin(), labels.end(), [&key](const auto& label) { return label.first == key; });
+}
+
+bool LogFileReader::isReservedPluginSourceLabelKey(const std::string& key) {
+    return key == METRIC_LABEL_KEY_FILE_NAME || key == METRIC_LABEL_KEY_FILE_DEV || key == METRIC_LABEL_KEY_FILE_INODE
+        || key == METRIC_LABEL_KEY_PROJECT || key == METRIC_LABEL_KEY_PIPELINE_NAME || key == METRIC_LABEL_KEY_LOGSTORE
+        || key == METRIC_LABEL_KEY_PLUGIN_TYPE || key == METRIC_LABEL_KEY_PLUGIN_ID;
+}
+
+bool LogFileReader::metricLabelsEqual(const MetricLabels& lhs, const MetricLabels& rhs) {
+    MetricLabels a = lhs;
+    MetricLabels b = rhs;
+    std::sort(a.begin(), a.end());
+    std::sort(b.begin(), b.end());
+    return a == b;
+}
+
+void LogFileReader::tryAppendContainerMetricLabel(MetricLabels& labels,
+                                                  const std::string& key,
+                                                  const std::string& value) const {
+    if (key.empty()) {
+        return;
+    }
+    if (hasMetricLabelKey(labels, key) || isReservedPluginSourceLabelKey(key)) {
+        LOG_WARNING(
+            sLogger,
+            ("skip container metric label", key)("reason", "conflicts with reserved or existing plugin_source label")(
+                "config", GetConfigName())("file", GetConvertedPath()));
+        return;
+    }
+    labels.emplace_back(key, value);
+}
+
+void LogFileReader::appendContainerMetricLabels() {
+    appendContainerMetricLabels(mMetricLabels);
+}
+
+void LogFileReader::appendContainerMetricLabels(MetricLabels& labels) const {
+    if (mTagConfig.first != nullptr) {
+        for (const auto& metadata : mContainerMetadatas) {
+            const auto& key = mTagConfig.first->GetFileTagKeyName(metadata.first);
+            if (!key.empty()) {
+                tryAppendContainerMetricLabel(labels, std::string(key.data(), key.size()), metadata.second);
+            }
+        }
+    }
+    for (const auto& metadata : mContainerCustomMetadatas) {
+        tryAppendContainerMetricLabel(labels, metadata.first, metadata.second);
+    }
+    for (const auto& tag : mContainerExtraTags) {
+        tryAppendContainerMetricLabel(labels, tag.first, tag.second);
+    }
+}
+
+void LogFileReader::seedMetricGaugesFromReaderState() {
+    int64_t readOffset = GetLastFilePos();
+    int64_t fileSize = std::max(GetFileSize(), readOffset);
+    SET_GAUGE(mSourceReadOffsetBytes, readOffset);
+    SET_GAUGE(mSourceSizeBytes, fileSize);
+}
+
 void LogFileReader::SetMetrics() {
     mMetricLabels = {{METRIC_LABEL_KEY_FILE_NAME, GetConvertedPath()},
                      {METRIC_LABEL_KEY_FILE_DEV, std::to_string(GetDevInode().dev)},
                      {METRIC_LABEL_KEY_FILE_INODE, std::to_string(GetDevInode().inode)}};
-    mMetricsRecordRef = FileServer::GetInstance()->GetOrCreateReentrantMetricsRecordRef(GetConfigName(), mMetricLabels);
+    appendContainerMetricLabels();
+    mMetricsRecordRef = FileServer::GetInstance()->GetOrCreateReentrantMetricsRecordRef(
+        GetConfigName(), mMetricLabels, [this](ReentrantMetricsRecord& rec) {
+            mOutEventsTotal = rec.GetCounter(METRIC_PLUGIN_OUT_EVENTS_TOTAL);
+            mOutEventGroupsTotal = rec.GetCounter(METRIC_PLUGIN_OUT_EVENT_GROUPS_TOTAL);
+            mOutSizeBytes = rec.GetCounter(METRIC_PLUGIN_OUT_SIZE_BYTES);
+            mSourceSizeBytes = rec.GetIntGauge(METRIC_PLUGIN_SOURCE_SIZE_BYTES);
+            mSourceReadOffsetBytes = rec.GetIntGauge(METRIC_PLUGIN_SOURCE_READ_OFFSET_BYTES);
+            // Do not PathStat here: GetOrCreate holds PluginMetricManager mutex.
+            seedMetricGaugesFromReaderState();
+        });
     if (mMetricsRecordRef == nullptr) {
         LOG_ERROR(sLogger,
                   ("failed to init metrics", "cannot get config's metricRecordRef")("config name", GetConfigName()));
@@ -986,8 +1061,9 @@ bool LogFileReader::ReadLog(LogBuffer& logBuffer, const Event* event, bool isSta
     bool tryRollback = true;
     if (event != nullptr && event->IsReaderFlushTimeout()) {
         // If flush timeout event, we should filter whether the event is legacy.
-        if (event->GetLastReadPos() == GetLastReadPos() && event->GetLastFilePos() == mLastFilePos
-            && event->GetInode() == mDevInode.inode) {
+        if (mDrainingWholeFileCache
+            || (event->GetLastReadPos() == GetLastReadPos() && event->GetLastFilePos() == mLastFilePos
+                && event->GetInode() == mDevInode.inode)) {
             tryRollback = false;
         } else {
             return false;
@@ -1343,6 +1419,64 @@ bool LogFileReader::CheckFileSignatureAndOffset(bool isOpenOnUpdate) {
     mLogFileOp.Stat(ps);
     time_t lastMTime = mLastMTime;
     mLastMTime = ps.GetMtime();
+
+    // In WHOLE_FILE overwrite mode, the entire file is treated as a single log entry. A rewrite must be
+    // re-read from the beginning. Detection combines three signals (OR), so a same-second overwrite that
+    // a second-precision mtime alone would miss is still caught:
+    //   1. mtime change at nanosecond OR second precision;
+    //   2. file size change;
+    //   3. first-1KB signature change (covers equal-size, same-timestamp rewrites).
+    // The 1KB signature read is only performed when the cheap mtime/size signals show no change.
+    if (mMultilineConfig.first->mMode == MultilineOptions::Mode::WHOLE_FILE
+        && mMultilineConfig.first->mFileWriteMode == MultilineOptions::FileWriteMode::OVERWRITE) {
+        int64_t mtimeSec = 0, mtimeNsec = 0;
+        ps.GetLastWriteTime(mtimeSec, mtimeNsec);
+        int64_t prevMTimeNsec = mLastMTimeNs;
+        int64_t prevWholeFileSize = mLastWholeFileSize;
+        mLastMTimeNs = mtimeNsec;
+        mLastWholeFileSize = endSize;
+
+        // Skip detection on the very first observation (no baseline yet).
+        if (lastMTime != 0) {
+            bool mtimeChanged = (lastMTime != mLastMTime) || (prevMTimeNsec != mtimeNsec);
+            bool sizeChanged = (prevWholeFileSize != endSize);
+            bool headChanged = false;
+            char firstLine[1025];
+            int nbytes = -1;
+            if (!mtimeChanged && !sizeChanged) {
+                nbytes = mLogFileOp.Pread(firstLine, 1, 1024, 0);
+                if (nbytes > 0) {
+                    firstLine[nbytes] = '\0';
+                    uint64_t tmpHash = mLastFileSignatureHash;
+                    uint32_t tmpSize = mLastFileSignatureSize;
+                    headChanged = !CheckAndUpdateSignature(string(firstLine), tmpHash, tmpSize);
+                }
+            }
+            if (mtimeChanged || sizeChanged || headChanged) {
+                LOG_INFO(sLogger,
+                         ("whole_file overwrite mode detected file modification, read from begin",
+                          mHostLogPath)("mtime changed", mtimeChanged)("size changed", sizeChanged)(
+                             "head changed", headChanged)("old mtime", lastMTime)("new mtime", mLastMTime)(
+                             "project", GetProject())("logstore", GetLogstore())("config", GetConfigName()));
+                mLastFilePos = 0;
+                mCache.clear();
+                mDrainingWholeFileCache = false;
+                mWholeFileChunkIndex = 0;
+                if (nbytes < 0) {
+                    nbytes = mLogFileOp.Pread(firstLine, 1, 1024, 0);
+                }
+                if (nbytes > 0) {
+                    firstLine[nbytes] = '\0';
+                    CheckAndUpdateSignature(string(firstLine), mLastFileSignatureHash, mLastFileSignatureSize);
+                }
+                if (mEOOption) {
+                    updatePrimaryCheckpointSignature();
+                }
+                return true;
+            }
+        }
+    }
+
     if (!isOpenOnUpdate || mLastFileSignatureSize == 0 || endSize < mLastFilePos
         || (endSize == mLastFilePos && lastMTime != mLastMTime)) {
         char firstLine[1025];
@@ -1551,6 +1685,21 @@ size_t LogFileReader::getNextReadSize(int64_t fileEnd, bool& fromCpt) {
         readSize = checkpoint.read_length();
         LOG_INFO(sLogger, ("read specified length", readSize)("offset", mLastFilePos));
     }
+    if (mMultilineConfig.first->mMode == MultilineOptions::Mode::WHOLE_FILE
+        && mMultilineConfig.first->mFileWriteMode == MultilineOptions::FileWriteMode::OVERWRITE) {
+        allowMoreBufferSize = true;
+        if (readSize > mMultilineConfig.first->mMaxWholeFileBytes) {
+            int32_t curTime = time(nullptr);
+            if (curTime - mWholeFileOversizeWarnTime >= INT32_FLAG(logtail_alarm_interval)) {
+                mWholeFileOversizeWarnTime = curTime;
+                LOG_WARNING(sLogger,
+                            ("whole_file overwrite mode file exceeds max limit, skipping", mHostLogPath)(
+                                "file size", fileEnd)("max allowed", mMultilineConfig.first->mMaxWholeFileBytes)(
+                                "project", GetProject())("logstore", GetLogstore())("config", GetConfigName()));
+            }
+            return 0;
+        }
+    }
     if (readSize > BUFFER_SIZE && !allowMoreBufferSize) {
         readSize = BUFFER_SIZE;
     }
@@ -1570,10 +1719,18 @@ void LogFileReader::setExactlyOnceCheckpointAfterRead(size_t readSize) {
 void LogFileReader::ReadUTF8(LogBuffer& logBuffer, int64_t end, bool& moreData, bool tryRollback, bool isStaticFile) {
     char* stringBuffer = nullptr;
     size_t nbytes = 0;
+    bool logTooLongSplitFlag = false;
 
     logBuffer.readOffset = mLastFilePos;
+    // WHOLE_FILE overwrite: chunked drain of large cache (continuation or initiation)
+    if (mDrainingWholeFileCache
+        || (!tryRollback && mMultilineConfig.first->mMode == MultilineOptions::Mode::WHOLE_FILE
+            && mMultilineConfig.first->mFileWriteMode == MultilineOptions::FileWriteMode::OVERWRITE
+            && mCache.size() > BUFFER_SIZE)) {
+        DrainWholeFileChunk(logBuffer, moreData);
+        return;
+    }
     if (!mLogFileOp.IsOpen()) {
-        // read flush timeout
         nbytes = mCache.size();
         StringBuffer stringMemory = logBuffer.sourcebuffer->AllocateStringBuffer(nbytes);
         stringBuffer = stringMemory.data;
@@ -1647,6 +1804,15 @@ void LogFileReader::ReadUTF8(LogBuffer& logBuffer, int64_t end, bool& moreData, 
             mCache.clear();
         } else {
             moreData = (nbytes == BUFFER_SIZE);
+            if (mMultilineConfig.first->mMode == MultilineOptions::Mode::WHOLE_FILE) {
+                if (!moreData && allowRollback) {
+                    mCache.assign(stringBuffer, stringBufferLen);
+                    return;
+                }
+                if (moreData) {
+                    logTooLongSplitFlag = true;
+                }
+            }
             auto alignedBytes = nbytes;
             if (allowRollback) {
                 alignedBytes = AlignLastCharacter(stringBuffer, nbytes);
@@ -1663,16 +1829,7 @@ void LogFileReader::ReadUTF8(LogBuffer& logBuffer, int64_t end, bool& moreData, 
                         int32_t rollbackLineFeedCount = 0;
                         nbytes = RemoveLastIncompleteLog(stringBuffer, nbytes, rollbackLineFeedCount, false);
                     }
-                    LOG_WARNING(sLogger,
-                                ("Log is too long and forced to be split at offset: ",
-                                 mLastFilePos + nbytes)("file: ", mHostLogPath)("inode: ", mDevInode.inode)(
-                                    "first 1024B log: ", logBuffer.rawBuffer.substr(0, 1024)));
-                    std::ostringstream oss;
-                    oss << "Log is too long and forced to be split at offset: " << ToString(mLastFilePos + nbytes)
-                        << " file: " << mHostLogPath << " inode: " << ToString(mDevInode.inode)
-                        << " first 1024B log: " << logBuffer.rawBuffer.substr(0, 1024) << std::endl;
-                    AlarmManager::GetInstance()->SendAlarmWarning(
-                        SPLIT_LOG_FAIL_ALARM, oss.str(), GetRegion(), GetProject(), GetConfigName(), GetLogstore());
+                    logTooLongSplitFlag = true;
                 } else {
                     // line is not finished yet nor more data, put all data in cache
                     mCache.assign(stringBuffer, stringBufferLen);
@@ -1705,7 +1862,17 @@ void LogFileReader::ReadUTF8(LogBuffer& logBuffer, int64_t end, bool& moreData, 
     logBuffer.readLength = nbytes;
     setExactlyOnceCheckpointAfterRead(nbytes);
     mLastFilePos += nbytes;
-
+    if (logTooLongSplitFlag) {
+        LOG_WARNING(sLogger,
+                    ("Log is too long and forced to be split at offset: ", mLastFilePos)("file: ", mHostLogPath)(
+                        "inode: ", mDevInode.inode)("first 1024B log: ", logBuffer.rawBuffer.substr(0, 1024)));
+        std::ostringstream oss;
+        oss << "Log is too long and forced to be split at offset: " << ToString(mLastFilePos)
+            << " file: " << mHostLogPath << " inode: " << ToString(mDevInode.inode)
+            << " first 1024B log: " << logBuffer.rawBuffer.substr(0, 1024) << std::endl;
+        AlarmManager::GetInstance()->SendAlarmWarning(
+            SPLIT_LOG_FAIL_ALARM, oss.str(), GetRegion(), GetProject(), GetConfigName(), GetLogstore());
+    }
     LOG_DEBUG(sLogger, ("read size", nbytes)("last file pos", mLastFilePos));
 }
 
@@ -1720,8 +1887,15 @@ void LogFileReader::ReadGBK(LogBuffer& logBuffer, int64_t end, bool& moreData, b
     bool allowRollback = true;
 
     logBuffer.readOffset = mLastFilePos;
+    // WHOLE_FILE overwrite: chunked drain of large cache (continuation or initiation)
+    if (mDrainingWholeFileCache
+        || (!tryRollback && mMultilineConfig.first->mMode == MultilineOptions::Mode::WHOLE_FILE
+            && mMultilineConfig.first->mFileWriteMode == MultilineOptions::FileWriteMode::OVERWRITE
+            && mCache.size() > BUFFER_SIZE)) {
+        DrainWholeFileChunk(logBuffer, moreData);
+        return;
+    }
     if (!mLogFileOp.IsOpen()) {
-        // read flush timeout
         readCharCount = mCache.size();
         gbkMemory.reset(new char[readCharCount + 1]);
         gbkBuffer = gbkMemory.get();
@@ -1787,6 +1961,15 @@ void LogFileReader::ReadGBK(LogBuffer& logBuffer, int64_t end, bool& moreData, b
             mCache.clear();
         } else {
             moreData = (readCharCount == BUFFER_SIZE);
+            if (mMultilineConfig.first->mMode == MultilineOptions::Mode::WHOLE_FILE) {
+                if (!moreData && allowRollback) {
+                    mCache.assign(gbkBuffer, originReadCount);
+                    return;
+                }
+                if (moreData) {
+                    logTooLongSplitFlag = true;
+                }
+            }
             auto alignedBytes = readCharCount;
             if (allowRollback) {
                 alignedBytes = AlignLastCharacter(gbkBuffer, readCharCount);
@@ -1999,6 +2182,9 @@ LogFileReader::RemoveLastIncompleteLog(char* buffer, int32_t size, int32_t& roll
     if (!allowRollback || size == 0) {
         return size;
     }
+    if (mMultilineConfig.first->mMode == MultilineOptions::Mode::WHOLE_FILE) {
+        return size;
+    }
     int32_t endPs = 0; // the position of \n or \0
     if (buffer[size - 1] == '\n') {
         endPs = size - 1;
@@ -2129,6 +2315,82 @@ size_t LogFileReader::AlignLastCharacter(char* buffer, size_t size) {
     return size;
 }
 
+size_t LogFileReader::GetWholeFileChunkSize(char* data, size_t available) {
+    if (available <= BUFFER_SIZE) {
+        return available; // last chunk takes everything
+    }
+    // Prefer to end on a line boundary: the last '\n' within the window (newline included in the chunk).
+    for (size_t i = BUFFER_SIZE; i > 0; --i) {
+        if (data[i - 1] == '\n') {
+            return i;
+        }
+    }
+    // No newline in the window: avoid splitting a multibyte character (encoding-aware).
+    size_t aligned = AlignLastCharacter(data, BUFFER_SIZE);
+    return aligned == 0 ? BUFFER_SIZE : aligned; // guarantee progress
+}
+
+int32_t LogFileReader::CountWholeFileChunks() {
+    int32_t count = 0;
+    size_t pos = 0;
+    size_t total = mCache.size();
+    char* data = total ? &mCache[0] : nullptr;
+    while (pos < total) {
+        pos += GetWholeFileChunkSize(data + pos, total - pos);
+        ++count;
+    }
+    return count;
+}
+
+void LogFileReader::DrainWholeFileChunk(LogBuffer& logBuffer, bool& moreData) {
+    if (!mDrainingWholeFileCache) {
+        mDrainingWholeFileCache = true;
+        mWholeFileChunkIndex = 0;
+        mWholeFileTotalChunks = CountWholeFileChunks();
+        mWholeFileId = mHostLogPath + "_" + ToString(mLastMTime) + "_" + ToString(mDevInode.inode);
+        mLastForceRead = true;
+    }
+    if (mCache.empty()) {
+        mDrainingWholeFileCache = false;
+        moreData = false;
+        return;
+    }
+    char* data = &mCache[0];
+    size_t chunkSize = GetWholeFileChunkSize(data, mCache.size());
+    if (mReaderConfig.first->mFileEncoding == FileReaderOptions::Encoding::GBK) {
+        // mCache holds raw GBK bytes; convert this chunk to UTF8 so it is readable downstream.
+        vector<long> lineFeedPos = {-1};
+        for (long idx = 0; idx < static_cast<long>(chunkSize) - 1; ++idx) {
+            if (data[idx] == '\n') {
+                lineFeedPos.push_back(idx);
+            }
+        }
+        lineFeedPos.push_back(static_cast<long>(chunkSize) - 1);
+        size_t srcLength = chunkSize;
+        size_t requiredLen
+            = EncodingConverter::GetInstance()->ConvertGbk2Utf8(data, &srcLength, nullptr, 0, lineFeedPos);
+        StringBuffer stringMemory = logBuffer.sourcebuffer->AllocateStringBuffer(requiredLen + 1);
+        size_t resultCharCount = EncodingConverter::GetInstance()->ConvertGbk2Utf8(
+            data, &srcLength, stringMemory.data, stringMemory.capacity, lineFeedPos);
+        logBuffer.rawBuffer = StringView(stringMemory.data, resultCharCount);
+    } else {
+        StringBuffer stringMemory = logBuffer.sourcebuffer->AllocateStringBuffer(chunkSize);
+        memcpy(stringMemory.data, data, chunkSize);
+        logBuffer.rawBuffer = StringView(stringMemory.data, chunkSize);
+    }
+    logBuffer.readLength = chunkSize;
+    logBuffer.readOffset = mLastFilePos;
+    logBuffer.wholeFileId = mWholeFileId;
+    logBuffer.wholeFileSeq = mWholeFileChunkIndex++;
+    logBuffer.wholeFileTotal = mWholeFileTotalChunks;
+    mCache.erase(0, chunkSize);
+    mLastFilePos += chunkSize;
+    moreData = !mCache.empty();
+    if (!moreData) {
+        mDrainingWholeFileCache = false;
+    }
+}
+
 std::unique_ptr<Event> LogFileReader::CreateFlushTimeoutEvent() {
     auto result = std::make_unique<Event>(mHostLogPathDir,
                                           mHostLogPathFile,
@@ -2148,6 +2410,31 @@ void LogFileReader::ReportMetrics(uint64_t readSize) {
     ADD_COUNTER(mOutSizeBytes, readSize);
     SET_GAUGE(mSourceReadOffsetBytes, GetLastFilePos());
     SET_GAUGE(mSourceSizeBytes, GetFileSize());
+}
+
+void LogFileReader::InitMetricGauges() {
+    // On config reload a new reader is created for the same file, sharing the same
+    // reentrant metrics record (keyed by config name + file labels). When the old
+    // reader is destroyed before the new one is built, the record is released and
+    // recreated with gauges defaulting to 0, so the source_size_bytes / read_offset_bytes
+    // series show a spurious drop to 0 until the new reader's first ReportMetrics call.
+    // Seed the gauges here with the reader's restored state to close that 0 window.
+    int64_t readOffset = GetLastFilePos();
+    // Best-effort current file size; the gauge is refreshed with the exact value on the
+    // first read. Fall back to readOffset (source_size >= read_offset always) so the size
+    // gauge never reads 0 either.
+    int64_t fileSize = readOffset;
+    fsutil::PathStat ps;
+    if (fsutil::PathStat::stat(mHostLogPath, ps)) {
+        fileSize = ps.GetFileSize();
+    }
+    // Clamp to the read offset to preserve the source_size >= read_offset invariant even
+    // when the file was truncated across the reload (stat succeeds but reports a size
+    // smaller than the checkpoint-restored offset), avoiding an unexpected size gauge
+    // regression. The exact size is restored on the first ReportMetrics call.
+    fileSize = std::max(fileSize, readOffset);
+    SET_GAUGE(mSourceReadOffsetBytes, readOffset);
+    SET_GAUGE(mSourceSizeBytes, fileSize);
 }
 
 
@@ -2521,6 +2808,12 @@ PipelineEventGroup LogFileReader::GenerateEventGroup(LogFileReaderPtr reader, Lo
     event->SetContentNoCopy(DEFAULT_CONTENT_KEY, logBuffer->rawBuffer);
     event->SetPosition(logBuffer->readOffset, logBuffer->readLength);
 
+    if (logBuffer->wholeFileSeq >= 0) {
+        event->SetContent("__whole_file_id__", logBuffer->wholeFileId);
+        event->SetContent("__whole_file_seq__", ToString(logBuffer->wholeFileSeq));
+        event->SetContent("__whole_file_total__", ToString(logBuffer->wholeFileTotal));
+    }
+
     return group;
 }
 
@@ -2543,7 +2836,7 @@ bool LogFileReader::UpdateContainerInfo() {
         LOG_INFO(sLogger,
                  ("container info of file reader changed", "may be because container restart")(
                      "old container id", mContainerID)("new container id", containerInfo->mRawContainerInfo->mID)(
-                     "container status", containerInfo->mRawContainerInfo->mStopped ? "stopped" : "running"));
+                     "container status", containerInfo->mRawContainerInfo->mStopped.load() ? "stopped" : "running"));
         // if config have wildcard path, use wildcardPaths[0] as base path
         std::string dockerPath;
         size_t realBaseDirSize = 0;
@@ -2566,11 +2859,23 @@ bool LogFileReader::UpdateContainerInfo() {
         }
         SetDockerPath(dockerPath, realBaseDirSize);
         SetContainerID(containerInfo->mRawContainerInfo->mID);
-        mContainerStopped = containerInfo->mRawContainerInfo->mStopped;
+        mContainerStopped = containerInfo->mRawContainerInfo->mStopped.load();
         mContainerMetadatas.clear();
+        mContainerCustomMetadatas.clear();
         mContainerExtraTags.clear();
         SetContainerMetadatas(containerInfo->mRawContainerInfo->mMetadatas);
+        SetContainerCustomMetadatas(containerInfo->mRawContainerInfo->mCustomMetadatas);
         SetContainerExtraTags(containerInfo->mExtraTags);
+
+        MetricLabels newLabels = {{METRIC_LABEL_KEY_FILE_NAME, GetConvertedPath()},
+                                  {METRIC_LABEL_KEY_FILE_DEV, std::to_string(GetDevInode().dev)},
+                                  {METRIC_LABEL_KEY_FILE_INODE, std::to_string(GetDevInode().inode)}};
+        appendContainerMetricLabels(newLabels);
+        if (metricLabelsEqual(newLabels, mMetricLabels)) {
+            return true;
+        }
+        FileServer::GetInstance()->ReleaseReentrantMetricsRecordRef(GetConfigName(), mMetricLabels);
+        SetMetrics();
         return true;
     }
     return false;

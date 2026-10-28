@@ -113,10 +113,19 @@ bool CollectionPipeline::Init(CollectionConfig&& config) {
             = PluginRegistry::GetInstance()->CreateInput(pluginType, mIsOnetime, GenNextPluginMeta(false));
         if (input) {
             Json::Value optionalGoPipeline;
-            if (!input->Init(detail, mContext, i, optionalGoPipeline)) {
+            if (!input->Init(detail, mContext, mInputs.size(), optionalGoPipeline)) {
                 return false;
             }
             mInputs.emplace_back(std::move(input));
+            {
+                vector<unique_ptr<InputInstance>> extras;
+                if (!mInputs.back()->ExpandAdditionalInputs(mInputs.size(), extras)) {
+                    return false;
+                }
+                for (auto& extra : extras) {
+                    mInputs.emplace_back(std::move(extra));
+                }
+            }
             if (!optionalGoPipeline.isNull()) {
                 MergeGoPipeline(optionalGoPipeline, mGoPipelineWithInput);
             }

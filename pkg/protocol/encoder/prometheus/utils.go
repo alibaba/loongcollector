@@ -41,22 +41,36 @@ func marshalBatchTimeseriesData(wr *pb.WriteRequest) []byte {
 	return data
 }
 
-func genPromRemoteWriteTimeseries(event *models.Metric) pb.TimeSeries {
-	return pb.TimeSeries{
-		Labels: lexicographicalSort(append(convTagsToLabels(event.GetTags()), pb.Label{Name: metricNameKey, Value: event.GetName()})),
-		Samples: []pb.Sample{{
-			Value: event.GetValue().GetSingleValue(),
+func genPromRemoteWriteTimeseries(event *models.Metric) []pb.TimeSeries {
+	timestamp := int64(event.GetTimestamp()) / 1e6
+	baseLabels := convTagsToLabels(event.GetTags())
 
-			// Decode (during input_prometheus stage) makes timestamp
-			// with unix milliseconds into unix nanoseconds,
-			// e.g. "model.Time(milliseconds).Time().UnixNano()".
-			//
-			// Encode (during flusher_prometheus stage) conversely makes timestamp
-			// with unix nanoseconds into unix milliseconds,
-			// e.g. "int64(nanoseconds)/10^6".
-			Timestamp: int64(event.GetTimestamp()) / 1e6,
-		}},
+	if event.GetValue().IsMultiValues() {
+		series := make([]pb.TimeSeries, 0, event.GetValue().GetMultiValues().Len())
+		category := event.GetName()
+		for field, value := range event.GetValue().GetMultiValues().Iterator() {
+			labels := append([]pb.Label{}, baseLabels...)
+			labels = append(labels, pb.Label{Name: metricNameKey, Value: category + "_" + field})
+			series = append(series, pb.TimeSeries{
+				Labels: lexicographicalSort(labels),
+				Samples: []pb.Sample{{
+					Value:     value,
+					Timestamp: timestamp,
+				}},
+			})
+		}
+		return series
 	}
+
+	labels := append([]pb.Label{}, baseLabels...)
+	labels = append(labels, pb.Label{Name: metricNameKey, Value: event.GetName()})
+	return []pb.TimeSeries{{
+		Labels: lexicographicalSort(labels),
+		Samples: []pb.Sample{{
+			Value:     event.GetValue().GetSingleValue(),
+			Timestamp: timestamp,
+		}},
+	}}
 }
 
 func convTagsToLabels(tags models.Tags) []pb.Label {

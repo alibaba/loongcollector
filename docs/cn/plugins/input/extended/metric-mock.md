@@ -4,6 +4,15 @@
 
 `metric_mock` 插件是用于模拟采集Metric类型输入数据的插件，可以通过调整参数获取不同的模拟输入。[源代码](https://github.com/alibaba/loongcollector/blob/main/plugins/input/mock/input_mock.go)
 
+
+## 事件能力
+
+列含义见 [概览 · 事件能力列说明](../../overview.md#事件能力列说明)。
+
+| Log | Metric | Span |
+| --- | --- | --- |
+| — | ✓ | — |
+
 ## 版本
 
 [Stable](../../stability-level.md)
@@ -42,16 +51,17 @@ flushers:
 
 ```json
 {
-    "field2":"field2",
-    "Index":"1",
-    "field1":"field1",
-    "__time__":"1658807050"
+    "field2": "field2",
+    "Index": "1",
+    "field1": "field1",
+    "__time__": "1658807050"
 }
+
 {
-    "field1":"field1",
-    "field2":"field2",
-    "Index":"2",
-    "__time__":"1658807051"
+    "field1": "field1",
+    "field2": "field2",
+    "Index": "2",
+    "__time__": "1658807051"
 }
 ```
 
@@ -78,17 +88,18 @@ flushers:
 
 ```json
 {
-    "__name__":"metrics_mock",
-    "__labels__":"field1#$#field1|field2#$#field2|tag1#$#tag1|tag2#$#tag2",
-    "__time_nano__":"1658806869597190887",
-    "__value__":"101",
-    "__time__":"1658806869"
+    "__name__": "metrics_mock",
+    "__labels__": "field1#$#field1|field2#$#field2|tag1#$#tag1|tag2#$#tag2",
+    "__time_nano__": "1658806869597190887",
+    "__value__": "101",
+    "__time__": "1658806869"
 }
+
 {
-    "__name__":"metrics_mock",
-    "__labels__":"field1#$#field1|field2#$#field2|tag1#$#tag1|tag2#$#tag2",
-    "__time_nano__":"1658806870597391426",
-    "__value__":"102",
-    "__time__":"1658806870"
+    "__name__": "metrics_mock",
+    "__labels__": "field1#$#field1|field2#$#field2|tag1#$#tag1|tag2#$#tag2",
+    "__time_nano__": "1658806870597391426",
+    "__value__": "102",
+    "__time__": "1658806870"
 }
 ```

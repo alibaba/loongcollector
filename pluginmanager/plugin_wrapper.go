@@ -32,6 +32,11 @@ type InputWrapper struct {
 	Tags     map[string]string
 	Interval time.Duration
 
+	// SourceMetricRecord is the plugin_source-level MetricsRecord (category=plugin_source).
+	// It is registered last so Context.GetMetricRecord() during Input.Init attaches
+	// plugin-specific metrics (binlog file, collect latency, …) to plugin_source.
+	SourceMetricRecord *selfmonitor.MetricsRecord
+
 	outEventsTotal      selfmonitor.CounterMetric
 	outEventGroupsTotal selfmonitor.CounterMetric
 	outSizeBytes        selfmonitor.CounterMetric
@@ -41,9 +46,21 @@ func (wrapper *InputWrapper) InitMetricRecord(pluginMeta *pipeline.PluginMeta) {
 	labels := pipeline.GetPluginCommonLabels(wrapper.Config.Context, pluginMeta)
 	wrapper.MetricRecord = wrapper.Config.Context.RegisterMetricRecord(labels)
 
-	wrapper.outEventsTotal = selfmonitor.NewCounterMetricAndRegister(wrapper.MetricRecord, selfmonitor.MetricPluginOutEventsTotal)
-	wrapper.outEventGroupsTotal = selfmonitor.NewCounterMetricAndRegister(wrapper.MetricRecord, selfmonitor.MetricPluginOutEventGroupsTotal)
-	wrapper.outSizeBytes = selfmonitor.NewCounterMetricAndRegister(wrapper.MetricRecord, selfmonitor.MetricPluginOutSizeBytes)
+	pluginOutEventsTotal := selfmonitor.NewCounterMetricAndRegister(wrapper.MetricRecord, selfmonitor.MetricPluginOutEventsTotal)
+	pluginOutEventGroupsTotal := selfmonitor.NewCounterMetricAndRegister(wrapper.MetricRecord, selfmonitor.MetricPluginOutEventGroupsTotal)
+	pluginOutSizeBytes := selfmonitor.NewCounterMetricAndRegister(wrapper.MetricRecord, selfmonitor.MetricPluginOutSizeBytes)
+
+	sourceLabels := selfmonitor.CloneLabelsWithCategory(labels, selfmonitor.MetricLabelValueMetricCategoryPluginSource)
+	wrapper.SourceMetricRecord = wrapper.Config.Context.RegisterMetricRecord(sourceLabels)
+
+	sourceOutEventsTotal := selfmonitor.NewCounterMetricAndRegister(wrapper.SourceMetricRecord, selfmonitor.MetricPluginOutEventsTotal)
+	sourceOutEventGroupsTotal := selfmonitor.NewCounterMetricAndRegister(wrapper.SourceMetricRecord, selfmonitor.MetricPluginOutEventGroupsTotal)
+	sourceOutSizeBytes := selfmonitor.NewCounterMetricAndRegister(wrapper.SourceMetricRecord, selfmonitor.MetricPluginOutSizeBytes)
+
+	// Fan-out so v1 AddData* and v2 PipelineCollectorWrapper increment both categories.
+	wrapper.outEventsTotal = selfmonitor.NewFanoutCounter(pluginOutEventsTotal, sourceOutEventsTotal)
+	wrapper.outEventGroupsTotal = selfmonitor.NewFanoutCounter(pluginOutEventGroupsTotal, sourceOutEventGroupsTotal)
+	wrapper.outSizeBytes = selfmonitor.NewFanoutCounter(pluginOutSizeBytes, sourceOutSizeBytes)
 }
 
 // The service plugin is an input plugin used for passively receiving data.

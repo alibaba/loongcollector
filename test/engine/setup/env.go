@@ -15,6 +15,7 @@ package setup
 
 import (
 	"context"
+	"strings"
 
 	"github.com/alibaba/ilogtail/test/config"
 )
@@ -38,7 +39,24 @@ func InitEnv(ctx context.Context, envType string) (context.Context, error) {
 	case "deployment":
 		Env = NewDeploymentEnv()
 	}
-	return SetAgentPID(ctx)
+	// PID is captured after compose start in StartDockerComposeEnv; avoid host stray processes here.
+	if envType == "docker-compose" {
+		return ctx, nil
+	}
+	ctx, err := SetAgentPID(ctx)
+	if err != nil {
+		return ctx, err
+	}
+	return EnsureGeneratedLogDir(ctx)
+}
+
+// EnsureGeneratedLogDir creates GENERATED_LOG_DIR on the test target before log generation.
+func EnsureGeneratedLogDir(ctx context.Context) (context.Context, error) {
+	if config.TestConfig.GeneratedLogDir == "" {
+		return ctx, nil
+	}
+	_, err := Env.ExecOnSource(ctx, "mkdir -p "+config.TestConfig.GeneratedLogDir)
+	return ctx, err
 }
 
 func Mkdir(ctx context.Context, dir string) (context.Context, error) {
@@ -48,7 +66,7 @@ func Mkdir(ctx context.Context, dir string) (context.Context, error) {
 }
 
 func SetAgentPID(ctx context.Context) (context.Context, error) {
-	command := "ps -e | grep loongcollector | grep -v grep | awk '{print $1}'"
+	command := "ps -e | grep '[l]oongcollector' | awk '{print $1}' | head -1"
 	result, err := Env.ExecOnLoongCollector(command)
 	if err != nil {
 		if err.Error() == "not implemented" {
@@ -56,7 +74,7 @@ func SetAgentPID(ctx context.Context) (context.Context, error) {
 		}
 		return ctx, err
 	}
-	return context.WithValue(ctx, config.AgentPIDKey, result), nil
+	return context.WithValue(ctx, config.AgentPIDKey, strings.TrimSpace(result)), nil
 }
 
 func RunCommandOnSource(ctx context.Context, command string) (context.Context, error) {

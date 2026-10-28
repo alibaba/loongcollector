@@ -1,16 +1,33 @@
 syntax = "proto3";
 package logtail.models;
 
+option go_package = "protocol";
+
+enum UntypedValueMetricType {
+  METRIC_TYPE_COUNTER = 0;
+  METRIC_TYPE_GAUGE = 1;
+}
+
 message UntypedSingleValue {
     double Value = 1;
 }
 
-message MetricEvent {  
+message UntypedMultiDoubleValue {
+    UntypedValueMetricType MetricType = 1;
+    double Value = 2;
+}
+
+message UntypedMultiDoubleValues {
+    map<string, UntypedMultiDoubleValue> Values = 1;
+}
+
+message MetricEvent {
     uint64 Timestamp = 1;
-    bytes Name = 2;  
+    bytes Name = 2;
     map<string, bytes> Tags = 3;
     oneof Value {
         UntypedSingleValue UntypedSingleValue = 4;
+        UntypedMultiDoubleValues UntypedMultiDoubleValues = 6;
     }
     map<string, bytes> Metadata = 5;    // Metadata related to the metric, only used to construct the Flusher Request
 }

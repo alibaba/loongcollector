@@ -41,6 +41,5 @@ public:
 private:
     mutable std::mutex mMutex;
     std::vector<std::shared_ptr<RetryableEvent>> mEventQueue;
-    std::vector<std::shared_ptr<RetryableEvent>> mEventProcessing;
 };
 } // namespace logtail::ebpf

@@ -23,12 +23,15 @@
 package journal
 
 import (
-	"github.com/alibaba/ilogtail/pkg/logger"
-	"github.com/alibaba/ilogtail/pkg/util"
 	"io"
 	"time"
 
+	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/util"
+
 	"github.com/coreos/go-systemd/sdjournal"
+
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
 // SD_JOURNAL_FIELD_CATALOG_ENTRY stores the name of the JournalEntry field to export Catalog entry to.
@@ -74,9 +77,9 @@ func (sj *ServiceJournal) Follow(journal *sdjournal.Journal, stop <-chan struct{
 			entry, err := readEntry(journal)
 			if err != nil && err != io.EOF {
 				if cursor, cerr := journal.GetCursor(); cerr != nil {
-					logger.Warningf(sj.context.GetRuntimeContext(), "JOURNAL_READ_ALARM", "Received unknown error when reading a new entry: %v, cursor read error: %v", err, cerr)
+					logger.Warningf(sj.context.GetRuntimeContext(), selfmonitor.JournalReadAlarm, "Received unknown error when reading a new entry: %v, cursor read error: %v", err, cerr)
 				} else {
-					logger.Warningf(sj.context.GetRuntimeContext(), "JOURNAL_READ_ALARM", "Received unknown error when reading a new entry: %v, cursor: %s", err, cursor)
+					logger.Warningf(sj.context.GetRuntimeContext(), selfmonitor.JournalReadAlarm, "Received unknown error when reading a new entry: %v, cursor: %s", err, cursor)
 				}
 				util.RandomSleep(time.Second*5, 0.1, stop)
 				continue
@@ -120,7 +123,7 @@ func (sj *ServiceJournal) Follow(journal *sdjournal.Journal, stop <-chan struct{
 					case -9:
 						continue process
 					default:
-						logger.Warningf(sj.context.GetRuntimeContext(), "JOURNAL_READ_ALARM", "Received unknown event: %d", e)
+						logger.Warningf(sj.context.GetRuntimeContext(), selfmonitor.JournalReadAlarm, "Received unknown event: %d", e)
 						util.RandomSleep(time.Second*5, 0.1, stop)
 					}
 				}

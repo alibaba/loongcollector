@@ -4,6 +4,15 @@
 
 `service_http_server` `input`插件可以接收来自unix socket、http/https、tcp的请求，并支持sls协议、otlp等多种协议。
 
+
+## 事件能力
+
+列含义见 [概览 · 事件能力列说明](../../overview.md#事件能力列说明)。
+
+| Log | Metric | Span |
+| --- | --- | --- |
+| ✓ | ✓ | ✓ |
+
 ## 版本
 
 [Stable](../../stability-level.md)
@@ -179,17 +188,18 @@ curl --location --request POST 'http://127.0.0.1:12345?QueryKey=queryValue' --he
 
 * 输出
 
-```plain
+```text
 [Event] event 1, metadata map[_header_prefix_HeaderKey:headerValue _param_prefix_QueryKey:queryValue], tags map[__hostname__:579ce1e01dea]
+```
 
+```json
 {
-    "eventType":"byteArray",
-    "name":"",
-    "timestamp":0,
-    "observedTimestamp":0,
-    "tags":{
-    },
-    "byteArray":"test_measurement,host=server01,region=cn value=0.5"
+    "eventType": "byteArray",
+    "name": "",
+    "timestamp": 0,
+    "observedTimestamp": 0,
+    "tags": {},
+    "byteArray": "test_measurement,host=server01,region=cn value=0.5"
 }
 ```
 

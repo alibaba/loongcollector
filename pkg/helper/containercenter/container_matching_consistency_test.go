@@ -22,7 +22,7 @@ import (
 	"testing"
 
 	"github.com/dlclark/regexp2"
-	"github.com/docker/docker/api/types/container"
+	"github.com/moby/moby/api/types/container"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -71,11 +71,9 @@ type TestData struct {
 func convertTestContainerToDockerInfoDetail(tc TestContainer) *DockerInfoDetail {
 	// Create container JSON
 	containerJSON := container.InspectResponse{
-		ContainerJSONBase: &container.ContainerJSONBase{
-			ID: tc.ID,
-			State: &container.State{
-				Status: "running",
-			},
+		ID: tc.ID,
+		State: &container.State{
+			Status: "running",
 		},
 		Config: &container.Config{
 			Labels: tc.Labels,
@@ -146,8 +144,8 @@ func runTestFile(t *testing.T, testFilePath string) {
 		containers[tc.ID] = convertTestContainerToDockerInfoDetail(tc)
 	}
 
-	// Set up the global container center with test data
-	containerCenterInstance := getContainerCenterInstance()
+	// Set up an isolated container center without its background discovery goroutine.
+	containerCenterInstance = newTestContainerCenter()
 	containerCenterInstance.lock.Lock()
 	containerCenterInstance.containerMap = containers
 	containerCenterInstance.lock.Unlock()

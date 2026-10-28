@@ -21,15 +21,20 @@ import (
 	"sync"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
 type FlusherChecker struct {
-	context  pipeline.Context
+	context pipeline.Context
+	// LogGroup records data received via the v1 Flush entry point.
 	LogGroup protocol.LogGroup
-	Lock     sync.RWMutex
-	Ready    bool
+	// GroupEvents records data received via the v2 Export entry point. It is kept
+	// as native PipelineGroupEvents rather than being converted to a v1 LogGroup.
+	GroupEvents []*models.PipelineGroupEvents
+	Lock        sync.RWMutex
+	Ready       bool
 }
 
 func (p *FlusherChecker) Init(context pipeline.Context) error {
@@ -45,7 +50,11 @@ func (*FlusherChecker) Description() string {
 func (p *FlusherChecker) GetLogCount() int {
 	p.Lock.Lock()
 	defer p.Lock.Unlock()
-	return len(p.LogGroup.Logs)
+	count := len(p.LogGroup.Logs)
+	for _, groupEvents := range p.GroupEvents {
+		count += len(groupEvents.Events)
+	}
+	return count
 }
 
 func (p *FlusherChecker) SetUrgent(flag bool) {
@@ -64,7 +73,7 @@ func (p *FlusherChecker) CheckKeyValue(key, value string) error {
 			}
 		}
 	}
-	return fmt.Errorf("cannot find this key :" + key)
+	return fmt.Errorf("cannot find this key: %s", key)
 }
 
 func (p *FlusherChecker) CheckKeyValueAny(key, value string) error {
@@ -79,7 +88,7 @@ func (p *FlusherChecker) CheckKeyValueAny(key, value string) error {
 			}
 		}
 	}
-	return fmt.Errorf("cannot find this key :" + key + ", value :" + value)
+	return fmt.Errorf("cannot find this key: %s, value: %s", key, value)
 }
 
 func (p *FlusherChecker) CheckKeyValueRegex(key, valueRegex string) error {
@@ -95,7 +104,7 @@ func (p *FlusherChecker) CheckKeyValueRegex(key, valueRegex string) error {
 			}
 		}
 	}
-	return fmt.Errorf("cannot find this key :" + key)
+	return fmt.Errorf("cannot find this key: %s", key)
 }
 
 func (p *FlusherChecker) CheckEveryLog(checker func(*protocol.Log) error) error {
@@ -135,6 +144,21 @@ func (p *FlusherChecker) Flush(projectName string, logstoreName string, configNa
 			// ilogtail.CopySLSLog(log)
 			p.LogGroup.Logs = append(p.LogGroup.Logs, newLog)
 		}
+	}
+	return nil
+}
+
+// Export is the v2 pipeline entry point. It records PipelineGroupEvents directly
+// for later assertion, without converting to protocol.LogGroup or going through
+// Flush, both of which belong to the v1 pipeline and are planned for removal.
+func (p *FlusherChecker) Export(groups []*models.PipelineGroupEvents, _ pipeline.PipelineContext) error {
+	p.Lock.Lock()
+	defer p.Lock.Unlock()
+	for _, groupEvents := range groups {
+		if groupEvents == nil || len(groupEvents.Events) == 0 {
+			continue
+		}
+		p.GroupEvents = append(p.GroupEvents, groupEvents)
 	}
 	return nil
 }

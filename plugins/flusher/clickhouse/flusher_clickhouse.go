@@ -18,15 +18,18 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"strings"
 	"time"
 
 	"github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	converter "github.com/alibaba/ilogtail/pkg/protocol/converter"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
 type FlusherClickHouse struct {
@@ -123,7 +126,7 @@ func (f *FlusherClickHouse) Init(context pipeline.Context) error {
 	f.context = context
 	// Validate config of flusher
 	if err := f.Validate(); err != nil {
-		logger.Warning(f.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "init clickhouse flusher fail, error", err)
+		logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherInitAlarm, "init clickhouse flusher fail, error", err)
 		return err
 	}
 	// Set default value while not set
@@ -136,18 +139,18 @@ func (f *FlusherClickHouse) Init(context pipeline.Context) error {
 	// Init converter
 	convert, err := f.getConverter()
 	if err != nil {
-		logger.Warning(f.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "init clickhouse flusher converter fail, error", err)
+		logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherInitAlarm, "init clickhouse flusher converter fail, error", err)
 		return err
 	}
 	f.converter = convert
 	conn, err := newConn(f)
 	if err != nil {
-		logger.Warning(f.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "init clickhouse flusher error", err)
+		logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherInitAlarm, "init clickhouse flusher error", err)
 		return err
 	}
 	f.conn = conn
 	if err = createNullBufferTable(f); err != nil {
-		logger.Warning(f.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "init clickhouse flusher error", err)
+		logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherInitAlarm, "init clickhouse flusher error", err)
 		return err
 	}
 	return nil
@@ -160,12 +163,12 @@ func (f *FlusherClickHouse) Description() string {
 func (f *FlusherClickHouse) Validate() error {
 	if len(f.Addresses) == 0 {
 		var err = fmt.Errorf("clickhouse addrs is nil")
-		logger.Warning(f.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "init clickhouse flusher error", err)
+		logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherInitAlarm, "init clickhouse flusher error", err)
 		return err
 	}
 	if f.Table == "" {
 		var err = fmt.Errorf("clickhouse table is nil")
-		logger.Warning(f.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "init clickhouse flusher error", err)
+		logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherInitAlarm, "init clickhouse flusher error", err)
 		return err
 	}
 	return nil
@@ -181,6 +184,24 @@ func (f *FlusherClickHouse) Flush(projectName string, logstoreName string, confi
 	return f.flusher(projectName, logstoreName, configName, logGroupList)
 }
 
+func (f *FlusherClickHouse) Export(groups []*models.PipelineGroupEvents, _ pipeline.PipelineContext) error {
+	ctx := context.Background()
+	for _, groupEvents := range groups {
+		serializedLogs, err := f.converter.ToByteStreamV2(groupEvents)
+		if err != nil {
+			logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "flush clickhouse convert log fail, error", err)
+			continue
+		}
+		for _, log := range serializedLogs.([][]byte) {
+			sql := fmt.Sprintf("INSERT INTO %s.ilogtail_%s_buffer (_timestamp, _log) VALUES (%d, '%s')", f.Authentication.PlainText.Database, f.Table, time.Now().Unix(), escapeClickHouseStringLiteral(string(log)))
+			if err := f.conn.AsyncInsert(ctx, sql, false); err != nil {
+				logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "flush clickhouse AsyncInsert fail, error", err)
+			}
+		}
+	}
+	return nil
+}
+
 func (f *FlusherClickHouse) BufferFlush(projectName string, logstoreName string, configName string, logGroupList []*protocol.LogGroup) error {
 	ctx := context.Background()
 	for _, logGroup := range logGroupList {
@@ -188,13 +209,13 @@ func (f *FlusherClickHouse) BufferFlush(projectName string, logstoreName string,
 		// Merge topicKeys and HashKeys,Only one convert after merge
 		serializedLogs, err := f.converter.ToByteStream(logGroup)
 		if err != nil {
-			logger.Warning(f.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM", "flush clickhouse convert log fail, error", err)
+			logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "flush clickhouse convert log fail, error", err)
 		}
 		for _, log := range serializedLogs.([][]byte) {
-			sql := fmt.Sprintf("INSERT INTO %s.ilogtail_%s_buffer (_timestamp, _log) VALUES (%d, '%s')", f.Authentication.PlainText.Database, f.Table, time.Now().Unix(), string(log))
+			sql := fmt.Sprintf("INSERT INTO %s.ilogtail_%s_buffer (_timestamp, _log) VALUES (%d, '%s')", f.Authentication.PlainText.Database, f.Table, time.Now().Unix(), escapeClickHouseStringLiteral(string(log)))
 			err = f.conn.AsyncInsert(ctx, sql, false)
 			if err != nil {
-				logger.Warning(f.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM", "flush clickhouse AsyncInsert fail, error", err)
+				logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "flush clickhouse AsyncInsert fail, error", err)
 			}
 		}
 		logger.Debug(f.context.GetRuntimeContext(), "ClickHouse success send events: messageID")
@@ -223,7 +244,7 @@ func init() {
 func newConn(f *FlusherClickHouse) (driver.Conn, error) {
 	compression, err := compressionMethod(f.Compression)
 	if err != nil {
-		logger.Warning(f.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "init clickhouse flusher error", err)
+		logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherInitAlarm, "init clickhouse flusher error", err)
 		return nil, err
 	}
 	opt := &clickhouse.Options{
@@ -247,20 +268,20 @@ func newConn(f *FlusherClickHouse) (driver.Conn, error) {
 	}
 	if err = f.Authentication.ConfigureAuthentication(opt); err != nil {
 		err = fmt.Errorf("configure authenticationfailed, err: %w", err)
-		logger.Warning(f.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "init clickhouse flusher error", err)
+		logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherInitAlarm, "init clickhouse flusher error", err)
 		return nil, err
 	}
 	conn, err := clickhouse.Open(opt)
 	if err != nil {
 		err = fmt.Errorf("sql open failed, err: %w", err)
-		logger.Warning(f.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "init clickhouse flusher error", err)
+		logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherInitAlarm, "init clickhouse flusher error", err)
 		return nil, err
 	}
 	if err = conn.Ping(context.Background()); err != nil {
 		if exception, ok := err.(*clickhouse.Exception); ok {
-			logger.Warning(f.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "code", exception.Code, "msg", exception.Message, "trace", exception.StackTrace)
+			logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherInitAlarm, "code", exception.Code, "msg", exception.Message, "trace", exception.StackTrace)
 		} else {
-			logger.Warning(f.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "error", err)
+			logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherInitAlarm, "error", err)
 		}
 		return nil, err
 	}
@@ -276,7 +297,7 @@ func createNullBufferTable(f *FlusherClickHouse) error {
 	}
 	sqlNull := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (`_timestamp` Int64,`_log` String) ENGINE = Null", sqlNullTableName)
 	if err := f.conn.Exec(context.Background(), sqlNull); err != nil {
-		logger.Warning(f.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "sql", sqlNull, "error", err)
+		logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherInitAlarm, "sql", sqlNull, "error", err)
 		return err
 	}
 	sqlBuffer := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s AS `%s`.`ilogtail_%s` ENGINE = Buffer(%s, ilogtail_%s, %d, %d, %d, %d, %d, %d, %d)",
@@ -286,10 +307,22 @@ func createNullBufferTable(f *FlusherClickHouse) error {
 		f.BufferNumLayers, f.BufferMinTime, f.BufferMaxTime, f.BufferMinRows, f.BufferMaxRows, f.BufferMinBytes, f.BufferMaxBytes,
 	)
 	if err := f.conn.Exec(context.Background(), sqlBuffer); err != nil {
-		logger.Warning(f.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "sql", sqlBuffer, "error", err)
+		logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherInitAlarm, "sql", sqlBuffer, "error", err)
 		return err
 	}
 	return nil
+}
+
+// escapeClickHouseStringLiteral escapes a string so it can be safely embedded
+// inside a single-quoted ClickHouse SQL string literal. ClickHouse consumes
+// backslash escape sequences (e.g. \" -> ") while parsing literals, so a JSON
+// payload containing escaped quotes would be corrupted on read-back. Escaping
+// the backslashes and single quotes here keeps the stored value byte-identical
+// to the serialized bytes. Backslash must be escaped before the single quote.
+func escapeClickHouseStringLiteral(s string) string {
+	s = strings.ReplaceAll(s, `\`, `\\`)
+	s = strings.ReplaceAll(s, `'`, `\'`)
+	return s
 }
 
 func compressionMethod(compression string) (clickhouse.CompressionMethod, error) {

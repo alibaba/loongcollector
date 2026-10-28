@@ -141,7 +141,7 @@ func TestRegisterWaitManagerReady(t *testing.T) {
 	gracePeriod := 1
 	cache := NewDeferredDeletionMetaStore(eventCh, stopCh, int64(gracePeriod), cache.MetaNamespaceKeyFunc)
 	manager := GetMetaManagerInstance()
-	cache.RegisterSendFunc("test", func(kme []*K8sMetaEvent) {}, 100)
+	cache.RegisterSendFunc("test", func(kme []*K8sMetaEvent) {}, 100, 5000, 2000)
 	select {
 	case <-cache.eventCh:
 		t.Error("should not receive event before manager is ready")
@@ -174,7 +174,7 @@ func TestTimerSend(t *testing.T) {
 	resultCh := make(chan struct{})
 	cache.RegisterSendFunc("test", func(kmes []*K8sMetaEvent) {
 		resultCh <- struct{}{}
-	}, 1)
+	}, 1, 5000, 2000)
 	go func() {
 		time.Sleep(3 * time.Second)
 		close(stopCh)
@@ -391,7 +391,7 @@ func TestRegisterAndUnRegisterSendFunc(t *testing.T) {
 	interval := 1
 	cache.RegisterSendFunc("test", func(kme []*K8sMetaEvent) {
 		counter++
-	}, interval)
+	}, interval, 5000, 2000)
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test",

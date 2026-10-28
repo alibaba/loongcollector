@@ -4,6 +4,15 @@
 
 `processor_parse_delimiter_native`插件解析事件中分隔符格式字段内容并提取新字段。
 
+
+## 事件能力
+
+列含义见 [概览 · 事件能力列说明](../../overview.md#事件能力列说明)。
+
+| Log | Metric | Span |
+| --- | --- | --- |
+| ✓ | — | — |
+
 ## 版本
 
 [Stable](../../stability-level.md)
@@ -45,7 +54,7 @@ enable: true
 inputs:
   - Type: input_file
     FilePaths: 
-      - /home/test-log/json.log
+      - /home/test-log/delimiter.log
 processors:
   - Type: processor_parse_delimiter_native
     SourceKey: content
@@ -71,7 +80,7 @@ flushers:
 
 ```json
 {
-    "__tag__:__path__": "/home/test-log/json.log",
+    "__tag__:__path__": "/home/test-log/delimiter.log",
     "ip": "127.0.0.1",
     "time": "07/Jul/2022:10:43:30 +0800",
     "method": "POST",

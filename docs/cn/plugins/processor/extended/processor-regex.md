@@ -4,7 +4,17 @@
 
 `processor_regex processor`插件可以通过正则匹配的模式实现文本日志的字段提取。
 
-备注：当作为第一个日志解析插件时，建议使用[正则加速](../accelerator/regex-accelerate.md)插件替代。
+备注：当作为第一个日志解析插件时，建议使用[正则解析原生处理插件](../native/processor-parse-regex-native.md)替代。
+
+## 事件能力
+
+列含义见 [概览 · 事件能力列说明](../../overview.md#事件能力列说明)。
+
+| v1 接口 | v2 接口 | Log | Metric | Span |
+| --- | --- | --- | --- | --- |
+| ✓ | ✓ | v1&v2 | 透传 | 透传 |
+
+> v2 场景下对每条 Log 事件以正则提取字段（输入 Log 输出 Log），Metric/Span 事件显式透传（不处理但不丢弃）。
 
 ## 版本
 

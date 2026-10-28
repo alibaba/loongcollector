@@ -5,6 +5,9 @@ import (
 	batch "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	networking "k8s.io/api/networking/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
 const (
@@ -27,7 +30,6 @@ const (
 	STORAGECLASS          = "storageclass"
 	INGRESS               = "ingress"
 	CONTAINER             = "container"
-	// entity link type, the direction is from resource which will be trigger to linked resource
 	//revive:disable:var-naming
 	LINK_SPLIT_CHARACTER     = "->"
 	POD_NODE                 = "pod->node"
@@ -202,6 +204,18 @@ type IngressNamespace struct {
 	Namespace *v1.Namespace
 }
 
+// PodCustomResource links a Pod to an arbitrary CR stored as unstructured.
+type PodCustomResource struct {
+	Pod *v1.Pod
+	CR  *unstructured.Unstructured
+}
+
+// NamespaceCustomResource links a Namespace to a namespaced CR (unstructured).
+type NamespaceCustomResource struct {
+	Namespace *v1.Namespace
+	CR        *unstructured.Unstructured
+}
+
 const (
 	EventTypeAdd            = "add"
 	EventTypeUpdate         = "update"
@@ -209,7 +223,7 @@ const (
 	EventTypeDeferredDelete = "deferredDelete"
 	EventTypeTimer          = "timer"
 
-	K8sMetaUnifyErrorCode = "K8S_META_COLLECTOR_ERROR"
+	K8sMetaUnifyErrorCode = selfmonitor.K8sMetaCollectorError
 )
 
 type PodMetadata struct {

@@ -80,6 +80,7 @@ jobs:
       - name: Check compatibility
         env:
           BUILD_LOGTAIL_UT: OFF
+          ENABLE_AGENTSIGHT: ON
           ENABLE_COMPATIBLE_MODE: ON
           ENABLE_STATIC_LINK_CRT: ON
           MAKE_JOBS: 16
@@ -88,7 +89,7 @@ jobs:
 
   actions-timeline:
     needs: [CheckCompatibility]
-    runs-on: ubuntu-latest
+    runs-on: loongcollector-small-runner
     permissions:
       actions: read
     steps:

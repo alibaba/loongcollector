@@ -4,6 +4,16 @@
 
 `processor_encrypt`插件可以使用 AES-128、AES-192、AES-256 算法对指定的字段加密，采用 PKCS7 填充算法。**由于密文可能包含不可见字符，插件会对其进行十六进制编码。**
 
+## 事件能力
+
+列含义见 [概览 · 事件能力列说明](../../overview.md#事件能力列说明)。
+
+| v1 接口 | v2 接口 | Log | Metric | Span |
+| --- | --- | --- | --- | --- |
+| ✓ | ✓ | v1&v2 | 透传 | 透传 |
+
+> v2 场景下对每条 Log 事件加密指定字段（输入 Log 输出 Log），Metric/Span 事件显式透传（不处理但不丢弃）。
+
 ## 版本
 
 [Stable](../../stability-level.md)
@@ -37,7 +47,7 @@
 
 * 采集配置
 
-```Yaml
+```yaml
 processors:
   - Type: processor_encrypt
     SourceKeys:
@@ -87,7 +97,7 @@ $ cat plaintext
 
 * 配置详情（注意 Key/IV 都是十六进制表示）
 
-```Yaml
+```yaml
 processors:
   - Type: processor_encrypt
     SourceKeys:
@@ -122,7 +132,7 @@ $ cat plaintext
 
 * 前置条件
 
-运行 logtail 的机器上需要创建文件 `/home/admin/aes_key.json`（JSON 格式），并将密钥以十六进制存放在其中，命令如下：
+运行 LoongCollector 的节点上需要创建文件 `/home/admin/aes_key.json`（JSON 格式），并将密钥以十六进制存放在其中，命令如下：
 
 ```shell
 printf "{\"Key\": \"FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF\"}" > /home/admin/aes_key.json
@@ -138,7 +148,7 @@ printf "{\"Key\": \"FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
 
 * 配置详情
 
-```Yaml
+```yaml
 processors:
   - Type: processor_encrypt
     SourceKeys:

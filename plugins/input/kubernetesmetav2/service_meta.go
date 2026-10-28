@@ -31,7 +31,9 @@ type ServiceK8sMeta struct {
 	StorageClass          bool
 	Ingress               bool
 	Container             bool
-	// labels and annotations switch
+	// CustomResources registers third-party CRs (dynamic informer + optional CR→Pod links via PodLink). See k8smeta.CustomResourceCollectorConfig.
+	CustomResources []k8smeta.CustomResourceCollectorConfig `json:"CustomResources,omitempty"`
+	// EnableLabels / EnableAnnotations: when true, emit full labels/annotations on built-in entity kinds (not CustomResources; those use CustomResources[].EnableLabels/EnableAnnotations).
 	EnableLabels      bool
 	EnableAnnotations bool
 	// link switch
@@ -68,6 +70,17 @@ type ServiceK8sMeta struct {
 	Cluster2Namespace        string
 	Cluster2PersistentVolume string
 	Cluster2StorageClass     string
+
+	// buffer and batch tuning
+	// EventBufferSize is the base buffer capacity per resource type for EventCh
+	// and entityBuffer/entityLinkBuffer. The actual buffer size is scaled by the
+	// number of registered resource types: actualSize = EventBufferSize * resourceTypeCount,
+	// capped at MaxBufferSize.
+	EventBufferSize int
+	// MaxBufferSize is the upper limit of the scaled buffer size, preventing
+	// excessive memory allocation when many resource types are enabled.
+	MaxBufferSize  int
+	DrainBatchSize int
 
 	// other
 	context       pipeline.Context
@@ -112,12 +125,10 @@ func (s *ServiceK8sMeta) Stop() error {
 func (s *ServiceK8sMeta) Start(collector pipeline.Collector) error {
 	s.collector = collector
 	s.metaCollector = &metaCollector{
-		serviceK8sMeta:   s,
-		collector:        collector,
-		entityBuffer:     make(chan models.PipelineEvent, 100),
-		entityLinkBuffer: make(chan models.PipelineEvent, 100),
-		stopCh:           make(chan struct{}),
-		entityProcessor:  make(map[string]ProcessFunc),
+		serviceK8sMeta:  s,
+		collector:       collector,
+		stopCh:          make(chan struct{}),
+		entityProcessor: make(map[string]ProcessFunc),
 	}
 	return s.metaCollector.Start()
 }
@@ -132,12 +143,24 @@ func (s *ServiceK8sMeta) initDomain() {
 
 }
 
+func (s *ServiceK8sMeta) resolvedCustomResources() []k8smeta.CustomResourceCollectorConfig {
+	if len(s.CustomResources) == 0 {
+		return nil
+	}
+	out := make([]k8smeta.CustomResourceCollectorConfig, len(s.CustomResources))
+	copy(out, s.CustomResources)
+	return out
+}
+
 func init() {
 	pipeline.ServiceInputs["service_kubernetes_meta"] = func() pipeline.ServiceInput {
 		return &ServiceK8sMeta{
 			Interval:          60,
 			EnableLabels:      false,
 			EnableAnnotations: false,
+			EventBufferSize:   10000,
+			MaxBufferSize:     200000,
+			DrainBatchSize:    2000,
 			clusterID:         *flags.ClusterID,
 			clusterName:       *flags.ClusterName,
 			clusterRegion:     *flags.ClusterRegion,

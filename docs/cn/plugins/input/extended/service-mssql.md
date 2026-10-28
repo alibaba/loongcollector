@@ -4,6 +4,15 @@
 
 `service_mssql` `input`插件可以采集Sql Server查询数据。
 
+
+## 事件能力
+
+列含义见 [概览 · 事件能力列说明](../../overview.md#事件能力列说明)。
+
+| Log | Metric | Span |
+| --- | --- | --- |
+| ✓ | — | — |
+
 ## 版本
 
 [Beta](../../stability-level.md)
@@ -37,22 +46,22 @@
 
 ## 样例
 
-Sql Server数据库创建LogtailTest数据库，LogtailTestTable表。
+Sql Server数据库创建LoongCollectorTest数据库，LoongCollectorTestTable表。
 
 * 表结构及数据信息如下
 
 ```sql
-IF NOT EXISTS(SELECT * FROM sys.databases WHERE name = 'LogtailTest')
+IF NOT EXISTS(SELECT * FROM sys.databases WHERE name = 'LoongCollectorTest')
 BEGIN
-    CREATE DATABASE [LogtailTest]
+    CREATE DATABASE [LoongCollectorTest]
 END
 GO
-USE [LogtailTest]
+USE [LoongCollectorTest]
 GO
 
-IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='LogtailTestTable' and xtype='U')
+IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='LoongCollectorTestTable' and xtype='U')
 BEGIN
-    CREATE TABLE LogtailTestTable (
+    CREATE TABLE LoongCollectorTestTable (
         id INT PRIMARY KEY IDENTITY (1, 1),
         name NVARCHAR(50), 
         quantity INT
@@ -60,11 +69,11 @@ BEGIN
 END
 GO
 
-INSERT INTO LogtailTestTable (name, quantity) values('banana', 1);
-INSERT INTO LogtailTestTable (name, quantity) values('banana', 2);
-INSERT INTO LogtailTestTable (name, quantity) values('banana', 3);
-INSERT INTO LogtailTestTable (name, quantity) values('banana', 4);
-SELECT * FROM LogtailTestTable;
+INSERT INTO LoongCollectorTestTable (name, quantity) values('banana', 1);
+INSERT INTO LoongCollectorTestTable (name, quantity) values('banana', 2);
+INSERT INTO LoongCollectorTestTable (name, quantity) values('banana', 3);
+INSERT INTO LoongCollectorTestTable (name, quantity) values('banana', 4);
+SELECT * FROM LoongCollectorTestTable;
 GO
 ```
 
@@ -80,14 +89,14 @@ inputs:
     CheckPointColumnType: int
     CheckPointSavePerPage: true
     CheckPointStart: "0"
-    Database: LogtailTest
+    Database: LoongCollectorTest
     IntervalMs: 1000
     Limit: true
     MaxSyncSize: 100
     PageSize: 100
     User: sa
     Password: xxxxx
-    StateMent: "select * from LogtailTestTable where id > ? order by id"
+    StateMent: "select * from LoongCollectorTestTable where id > ? order by id"
 flushers:
   - Type: flusher_stdout
     OnlyStdout: true
@@ -96,8 +105,31 @@ flushers:
 * 输出
 
 ```json
-{"id":"1","name":"banana","quantity":"1","__time__":"1661416452"}
-{"id":"2","name":"banana","quantity":"2","__time__":"1661416452"}
-{"id":"3","name":"banana","quantity":"3","__time__":"1661416452"}
-{"id":"4","name":"banana","quantity":"4","__time__":"1661416452"}
+{
+    "id": "1",
+    "name": "banana",
+    "quantity": "1",
+    "__time__": "1661416452"
+}
+
+{
+    "id": "2",
+    "name": "banana",
+    "quantity": "2",
+    "__time__": "1661416452"
+}
+
+{
+    "id": "3",
+    "name": "banana",
+    "quantity": "3",
+    "__time__": "1661416452"
+}
+
+{
+    "id": "4",
+    "name": "banana",
+    "quantity": "4",
+    "__time__": "1661416452"
+}
 ```

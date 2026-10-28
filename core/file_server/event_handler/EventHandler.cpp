@@ -1197,10 +1197,13 @@ bool ModifyHandler::RemoveReaderFromArrayAndMap(LogFileReaderPtr expectedReader,
 }
 
 void ModifyHandler::ForceReadLogAndPush(LogFileReaderPtr reader) {
-    auto logBuffer = make_unique<LogBuffer>();
-    auto pEvent = reader->CreateFlushTimeoutEvent();
-    reader->ReadLog(*logBuffer, pEvent.get());
-    PushLogToProcessor(reader, logBuffer.get(), true);
+    bool moreData;
+    do {
+        auto logBuffer = make_unique<LogBuffer>();
+        auto pEvent = reader->CreateFlushTimeoutEvent();
+        moreData = reader->ReadLog(*logBuffer, pEvent.get());
+        PushLogToProcessor(reader, logBuffer.get(), true);
+    } while (moreData);
 }
 
 int32_t ModifyHandler::PushLogToProcessor(LogFileReaderPtr reader, LogBuffer* logBuffer, bool dropIfBlocked) {

@@ -5,7 +5,7 @@ LoongCollector Golang 部分目前支持 `SLS Log Protocol` 和 `Pipeline Event`
 |  | SLS Log Protocol | Pipeline Event |
 |  ----  | ----  |  ---- |
 | 描述 | SLS 日志的专用处理结构 | 可扩展的可观测性数据模型，支持Metrics、Trace、Logging、Bytes、Profile等 |
-| 流水线配置版本 |        v1              |          v2       |
+| 采集配置结构版本 |        v1              |          v2       |
 | Logging 数据结构 |      支持           |        支持         |
 | Metric 数据结构 |      不支持           |      支持           |
 | Trace 数据结构 |      不支持            |       支持          |
@@ -19,7 +19,7 @@ LoongCollector Golang 部分目前支持 `SLS Log Protocol` 和 `Pipeline Event`
 
 ## Pipeline Event
 
-`PipelineEvent` 是数据处理管道中的抽象数据接口，定义如下  
+`PipelineEvent` 是 **collection pipeline**（采集配置）数据处理路径中的抽象数据接口（通常对应 **一条数据**），定义如下  
 
 ```go
 type PipelineEvent interface {

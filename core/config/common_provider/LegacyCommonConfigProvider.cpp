@@ -24,6 +24,7 @@
 #include "application/Application.h"
 #include "common/EncodingUtil.h"
 #include "common/LogtailCommonFlags.h"
+#include "common/SafeThread.h"
 #include "common/StringTools.h"
 #include "common/TimeUtil.h"
 #include "common/http/Constant.h"
@@ -81,7 +82,7 @@ void LegacyCommonConfigProvider::Init(const string& dir) {
         LOG_INFO(sLogger, ("ilogtail_configserver_tags", confJson["ilogtail_tags"].toStyledString()));
     }
 
-    mThreadRes = async(launch::async, &LegacyCommonConfigProvider::CheckUpdateThread, this);
+    LaunchAsync(mThreadRes, "LegacyCommonConfigProvider", &LegacyCommonConfigProvider::CheckUpdateThread, this);
 }
 
 void LegacyCommonConfigProvider::Stop() {

@@ -43,10 +43,8 @@ public:
 
     virtual int Init() = 0;
 
-    virtual int AddOrUpdateConfig(const CollectionPipelineContext*,
-                                  uint32_t,
-                                  const PluginMetricManagerPtr&,
-                                  const std::variant<SecurityOptions*, ObserverNetworkOption*>&)
+    virtual int
+    AddOrUpdateConfig(const CollectionPipelineContext*, uint32_t, const PluginMetricManagerPtr&, const PluginOptions&)
         = 0;
 
     virtual int RemoveConfig(const std::string&) = 0;
@@ -69,6 +67,8 @@ public:
 
     virtual int ConsumePerfBufferData() { return mEBPFAdapter->ConsumePerfBufferData(GetPluginType()); }
 
+    virtual int OnEpollReadable() { return 0; }
+
     bool IsRunning() { return mInited && !mSuspendFlag; }
 
     bool IsExists() { return mInited; }
@@ -86,17 +86,18 @@ public:
         return 0;
     }
 
-    virtual std::unique_ptr<PluginConfig>
-    GeneratePluginConfig([[maybe_unused]] const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) = 0;
+    virtual std::unique_ptr<PluginConfig> GeneratePluginConfig([[maybe_unused]] const PluginOptions& options) = 0;
 
     std::shared_ptr<ProcessCacheManager> GetProcessCacheManager() const { return mProcessCacheManager; }
 
 private:
-    mutable ReadWriteLock mMtx; // lock
     std::shared_ptr<ProcessCacheManager> mProcessCacheManager;
 
 protected:
-    virtual int update([[maybe_unused]] const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) {
+    // Subclasses that override Suspend()/resume() may need to set mSuspendFlag under this lock (same as base).
+    mutable ReadWriteLock mMtx;
+
+    virtual int update([[maybe_unused]] const PluginOptions& options) {
         bool ret = mEBPFAdapter->UpdatePlugin(GetPluginType(), GeneratePluginConfig(options));
         if (!ret) {
             LOG_ERROR(sLogger, ("failed to update plugin", magic_enum::enum_name(GetPluginType())));
@@ -105,7 +106,7 @@ protected:
         return 0;
     }
 
-    virtual int resume(const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) {
+    virtual int resume(const PluginOptions& options) {
         {
             WriteLock lock(mMtx);
             mSuspendFlag = false;

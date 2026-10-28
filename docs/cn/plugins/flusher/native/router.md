@@ -4,6 +4,15 @@
 
 您可以选择根据pipeline event group的属性将group发送到不同的flusher。
 
+
+## 事件能力
+
+列含义见 [概览 · 事件能力列说明](../../overview.md#事件能力列说明)。
+
+| Log | Metric | Span |
+| --- | --- | --- |
+| ✓ | ✓ | ✓ |
+
 ## 限制
 
 仅限使用原生处理插件且所有flusher均支持发送路由能力的场景。
@@ -36,7 +45,7 @@
 
 采集k8s集群中所有容器内`/home/test-log/`路径下的所有文件名匹配`*.log`规则的文件，并将default命名空间下的日志发送到sls的test_logstore_1，test命名空间下的日志发送到test_logstore_2。
 
-``` yaml
+```yaml
 enable: true
 inputs:
   - Type: input_file

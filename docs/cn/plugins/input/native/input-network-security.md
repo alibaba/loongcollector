@@ -4,13 +4,21 @@
 
 `input_network_security`插件可以实现利用ebpf探针采集网络安全相关动作。
 
+## 事件能力
+
+列含义见 [概览 · 事件能力列说明](../../overview.md#事件能力列说明)。
+
+| Log | Metric | Span |
+| --- | --- | --- |
+| ✓ | — | — |
+
 ## 版本
 
 [Dev](../../stability-level.md)
 
 ## 版本说明
 
-* 推荐版本：【待发布】
+* 推荐版本：LoongCollector v3.1.4 及以上
 
 ## 配置参数
 
@@ -49,7 +57,7 @@
 
 * 输入
 
-```json
+```bash
 curl www.alibabacloud.com
 ```
 
@@ -111,6 +119,7 @@ flushers:
     "event_type": "kprobe",
     "__time__": "1758715178"
 }
+
 {
     "exec_id": "djQzYzExMjA0LnNxYS5uYTEzMTozNDY1MzQzNDQxMjM2MDI3MDo3NTQyNDU=",
     "pid": "754245",
@@ -142,6 +151,7 @@ flushers:
     "event_type": "kprobe",
     "__time__": "1758715178"
 }
+
 {
     "exec_id": "djQzYzExMjA0LnNxYS5uYTEzMTozNDY1MzQzNDQxMjM2MDI3MDo3NTQyNDU=",
     "pid": "754245",

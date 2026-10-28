@@ -17,6 +17,7 @@
 #include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "common/FileSystemUtil.h"
 #include "common/LogtailCommonFlags.h"
+#include "common/SafeThread.h"
 #include "file_server/checkpoint/CheckPointManager.h"
 #include "file_server/checkpoint/InputStaticFileCheckpointManager.h"
 #include "runner/ProcessorRunner.h"
@@ -43,7 +44,7 @@ StaticFileServer::StaticFileServer() {
 void StaticFileServer::Init() {
     InputStaticFileCheckpointManager::GetInstance()->GetAllCheckpointFileNames();
     mIsThreadRunning = true;
-    mThreadRes = async(launch::async, &StaticFileServer::Run, this);
+    LaunchAsync(mThreadRes, "StaticFileServer", &StaticFileServer::Run, this);
     mStartTime = time(nullptr);
 }
 
@@ -209,6 +210,7 @@ void StaticFileServer::ReadFiles() {
     }
 }
 
+// Caller must hold mUpdateMux (ReadFiles, or TestGetNextAvailableReader for unit tests).
 LogFileReaderPtr StaticFileServer::GetNextAvailableReader(const string& configName, size_t idx) {
     FileFingerprint fingerprint;
     while (InputStaticFileCheckpointManager::GetInstance()->GetCurrentFileFingerprint(configName, idx, &fingerprint)) {
@@ -279,7 +281,7 @@ LogFileReaderPtr StaticFileServer::GetNextAvailableReader(const string& configNa
         }
         return reader;
     }
-    // all files have been read
+    // all files have been read (mDeletedInputs under mUpdateMux; see GetNextAvailableReader precondition)
     mDeletedInputs.emplace(configName, idx);
     return LogFileReaderPtr();
 }
@@ -346,6 +348,11 @@ void StaticFileServer::Clear() {
     mPipelineNameReadersMap.clear();
     mAddedInputs.clear();
     mDeletedInputs.clear();
+}
+
+LogFileReaderPtr StaticFileServer::TestGetNextAvailableReader(const string& configName, size_t idx) {
+    lock_guard<mutex> lock(mUpdateMux);
+    return GetNextAvailableReader(configName, idx);
 }
 #endif
 

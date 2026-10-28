@@ -4,6 +4,16 @@
 
 `processor_log_to_sls_metric`插件可以根据配置将日志转换为sls metric。
 
+## 事件能力
+
+列含义见 [概览 · 事件能力列说明](../../overview.md#事件能力列说明)。
+
+| v1 接口 | v2 接口 | Log | Metric | Span |
+| --- | --- | --- | --- | --- |
+| ✓ | ✓ | v1&v2 | v2 | 透传 |
+
+> v2 场景下输入 Log 输出 Metric 事件（解析 name/labels/value/time 字段生成 models.Metric），校验失败或无指标字段的 Log 被丢弃；已有 Metric/Span 事件透传。
+
 ## 版本
 
 [Beta](../../stability-level.md)
@@ -33,7 +43,7 @@
 * 输入
 
 ```bash
-echo '::1 - - [18/Jul/2022:07:28:01 +0000] "GET /hello/ilogtail HTTP/1.1" 404 153 "-" "curl/7.74.0" "-"' >> /home/test-log/nginx.log
+echo '::1 - - [18/Jul/2022:07:28:01 +0000] "GET /hello/loongcollector HTTP/1.1" 404 153 "-" "curl/7.74.0" "-"' >> /home/test-log/nginx.log
 ```
 
 * 采集配置
@@ -78,7 +88,7 @@ flushers:
 
 ```json
 {
-  "__labels__":"method#$#GET|nginx#$#test|url#$#/hello/ilogtail",
+  "__labels__":"method#$#GET|nginx#$#test|url#$#/hello/loongcollector",
   "__name__":"::1",
   "__value__":"404",
   "__time_nano__":"1688956340000000000",

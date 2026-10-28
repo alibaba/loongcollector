@@ -17,6 +17,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <memory>
 #include <shared_mutex>
 #include <thread>
 #include <vector>
@@ -28,9 +29,11 @@
 #include "common/TimeKeeper.h"
 #include "common/http/AsynCurlRunner.h"
 #include "ebpf/Config.h"
+#include "ebpf/EBPFAdapter.h"
 #include "ebpf/EBPFServer.h"
 #include "ebpf/include/export.h"
 #include "logger/Logger.h"
+#include "plugin/input/InputCpuProfiling.h"
 #include "plugin/input/InputFileSecurity.h"
 #include "plugin/input/InputNetworkObserver.h"
 #include "plugin/input/InputNetworkSecurity.h"
@@ -51,6 +54,7 @@ public:
     void TestProcessSecurity();
     void TestNetworkSecurity();
     void TestFileSecurity();
+    void TestCpuProfiling();
 
     // for start and stop all ...
     void TestAllStartAndStop();
@@ -58,6 +62,7 @@ public:
     // for update scenario ...
     void TestUpdateFileSecurity();
     void TestUpdateNetworkSecurity();
+    void TestUpdateCpuProfiling();
 
     void TestLoadEbpfParametersV1();
     void TestLoadEbpfParametersV2();
@@ -69,6 +74,10 @@ public:
     void TestEbpfParameters();
 
     void TestEnvManager();
+
+    void TestEBPFAdapterAgentSightReloadShortCircuit();
+
+    void TestRegisterExternalEpollAndUnregister();
 
     void TestUnifiedEpoll();
 
@@ -110,6 +119,7 @@ protected:
         mConfig->mProfileProbeConfig.mProfileUploadDuration = 10;
         mConfig->mProcessProbeConfig.mEnableOOMDetect = false;
         ebpf::EBPFServer::GetInstance()->Init();
+        AppConfig::GetInstance()->mPurageContainerMode = false;
     }
 
     void TearDown() override {
@@ -300,6 +310,37 @@ void eBPFServerUnittest::TestProcessSecurity() {
     EXPECT_TRUE(res);
 }
 
+void eBPFServerUnittest::TestCpuProfiling() {
+    std::string configStr = R"(
+        {
+            "Type": "input_cpu_profiling"
+        }
+    )";
+    std::string errorMsg;
+    Json::Value configJson, optionalGoPipeline;
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
+    CpuProfilingOption profiling_option;
+    profiling_option.Init(configJson, &ctx, "test");
+    auto input = std::make_shared<InputCpuProfiling>();
+    input->SetContext(ctx);
+    input->CreateMetricsRecordRef("test", "1");
+    auto initStatus = input->Init(configJson, optionalGoPipeline);
+    input->CommitMetricsRecordRef();
+    APSARA_TEST_TRUE(initStatus);
+
+    ctx.SetConfigName("test-1");
+    auto res = input->Start();
+    EXPECT_TRUE(res);
+
+    APSARA_TEST_TRUE(ebpf::EBPFServer::GetInstance()->mEnvMgr.AbleToLoadDyLib());
+    APSARA_TEST_TRUE(ebpf::EBPFServer::GetInstance()->mEBPFAdapter != nullptr);
+
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+
+    res = input->Stop(true);
+    EXPECT_TRUE(res);
+}
+
 void eBPFServerUnittest::TestUpdateFileSecurity() {
     std::string configStr = R"(
         {
@@ -483,6 +524,62 @@ void eBPFServerUnittest::TestUpdateNetworkSecurity() {
     EXPECT_TRUE(res);
 }
 
+
+void eBPFServerUnittest::TestUpdateCpuProfiling() {
+    std::string configStr = R"(
+        {
+            "Type": "input_cpu_profiling"
+        }
+    )";
+    auto input = std::make_shared<InputCpuProfiling>();
+    ctx.SetConfigName("test-profiling-pipeline");
+    input->SetContext(ctx);
+    input->CreateMetricsRecordRef("test", "1");
+    input->CommitMetricsRecordRef();
+
+    std::string errorMsg;
+    Json::Value configJson, optionalGoPipeline;
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
+
+    input->SetContext(ctx);
+    input->CreateMetricsRecordRef("test", "1");
+    auto initStatus = input->Init(configJson, optionalGoPipeline);
+    input->CommitMetricsRecordRef();
+    APSARA_TEST_TRUE(initStatus);
+
+    ctx.SetConfigName("test-1");
+    auto res = input->Start();
+    EXPECT_TRUE(res);
+
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+
+    // suspend
+    res = input->Stop(false);
+    EXPECT_TRUE(res);
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+
+    // update & resume
+    input = std::make_shared<InputCpuProfiling>();
+    configStr = R"(
+        {
+            "Type": "input_cpu_profiling",
+            "CommandLines": ["java.*"]
+        }
+    )";
+    input->SetContext(ctx);
+    input->CreateMetricsRecordRef("test", "2");
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
+    res = input->Init(configJson, optionalGoPipeline);
+    input->CommitMetricsRecordRef();
+    EXPECT_TRUE(res);
+    res = input->Start();
+    EXPECT_TRUE(res);
+
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+
+    res = input->Stop(true);
+    EXPECT_TRUE(res);
+}
 
 void eBPFServerUnittest::TestLoadEbpfParametersV1() {
     Json::Value value;
@@ -818,6 +915,37 @@ void eBPFServerUnittest::TestEnvManager() {
     EXPECT_EQ(EBPFServer::GetInstance()->IsSupportedEnv(logtail::ebpf::PluginType::NETWORK_SECURITY), false);
     EXPECT_EQ(EBPFServer::GetInstance()->IsSupportedEnv(logtail::ebpf::PluginType::PROCESS_SECURITY), false);
     EXPECT_EQ(EBPFServer::GetInstance()->IsSupportedEnv(logtail::ebpf::PluginType::FILE_SECURITY), false);
+
+    EBPFServer::GetInstance()->mEnvMgr.m310Support = false;
+    EBPFServer::GetInstance()->mEnvMgr.mArchSupport = true;
+    EBPFServer::GetInstance()->mEnvMgr.mBTFSupport = false;
+    EXPECT_EQ(EBPFServer::GetInstance()->IsSupportedEnv(PluginType::AGENTSIGHT_OBSERVE), true);
+}
+
+void eBPFServerUnittest::TestEBPFAdapterAgentSightReloadShortCircuit() {
+    EBPFAdapter adapter;
+    adapter.mBinaryPath = GetProcessExecutionDir();
+    auto sym = std::make_unique<AgentSightSymbolTable>();
+    adapter.mAgentSightSymbols = std::move(sym);
+#if defined(__linux__)
+    APSARA_TEST_TRUE(adapter.tryLoadAgentSightDylib());
+#endif
+}
+
+void eBPFServerUnittest::TestRegisterExternalEpollAndUnregister() {
+    auto* server = EBPFServer::GetInstance();
+    server->Init();
+    APSARA_TEST_GE(server->mUnifiedEpollFd, 0);
+    int fd = eventfd(0, EFD_NONBLOCK);
+    APSARA_TEST_GE(fd, 0);
+    server->RegisterExternalEpollFd(PluginType::AGENTSIGHT_OBSERVE, -1);
+    server->RegisterExternalEpollFd(PluginType::FILE_SECURITY, fd);
+    server->RegisterExternalEpollFd(PluginType::AGENTSIGHT_OBSERVE, fd);
+    server->RegisterExternalEpollFd(PluginType::AGENTSIGHT_OBSERVE, fd);
+    server->UnregisterExternalEpollFd(PluginType::AGENTSIGHT_OBSERVE, -1);
+    server->UnregisterExternalEpollFd(PluginType::FILE_SECURITY, fd);
+    server->UnregisterExternalEpollFd(PluginType::AGENTSIGHT_OBSERVE, fd);
+    close(fd);
 }
 
 // UNIT_TEST_CASE(eBPFServerUnittest, TestNetworkObserver);
@@ -827,8 +955,10 @@ void eBPFServerUnittest::TestEnvManager() {
 // UNIT_TEST_CASE(eBPFServerUnittest, TestNetworkSecurity);
 
 UNIT_TEST_CASE(eBPFServerUnittest, TestUpdateFileSecurity);
+UNIT_TEST_CASE(eBPFServerUnittest, TestUpdateCpuProfiling);
 UNIT_TEST_CASE(eBPFServerUnittest, TestFileSecurity);
 UNIT_TEST_CASE(eBPFServerUnittest, TestProcessSecurity);
+UNIT_TEST_CASE(eBPFServerUnittest, TestCpuProfiling);
 UNIT_TEST_CASE(eBPFServerUnittest, TestDefaultEbpfParameters);
 UNIT_TEST_CASE(eBPFServerUnittest, TestDefaultAndLoadEbpfParameters);
 UNIT_TEST_CASE(eBPFServerUnittest, TestLoadEbpfParametersV1);
@@ -836,6 +966,8 @@ UNIT_TEST_CASE(eBPFServerUnittest, TestLoadEbpfParametersV2);
 UNIT_TEST_CASE(eBPFServerUnittest, TestUnifiedEpoll);
 UNIT_TEST_CASE(eBPFServerUnittest, TestRetryCache);
 UNIT_TEST_CASE(eBPFServerUnittest, TestEnvManager);
+UNIT_TEST_CASE(eBPFServerUnittest, TestEBPFAdapterAgentSightReloadShortCircuit);
+UNIT_TEST_CASE(eBPFServerUnittest, TestRegisterExternalEpollAndUnregister);
 
 } // namespace ebpf
 } // namespace logtail

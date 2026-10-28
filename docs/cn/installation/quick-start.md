@@ -4,11 +4,17 @@
 
 1. 下载预编译的 LoongCollector 包，解压后进入目录，该目录下文均称为部署目录。
 
+    **版本号请始终以 [GitHub Releases — alibaba/loongcollector](https://github.com/alibaba/loongcollector/releases/latest) 为准**（含 `linux-amd64` / `linux-arm64` / `windows-amd64` 资产及 checksum）。下例中的 `VERSION` 仅为演示；你也可使用 Release 正文中给出的 OSS 镜像 URL（与 GitHub 资产一致）。
+
     ```bash
-    wget https://loongcollector-community-edition.oss-cn-shanghai.aliyuncs.com/0.2.0/loongcollector-0.2.0.linux-amd64.tar.gz
-    tar -xzvf loongcollector-0.2.0.linux-amd64.tar.gz
-    cd loongcollector-0.2.0
+    VERSION=3.3.2
+    curl -fL -o "loongcollector-${VERSION}.linux-amd64.tar.gz" \
+      "https://github.com/alibaba/loongcollector/releases/download/v${VERSION}/loongcollector-${VERSION}.linux-amd64.tar.gz"
+    tar -xzvf "loongcollector-${VERSION}.linux-amd64.tar.gz"
+    cd "loongcollector-${VERSION}"
     ```
+
+    若解压后的顶层目录名与上述 `cd` 不一致，请以包内实际目录名为准。
 
 2. 对 LoongCollector 进行配置
 
@@ -28,7 +34,7 @@
     您也可以直接从下面的地址下载示例配置。
 
     ```bash
-    cd ./config/local
+    cd conf/continuous_pipeline_config/local
     wget https://raw.githubusercontent.com/alibaba/loongcollector/main/example_config/quick_start/config/file_simple.yaml
     cd -
     ```

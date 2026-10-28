@@ -234,6 +234,84 @@ func TestEncoderBatchV2_ShouldDecodeSuccess_GivenNormalDataOfDataOfPipelineGroup
 // 预期：「构造的用例数据」的长度小于「对用例数据先Encode再Decode后的数据」的长度，且用 expectedLen 计算后的长度相等
 // PS：expectedLen 的计算方法，其实是和 genPipelineGroupEventsSlice 生成用例及根据series limit确定encode批次
 // 的逻辑相关，和 Encode 本身的逻辑无关
+func TestEncodeV2_MultiValueRespectsSeriesLimitWithoutDataLoss(t *testing.T) {
+	seriesLimit := 2
+	multiValue := models.NewMetricMultiValueWithMap(map[string]float64{
+		"cpu":  0.1,
+		"mem":  0.2,
+		"disk": 0.3,
+	})
+	metric := models.NewMultiValuesMetric("agent", models.MetricTypeUntyped, models.NewTags(), 1_000_000_000, multiValue.Values)
+	groupEvents := &models.PipelineGroupEvents{
+		Group:  models.NewGroup(models.NewMetadata(), models.NewTags()),
+		Events: []models.PipelineEvent{metric},
+	}
+
+	p := NewPromEncoder(seriesLimit)
+	data, err := p.EncodeV2(groupEvents)
+	assert.NoError(t, err)
+	assert.Len(t, data, 2)
+
+	gotGroupEventsSlice, err := DecodeBatchV2(data)
+	assert.NoError(t, err)
+
+	names := make(map[string]float64)
+	for _, group := range gotGroupEventsSlice {
+		for _, event := range group.Events {
+			m, ok := event.(*models.Metric)
+			assert.True(t, ok)
+			names[m.GetName()] = m.GetValue().GetSingleValue()
+		}
+	}
+	assert.Len(t, names, 3)
+	assert.Equal(t, 0.1, names["agent_cpu"])
+	assert.Equal(t, 0.2, names["agent_mem"])
+	assert.Equal(t, 0.3, names["agent_disk"])
+}
+
+func TestEncodeV2_MultiValueSeriesLimitSplitAcrossBatchBoundary(t *testing.T) {
+	seriesLimit := 2
+	singleMetric := models.NewSingleValueMetric(
+		"prefill",
+		models.MetricTypeGauge,
+		models.NewTags(),
+		1_000_000_000,
+		1.0,
+	)
+	multiValue := models.NewMetricMultiValueWithMap(map[string]float64{
+		"cpu": 0.5,
+		"mem": 0.6,
+	})
+	multiMetric := models.NewMultiValuesMetric("agent", models.MetricTypeUntyped, models.NewTags(), 1_000_000_000, multiValue.Values)
+	groupEvents := &models.PipelineGroupEvents{
+		Group: models.NewGroup(models.NewMetadata(), models.NewTags()),
+		Events: []models.PipelineEvent{
+			singleMetric,
+			multiMetric,
+		},
+	}
+
+	p := NewPromEncoder(seriesLimit)
+	data, err := p.EncodeV2(groupEvents)
+	assert.NoError(t, err)
+
+	gotGroupEventsSlice, err := DecodeBatchV2(data)
+	assert.NoError(t, err)
+
+	names := make(map[string]bool)
+	for _, group := range gotGroupEventsSlice {
+		for _, event := range group.Events {
+			m, ok := event.(*models.Metric)
+			assert.True(t, ok)
+			names[m.GetName()] = true
+		}
+	}
+	assert.True(t, names["prefill"])
+	assert.True(t, names["agent_cpu"])
+	assert.True(t, names["agent_mem"])
+	assert.Len(t, names, 3)
+}
+
 func TestEncoderBatchV2_ShouldDecodeSuccess_GivenNormalDataOfDataOfPipelineGroupEventsWithSingleTagExceedingSeriesLimit(t *testing.T) {
 	// given
 	seriesLimit := 19

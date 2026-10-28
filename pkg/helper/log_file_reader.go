@@ -104,7 +104,7 @@ func NewLogFileReader(context context.Context, checkpoint LogFileReaderCheckPoin
 			if os.IsNotExist(err) {
 				foundFile = false
 			}
-			logger.Warning(context, "STAT_FILE_ALARM", "stat file error when create reader, file", checkpoint.Path, "error", err.Error())
+			logger.Warning(context, selfmonitor.StatFileAlarm, "stat file error when create reader, file", checkpoint.Path, "error", err.Error())
 		}
 	}
 	if !checkpoint.State.IsEmpty() {
@@ -190,11 +190,11 @@ func (r *LogFileReader) CheckFileChange() bool {
 	default:
 		if os.IsNotExist(err) {
 			if r.foundFile {
-				logger.Warning(r.logContext, "STAT_FILE_ALARM", "stat file error, file", r.checkpoint.Path, "error", err.Error())
+				logger.Warning(r.logContext, selfmonitor.StatFileAlarm, "stat file error, file", r.checkpoint.Path, "error", err.Error())
 				r.foundFile = false
 			}
 		} else {
-			logger.Warning(r.logContext, "STAT_FILE_ALARM", "stat file error, file", r.checkpoint.Path, "error", err.Error())
+			logger.Warning(r.logContext, selfmonitor.StatFileAlarm, "stat file error, file", r.checkpoint.Path, "error", err.Error())
 		}
 	}
 	return false
@@ -327,7 +327,7 @@ func (r *LogFileReader) ReadAndProcess(once bool) {
 				return
 			}
 		} else {
-			logger.Warning(r.logContext, "STAT_FILE_ALARM", "stat file error, file", r.checkpoint.Path, "error", statErr.Error())
+			logger.Warning(r.logContext, selfmonitor.StatFileAlarm, "stat file error, file", r.checkpoint.Path, "error", statErr.Error())
 		}
 		for {
 			n, readErr := file.ReadAt(r.nowBlock[r.lastBufferSize:], int64(r.lastBufferSize)+r.checkpoint.Offset)
@@ -341,7 +341,7 @@ func (r *LogFileReader) ReadAndProcess(once bool) {
 			}
 			if readErr != nil {
 				if readErr != io.EOF {
-					logger.Warning(r.logContext, "READ_FILE_ALARM", "read file error, file", r.checkpoint.Path, "error", readErr.Error())
+					logger.Warning(r.logContext, selfmonitor.ReadFileAlarm, "read file error, file", r.checkpoint.Path, "error", readErr.Error())
 					break
 				}
 				logger.Debug(r.logContext, "read end of file", r.checkpoint.Path, "offset", r.checkpoint.Offset, "last buffer size", r.lastBufferSize, "read n", n, "stat", r.checkpoint.State.String())
@@ -365,7 +365,7 @@ func (r *LogFileReader) ReadAndProcess(once bool) {
 			}
 		}
 	} else {
-		logger.Warning(r.logContext, "READ_FILE_ALARM", "open file for read error, file", r.checkpoint.Path, "error", err.Error())
+		logger.Warning(r.logContext, selfmonitor.ReadFileAlarm, "open file for read error, file", r.checkpoint.Path, "error", err.Error())
 	}
 }
 

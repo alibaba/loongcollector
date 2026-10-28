@@ -17,8 +17,19 @@ package dockercompose
 import (
 	"context"
 	"errors"
+	"os"
+	"os/exec"
+	"strings"
 	"sync"
+
+	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/test/config"
 )
+
+// ForceShutDown is an alias for ShutDown; always tears down compose and removes orphans.
+func ForceShutDown() error {
+	return ShutDown()
+}
 
 type BootType = string
 
@@ -71,21 +82,26 @@ func Start(ctx context.Context) error {
 	return nil
 }
 
-// ShutDown close the virtual environment.
+// ShutDown stops compose and removes any leftover E2E containers (even if Start failed).
 func ShutDown() error {
 	mu.Lock()
 	defer mu.Unlock()
-	if !started {
-		return nil
+	var joined error
+	if instance != nil {
+		if err := instance.Stop(); err != nil {
+			joined = errors.Join(joined, err)
+		}
+	} else if config.CaseHome != "" {
+		if err := ComposeDown(config.CaseHome); err != nil {
+			joined = errors.Join(joined, err)
+		}
 	}
-	if instance == nil {
-		return errors.New("cannot stop booter when config unloading")
+	if err := RemoveLeftoverE2EContainers(); err != nil {
+		joined = errors.Join(joined, err)
 	}
-	if err := instance.Stop(); err != nil {
-		return err
-	}
+	clearNetworkMappingLocked()
 	started = false
-	return nil
+	return joined
 }
 
 func CopyCoreLogs() {
@@ -95,6 +111,38 @@ func CopyCoreLogs() {
 		return
 	}
 	instance.CopyCoreLogs()
+}
+
+// TryCopyCoreLogs exports loongcollector logs to test/e2e/report/<case>_log/ for debugging.
+func TryCopyCoreLogs() {
+	CopyCoreLogs()
+	if config.LogDir == "" {
+		return
+	}
+	if _, err := exec.LookPath("docker"); err != nil {
+		return
+	}
+	out, err := exec.Command("docker", "ps", "-a", "--filter", "name=loongcollectorC", "--format", "{{.ID}}").CombinedOutput()
+	if err != nil {
+		return
+	}
+	ids := strings.Fields(strings.TrimSpace(string(out)))
+	if len(ids) == 0 {
+		return
+	}
+	_ = os.MkdirAll(config.LogDir, 0750)
+	for _, id := range ids {
+		copyLogFile(id, "loongcollector.LOG")
+		copyLogFile(id, "go_plugin.LOG")
+	}
+}
+
+func copyLogFile(containerID, name string) {
+	dest := config.LogDir + "/" + name
+	cmd := exec.Command("docker", "cp", containerID+":/usr/local/loongcollector/log/"+name, dest)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		logger.Debugf(context.Background(), "TryCopyCoreLogs %s: %v %s", name, err, string(out))
+	}
 }
 
 func GetPhysicalAddress(virtual string) string {

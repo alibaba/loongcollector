@@ -20,8 +20,9 @@ package containercenter
 import (
 	"testing"
 
-	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/stretchr/testify/require"
+
+	"github.com/alibaba/ilogtail/pkg/helper"
 )
 
 func TestGetMountedFilePath(t *testing.T) {

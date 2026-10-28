@@ -26,6 +26,7 @@
 #include "app_config/AppConfig.h"
 #include "common/MachineInfoUtil.h"
 #include "common/NetworkUtil.h"
+#include "common/SafeThread.h"
 #include "common/StringTools.h"
 #include "common/StringView.h"
 #include "common/http/Curl.h"
@@ -132,8 +133,8 @@ K8sMetadata::K8sMetadata(size_t ipCacheSize, size_t cidCacheSize, size_t externa
     // batch query metadata ...
     if (mEnable) {
         mFlag = true;
-        mNetDetector = std::thread(&K8sMetadata::DetectNetwork, this);
-        mQueryThread = std::thread(&K8sMetadata::ProcessBatch, this);
+        LaunchStdThread(mNetDetector, "K8sMetadataNetDetector", &K8sMetadata::DetectNetwork, this);
+        LaunchStdThread(mQueryThread, "K8sMetadataQuery", &K8sMetadata::ProcessBatch, this);
     }
 }
 

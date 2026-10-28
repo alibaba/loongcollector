@@ -15,12 +15,21 @@
 
 TARGET_ARTIFACT_PATH=${TARGET_ARTIFACT_PATH:-"./core/build/unittest"}
 
+# Run each test with: sudo -E env LD_LIBRARY_PATH=… ./name (eBPF 等需加载内核 BPF 时常需要).
+# Default 1. Disable with: RUN_CORE_UT_USE_SUDO=0 ./scripts/run_core_ut.sh
+# 未配置免密 sudo 时并行会多次要密码，可: MAX_JOBS=1 ./scripts/run_core_ut.sh
+RUN_CORE_UT_USE_SUDO=${RUN_CORE_UT_USE_SUDO:-1}
+
+# Test discovery: collect_tests() picks files whose basename matches *…*_unittest (final segment
+# must be exactly "unittest"). That includes unittest/ebpf/agentsight_manager_unittest and
+# all other eBPF *_*_unittest binaries. Do not add "ebpf" to BLACKLIST_DIRS if you want them
+# to run. LD_LIBRARY_PATH is extended in main() for libunittest_base, libeBPFDriver, coolbpf.
+
 # Blacklist: directory names to skip
 # Example: "test_dir"
 BLACKLIST_DIRS=(
     # "pipeline"
     # "host_monitor"
-    # "ebpf"
 )
 
 # Get CPU core count for parallel execution
@@ -169,7 +178,13 @@ run_directory_tests() {
         # Run test and capture output to both temp file and output file in real-time
         # This ensures we can see partial output even if test times out
         # Use PIPESTATUS to check the exit status of the test program, not tee
-        "./$test_name" 2>&1 | tee "$test_output" >> "$output_file"
+        # Use $test_file (absolute): under sudo, cwd for the child can differ; ./$test_name
+        # then fails with: env: './foo_unittest': No such file or directory
+        if [ "${RUN_CORE_UT_USE_SUDO}" = "1" ]; then
+            sudo -E env LD_LIBRARY_PATH="${LD_LIBRARY_PATH}" "$test_file" 2>&1 | tee "$test_output" >> "$output_file"
+        else
+            "$test_file" 2>&1 | tee "$test_output" >> "$output_file"
+        fi
         local test_exit_status=${PIPESTATUS[0]}
         if [ $test_exit_status -ne 0 ]; then
             local test_end=$(date +%s.%N)
@@ -258,15 +273,24 @@ format_duration() {
 
 # Main execution with parallel directory processing
 main() {
-    # Maybe some unittest depend on relative paths, so execute in the unittest directory
-    UT_BASE_PATH="$(pwd)/${TARGET_ARTIFACT_PATH:2}"
-    export LD_LIBRARY_PATH=${UT_BASE_PATH}:$LD_LIBRARY_PATH
-    
     local original_dir=$(pwd)
     cd "$TARGET_ARTIFACT_PATH" || exit 1
     
     # Get absolute path of TARGET_ARTIFACT_PATH for relative path calculation
     local artifact_abs_path=$(pwd)
+    # eBPF UTs (including agentsight_manager_unittest) link libunittest_base and may need
+    # libeBPFDriver / coolbpf. TARGET_ARTIFACT_PATH may be .../unittest (default) or a subdir
+    # like .../unittest/ebpf; driver/coolbpf live under the CMake build root (parent of unittest).
+    local ut_root="$artifact_abs_path"
+    while [ "$ut_root" != "/" ] && [ "$(basename "$ut_root")" != "unittest" ]; do
+        ut_root=$(dirname "$ut_root")
+    done
+    if [ "$(basename "$ut_root")" != "unittest" ]; then
+        ut_root="$artifact_abs_path"
+    fi
+    local cmake_build_root
+    cmake_build_root=$(dirname "$ut_root")
+    export LD_LIBRARY_PATH="${ut_root}/ebpf:${ut_root}:${cmake_build_root}/ebpf/driver:${cmake_build_root}/_thirdparty/coolbpf/src${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
     
     # Disable job control messages to suppress termination messages
     # This prevents bash from printing "Terminated" messages when background jobs are killed
@@ -303,6 +327,9 @@ main() {
     
     echo "Found ${#DIR_ORDER[@]} directories with tests"
     echo "Running tests with max $MAX_JOBS parallel directories"
+    if [ "${RUN_CORE_UT_USE_SUDO}" = "1" ]; then
+        echo "RUN_CORE_UT_USE_SUDO=1 (each test runs via sudo -E env LD_LIBRARY_PATH=…; may prompt for password per process unless passwordless sudo)"
+    fi
     echo
     echo "Real-time test results:"
     echo "----------------------"

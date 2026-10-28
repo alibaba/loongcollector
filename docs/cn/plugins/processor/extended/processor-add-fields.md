@@ -4,6 +4,16 @@
 
 `processor_add_fields processor`插件可以添加日志字段。
 
+## 事件能力
+
+列含义见 [概览 · 事件能力列说明](../../overview.md#事件能力列说明)。
+
+| v1 接口 | v2 接口 | Log | Metric | Span |
+| --- | --- | --- | --- | --- |
+| ✓ | ✓ | v1&v2 | 透传 | 透传 |
+
+> v2 场景下对每条 Log 事件添加字段（输入 Log 输出 Log），Metric/Span 事件显式透传（不处理但不丢弃）。
+
 ## 版本
 
 [Stable](../../stability-level.md)
@@ -52,7 +62,7 @@ flushers:
 
 ```json
 {
-    "__tag__:__path__": "/home/test_log/key_value.log",
+    "__tag__:__path__": "/home/test-log/test.log",
     "content": "this is a test log",
     "service": "A",
     "__time__": "1657354602"

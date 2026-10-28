@@ -23,6 +23,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pkg/util"
 	"github.com/alibaba/ilogtail/plugins/aggregator/baseagg"
 )
@@ -129,7 +130,7 @@ func (g *AggregatorContentValueGroup) getOrCreateGroupAggs(log *protocol.Log) (*
 
 	agg := baseagg.NewAggregatorBase()
 	if _, err := agg.Init(g.context, groupQueue); err != nil {
-		logger.Error(g.context.GetRuntimeContext(), "AGG_GROUP_ALARM", "aggregator group fail to create agg for group", groupKVs)
+		logger.Error(g.context.GetRuntimeContext(), selfmonitor.AggGroupAlarm, "aggregator group fail to create agg for group", groupKVs)
 		return nil, err
 	}
 	agg.InitInner(
@@ -176,7 +177,7 @@ func (g *AggregatorContentValueGroup) getGroupKVs(log *protocol.Log) map[string]
 	for _, key := range g.GroupKeys {
 		val, found := g.findLogContent(log, key)
 		if !found && g.ErrIfKeyNotFound {
-			logger.Warning(g.context.GetRuntimeContext(), "AGG_GROUP_ALARM", "aggregator group fail to find key in log content,key", key)
+			logger.Warning(g.context.GetRuntimeContext(), selfmonitor.AggGroupAlarm, "aggregator group fail to find key in log content,key", key)
 		}
 		group[key] = val
 	}

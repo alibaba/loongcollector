@@ -4,6 +4,16 @@
 
 `processor_strptime`插件可从指定字段中提取日志时间，时间格式为 [Linux strptime](http://man7.org/linux/man-pages/man3/strptime.3.html)。
 
+## 事件能力
+
+列含义见 [概览 · 事件能力列说明](../../overview.md#事件能力列说明)。
+
+| v1 接口 | v2 接口 | Log | Metric | Span |
+| --- | --- | --- | --- | --- |
+| ✓ | ✓ | v1&v2 | 透传 | 透传 |
+
+> v2 场景下对每条 Log 事件以 strptime 格式解析时间字段（输入 Log 输出 Log），Metric/Span 事件显式透传（不处理但不丢弃）。
+
 ## 版本
 
 [Stable](../../stability-level.md)
@@ -37,8 +47,8 @@
 
 * 输入
 
-```text
-"log_time":"2016/01/02 12:59:59"
+```json
+{"log_time": "2016/01/02 12:59:59"}
 ```
 
 * 配置详情
@@ -52,10 +62,14 @@ processors:
 
 * 配置后结果
 
-```text
-"log_time":"2016/01/02 12:59:59"
-Log.Time = 1451710799
+```json
+{
+    "log_time": "2016/01/02 12:59:59",
+    "Log.Time": 1451710799
+}
 ```
+
+（`Log.Time` 为解析得到的日志时间字段示意。）
 
 ### 示例 2
 
@@ -65,8 +79,8 @@ Log.Time = 1451710799
 
 * 输入
 
-```text
-"log_time":"2016/01/02 12:59:59"
+```json
+{"log_time": "2016/01/02 12:59:59"}
 ```
 
 * 配置详情
@@ -82,7 +96,11 @@ processors:
 
 * 配置后结果
 
-```text
-"log_time":"2016/01/02 12:59:59"
-Log.Time = 1451714399
+```json
+{
+    "log_time": "2016/01/02 12:59:59",
+    "Log.Time": 1451714399
+}
 ```
+
+（`Log.Time` 为按东七区调整后的日志时间示意。）

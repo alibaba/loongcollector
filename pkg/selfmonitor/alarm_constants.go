@@ -14,19 +14,6 @@
 
 package selfmonitor
 
-type AlarmType string
-
-func (a AlarmType) String() string {
-	return string(a)
-}
-
-// todo: add more alarm type
-const (
-	InputCollectAlarm    AlarmType = "INPUT_COLLECT_ALARM"
-	CategoryConfigAlarm  AlarmType = "CATEGORY_CONFIG_ALARM"
-	ContainerCenterAlarm AlarmType = "CONTAINER_CENTER_ALARM"
-)
-
 type AlarmLevel string
 
 func (a AlarmLevel) String() string {

@@ -24,6 +24,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
 
@@ -184,19 +185,19 @@ func parseDockerJSONLog(line []byte) (*LogMessage, error) {
 
 func (p *DockerStdoutProcessor) ParseContainerLogLine(line []byte) *LogMessage {
 	if len(line) == 0 {
-		logger.Warning(p.context.GetRuntimeContext(), "PARSE_DOCKER_LINE_ALARM", "parse docker line error", "empty line")
+		logger.Warning(p.context.GetRuntimeContext(), selfmonitor.ParseDockerLineAlarm, "parse docker line error", "empty line")
 		return &LogMessage{}
 	}
 	if line[0] == '{' {
 		log, err := parseDockerJSONLog(line)
 		if err != nil {
-			logger.Warning(p.context.GetRuntimeContext(), "PARSE_DOCKER_LINE_ALARM", "parse json docker line error", err.Error(), "line", util.CutString(string(line), 512))
+			logger.Warning(p.context.GetRuntimeContext(), selfmonitor.ParseDockerLineAlarm, "parse json docker line error", err.Error(), "line", util.CutString(string(line), 512))
 		}
 		return log
 	}
 	log, err := parseCRILog(line)
 	if err != nil {
-		logger.Warning(p.context.GetRuntimeContext(), "PARSE_DOCKER_LINE_ALARM", "parse cri docker line error", err.Error(), "line", util.CutString(string(line), 512))
+		logger.Warning(p.context.GetRuntimeContext(), selfmonitor.ParseDockerLineAlarm, "parse cri docker line error", err.Error(), "line", util.CutString(string(line), 512))
 	}
 	return log
 }

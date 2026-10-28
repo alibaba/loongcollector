@@ -41,6 +41,10 @@ extern const uint32_t NO_FALL_BACK_FAIL_PERCENTAGE;
 extern const uint32_t SLOW_FALL_BACK_FAIL_PERCENTAGE;
 extern const std::string LOONGCOLLECTOR_ENV_PREFIX;
 
+/** gflag / ilogtail_config.json key (string, comma-separated) / env key (with LOONG_ + uppercase) for ignored
+ *  host-identity interfaces (Linux). Loaded via ParseJsonToFlags / ParseEnvToFlags. */
+constexpr const char* kIgnoredInterfacesKey = "ignored_interfaces";
+
 void CreateAgentDir();
 
 std::string GetAgentLogDir();
@@ -223,7 +227,6 @@ private:
     std::vector<std::string> mHostPathBlacklist;
 
     std::string mBindInterface;
-
 
     // /**
     //  * @brief Load ConfigServer, DataServer and network interface
@@ -550,8 +553,10 @@ public:
     friend class ProcessorTagNativeUnittest;
     friend class EnterpriseConfigProviderUnittest;
     friend class PollingPreservedDirDepthUnittest;
+    friend class CheckpointManagerUnittest;
     friend class InputStaticFileUnittest;
     friend class LogInputReaderUnittest;
+    friend class eBPFServerUnittest;
 #endif
 };
 

@@ -244,8 +244,10 @@ bool ConfigManager::RegisterHandlers() {
     // Build and sort path items from all configs.
     vector<PathItem> sortedPaths; // 所有精确路径（按原始 basePath 排序）
     vector<PathItem> wildcardPaths; // 所有通配符路径
-    auto nameConfigMap = FileServer::GetInstance()->GetAllFileDiscoveryConfigs();
-    BuildAndSortPathItems(nameConfigMap, sortedPaths, wildcardPaths);
+    FileServer::GetInstance()->WithFileDiscoveryConfigs(
+        [&](const std::unordered_map<std::string, FileDiscoveryConfig>& nameConfigMap) {
+            BuildAndSortPathItems(nameConfigMap, sortedPaths, wildcardPaths);
+        });
 
     // Check if has container config
     bool hasContainerConfig = false;
@@ -665,49 +667,42 @@ FileDiscoveryConfig ConfigManager::FindBestMatch(const string& path, const strin
             }
         }
     }
-    const auto& nameConfigMap = FileServer::GetInstance()->GetAllFileDiscoveryConfigs();
-    auto itr = nameConfigMap.begin();
     FileDiscoveryConfig prevMatch(nullptr, nullptr);
     size_t prevLen = 0;
     size_t curLen = 0;
     uint32_t nameRepeat = 0;
     string logNameList;
     vector<FileDiscoveryConfig> multiConfigs;
-    for (; itr != nameConfigMap.end(); ++itr) {
-        const FileDiscoveryOptions* config = itr->second.first;
-        // // exclude __FUSE_CONFIG__
-        // if (itr->first == STRING_FLAG(fuse_customized_config_name)) {
-        //     continue;
-        // }
-
-        int32_t matchedPathDepth = 0;
-        bool match = config->IsMatch(path, name, &matchedPathDepth);
-        if (match) {
-            // if force multi config, do not send alarm
-            if (!name.empty() && !config->mAllowingIncludedByMultiConfigs) {
-                nameRepeat++;
-                logNameList.append("logstore:");
-                logNameList.append(itr->second.second->GetLogstoreName());
-                logNameList.append(",config:");
-                logNameList.append(itr->second.second->GetConfigName());
-                logNameList.append(" ");
-                multiConfigs.push_back(itr->second);
-            }
-
-            // note: best config is the one which depth is greatest and create time is nearest
-            // Use the actual matched path depth
-            curLen = matchedPathDepth;
-            if (prevLen < curLen) {
-                prevMatch = itr->second;
-                prevLen = curLen;
-            } else if (prevLen == curLen && prevMatch.first) {
-                if (prevMatch.second->GetCreateTime() > itr->second.second->GetCreateTime()) {
-                    prevMatch = itr->second;
+    FileServer::GetInstance()->WithFileDiscoveryConfigs(
+        [&](const std::unordered_map<std::string, FileDiscoveryConfig>& nameConfigMap) {
+            for (const auto& [entryName, cfg] : nameConfigMap) {
+                const FileDiscoveryOptions* config = cfg.first;
+                int32_t matchedPathDepth = 0;
+                if (!config->IsMatch(path, name, &matchedPathDepth)) {
+                    continue;
+                }
+                if (!name.empty() && !config->mAllowingIncludedByMultiConfigs) {
+                    nameRepeat++;
+                    logNameList.append("logstore:");
+                    logNameList.append(cfg.second->GetLogstoreName());
+                    logNameList.append(",config:");
+                    logNameList.append(cfg.second->GetConfigName());
+                    logNameList.append(" ");
+                    multiConfigs.push_back(cfg);
+                }
+                // best config: greatest depth, then earliest create time
+                curLen = matchedPathDepth;
+                if (prevLen < curLen) {
+                    prevMatch = cfg;
                     prevLen = curLen;
+                } else if (prevLen == curLen && prevMatch.first) {
+                    if (prevMatch.second->GetCreateTime() > cfg.second->GetCreateTime()) {
+                        prevMatch = cfg;
+                        prevLen = curLen;
+                    }
                 }
             }
-        }
-    }
+        });
 
     // file include in multi config, find config for path will not trigger this alarm
     // do not send alarm to config with mForceMultiConfig
@@ -757,25 +752,16 @@ int32_t ConfigManager::FindAllMatch(vector<FileDiscoveryConfig>& allConfig,
         }
     }
     bool alarmFlag = false;
-    auto nameConfigMap = FileServer::GetInstance()->GetAllFileDiscoveryConfigs();
-    auto itr = nameConfigMap.begin();
-
-    // Store matched configs with their matched path depth
     vector<pair<FileDiscoveryConfig, int32_t>> matchedConfigsWithDepth;
-
-    for (; itr != nameConfigMap.end(); ++itr) {
-        const FileDiscoveryOptions* config = itr->second.first;
-        // // exclude __FUSE_CONFIG__
-        // if (itr->first == STRING_FLAG(fuse_customized_config_name)) {
-        //     continue;
-        // }
-
-        int32_t matchedPathDepth = 0;
-        bool match = config->IsMatch(path, name, &matchedPathDepth);
-        if (match) {
-            matchedConfigsWithDepth.emplace_back(itr->second, matchedPathDepth);
-        }
-    }
+    FileServer::GetInstance()->WithFileDiscoveryConfigs(
+        [&](const std::unordered_map<std::string, FileDiscoveryConfig>& nameConfigMap) {
+            for (const auto& [entryName, cfg] : nameConfigMap) {
+                int32_t matchedPathDepth = 0;
+                if (cfg.first->IsMatch(path, name, &matchedPathDepth)) {
+                    matchedConfigsWithDepth.emplace_back(cfg, matchedPathDepth);
+                }
+            }
+        });
 
     if (!name.empty() && matchedConfigsWithDepth.size() > static_cast<size_t>(maxMultiConfigSize)) {
         // only report log file alarm
@@ -828,54 +814,44 @@ int32_t ConfigManager::FindMatchWithForceFlag(std::vector<FileDiscoveryConfig>& 
             }
         }
     }
-    auto nameConfigMap = FileServer::GetInstance()->GetAllFileDiscoveryConfigs();
-    auto itr = nameConfigMap.begin();
     FileDiscoveryConfig prevMatch = make_pair(nullptr, nullptr);
     size_t prevLen = 0;
     size_t curLen = 0;
     uint32_t nameRepeat = 0;
     string logNameList;
     vector<FileDiscoveryConfig> multiConfigs;
-    for (; itr != nameConfigMap.end(); ++itr) {
-        FileDiscoveryConfig config = itr->second;
-        // // exclude __FUSE_CONFIG__
-        // if (itr->first == STRING_FLAG(fuse_customized_config_name)) {
-        //     continue;
-        // }
-
-        int32_t matchedPathDepth = 0;
-        bool match = config.first->IsMatch(path, name, &matchedPathDepth);
-        if (match) {
-            // if force multi config, do not send alarm
-            if (!name.empty() && !config.first->mAllowingIncludedByMultiConfigs) {
-                nameRepeat++;
-                logNameList.append("logstore:");
-                logNameList.append(config.second->GetLogstoreName());
-                logNameList.append(",config:");
-                logNameList.append(config.second->GetConfigName());
-                logNameList.append(" ");
-                multiConfigs.push_back(config);
-            }
-            if (!config.first->mAllowingIncludedByMultiConfigs) {
-                // if not ForceMultiConfig, find best match in normal cofigs
-                // note: best config is the one which depth is greatest and create time is nearest
-                // Use the actual matched path depth
-                curLen = matchedPathDepth;
-                if (prevLen < curLen) {
-                    prevMatch = config;
-                    prevLen = curLen;
-                } else if (prevLen == curLen && prevMatch.first) {
-                    if (prevMatch.second->GetCreateTime() > config.second->GetCreateTime()) {
-                        prevMatch = config;
-                        prevLen = curLen;
-                    }
+    FileServer::GetInstance()->WithFileDiscoveryConfigs(
+        [&](const std::unordered_map<std::string, FileDiscoveryConfig>& nameConfigMap) {
+            for (const auto& [entryName, cfg] : nameConfigMap) {
+                int32_t matchedPathDepth = 0;
+                if (!cfg.first->IsMatch(path, name, &matchedPathDepth)) {
+                    continue;
                 }
-            } else {
-                // save ForceMultiConfig
-                allConfig.push_back(config);
+                if (!name.empty() && !cfg.first->mAllowingIncludedByMultiConfigs) {
+                    nameRepeat++;
+                    logNameList.append("logstore:");
+                    logNameList.append(cfg.second->GetLogstoreName());
+                    logNameList.append(",config:");
+                    logNameList.append(cfg.second->GetConfigName());
+                    logNameList.append(" ");
+                    multiConfigs.push_back(cfg);
+                }
+                if (!cfg.first->mAllowingIncludedByMultiConfigs) {
+                    curLen = matchedPathDepth;
+                    if (prevLen < curLen) {
+                        prevMatch = cfg;
+                        prevLen = curLen;
+                    } else if (prevLen == curLen && prevMatch.first) {
+                        if (prevMatch.second->GetCreateTime() > cfg.second->GetCreateTime()) {
+                            prevMatch = cfg;
+                            prevLen = curLen;
+                        }
+                    }
+                } else {
+                    allConfig.push_back(cfg);
+                }
             }
-        }
-    }
+        });
 
     bool alarmFlag = false;
     // file include in multi config, find config for path will not trigger this alarm
@@ -953,12 +929,14 @@ void ConfigManager::DeleteHandlers() {
 // 1. No wildcard path: the base path of Config is the prefix of @path and within depth.
 // 2. Wildcard path: @path matches and within depth.
 void ConfigManager::GetRelatedConfigs(const std::string& path, std::vector<FileDiscoveryConfig>& configs) {
-    const auto& nameConfigMap = FileServer::GetInstance()->GetAllFileDiscoveryConfigs();
-    for (auto iter = nameConfigMap.begin(); iter != nameConfigMap.end(); ++iter) {
-        if (iter->second.first->IsMatch(path, "")) {
-            configs.push_back(iter->second);
-        }
-    }
+    FileServer::GetInstance()->WithFileDiscoveryConfigs(
+        [&](const std::unordered_map<std::string, FileDiscoveryConfig>& nameConfigMap) {
+            for (const auto& [entryName, cfg] : nameConfigMap) {
+                if (cfg.first->IsMatch(path, "")) {
+                    configs.push_back(cfg);
+                }
+            }
+        });
 }
 
 

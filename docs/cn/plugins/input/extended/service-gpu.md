@@ -4,6 +4,15 @@
 
 `service_gpu_metric` `input`插件可以采集 英伟达 GPU 相关指标（如未安装英伟达驱动，此插件无法正常工作）。
 
+
+## 事件能力
+
+列含义见 [概览 · 事件能力列说明](../../overview.md#事件能力列说明)。
+
+| Log | Metric | Span |
+| --- | --- | --- |
+| — | ✓ | — |
+
 ## 版本
 
 [Stable](../../stability-level.md)

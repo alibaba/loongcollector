@@ -1,0 +1,15 @@
+---
+description: Building
+globs:
+alwaysApply: false
+---
+## 编译（LoongCollector）
+
+**与 CI 对齐**：`make core PATH_IN_DOCKER=$(pwd)` + `./scripts/run_core_ut.sh`。本机 CMake 见 `skills/compile/SKILL.md`。
+
+```bash
+make core PATH_IN_DOCKER=$(pwd)
+./scripts/run_core_ut.sh --gtest_filter=... unittest/config/collection_config_unittest
+```
+
+Native→Go 桥接仅 `ProcessPipelineEventGroup`；勿再使用已删除的 `ProcessLogGroup` / `ProcessLog` export。

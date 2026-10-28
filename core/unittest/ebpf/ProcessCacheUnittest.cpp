@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <cstdio>
+
 #include <memory>
 
 #include "ProcessCacheValue.h"
@@ -21,6 +23,21 @@
 
 using namespace logtail;
 using namespace logtail::ebpf;
+
+namespace {
+// ForceShrink() drops entries when the pid is not in /proc. Small pids (e.g. 1000–1004) often
+// exist on a real system, so use values above the kernel's pid_max to avoid flaky tests.
+uint64_t FakeDataEventPidForForceShrinkTest(int index) {
+    unsigned long maxPid = 4194304UL;
+    if (FILE* f = std::fopen("/proc/sys/kernel/pid_max", "r")) {
+        if (std::fscanf(f, "%lu", &maxPid) != 1) {
+            maxPid = 4194304UL;
+        }
+        std::fclose(f);
+    }
+    return static_cast<uint64_t>(maxPid) + 10UL + static_cast<unsigned long>(index);
+}
+} // namespace
 
 class ProcessCacheValueUnittest : public ::testing::Test {
 protected:
@@ -180,7 +197,7 @@ void ProcessCacheUnittest::TestClearExpiredCache() {
 
 void ProcessCacheUnittest::TestForceShrink() {
     for (int i = 0; i < 5; i++) {
-        data_event_id key{static_cast<uint32_t>(i + 1000), static_cast<uint64_t>(i + 1000000)};
+        data_event_id key{FakeDataEventPidForForceShrinkTest(i), static_cast<uint64_t>(i + 1000000)};
         auto cacheValue = std::make_shared<ProcessCacheValue>();
         cacheValue->SetContent<kProcessId>(StringView("1234"));
         cacheValue->SetContent<kKtime>(StringView("5678"));
@@ -196,7 +213,7 @@ void ProcessCacheUnittest::TestForceShrink() {
 
     // interval within 2min
     for (int i = 0; i < 5; i++) {
-        data_event_id key{static_cast<uint32_t>(i + 1000), static_cast<uint64_t>(i + 1000000)};
+        data_event_id key{FakeDataEventPidForForceShrinkTest(i), static_cast<uint64_t>(i + 1000000)};
         auto cacheValue = std::make_shared<ProcessCacheValue>();
         cacheValue->SetContent<kProcessId>(StringView("1234"));
         cacheValue->SetContent<kKtime>(StringView("5678"));

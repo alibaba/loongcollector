@@ -4,9 +4,17 @@
 
 `input_internal_metrics` 插件收集 LoongCollector 自身运行时的指标数据，并以[多值MetricEvent](../../../developer-guide/data-model-cpp.md)的格式暴露出去。
 
+## 事件能力
+
+列含义见 [概览 · 事件能力列说明](../../overview.md#事件能力列说明)。
+
+| Log | Metric | Span |
+| --- | --- | --- |
+| — | ✓ | — |
+
 ## 版本
 
-[Beta](../../stability-level.md)
+[Stable](../../stability-level.md)
 
 ## 版本说明
 
@@ -21,7 +29,7 @@
 |  Type  |  string  |  是  |  /  |  插件类型。固定为input\_internal\_metrics。  |
 |  Agent  |  InternalMetricRule  |  否  |  /  |  进程级指标（LoongCollector的基本信息、资源占用率等进程级别信息）的采集规则  |
 |  Runner  |  InternalMetricRule  |  否  |  /  |  Runner级指标（LoongCollector内重要单例的运行状态）的采集规则  |
-|  Pipeline  |  InternalMetricRule  |  否  |  /  |  Pipeline级指标（单个采集配置流水线的状态）的采集规则  |
+|  Pipeline  |  InternalMetricRule  |  否  |  /  |  Pipeline级指标（单个采集配置的状态）的采集规则  |
 |  PluginSource  |  InternalMetricRule  |  否  |  /  |  数据源级（例如被采集的文件的信息）的采集规则  |
 |  Plugin  |  InternalMetricRule  |  否  |  /  |  插件级指标（单个插件的状态、吞吐量等信息）的采集规则  |
 |  Component  |  InternalMetricRule  |  否  |  /  |  组件级指标（为了辅助Pipeline等运行的组件的状态）的采集规则  |
@@ -33,11 +41,15 @@ InternalMetricRule 的结构如下：
 |  Enable  |  bool  |  否  |  true  |  是否开启。默认开启。  |
 |  Interval  |  int  |  否  |  10  |  统计间隔，单位为分钟，表示每隔指定时间输出一次该类型的指标。  |
 
+## 导出到外部系统
+
+采集、本地落盘及导出到 Prometheus 等外部系统的说明，见 [如何收集自监控指标](../../../developer-guide/self-monitor/metrics/how-to-collect-internal-metrics.md)。下方样例为**仅写本地文件**的快速参考。
+
 ## 样例
 
 采集LoongCollector所有自监控指标，并将采集结果写到本地文件。
 
-``` yaml
+```yaml
 enable: true
 inputs:
   - Type: input_internal_metrics

@@ -18,8 +18,10 @@ import (
 	"encoding/base64"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
 type ProcessorBase64Encoding struct {
@@ -60,10 +62,33 @@ func (p *ProcessorBase64Encoding) ProcessLogs(logArray []*protocol.Log) []*proto
 			}
 		}
 		if !found && p.NoKeyError {
-			logger.Warning(p.context.GetRuntimeContext(), "BASE64_E_FIND_ALARM", "cannot find key", p.SourceKey)
+			logger.Warning(p.context.GetRuntimeContext(), selfmonitor.Base64EFindAlarm, "cannot find key", p.SourceKey)
 		}
 	}
 	return logArray
+}
+
+// Process implements the v2 ProcessorV2 interface: it base64-encodes the
+// SourceKey value of each Log event (writing to NewKey when set, otherwise in
+// place); Metric/Span events pass through unchanged.
+func (p *ProcessorBase64Encoding) Process(in *models.PipelineGroupEvents, context pipeline.PipelineContext) {
+	pipeline.ProcessLogEventsOnly(in, context, p.processLogEvent)
+}
+
+func (p *ProcessorBase64Encoding) processLogEvent(log *models.Log) {
+	contents := log.GetIndices()
+	if !contents.Contains(p.SourceKey) {
+		if p.NoKeyError {
+			logger.Warning(p.context.GetRuntimeContext(), selfmonitor.Base64EFindAlarm, "cannot find key", p.SourceKey)
+		}
+		return
+	}
+	newVal := base64.StdEncoding.EncodeToString([]byte(pipeline.GetStringValue(contents.Get(p.SourceKey))))
+	if len(p.NewKey) > 0 {
+		contents.Add(p.NewKey, newVal)
+	} else {
+		contents.Add(p.SourceKey, newVal)
+	}
 }
 
 func init() {

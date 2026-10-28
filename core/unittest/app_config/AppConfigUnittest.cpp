@@ -16,6 +16,8 @@
 #include "common/FileSystemUtil.h"
 #include "common/Flags.h"
 #include "common/JsonUtil.h"
+#include "common/LogtailCommonFlags.h"
+#include "common/MachineInfoUtil.h"
 #include "unittest/Unittest.h"
 
 DECLARE_FLAG_INT32(checkpoint_find_max_file_count);
@@ -42,8 +44,17 @@ public:
     void TestLoadSingleValueEnvConfig();
     void TestLoadStringParameter();
     void TestGenerateFileTagsDir();
+    void TestIgnoredInterfacesConfig();
+    void TestIgnoredInterfacesEnv();
+    void TestBindInterfaceWorkingInterfacePrecedence();
 
 private:
+    static Json::Value MakeDefaultIgnoredInterfacesConfig() {
+        Json::Value conf;
+        conf[kIgnoredInterfacesKey] = "kube-ipvs0,nodelocaldns,docker0";
+        return conf;
+    }
+
     void writeLogtailConfigJSON(const Json::Value& v) {
         LOG_INFO(sLogger, ("writeLogtailConfigJSON", v.toStyledString()));
         if (BOOL_FLAG(logtail_mode)) {
@@ -226,6 +237,89 @@ void AppConfigUnittest::TestLoadStringParameter() {
     APSARA_TEST_EQUAL(res, "0.7");
 }
 
+void AppConfigUnittest::TestIgnoredInterfacesConfig() {
+    AppConfig* cfg = AppConfig::GetInstance();
+    cfg->ParseJsonToFlags(MakeDefaultIgnoredInterfacesConfig());
+    APSARA_TEST_TRUE(IsIgnoredInterfaceForHostIdentity("kube-ipvs0"));
+    APSARA_TEST_TRUE(IsIgnoredInterfaceForHostIdentity("docker0"));
+
+    // JSON array is not applied as a gflag; flag value stays unchanged.
+    Json::Value bad;
+    bad[kIgnoredInterfacesKey] = Json::arrayValue;
+    bad[kIgnoredInterfacesKey].append("x");
+    cfg->ParseJsonToFlags(bad);
+    APSARA_TEST_TRUE(IsIgnoredInterfaceForHostIdentity("kube-ipvs0"));
+
+    Json::Value good;
+    good[kIgnoredInterfacesKey] = "iface-a, iface-b";
+    cfg->ParseJsonToFlags(good);
+    APSARA_TEST_TRUE(IsIgnoredInterfaceForHostIdentity("iface-a"));
+    APSARA_TEST_TRUE(IsIgnoredInterfaceForHostIdentity("iface-b"));
+    APSARA_TEST_FALSE(IsIgnoredInterfaceForHostIdentity("kube-ipvs0"));
+
+    Json::Value empty;
+    empty[kIgnoredInterfacesKey] = "";
+    cfg->ParseJsonToFlags(empty);
+    APSARA_TEST_FALSE(IsIgnoredInterfaceForHostIdentity("kube-ipvs0"));
+
+    cfg->ParseJsonToFlags(MakeDefaultIgnoredInterfacesConfig());
+}
+
+void AppConfigUnittest::TestIgnoredInterfacesEnv() {
+    AppConfig* cfg = AppConfig::GetInstance();
+    cfg->ParseJsonToFlags(MakeDefaultIgnoredInterfacesConfig());
+
+    SetEnv(kIgnoredInterfacesKey, "env-a, env-b");
+    cfg->ParseEnvToFlags();
+    APSARA_TEST_TRUE(IsIgnoredInterfaceForHostIdentity("env-a"));
+    APSARA_TEST_TRUE(IsIgnoredInterfaceForHostIdentity("env-b"));
+    UnsetEnv(kIgnoredInterfacesKey);
+
+    SetEnv("LOONG_IGNORED_INTERFACES", "p,q");
+    cfg->ParseEnvToFlags();
+    APSARA_TEST_TRUE(IsIgnoredInterfaceForHostIdentity("p"));
+    APSARA_TEST_TRUE(IsIgnoredInterfaceForHostIdentity("q"));
+    UnsetEnv("LOONG_IGNORED_INTERFACES");
+
+    cfg->ParseJsonToFlags(MakeDefaultIgnoredInterfacesConfig());
+}
+
+void AppConfigUnittest::TestBindInterfaceWorkingInterfacePrecedence() {
+    AppConfig* cfg = AppConfig::GetInstance();
+    std::string savedWorking = STRING_FLAG(working_interface);
+    std::string savedBind = cfg->mBindInterface;
+
+    // working_interface empty: LoadResourceConf keeps the configured bind_interface as-is.
+    STRING_FLAG(working_interface) = "";
+    {
+        Json::Value conf;
+        conf["bind_interface"] = "eth0";
+        cfg->LoadResourceConf(conf);
+        APSARA_TEST_EQUAL(cfg->GetBindInterface(), "eth0");
+    }
+
+    // working_interface set: it overrides bind_interface at load time, so GetBindInterface (and thus
+    // the curl egress binding) uses the same interface from which GetHostIp resolves the reported IP.
+    STRING_FLAG(working_interface) = "eth1";
+    {
+        Json::Value conf;
+        conf["bind_interface"] = "eth0";
+        cfg->LoadResourceConf(conf);
+        APSARA_TEST_EQUAL(cfg->GetBindInterface(), "eth1");
+    }
+
+    // The override applies even when bind_interface is absent from the config.
+    cfg->mBindInterface = "eth2";
+    {
+        Json::Value conf; // no bind_interface key
+        cfg->LoadResourceConf(conf);
+        APSARA_TEST_EQUAL(cfg->GetBindInterface(), "eth1");
+    }
+
+    STRING_FLAG(working_interface) = savedWorking;
+    cfg->mBindInterface = savedBind;
+}
+
 void AppConfigUnittest::TestGenerateFileTagsDir() {
     {
         STRING_FLAG(ALIYUN_LOG_FILE_TAGS) = "";
@@ -277,6 +371,9 @@ UNIT_TEST_CASE(AppConfigUnittest, TestRecurseParseJsonToFlags);
 UNIT_TEST_CASE(AppConfigUnittest, TestParseEnvToFlags);
 UNIT_TEST_CASE(AppConfigUnittest, TestLoadSingleValueEnvConfig);
 UNIT_TEST_CASE(AppConfigUnittest, TestLoadStringParameter);
+UNIT_TEST_CASE(AppConfigUnittest, TestIgnoredInterfacesConfig);
+UNIT_TEST_CASE(AppConfigUnittest, TestIgnoredInterfacesEnv);
+UNIT_TEST_CASE(AppConfigUnittest, TestBindInterfaceWorkingInterfacePrecedence);
 UNIT_TEST_CASE(AppConfigUnittest, TestGenerateFileTagsDir);
 
 } // namespace logtail

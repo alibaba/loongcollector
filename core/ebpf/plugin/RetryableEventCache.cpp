@@ -25,7 +25,6 @@ namespace logtail::ebpf {
 
 RetryableEventCache::RetryableEventCache() {
     mEventQueue.reserve(4096);
-    mEventProcessing.reserve(4096);
 }
 
 size_t RetryableEventCache::Size() const {
@@ -44,36 +43,37 @@ void RetryableEventCache::Clear() {
 }
 
 void RetryableEventCache::HandleEvents() {
+    // Take a per-call batch from the shared queue. Use a local vector (not a class member) so
+    // concurrent HandleEvents (e.g. EBPFServer::pollPerfBuffers and another thread's handleEventCache
+    // in unit tests) cannot swap/iterate the same mEventProcessing and race.
+    std::vector<std::shared_ptr<RetryableEvent>> processing;
     {
         std::lock_guard<std::mutex> lock(mMutex);
-        mEventProcessing.swap(mEventQueue);
+        processing.swap(mEventQueue);
     }
     size_t nextRetryItemCount = 0;
-    for (auto& item : mEventProcessing) {
+    for (auto& item : processing) {
         if (item->OnRetry()) {
             continue;
         }
         item->DecrementRetryCount();
         if (item->CanRetry()) {
-            mEventProcessing[nextRetryItemCount++] = item;
+            processing[nextRetryItemCount++] = item;
         } else {
             item->OnDrop();
         }
     }
     if (nextRetryItemCount > 0) {
-        mEventProcessing.resize(nextRetryItemCount);
+        processing.resize(nextRetryItemCount);
         std::lock_guard<std::mutex> lock(mMutex);
-        mEventQueue.insert(mEventQueue.end(),
-                           std::make_move_iterator(mEventProcessing.begin()),
-                           std::make_move_iterator(mEventProcessing.end()));
+        mEventQueue.insert(
+            mEventQueue.end(), std::make_move_iterator(processing.begin()), std::make_move_iterator(processing.end()));
     }
-    mEventProcessing.clear();
 }
 
 void RetryableEventCache::ClearEvents() {
     std::lock_guard<std::mutex> lock(mMutex);
     mEventQueue.clear();
-    mEventProcessing.clear();
-};
+}
 
 } // namespace logtail::ebpf

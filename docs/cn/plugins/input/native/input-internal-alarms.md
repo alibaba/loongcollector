@@ -4,9 +4,17 @@
 
 `input_internal_alarms` 插件收集 LoongCollector 自身运行时的告警数据，并以[LogEvent](../../../developer-guide/data-model-cpp.md)的格式暴露出去。
 
+## 事件能力
+
+列含义见 [概览 · 事件能力列说明](../../overview.md#事件能力列说明)。
+
+| Log | Metric | Span |
+| --- | --- | --- |
+| ✓ | — | — |
+
 ## 版本
 
-[Beta](../../stability-level.md)
+[Stable](../../stability-level.md)
 
 ## 版本说明
 
@@ -20,11 +28,12 @@
 | --- | --- | --- | --- | --- |
 |  Type  |  string  |  是  |  /  |  插件类型。固定为input\_internal\_alarms。  |
 
+
 ## 样例
 
 采集LoongCollector所有自监控告警，并将采集结果写到本地文件。
 
-``` yaml
+```yaml
 enable: true
 inputs:
   - Type: input_internal_alarms

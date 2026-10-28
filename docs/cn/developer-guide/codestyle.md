@@ -4,7 +4,7 @@ LoongCollector C++遵循基于[Google代码规范](https://google.github.io/styl
 
 Go遵循[Effective Go](https://go.dev/doc/effective_go)风格。
 
-Markdown遵循基于[markdownlint](<https://github.com/DavidAnson/markdownlint/blob/main/doc/Rules.md>)的风格，并为了兼容[GitBook](https://docs.gitbook.com/editing-content/rich-content/with-command-palette#hints-and-callouts)排除[MD033](<https://github.com/DavidAnson/markdownlint/blob/main/doc/Rules.md#md033---inline-html>)。
+Markdown遵循基于 [markdownlint](https://github.com/DavidAnson/markdownlint/blob/main/doc/Rules.md) 的风格，并为了兼容 [GitBook](https://docs.gitbook.com/editing-content/rich-content/with-command-palette#hints-and-callouts) 排除 [MD033](https://github.com/DavidAnson/markdownlint/blob/main/doc/Rules.md#md033---inline-html)。
 
 ## 格式化C++代码
 

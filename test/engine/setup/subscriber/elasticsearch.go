@@ -29,6 +29,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/doc"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
 const elasticSearchName = "elasticsearch"
@@ -67,7 +68,7 @@ func (i *ElasticSearchSubscriber) GetData(sql string, startTime int32) ([]*proto
 	}
 	es, err := elasticsearch.NewClient(cfg)
 	if err != nil {
-		logger.Warningf(context.Background(), "ELASTICSEARCH_SUBSCRIBER_ALARM", "failed to create elasticsearch client, host %, err: %s", host, err)
+		logger.Warningf(context.Background(), selfmonitor.ElasticsearchSubscriberAlarm, "failed to create elasticsearch client, host %, err: %s", host, err)
 		return nil, err
 	}
 	i.client = es
@@ -97,23 +98,20 @@ func (i *ElasticSearchSubscriber) queryRecords() (logGroup *protocol.LogGroup, e
 		i.client.Search.WithBody(strings.NewReader(`{"query" : { "match_all" : { } }}`)),
 	)
 	if err != nil {
-		logger.Warning(context.Background(), "ELASTICSEARCH_SUBSCRIBER_ALARM", "err", err)
+		logger.Warning(context.Background(), selfmonitor.ElasticsearchSubscriberAlarm, "err", err)
 		return
 	}
 	if err = json.NewDecoder(res.Body).Decode(&r); err != nil {
 		log.Fatalf("Error parsing the response body: %s", err)
 	}
 
+	// contents is parsed generically so structurally-converted events (e.g. a
+	// Metric flushed as __name__/__labels__/__value__/__time_nano__) surface all
+	// their fields for verification without hard-coding a fixed field set.
 	type logContent struct {
-		Contents struct {
-			Index   string `json:"Index"`
-			Content string `json:"Content"`
-		} `json:"contents"`
-		Tags struct {
-			HostIP   string `json:"host.ip"`
-			HostName string `json:"host.name"`
-		} `json:"tags"`
-		Time int `json:"time"`
+		Contents map[string]string `json:"contents"`
+		Tags     map[string]string `json:"tags"`
+		Time     int               `json:"time"`
 	}
 	if _, ok := r["hits"]; !ok {
 		return nil, fmt.Errorf("no hits found in response")
@@ -126,14 +124,12 @@ func (i *ElasticSearchSubscriber) queryRecords() (logGroup *protocol.LogGroup, e
 		lc := logContent{}
 		err = json.Unmarshal(tmpJSON, &lc)
 		if err != nil {
-			logger.Warning(context.Background(), "ELASTICSEARCH_SUBSCRIBER_ALARM", "err", err)
+			logger.Warning(context.Background(), selfmonitor.ElasticsearchSubscriberAlarm, "err", err)
 		}
 
-		log := &protocol.Log{
-			Contents: []*protocol.Log_Content{
-				{Key: "index", Value: lc.Contents.Index},
-				{Key: "content", Value: lc.Contents.Content},
-			},
+		log := &protocol.Log{}
+		for k, v := range lc.Contents {
+			log.Contents = append(log.Contents, &protocol.Log_Content{Key: k, Value: v})
 		}
 		logGroup.Logs = append(logGroup.Logs, log)
 	}

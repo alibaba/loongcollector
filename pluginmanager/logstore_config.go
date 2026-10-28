@@ -25,10 +25,12 @@ import (
 	"sync/atomic"
 
 	"github.com/alibaba/ilogtail/pkg/config"
+	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/plugins/input"
 )
 
@@ -82,7 +84,7 @@ type LogstoreConfig struct {
 	LogstoreKey          int64
 	FlushOutFlag         atomic.Bool
 	// Each LogstoreConfig can have its independent GlobalConfig if the "global" field
-	//   is offered in configuration, see build-in AlarmConfig.
+	//   is offered in configuration.
 	GlobalConfig *config.GlobalConfig
 
 	Version      ConfigVersion
@@ -236,40 +238,36 @@ func (lc *LogstoreConfig) ProcessRawLogV2(rawLog []byte, packID string, topic st
 	return 0
 }
 
-func (lc *LogstoreConfig) ProcessLog(logByte []byte, packID string, topic string, tags []byte) int {
-	log := &protocol.Log{}
-	err := log.Unmarshal(logByte)
-	if err != nil {
-		logger.Error(lc.Context.GetRuntimeContext(), "WRONG_PROTOBUF_ALARM",
-			"cannot process logs passed by core, err", err)
+func (lc *LogstoreConfig) ProcessPipelineEventGroup(pbBytes []byte, packID string) int {
+	pbGroup := &protocol.PipelineEventGroup{}
+	if err := pbGroup.Unmarshal(pbBytes); err != nil {
+		logger.Error(lc.Context.GetRuntimeContext(), selfmonitor.WrongProtobufAlarm, "cannot process pipeline event group passed by core, err", err)
 		return -1
 	}
-	if len(topic) > 0 {
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "__log_topic__", Value: topic})
+	if runner, ok := lc.PluginRunner.(*pluginv2Runner); ok {
+		runner.ReceivePipelineEventGroup(pbGroup, map[string]interface{}{ctxKeySource: packID})
+		return 0
 	}
-	// When UsingOldContentTag is set to false, the tag is now put into the context during cgo.
-	if !lc.GlobalConfig.UsingOldContentTag {
-		logTags := extractTagsToLogTags(tags)
-		lc.PluginRunner.ReceiveRawLog(&pipeline.LogWithContext{Log: log, Context: map[string]interface{}{"source": packID, "topic": topic, "tags": logTags}})
-	} else {
-		extractTags(tags, log)
-		lc.PluginRunner.ReceiveRawLog(&pipeline.LogWithContext{Log: log, Context: map[string]interface{}{"source": packID, "topic": topic}})
-	}
-	return 0
-}
-
-func (lc *LogstoreConfig) ProcessLogGroup(logByte []byte, packID string) int {
-	logGroup := &protocol.LogGroup{}
-	err := logGroup.Unmarshal(logByte)
+	logGroup, discarded, err := helper.TransferPBToLogGroupForV1(pbGroup)
 	if err != nil {
-		logger.Error(lc.Context.GetRuntimeContext(), "WRONG_PROTOBUF_ALARM",
-			"cannot process log group passed by core, err", err)
+		logger.Error(lc.Context.GetRuntimeContext(), selfmonitor.WrongProtobufAlarm,
+			"cannot convert pipeline event group for v1 runner", err, "config", lc.ConfigName)
 		return -1
+	}
+	if discarded {
+		return 0
+	}
+	if logGroup == nil || len(logGroup.Logs) == 0 {
+		return 0
+	}
+	ctx := map[string]interface{}{ctxKeySource: packID}
+	for k, v := range pbGroup.Metadata {
+		ctx[k] = string(v)
 	}
 	lc.PluginRunner.ReceiveLogGroup(pipeline.LogGroupWithContext{
 		LogGroup: logGroup,
-		Context:  map[string]interface{}{ctxKeySource: packID}},
-	)
+		Context:  ctx,
+	})
 	return 0
 }
 
@@ -656,7 +654,7 @@ func UnloadPartiallyLoadedConfig(configName string) error {
 		ToStartPipelineConfigWithoutInput = nil
 		return nil
 	}
-	logger.Error(context.Background(), "unload config", "config not found", configName)
+	logger.Error(context.Background(), selfmonitor.LoadConfigAlarm, "config not found", configName)
 	return fmt.Errorf("config not found")
 }
 
@@ -712,7 +710,7 @@ func loadService(pluginMeta *pipeline.PluginMeta, logstoreConfig *LogstoreConfig
 func loadProcessor(pluginMeta *pipeline.PluginMeta, priority int, logstoreConfig *LogstoreConfig, configInterface interface{}) (err error) {
 	creator, existFlag := pipeline.Processors[pluginMeta.PluginType]
 	if !existFlag || creator == nil {
-		logger.Error(logstoreConfig.Context.GetRuntimeContext(), "INVALID_PROCESSOR_TYPE", "invalid processor type, maybe type is wrong or logtail version is too old", pluginMeta.PluginType)
+		logger.Error(logstoreConfig.Context.GetRuntimeContext(), selfmonitor.InvalidProcessorTypeAlarm, "invalid processor type, maybe type is wrong or logtail version is too old", pluginMeta.PluginType)
 		return nil
 	}
 	processor := creator()
@@ -725,7 +723,7 @@ func loadProcessor(pluginMeta *pipeline.PluginMeta, priority int, logstoreConfig
 func loadAggregator(pluginMeta *pipeline.PluginMeta, logstoreConfig *LogstoreConfig, configInterface interface{}) (err error) {
 	creator, existFlag := pipeline.Aggregators[pluginMeta.PluginType]
 	if !existFlag || creator == nil {
-		logger.Error(logstoreConfig.Context.GetRuntimeContext(), "INVALID_AGGREGATOR_TYPE", "invalid aggregator type, maybe type is wrong or logtail version is too old", pluginMeta.PluginType)
+		logger.Error(logstoreConfig.Context.GetRuntimeContext(), selfmonitor.InvalidAggregatorTypeAlarm, "invalid aggregator type, maybe type is wrong or logtail version is too old", pluginMeta.PluginType)
 		return nil
 	}
 	aggregator := creator()

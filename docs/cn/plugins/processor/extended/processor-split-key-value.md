@@ -4,6 +4,16 @@
 
 `processor_split_key_value processor`插件可以通过切分键值对的方式提取字段。
 
+## 事件能力
+
+列含义见 [概览 · 事件能力列说明](../../overview.md#事件能力列说明)。
+
+| v1 接口 | v2 接口 | Log | Metric | Span |
+| --- | --- | --- | --- | --- |
+| ✓ | ✓ | v1&v2 | 透传 | 透传 |
+
+> v2 场景下对每条 Log 事件做键值对切分（输入 Log 输出 Log），Metric/Span 事件显式透传（不处理但不丢弃）。
+
 ## 版本
 
 [Stable](../../stability-level.md)
@@ -79,7 +89,7 @@ flushers:
 * 输入
 
 ```bash
-echo -e 'class:main http_user_agent:"User Agent" "中文" "hello\t\"ilogtail\"\tworld"' >> /home/test-log/key_value.log
+echo -e 'class:main http_user_agent:"User Agent" "中文" "hello\t\"loongcollector\"\tworld"' >> /home/test-log/key_value.log
 ```
 
 * 采集配置
@@ -109,7 +119,7 @@ flushers:
     "class": "main",
     "http_user_agent": "User Agent",
     "no_separator_key_0": "中文",
-    "no_separator_key_1": "hello\t\"ilogtail\"\tworld",
+    "no_separator_key_1": "hello\t\"loongcollector\"\tworld",
     "__time__": "1657354602"
 }
 ```

@@ -35,7 +35,6 @@ plugins:
     - import: "github.com/alibaba/ilogtail/plugins/flusher/elasticsearch"
     - import: "github.com/alibaba/ilogtail/plugins/flusher/grpc"
     - import: "github.com/alibaba/ilogtail/plugins/flusher/http"
-    - import: "github.com/alibaba/ilogtail/plugins/flusher/kafka"
     - import: "github.com/alibaba/ilogtail/plugins/flusher/kafkav2"
     - import: "github.com/alibaba/ilogtail/plugins/flusher/loki"
     - import: "github.com/alibaba/ilogtail/plugins/flusher/odps"
@@ -124,3 +123,4 @@ plugins:
     - import: "github.com/alibaba/ilogtail/plugins/input/telegraf"
   windows:
     - import: "github.com/alibaba/ilogtail/plugins/input/input_wineventlog"
+    - import: "github.com/alibaba/ilogtail/plugins/input/input_etw"

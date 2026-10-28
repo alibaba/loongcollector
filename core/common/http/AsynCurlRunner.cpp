@@ -16,6 +16,7 @@
 
 #include <chrono>
 
+#include "common/SafeThread.h"
 #include "common/StringTools.h"
 #include "common/http/Curl.h"
 #include "logger/Logger.h"
@@ -35,7 +36,7 @@ bool AsynCurlRunner::Init() {
         LOG_ERROR(sLogger, ("failed to init async curl runner", "failed to init curl client"));
         return false;
     }
-    mThreadRes = async(launch::async, &AsynCurlRunner::Run, this);
+    LaunchAsync(mThreadRes, "AsynCurlRunner", &AsynCurlRunner::Run, this);
     mInited = true;
     return true;
 }

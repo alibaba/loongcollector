@@ -3,6 +3,7 @@ package k8smeta
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	app "k8s.io/api/apps/v1"
@@ -34,6 +35,9 @@ type k8sMetaCache struct {
 
 	resourceType string
 	schema       *runtime.Scheme
+
+	watchOnce sync.Once
+	giveUp    *informerGiveUp
 }
 
 func newK8sMetaCache(stopCh chan struct{}, resourceType string) *k8sMetaCache {
@@ -44,6 +48,7 @@ func newK8sMetaCache(stopCh chan struct{}, resourceType string) *k8sMetaCache {
 	m.metaStore = NewDeferredDeletionMetaStore(m.eventCh, m.stopCh, 120, cache.MetaNamespaceKeyFunc, idxRules...)
 	m.resourceType = resourceType
 	m.schema = runtime.NewScheme()
+	m.giveUp = newInformerGiveUp()
 	_ = v1.AddToScheme(m.schema)
 	_ = batch.AddToScheme(m.schema)
 	_ = batchv1beta1.AddToScheme(m.schema)
@@ -57,7 +62,17 @@ func newK8sMetaCache(stopCh chan struct{}, resourceType string) *k8sMetaCache {
 func (m *k8sMetaCache) init(clientset *kubernetes.Clientset) {
 	m.clientset = clientset
 	m.metaStore.Start()
-	m.watch(m.stopCh)
+}
+
+func (m *k8sMetaCache) ensureWatchStarted() {
+	m.watchOnce.Do(func() {
+		if m.clientset != nil {
+			go m.watch(m.stopCh)
+		} else {
+			logger.Warning(context.Background(), K8sMetaUnifyErrorCode,
+				"ensureWatchStarted called before init, watch permanently skipped", m.resourceType)
+		}
+	})
 }
 
 func (m *k8sMetaCache) Get(key []string) map[string][]*ObjectWrapper {
@@ -80,8 +95,9 @@ func (m *k8sMetaCache) Filter(filterFunc func(*ObjectWrapper) bool, limit int) [
 	return m.metaStore.Filter(filterFunc, limit)
 }
 
-func (m *k8sMetaCache) RegisterSendFunc(key string, sendFunc SendFunc, interval int) {
-	m.metaStore.RegisterSendFunc(key, sendFunc, interval)
+func (m *k8sMetaCache) RegisterSendFunc(key string, sendFunc SendFunc, interval int, eventChSize int, drainBatch int) {
+	m.ensureWatchStarted()
+	m.metaStore.RegisterSendFunc(key, sendFunc, interval, eventChSize, drainBatch)
 	logger.Debug(context.Background(), "register send func", m.resourceType)
 }
 
@@ -90,10 +106,18 @@ func (m *k8sMetaCache) UnRegisterSendFunc(key string) {
 }
 
 func (m *k8sMetaCache) watch(stopCh <-chan struct{}) {
+	_ = stopCh // MetaCache uses m.stopCh for global shutdown; parameter kept for interface compatibility.
 	defer panicRecover()
 	factory, informer := m.getFactoryInformer()
 	if informer == nil {
 		return
+	}
+	mergedStop := m.giveUp.mergedStop(m.stopCh)
+	if err := attachWatchErrorHandler(informer, m.giveUp, watchErrorHandlerOpts{
+		ResourceType:  m.resourceType,
+		GiveUpStopMsg: "stopping informer after repeated errors (RBAC/auth or missing API resource; no further retries)",
+	}); err != nil {
+		logger.Error(context.Background(), K8sMetaUnifyErrorCode, "fail to set watch error handler", err)
 	}
 	_, _ = informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
@@ -112,6 +136,14 @@ func (m *k8sMetaCache) watch(stopCh <-chan struct{}) {
 		},
 		UpdateFunc: func(oldObj interface{}, obj interface{}) {
 			defer panicRecover()
+			oldMeta, err1 := meta.Accessor(oldObj)
+			newMeta, err2 := meta.Accessor(obj)
+			if err1 == nil && err2 == nil && oldMeta.GetResourceVersion() == newMeta.GetResourceVersion() {
+				return
+			}
+			if !isSignificantUpdate(m.resourceType, oldObj, obj) {
+				return
+			}
 			nowTime := time.Now().Unix()
 			m.eventCh <- &K8sMetaEvent{
 				EventType: EventTypeUpdate,
@@ -137,16 +169,8 @@ func (m *k8sMetaCache) watch(stopCh <-chan struct{}) {
 			metaManager.deleteEventCount.Add(1)
 		},
 	})
-	go factory.Start(stopCh)
-	// wait infinite for first cache sync success
-	for {
-		if !cache.WaitForCacheSync(stopCh, informer.HasSynced) {
-			logger.Error(context.Background(), K8sMetaUnifyErrorCode, "service cache sync timeout")
-			time.Sleep(1 * time.Second)
-		} else {
-			break
-		}
-	}
+	go factory.Start(mergedStop)
+	waitInformerCacheSync(mergedStop, informer.HasSynced, informerCacheSyncOpts{ResourceType: m.resourceType})
 }
 
 func (m *k8sMetaCache) getFactoryInformer() (informers.SharedInformerFactory, cache.SharedIndexInformer) {
@@ -197,15 +221,6 @@ func (m *k8sMetaCache) getFactoryInformer() (informers.SharedInformerFactory, ca
 	// 如果 informer 为 nil，直接返回，不再watch error
 	if informer == nil {
 		return factory, nil
-	}
-	// add watch error handler
-	err := informer.SetWatchErrorHandler(func(r *cache.Reflector, err error) {
-		if err != nil {
-			logger.Error(context.Background(), K8sMetaUnifyErrorCode, "resourceType", m.resourceType, "watchError", err)
-		}
-	})
-	if err != nil {
-		logger.Error(context.Background(), K8sMetaUnifyErrorCode, "fail to handle watch error handler", err)
 	}
 	return factory, informer
 }
@@ -398,13 +413,11 @@ func (m *k8sMetaCache) getCronJobInformer(factory informers.SharedInformerFactor
 	// 2. 如不支持v1，那么 fallback到 v1beta1
 	resourceList, err = m.clientset.Discovery().ServerResourcesForGroupVersion("batch/v1beta1")
 	if err != nil {
-		logger.Warning(context.Background(), K8sMetaUnifyErrorCode,
-			"Neither batch/v1 nor batch/v1beta1 CronJob API found", "error", err)
+		logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "Neither batch/v1 nor batch/v1beta1 CronJob API found", "error", err)
 		return nil
 	}
 	if !containsResource(resourceList.APIResources, "cronjobs") {
-		logger.Warning(context.Background(), K8sMetaUnifyErrorCode,
-			"CronJob API not found in both v1 and v1beta1")
+		logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "CronJob API not found in both v1 and v1beta1")
 		return nil
 	}
 	logger.Info(context.Background(), "Using CronJob v1beta1 API")
@@ -427,13 +440,11 @@ func (m *k8sMetaCache) getIngressInformer(factory informers.SharedInformerFactor
 	// 2. 如不支持networking.k8s.io/v1，那么 fallback到 extensions/v1beta1
 	resourceList, err = m.clientset.Discovery().ServerResourcesForGroupVersion("extensions/v1beta1")
 	if err != nil {
-		logger.Warning(context.Background(), K8sMetaUnifyErrorCode,
-			"Neither networking.k8s.io/v1 nor extensions/v1beta1 Ingress API found", "error", err)
+		logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "Neither networking.k8s.io/v1 nor extensions/v1beta1 Ingress API found", "error", err)
 		return nil
 	}
 	if !containsResource(resourceList.APIResources, "ingresses") {
-		logger.Warning(context.Background(), K8sMetaUnifyErrorCode,
-			"Ingress API not found in both networking.k8s.io/v1 and extensions/v1beta1")
+		logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "Ingress API not found in both networking.k8s.io/v1 and extensions/v1beta1")
 		return nil
 	}
 	logger.Info(context.Background(), "Using Ingress extensions/v1beta1 API")
@@ -449,6 +460,7 @@ func containsResource(resources []metav1.APIResource, name string) bool {
 	}
 	return false
 }
+
 func generateNodeKey(obj interface{}) ([]string, error) {
 	node, err := meta.Accessor(obj)
 	if err != nil {

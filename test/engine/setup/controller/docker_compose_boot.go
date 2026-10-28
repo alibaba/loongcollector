@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/test/config"
 	"github.com/alibaba/ilogtail/test/engine/setup/dockercompose"
 )
@@ -30,7 +31,7 @@ type BootController struct {
 func (c *BootController) Init(bootType dockercompose.BootType) error {
 	logger.Info(context.Background(), "boot controller is initializing....")
 	if err := dockercompose.Load(bootType); err != nil {
-		logger.Error(context.Background(), "BOOT_LOAD_ALARM", "err", err)
+		logger.Error(context.Background(), selfmonitor.BootLoadAlarm, "err", err)
 		return err
 	}
 	return nil
@@ -40,24 +41,37 @@ func (c *BootController) Start(ctx context.Context) error {
 	logger.Info(context.Background(), "boot controller is starting....")
 	if _, err := os.Stat(config.ConfigDir); os.IsNotExist(err) {
 		if err = os.Mkdir(config.ConfigDir, 0750); err != nil {
-			logger.Error(context.Background(), "BOOT_START_ALARM", "err", err)
+			logger.Error(context.Background(), selfmonitor.BootStartAlarm, "err", err)
 			return err
 		}
 	} else if err != nil {
-		logger.Error(context.Background(), "BOOT_START_ALARM", "err", err)
+		logger.Error(context.Background(), selfmonitor.BootStartAlarm, "err", err)
 		return err
 	}
 	if _, err := os.Stat(config.OnetimeConfigDir); os.IsNotExist(err) {
 		if err = os.Mkdir(config.OnetimeConfigDir, 0750); err != nil {
-			logger.Error(context.Background(), "BOOT_START_ALARM", "err", err)
+			logger.Error(context.Background(), selfmonitor.BootStartAlarm, "err", err)
 			return err
 		}
 	} else if err != nil {
-		logger.Error(context.Background(), "BOOT_START_ALARM", "err", err)
+		logger.Error(context.Background(), selfmonitor.BootStartAlarm, "err", err)
+		return err
+	}
+	if config.SelfMonitorDir != "" {
+		if err := os.MkdirAll(config.SelfMonitorDir, 0750); err != nil {
+			logger.Error(context.Background(), selfmonitor.BootStartAlarm, "err", err)
+			return err
+		}
+	}
+	if err := ensureE2ESelfMonitorConfig(); err != nil {
+		logger.Error(context.Background(), selfmonitor.BootStartAlarm, "err", err, "stage", "self_monitor_config")
 		return err
 	}
 	if err := dockercompose.Start(ctx); err != nil {
-		logger.Error(context.Background(), "BOOT_START_ALARM", "err", err)
+		logger.Error(context.Background(), selfmonitor.BootStartAlarm, "err", err)
+		if stopErr := dockercompose.ShutDown(); stopErr != nil {
+			logger.Error(context.Background(), selfmonitor.BootStopAlarm, "err", stopErr, "stage", "start_failed_cleanup")
+		}
 		return err
 	}
 	return nil
@@ -65,8 +79,9 @@ func (c *BootController) Start(ctx context.Context) error {
 
 func (c *BootController) Clean() {
 	logger.Info(context.Background(), "boot controller is cleaning....")
+	dockercompose.CopyCoreLogs()
 	if err := dockercompose.ShutDown(); err != nil {
-		logger.Error(context.Background(), "BOOT_STOP_ALARM", "err", err)
+		logger.Error(context.Background(), selfmonitor.BootStopAlarm, "err", err)
 	}
 	_ = os.RemoveAll(config.FlusherFile)
 	_ = os.RemoveAll(config.ConfigDir)

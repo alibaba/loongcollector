@@ -221,7 +221,7 @@ private:
     void stopContainer(const std::string containerID) {
         for (auto& containerInfo : *(discoveryOpts.mContainerInfos)) {
             if (containerInfo.mRawContainerInfo->mID == containerID) {
-                containerInfo.mRawContainerInfo->mStopped = true;
+                containerInfo.mRawContainerInfo->mStopped.store(true);
                 break;
             }
         }

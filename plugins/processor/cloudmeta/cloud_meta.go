@@ -25,8 +25,10 @@ import (
 
 	"github.com/alibaba/ilogtail/pkg/helper/platformmeta"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
 
@@ -53,13 +55,13 @@ func (c *ProcessorCloudMeta) Init(context pipeline.Context) error {
 	m := platformmeta.GetManager(c.Platform)
 	if m == nil {
 		// don't direct return to support still work on unknown host with auto mode.
-		logger.Warning(c.context.GetRuntimeContext(), "CLOUD_META_ALARM", "not support platform", c.Platform)
+		logger.Warning(c.context.GetRuntimeContext(), selfmonitor.CloudMetaAlarm, "not support platform", c.Platform)
 	} else {
 		c.manager = m
 		c.manager.StartCollect()
 	}
 	if len(c.Metadata) == 0 {
-		logger.Warning(c.context.GetRuntimeContext(), "CLOUD_META_ALARM", "metadata is required")
+		logger.Warning(c.context.GetRuntimeContext(), selfmonitor.CloudMetaAlarm, "metadata is required")
 		return errors.New("metadata is required")
 	}
 	c.JSONPath = strings.TrimSpace(c.JSONPath)
@@ -96,7 +98,7 @@ func (c *ProcessorCloudMeta) ProcessLog(log *protocol.Log) {
 	}
 	res := make(map[string]interface{})
 	if err := json.Unmarshal(util.ZeroCopyStringToBytes(content.Value), &res); err != nil {
-		logger.Warning(c.context.GetRuntimeContext(), "CLOUD_META_ALARM", "json deserialize err", err)
+		logger.Warning(c.context.GetRuntimeContext(), selfmonitor.CloudMetaAlarm, "json deserialize err", err)
 		return
 	}
 	// append metadata to json
@@ -217,4 +219,42 @@ func init() {
 			RenameMetadata: map[string]string{},
 		}
 	}
+}
+
+// Process implements the v2 ProcessorV2 interface.
+//
+// v1 (ProcessLogs) enriches every Log's Contents with cloud metadata. In v2 the
+// data model is a PipelineEventGroup that carries group-level Tags shared by all
+// its events, so instead of mutating each Log the v2 path adds the same cloud
+// metadata key/values ONCE to the group Tags and then passes ALL events
+// (Log/Metric/Span) through unchanged. The metadata set (including RenameMetadata
+// and instance-tag handling) is computed by readMeta, exactly as the v1 path.
+//
+// Guard: if the platform meta provider is unavailable (readMeta keeps c.meta
+// empty, e.g. c.manager == nil), no tags are added and events simply pass
+// through, mirroring the v1 no-op condition in ProcessLogs.
+func (c *ProcessorCloudMeta) Process(in *models.PipelineGroupEvents, context pipeline.PipelineContext) {
+	if in == nil {
+		return
+	}
+	c.readMeta()
+	if len(c.meta) != 0 {
+		logger.Debugf(c.context.GetRuntimeContext(), "meta: %v", c.meta)
+		// Ensure the group carries a writable Tags before adding cloud metadata.
+		// An input may emit Group == nil, Group.Tags == nil, or Group.Tags set to
+		// the shared immutable NilStringValues sentinel (e.g. a bare
+		// &models.GroupInfo{} or a ByteArray event). Adding to the sentinel is a
+		// silent no-op, so in all these cases install a fresh mutable Tags.
+		if in.Group == nil {
+			in.Group = &models.GroupInfo{}
+		}
+		if in.Group.Tags == nil || in.Group.Tags.IsNil() {
+			in.Group.Tags = models.NewTags()
+		}
+		tags := in.Group.Tags
+		for k, v := range c.meta {
+			tags.Add(k, v)
+		}
+	}
+	pipeline.CollectGroupEvents(context, in)
 }

@@ -4,6 +4,15 @@
 
 `flusher_file` `flusher`插件将采集到的数据写入本地文件中。flusher\_file插件使用[spdlog](https://github.com/gabime/spdlog)库实现，所以写入的文件具有部分日志文件的特征，例如存在大小限制、会自动轮转。
 
+
+## 事件能力
+
+列含义见 [概览 · 事件能力列说明](../../overview.md#事件能力列说明)。
+
+| Log | Metric | Span |
+| --- | --- | --- |
+| ✓ | ✓ | ✓ |
+
 ## 版本
 
 [Alpha](../../stability-level.md)
@@ -25,7 +34,7 @@
 
 采集LoongCollector所有自监控指标，并将采集结果写到本地文件。
 
-``` yaml
+```yaml
 enable: true
 inputs:
   - Type: input_internal_metrics
@@ -52,28 +61,28 @@ flushers:
     FilePath: self_monitor/self_metrics.log
 ```
 
-输出到 LoongCollector 的 `self_monitor/self_metrics.log` 文件中，每行均为一条json格式的指标。下面是其中一行展开后的参考样例：
+输出到 LoongCollector 的 `self_monitor/self_metrics.log` 文件中，每行多为 JSON 指标；下面将**单行**格式化展开便于阅读：
 
 ```json
 {
-    "__labels__":{
-        "component_name":"process_queue",
-        "pipeline_name":"pipeline-demo",
-        "project":"",
-        "queue_type":"bounded"
+    "__labels__": {
+        "component_name": "process_queue",
+        "pipeline_name": "pipeline-demo",
+        "project": "",
+        "queue_type": "bounded"
     },
-    "__name__":"component",
-    "__time__":1735127390,
-    "__value__":{
-        "fetch_times_total":6000.0,
-        "in_items_total":0.0,
-        "in_size_bytes":0.0,
-        "out_items_total":0.0,
-        "queue_size":0.0,
-        "queue_size_bytes":0.0,
-        "total_delay_ms":0.0,
-        "valid_fetch_times_total":0.0,
-        "valid_to_push_status":1.0
+    "__name__": "component",
+    "__time__": 1735127390,
+    "__value__": {
+        "fetch_times_total": 6000.0,
+        "in_items_total": 0.0,
+        "in_size_bytes": 0.0,
+        "out_items_total": 0.0,
+        "queue_size": 0.0,
+        "queue_size_bytes": 0.0,
+        "total_delay_ms": 0.0,
+        "valid_fetch_times_total": 0.0,
+        "valid_to_push_status": 1.0
     }
 }
 ```

@@ -110,7 +110,7 @@ void StaticFileServerUnittest::TestGetNextAvailableReader() const {
 
     {
         // file 1 existed
-        APSARA_TEST_NOT_EQUAL(nullptr, sServer->GetNextAvailableReader("test_config", 0));
+        APSARA_TEST_NOT_EQUAL(nullptr, sServer->TestGetNextAvailableReader("test_config", 0));
         auto const& cpt = sManager->mInputCheckpointMap.at(make_pair("test_config", 0));
         APSARA_TEST_EQUAL(StaticFileReadingStatus::RUNNING, cpt.mStatus);
         APSARA_TEST_EQUAL(FileStatus::WAITING, cpt.mFileCheckpoints[0].mStatus);
@@ -123,7 +123,7 @@ void StaticFileServerUnittest::TestGetNextAvailableReader() const {
             ofstream fout(cptFiles[2], ios::binary);
             fout << string(10, 'd') << "\n";
         }
-        APSARA_TEST_EQUAL(nullptr, sServer->GetNextAvailableReader("test_config", 0));
+        APSARA_TEST_EQUAL(nullptr, sServer->TestGetNextAvailableReader("test_config", 0));
         APSARA_TEST_EQUAL(1U, sServer->mDeletedInputs.size());
         APSARA_TEST_NOT_EQUAL(sServer->mDeletedInputs.end(), sServer->mDeletedInputs.find(make_pair("test_config", 0)));
         auto const& cpt = sManager->mInputCheckpointMap.at(make_pair("test_config", 0));
@@ -218,7 +218,7 @@ void StaticFileServerUnittest::TestSetExpectedFileSize() const {
     sServer->UpdateInputs();
 
     // Get reader and check if mExpectedFileSize is set correctly
-    auto reader = sServer->GetNextAvailableReader("test_config", 0);
+    auto reader = sServer->TestGetNextAvailableReader("test_config", 0);
     APSARA_TEST_NOT_EQUAL(nullptr, reader);
 
     // Check that mExpectedFileSize is set to initial file size
@@ -282,7 +282,7 @@ void StaticFileServerUnittest::TestFileRotationDetection() const {
     APSARA_TEST_NOT_EQUAL(originalDevInode, newFileDevInode);
 
     // Get reader - should find rotated file by devinode
-    auto reader = sServer->GetNextAvailableReader("test_config", 0);
+    auto reader = sServer->TestGetNextAvailableReader("test_config", 0);
     APSARA_TEST_NOT_EQUAL(nullptr, reader);
     APSARA_TEST_EQUAL(rotatedFile, reader->GetHostLogPath());
 

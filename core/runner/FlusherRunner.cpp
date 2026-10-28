@@ -23,6 +23,7 @@
 #include "collection_pipeline/queue/SenderQueueItem.h"
 #include "collection_pipeline/queue/SenderQueueManager.h"
 #include "common/LogtailCommonFlags.h"
+#include "common/SafeThread.h"
 #include "common/StringTools.h"
 #include "common/http/HttpRequest.h"
 #include "logger/Logger.h"
@@ -58,7 +59,7 @@ bool FlusherRunner::Init() {
     mWaitingItemsTotal = mMetricsRecordRef.CreateIntGauge(METRIC_RUNNER_FLUSHER_WAITING_ITEMS_TOTAL);
     WriteMetrics::GetInstance()->CommitMetricsRecordRef(mMetricsRecordRef);
 
-    mThreadRes = async(launch::async, &FlusherRunner::Run, this);
+    LaunchAsync(mThreadRes, "FlusherRunner", &FlusherRunner::Run, this);
     mLastCheckSendClientTime = time(nullptr);
     mIsFlush = false;
 

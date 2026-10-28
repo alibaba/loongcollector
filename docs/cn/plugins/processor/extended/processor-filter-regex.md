@@ -2,7 +2,17 @@
 
 ## 简介
 
-`processor_filter_regex processor`插件可以实现对日志的过滤。一条日志只有完全匹配Include中的正则表达式，且不匹配Exclude中的正则表达式时才会被采集，否则直接丢弃。
+`processor_filter_regex` 插件可以实现对日志的过滤。**一条数据**只有完全匹配 Include 中的正则表达式，且不匹配 Exclude 中的正则表达式时才会被采集，否则直接丢弃。
+
+## 事件能力
+
+列含义见 [概览 · 事件能力列说明](../../overview.md#事件能力列说明)。
+
+| v1 接口 | v2 接口 | Log | Metric | Span |
+| --- | --- | --- | --- | --- |
+| ✓ | ✓ | v1&v2 | 透传 | 透传 |
+
+> v2 场景下对每条 Log 事件按字段值正则过滤（输入 Log 输出 Log），不匹配的 Log 被丢弃，Metric/Span 事件显式透传（不处理但不丢弃）。
 
 ## 版本
 
@@ -28,7 +38,7 @@
 ```bash
 echo '{"ip": "10.**.**.**", "method": "POST", "brower": "aliyun-sdk-java"}' >> /home/test-log/proccessor-filter-regex.log
 echo '{"ip": "10.**.**.**", "method": "POST", "brower": "chrome"}' >> /home/test-log/proccessor-filter-regex.log
-echo '{"ip": "192.168.**.**", "method": "POST", "brower": "aliyun-sls-ilogtail"}' >> /home/test-log/proccessor-filter-regex.log
+echo '{"ip": "192.168.**.**", "method": "POST", "brower": "aliyun-sls-loongcollector"}' >> /home/test-log/proccessor-filter-regex.log
 ```
 
 * 采集配置

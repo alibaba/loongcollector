@@ -15,12 +15,18 @@ package ratelimit
 
 import (
 	"context"
+	"strconv"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/pingcap/check"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
+	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/plugins/test"
@@ -173,4 +179,113 @@ func (s *processorTestSuite) TestGC(c *check.C) {
 		// metric
 		c.Assert(int64(processor.limitMetric.Collect().Value), check.Equals, int64(10004))
 	}
+}
+
+// ---- v2 (PipelineEvent / SendPb) Process path tests ----
+
+func newV2Log(kv ...string) *models.Log {
+	log := models.NewLog("", nil, "", "", "", models.NewTags(), 0)
+	for i := 0; i+1 < len(kv); i += 2 {
+		log.GetIndices().Add(kv[i], kv[i+1])
+	}
+	return log
+}
+
+// TestProcessorRateLimit_ProcessV2Filter verifies that the v2 Process drops Log
+// events once the shared rate limit is exhausted while keeping earlier ones and
+// passing Metric events through unchanged. Order is preserved.
+func TestProcessorRateLimit_ProcessV2Filter(t *testing.T) {
+	processor := &ProcessorRateLimit{Limit: "3/s"}
+	require.NoError(t, processor.Init(mock.NewEmptyContext("p", "l", "c")))
+
+	log1 := newV2Log("k", "1")
+	log2 := newV2Log("k", "2")
+	log3 := newV2Log("k", "3")
+	log4 := newV2Log("k", "4") // exceeds 3/s -> drop
+	metric := models.NewSingleValueMetric("m", models.MetricTypeCounter, models.NewTags(), 0, 1.0)
+
+	context := helper.NewObservePipelineContext(10)
+	processor.Process(&models.PipelineGroupEvents{
+		Events: []models.PipelineEvent{log1, log2, metric, log3, log4},
+	}, context)
+
+	results := context.Collector().ToArray()
+	require.Len(t, results, 1)
+	events := results[0].Events
+	require.Len(t, events, 4, "first three logs plus the metric survive")
+	assert.Equal(t, log1, events[0])
+	assert.Equal(t, log2, events[1])
+	assert.Equal(t, metric, events[2], "metric events must pass through unchanged")
+	assert.Equal(t, log3, events[3])
+	assert.Equal(t, int64(1), int64(processor.limitMetric.Collect().Value))
+}
+
+// TestProcessorRateLimit_MakeKeyNoEmptyPrefix guards against the regression
+// where makeKey/makeKeyV2 preallocated values with len(Fields), so append built
+// keys like "___a_b" (leading empty segments). Both the v1 and v2 key builders
+// must emit exactly one segment per field, and Init must sort Fields once so the
+// key is independent of the configured field order.
+func TestProcessorRateLimit_MakeKeyNoEmptyPrefix(t *testing.T) {
+	// Fields deliberately unsorted to prove Init sorts them.
+	processor := &ProcessorRateLimit{Limit: "3/s", Fields: []string{"key2", "key1"}}
+	require.NoError(t, processor.Init(mock.NewEmptyContext("p", "l", "c")))
+
+	v1Key := processor.makeKey(test.CreateLogs("content", "x", "key1", "a", "key2", "b"))
+	assert.Equal(t, "a_b", v1Key, "v1 key: sorted key1,key2 -> a_b, no empty prefix")
+
+	v2Key := processor.makeKeyV2(newV2Log("key1", "a", "key2", "b"))
+	assert.Equal(t, "a_b", v2Key, "v2 key must mirror v1")
+
+	// Missing field yields a single empty segment, not extra leading separators.
+	assert.Equal(t, "_b", processor.makeKeyV2(newV2Log("key2", "b")))
+}
+
+// TestTokenBucketGCConcurrentNoRace guards the token-bucket GC counter reset
+// against the data race where runGC overwrote the whole atomic.Int32 counter
+// while IsAllowed atomically Add/Load it. Many goroutines cross the NumCalls GC
+// threshold together so runGC fires concurrently with in-flight IsAllowed calls;
+// under `go test -race` this fails if the reset is not done atomically.
+func TestTokenBucketGCConcurrentNoRace(t *testing.T) {
+	limit := rate{}
+	require.NoError(t, limit.Unpack("100/s"))
+	tb := newTokenBucket(limit)
+
+	const (
+		goroutines = 8
+		perG       = 3000 // 8*3000 = 24000 > NumCalls threshold (10000)
+	)
+	var wg sync.WaitGroup
+	wg.Add(goroutines)
+	for g := 0; g < goroutines; g++ {
+		go func(g int) {
+			defer wg.Done()
+			for i := 0; i < perG; i++ {
+				tb.IsAllowed("key" + strconv.Itoa((g*perG+i)%64))
+			}
+		}(g)
+	}
+	wg.Wait()
+}
+
+// TestProcessorRateLimit_ProcessV2Fields verifies the per-key limiting when
+// Fields are configured: separate limit keys have independent budgets.
+func TestProcessorRateLimit_ProcessV2Fields(t *testing.T) {
+	processor := &ProcessorRateLimit{Limit: "3/s", Fields: []string{"key1"}}
+	require.NoError(t, processor.Init(mock.NewEmptyContext("p", "l", "c")))
+
+	events := []models.PipelineEvent{
+		newV2Log("key1", "a"),
+		newV2Log("key1", "a"),
+		newV2Log("key1", "a"),
+		newV2Log("key1", "a"), // 4th "a" -> drop
+		newV2Log("key1", "b"), // different key -> allowed
+	}
+
+	context := helper.NewObservePipelineContext(10)
+	processor.Process(&models.PipelineGroupEvents{Events: events}, context)
+
+	results := context.Collector().ToArray()
+	require.Len(t, results, 1)
+	require.Len(t, results[0].Events, 4, "three 'a' logs plus one 'b' log survive")
+	assert.Equal(t, int64(1), int64(processor.limitMetric.Collect().Value))
 }

@@ -1,0 +1,6 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+@.cursor/rules/project-knowledge/architecture.md

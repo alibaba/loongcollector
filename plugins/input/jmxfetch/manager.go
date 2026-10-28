@@ -336,22 +336,20 @@ func (m *Manager) checkJavaPath(javaPath string) (string, error) {
 // autoInstall returns true if agent has been installed.
 func (m *Manager) autoInstall() bool {
 	if exist, err := util.PathExists(m.jmxfetchdPath); err != nil {
-		logger.Warningf(m.managerMeta.GetContext(), "JMXFETCH_ALARM", "stat path %v err when install: %v", m.jmxfetchdPath, err)
+		logger.Warningf(m.managerMeta.GetContext(), selfmonitor.JmxfetchAlarm, "stat path %v err when install: %v", m.jmxfetchdPath, err)
 		return false
 	} else if exist {
 		return true
 	}
 	scriptPath := path.Join(m.jmxFetchPath, "install.sh")
 	if exist, err := util.PathExists(scriptPath); err != nil || !exist {
-		logger.Warningf(m.managerMeta.GetContext(), "JMXFETCH_ALARM",
-			"can not find install script %v, maybe stat error: %v", scriptPath, err)
+		logger.Warningf(m.managerMeta.GetContext(), selfmonitor.JmxfetchAlarm, "can not find install script %v, maybe stat error: %v", scriptPath, err)
 		return false
 	}
 	cmd := exec.Command(scriptPath) //nolint:gosec
 	output, err := cmd.CombinedOutput()
 	if err != nil && !strings.Contains(err.Error(), "no child process") {
-		logger.Warningf(m.managerMeta.GetContext(), "JMXFETCH_ALARM",
-			"install agent error, output: %v, error: %v", string(output), err)
+		logger.Warningf(m.managerMeta.GetContext(), selfmonitor.JmxfetchAlarm, "install agent error, output: %v, error: %v", string(output), err)
 		return false
 	}
 	logger.Infof(m.managerMeta.GetContext(), "install agent done, output: %v", string(output))
@@ -364,12 +362,12 @@ func (m *Manager) manualInstall() bool {
 	logger.Infof(m.managerMeta.GetContext(), "init jmxfetch path: %s", m.jmxFetchPath)
 	if exist, err := util.PathExists(m.jmxFetchPath); !exist {
 		if err != nil {
-			logger.Warningf(m.managerMeta.GetContext(), "JMXFETCH_ALARM", "create conf dir error, path %v, err: %v", m.jmxFetchPath, err)
+			logger.Warningf(m.managerMeta.GetContext(), selfmonitor.JmxfetchAlarm, "create conf dir error, path %v, err: %v", m.jmxFetchPath, err)
 			return false
 		}
 		err = os.MkdirAll(m.jmxFetchPath, 0750)
 		if err != nil {
-			logger.Warningf(m.managerMeta.GetContext(), "JMXFETCH_ALARM", "create conf dir error, path %v, err: %v", m.jmxFetchPath, err)
+			logger.Warningf(m.managerMeta.GetContext(), selfmonitor.JmxfetchAlarm, "create conf dir error, path %v, err: %v", m.jmxFetchPath, err)
 		}
 	}
 	return true
@@ -378,12 +376,12 @@ func (m *Manager) manualInstall() bool {
 func (m *Manager) initConfDir() bool {
 	if exist, err := util.PathExists(m.jmxfetchConfPath); !exist {
 		if err != nil {
-			logger.Warningf(m.managerMeta.GetContext(), "JMXFETCH_ALARM", "create conf dir error, path %v, err: %v", m.jmxfetchConfPath, err)
+			logger.Warningf(m.managerMeta.GetContext(), selfmonitor.JmxfetchAlarm, "create conf dir error, path %v, err: %v", m.jmxfetchConfPath, err)
 			return false
 		}
 		err = os.MkdirAll(m.jmxfetchConfPath, 0750)
 		if err != nil {
-			logger.Warningf(m.managerMeta.GetContext(), "JMXFETCH_ALARM", "create conf dir error, path %v, err: %v", m.jmxfetchConfPath, err)
+			logger.Warningf(m.managerMeta.GetContext(), selfmonitor.JmxfetchAlarm, "create conf dir error, path %v, err: %v", m.jmxfetchConfPath, err)
 			return false
 		}
 		return true
@@ -395,14 +393,12 @@ func (m *Manager) initConfDir() bool {
 			if err = os.Remove(filePath); err == nil {
 				logger.Infof(m.managerMeta.GetContext(), "delete outdated agent config file: %v", filePath)
 			} else {
-				logger.Warningf(m.managerMeta.GetContext(), "deleted outdated agent config file err, path: %v, err: %v",
-					filePath, err)
+				logger.Warningf(m.managerMeta.GetContext(), selfmonitor.JmxfetchAlarm, "delete outdated agent config file err, path: %v, err: %v", filePath, err)
 				return false
 			}
 		}
 	} else {
-		logger.Warningf(m.managerMeta.GetContext(), "JMXFETCH_ALARM",
-			"clean conf dir error, path %v, err: %v", m.jmxfetchConfPath, err)
+		logger.Warningf(m.managerMeta.GetContext(), selfmonitor.JmxfetchAlarm, "clean conf dir error, path %v, err: %v", m.jmxfetchConfPath, err)
 		return false
 	}
 	return true

@@ -47,13 +47,15 @@
 
 2. 启动 LoongCollector 容器，并挂载 LoongCollector 配置目录
 
+    镜像 **tag** 请与 [GitHub Releases — alibaba/loongcollector](https://github.com/alibaba/loongcollector/releases/latest) 当前发布一致。下例使用 **阿里云镜像 + 明确版本号 `3.3.2`**（国内拉取常见写法）。**注意**：阿里云该仓库**不提供**与 GHCR 对等的 **`latest` 浮动 tag**；若希望 `docker pull ...:latest`，请改用 **`ghcr.io/alibaba/loongcollector:latest`**（仍以 Release 正文为准），并接受其滚动更新语义。
+
     ```bash
     docker run -d --name docker_loongcollector \
       -v /:/logtail_host:ro \
       -v /var/run:/var/run \
       -v /var/lib/docker_loongcollector/checkpoint:/usr/local/loongcollector/data/checkpoint \
       -v `pwd`/config:/usr/local/loongcollector/conf/continuous_pipeline_config/local \
-      sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector:latest
+      sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector:3.3.2
     ```
 
     第1行`-d`参数表示后台启动 LoongCollector 容器，`--name`指定容器名称以便引用。\
@@ -79,7 +81,7 @@
     recover stdout
     ```
 
-4. 进入iLogtail容器
+4. 进入 LoongCollector 容器
 
     ```bash
     docker exec -it docker_loongcollector bash
@@ -94,9 +96,9 @@
     结果为
 
     ```text
-    2024-12-05 08:26:39 {"content":"loongcollector started. pid: 11","_time_":"2024-12-05T08:26:30.642276065Z","_source_":"stdout","_image_name_":"sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector:0.2.0","_container_name_":"docker_loongcollector","_container_ip_":"172.17.0.7","__time__":"1733387196"}
-    2024-12-05 08:26:39 {"content":"/usr/local/loongcollector/thirdparty dir is not existing, create done","_time_":"2024-12-05T08:26:30.666735624Z","_source_":"stdout","_image_name_":"sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector:0.2.0","_container_name_":"docker_loongcollector","_container_ip_":"172.17.0.7","__time__":"1733387196"}
-    2024-12-05 08:26:39 {"content":"recover stdout","_time_":"2024-12-05T08:26:33.775046868Z","_source_":"stdout","_image_name_":"sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector:0.2.0","_container_name_":"docker_loongcollector","_container_ip_":"172.17.0.7","__time__":"1733387196"}
+    2024-12-05 08:26:39 {"content":"loongcollector started. pid: 11","_time_":"2024-12-05T08:26:30.642276065Z","_source_":"stdout","_image_name_":"sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector:3.3.2","_container_name_":"docker_loongcollector","_container_ip_":"172.17.0.7","__time__":"1733387196"}
+    2024-12-05 08:26:39 {"content":"/usr/local/loongcollector/thirdparty dir is not existing, create done","_time_":"2024-12-05T08:26:30.666735624Z","_source_":"stdout","_image_name_":"sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector:3.3.2","_container_name_":"docker_loongcollector","_container_ip_":"172.17.0.7","__time__":"1733387196"}
+    2024-12-05 08:26:39 {"content":"recover stdout","_time_":"2024-12-05T08:26:33.775046868Z","_source_":"stdout","_image_name_":"sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector:3.3.2","_container_name_":"docker_loongcollector","_container_ip_":"172.17.0.7","__time__":"1733387196"}
     ```
 
 6. 构造示例日志

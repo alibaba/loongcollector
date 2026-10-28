@@ -14,14 +14,20 @@
 
 #include <cstdio>
 
+#include <chrono>
 #include <fstream>
+#include <thread>
 
 #include "common/FileSystemUtil.h"
+#include "common/JsonUtil.h"
 #include "common/RuntimeUtil.h"
+#include "constants/TagConstants.h"
 #include "file_server/FileServer.h"
 #include "file_server/checkpoint/CheckPointManager.h"
 #include "file_server/reader/JsonLogFileReader.h"
 #include "file_server/reader/LogFileReader.h"
+#include "monitor/metric_constants/MetricConstants.h"
+#include "monitor/metric_models/ReentrantMetricsRecord.h"
 #include "unittest/Unittest.h"
 
 DECLARE_FLAG_INT32(force_release_deleted_file_fd_timeout);
@@ -70,6 +76,11 @@ public:
     void TestReadGBK();
     void TestReadUTF8();
     void TestSetExpectedFileSize();
+    void TestReloadMetricsGaugeNoZeroDrop();
+    void TestReloadMetricsGaugeTruncatedFile();
+    void TestContainerMetricLabels();
+    void TestContainerMetricLabelsRebind();
+    void TestContainerMetricLabelsKeepOnSameLabels();
 
     std::unique_ptr<char[]> expectedContent;
     static std::string logPathDir;
@@ -86,6 +97,11 @@ protected:
 UNIT_TEST_CASE(LogFileReaderUnittest, TestReadGBK);
 UNIT_TEST_CASE(LogFileReaderUnittest, TestReadUTF8);
 UNIT_TEST_CASE(LogFileReaderUnittest, TestSetExpectedFileSize);
+UNIT_TEST_CASE(LogFileReaderUnittest, TestReloadMetricsGaugeNoZeroDrop);
+UNIT_TEST_CASE(LogFileReaderUnittest, TestReloadMetricsGaugeTruncatedFile);
+UNIT_TEST_CASE(LogFileReaderUnittest, TestContainerMetricLabels);
+UNIT_TEST_CASE(LogFileReaderUnittest, TestContainerMetricLabelsRebind);
+UNIT_TEST_CASE(LogFileReaderUnittest, TestContainerMetricLabelsKeepOnSameLabels);
 
 std::string LogFileReaderUnittest::logPathDir;
 std::string LogFileReaderUnittest::gbkFile;
@@ -727,6 +743,444 @@ void LogFileReaderUnittest::TestSetExpectedFileSize() {
     }
 }
 
+// Regression test for #2632: config reload must not expose a transient 0 on the
+// source_size_bytes / read_offset_bytes gauges. On reload a new reader is created for
+// the same file, sharing the reentrant metrics record keyed by config name + file
+// labels. If the old reader is destroyed before the new one is built, the shared
+// record is released and recreated with gauges defaulting to 0. Without seeding, the
+// gauge series shows a spurious drop to 0 until the new reader's first ReportMetrics.
+void LogFileReaderUnittest::TestReloadMetricsGaugeNoZeroDrop() {
+    const std::string configName = "reload_metrics_config_2632";
+    MetricLabelsPtr defaultLabels = std::make_shared<MetricLabels>();
+    defaultLabels->emplace_back(METRIC_LABEL_KEY_PROJECT, "test_project");
+    defaultLabels->emplace_back(METRIC_LABEL_KEY_PIPELINE_NAME, configName);
+    std::unordered_map<std::string, MetricType> metricKeys = {
+        {METRIC_PLUGIN_OUT_EVENTS_TOTAL, MetricType::METRIC_TYPE_COUNTER},
+        {METRIC_PLUGIN_OUT_EVENT_GROUPS_TOTAL, MetricType::METRIC_TYPE_COUNTER},
+        {METRIC_PLUGIN_OUT_SIZE_BYTES, MetricType::METRIC_TYPE_COUNTER},
+        {METRIC_PLUGIN_SOURCE_SIZE_BYTES, MetricType::METRIC_TYPE_INT_GAUGE},
+        {METRIC_PLUGIN_SOURCE_READ_OFFSET_BYTES, MetricType::METRIC_TYPE_INT_GAUGE},
+    };
+    auto pluginMetricManager = std::make_shared<PluginMetricManager>(
+        defaultLabels, metricKeys, MetricCategory::METRIC_CATEGORY_PLUGIN_SOURCE);
+    FileServer::GetInstance()->AddPluginMetricManager(configName, pluginMetricManager);
+    // RAII guard: remove the manager from the global FileServer singleton on scope exit,
+    // including an early return triggered by a *_FATAL (gtest ASSERT_*) assertion, so a
+    // mid-test failure cannot leak a stale manager into subsequent test cases.
+    std::shared_ptr<void> managerGuard(
+        nullptr, [&configName](void*) { FileServer::GetInstance()->RemovePluginMetricManager(configName); });
+
+    CollectionPipelineContext reloadCtx;
+    reloadCtx.SetConfigName(configName);
+    MultilineOptions multilineOpts;
+    FileReaderOptions reloadReaderOpts;
+    reloadReaderOpts.mInputType = FileReaderOptions::InputType::InputFile;
+    // Same dev/inode across readers so both map to the same reentrant metrics record.
+    DevInode devInode(1234, 5678);
+    // Offset restored from checkpoint; kept within the real file size so source_size
+    // (from the actual on-disk file) stays >= read_offset, mirroring a normal reload.
+    const int64_t consumedOffset = 128;
+
+    // --- Old reader before reload: gauges hold a real, non-zero read offset. ---
+    uint64_t offsetBeforeReload = 0;
+    {
+        LogFileReader oldReader(logPathDir,
+                                utf8File,
+                                devInode,
+                                std::make_pair(&reloadReaderOpts, &reloadCtx),
+                                std::make_pair(&multilineOpts, &reloadCtx),
+                                std::make_pair(&fileTagOpts, &reloadCtx));
+        oldReader.SetMetrics();
+        APSARA_TEST_TRUE_FATAL(oldReader.mSourceReadOffsetBytes != nullptr);
+        oldReader.mLastFilePos = consumedOffset;
+        oldReader.ReportMetrics(0);
+        offsetBeforeReload = oldReader.mSourceReadOffsetBytes->GetValue();
+        APSARA_TEST_EQUAL_FATAL(offsetBeforeReload, (uint64_t)consumedOffset);
+    }
+    // oldReader destroyed -> ReleaseReentrantMetricsRecordRef erases the shared record.
+
+    // --- New reader after reload: fresh record, gauge starts at 0 (the reload bug). ---
+    LogFileReader newReader(logPathDir,
+                            utf8File,
+                            devInode,
+                            std::make_pair(&reloadReaderOpts, &reloadCtx),
+                            std::make_pair(&multilineOpts, &reloadCtx),
+                            std::make_pair(&fileTagOpts, &reloadCtx));
+    newReader.SetMetrics();
+    APSARA_TEST_TRUE_FATAL(newReader.mSourceReadOffsetBytes != nullptr);
+    // Reproduce the bug window: the freshly recreated record reads 0 before seeding.
+    APSARA_TEST_EQUAL_FATAL(newReader.mSourceReadOffsetBytes->GetValue(), 0UL);
+
+    // Simulate the checkpoint offset restore performed by InitReader on reload.
+    newReader.mLastFilePos = consumedOffset;
+
+    // Fix under test: seed gauges right after the reader is (re)created.
+    newReader.InitMetricGauges();
+
+    // No 0 gap: read offset is restored, and source size is the real (non-zero) file size.
+    APSARA_TEST_EQUAL_FATAL(newReader.mSourceReadOffsetBytes->GetValue(), (uint64_t)consumedOffset);
+    APSARA_TEST_GT_FATAL(newReader.mSourceSizeBytes->GetValue(), 0UL);
+    APSARA_TEST_GE_FATAL(newReader.mSourceSizeBytes->GetValue(), newReader.mSourceReadOffsetBytes->GetValue());
+    // managerGuard removes the PluginMetricManager on scope exit.
+}
+
+// Regression test for #2632 maintainer feedback: when the file is truncated across a
+// reload (stat succeeds but reports a size smaller than the checkpoint-restored offset),
+// InitMetricGauges must clamp source_size_bytes up to read_offset_bytes so the
+// source_size >= read_offset invariant holds and the size gauge does not regress below
+// the offset.
+void LogFileReaderUnittest::TestReloadMetricsGaugeTruncatedFile() {
+    const std::string configName = "reload_metrics_config_2632_truncated";
+    MetricLabelsPtr defaultLabels = std::make_shared<MetricLabels>();
+    defaultLabels->emplace_back(METRIC_LABEL_KEY_PROJECT, "test_project");
+    defaultLabels->emplace_back(METRIC_LABEL_KEY_PIPELINE_NAME, configName);
+    std::unordered_map<std::string, MetricType> metricKeys = {
+        {METRIC_PLUGIN_OUT_EVENTS_TOTAL, MetricType::METRIC_TYPE_COUNTER},
+        {METRIC_PLUGIN_OUT_EVENT_GROUPS_TOTAL, MetricType::METRIC_TYPE_COUNTER},
+        {METRIC_PLUGIN_OUT_SIZE_BYTES, MetricType::METRIC_TYPE_COUNTER},
+        {METRIC_PLUGIN_SOURCE_SIZE_BYTES, MetricType::METRIC_TYPE_INT_GAUGE},
+        {METRIC_PLUGIN_SOURCE_READ_OFFSET_BYTES, MetricType::METRIC_TYPE_INT_GAUGE},
+    };
+    auto pluginMetricManager = std::make_shared<PluginMetricManager>(
+        defaultLabels, metricKeys, MetricCategory::METRIC_CATEGORY_PLUGIN_SOURCE);
+    FileServer::GetInstance()->AddPluginMetricManager(configName, pluginMetricManager);
+    std::shared_ptr<void> managerGuard(
+        nullptr, [&configName](void*) { FileServer::GetInstance()->RemovePluginMetricManager(configName); });
+
+    CollectionPipelineContext reloadCtx;
+    reloadCtx.SetConfigName(configName);
+    MultilineOptions multilineOpts;
+    FileReaderOptions reloadReaderOpts;
+    reloadReaderOpts.mInputType = FileReaderOptions::InputType::InputFile;
+    DevInode devInode(4321, 8765);
+
+    LogFileReader reader(logPathDir,
+                         utf8File,
+                         devInode,
+                         std::make_pair(&reloadReaderOpts, &reloadCtx),
+                         std::make_pair(&multilineOpts, &reloadCtx),
+                         std::make_pair(&fileTagOpts, &reloadCtx));
+    reader.SetMetrics();
+    APSARA_TEST_TRUE_FATAL(reader.mSourceReadOffsetBytes != nullptr);
+    APSARA_TEST_TRUE_FATAL(reader.mSourceSizeBytes != nullptr);
+
+    // Restore an offset far beyond the real on-disk file size, simulating a file that
+    // was truncated between the two readers while the checkpoint still holds the old,
+    // larger offset. stat() succeeds here but returns a size smaller than the offset.
+    const int64_t truncatedOffset = 1LL << 30; // 1 GiB, well above the small test file.
+    reader.mLastFilePos = truncatedOffset;
+
+    reader.InitMetricGauges();
+
+    // Clamp under test: size gauge is raised to the offset, never below it.
+    APSARA_TEST_EQUAL_FATAL(reader.mSourceReadOffsetBytes->GetValue(), (uint64_t)truncatedOffset);
+    APSARA_TEST_EQUAL_FATAL(reader.mSourceSizeBytes->GetValue(), (uint64_t)truncatedOffset);
+    APSARA_TEST_GE_FATAL(reader.mSourceSizeBytes->GetValue(), reader.mSourceReadOffsetBytes->GetValue());
+    // managerGuard removes the PluginMetricManager on scope exit.
+}
+
+namespace {
+
+bool HasMetricLabel(const MetricLabels& labels, const std::string& key, const std::string& value) {
+    for (const auto& label : labels) {
+        if (label.first == key && label.second == value) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool HasMetricLabelKey(const MetricLabels& labels, const std::string& key) {
+    for (const auto& label : labels) {
+        if (label.first == key) {
+            return true;
+        }
+    }
+    return false;
+}
+
+PluginMetricManagerPtr CreateFilePluginMetricManager(const std::string& configName) {
+    MetricLabelsPtr defaultLabels = std::make_shared<MetricLabels>();
+    defaultLabels->emplace_back(METRIC_LABEL_KEY_PROJECT, "test_project");
+    defaultLabels->emplace_back(METRIC_LABEL_KEY_PIPELINE_NAME, configName);
+    std::unordered_map<std::string, MetricType> metricKeys = {
+        {METRIC_PLUGIN_OUT_EVENTS_TOTAL, MetricType::METRIC_TYPE_COUNTER},
+        {METRIC_PLUGIN_OUT_EVENT_GROUPS_TOTAL, MetricType::METRIC_TYPE_COUNTER},
+        {METRIC_PLUGIN_OUT_SIZE_BYTES, MetricType::METRIC_TYPE_COUNTER},
+        {METRIC_PLUGIN_SOURCE_SIZE_BYTES, MetricType::METRIC_TYPE_INT_GAUGE},
+        {METRIC_PLUGIN_SOURCE_READ_OFFSET_BYTES, MetricType::METRIC_TYPE_INT_GAUGE},
+    };
+    return std::make_shared<PluginMetricManager>(
+        defaultLabels, metricKeys, MetricCategory::METRIC_CATEGORY_PLUGIN_SOURCE);
+}
+
+std::vector<std::pair<TagKey, std::string>> MakeContainerMetadatas(const std::string& podUid) {
+    return {
+        {TagKey::K8S_NAMESPACE_TAG_KEY, "test_namespace"},
+        {TagKey::K8S_POD_NAME_TAG_KEY, "test_pod"},
+        {TagKey::K8S_POD_UID_TAG_KEY, podUid},
+        {TagKey::CONTAINER_IMAGE_NAME_TAG_KEY, "test_image"},
+        {TagKey::CONTAINER_NAME_TAG_KEY, "test_container"},
+        {TagKey::CONTAINER_IP_TAG_KEY, "test_container_ip"},
+    };
+}
+
+} // namespace
+
+void LogFileReaderUnittest::TestContainerMetricLabels() {
+    const std::string configName = "container_metric_labels_config";
+    auto pluginMetricManager = CreateFilePluginMetricManager(configName);
+    FileServer::GetInstance()->AddPluginMetricManager(configName, pluginMetricManager);
+    std::shared_ptr<void> managerGuard(
+        nullptr, [&configName](void*) { FileServer::GetInstance()->RemovePluginMetricManager(configName); });
+
+    CollectionPipelineContext metricCtx;
+    metricCtx.SetConfigName(configName);
+    MultilineOptions multilineOpts;
+    FileReaderOptions metricReaderOpts;
+    metricReaderOpts.mInputType = FileReaderOptions::InputType::InputFile;
+    DevInode devInode(1111, 2222);
+
+    {
+        Json::Value configJson;
+        std::string errorMsg;
+        APSARA_TEST_TRUE_FATAL(ParseJsonTable(R"({})", configJson, errorMsg));
+        FileTagOptions tagOpts;
+        APSARA_TEST_TRUE_FATAL(tagOpts.Init(configJson, metricCtx, "input_file", true));
+
+        LogFileReader reader(logPathDir,
+                             utf8File,
+                             devInode,
+                             std::make_pair(&metricReaderOpts, &metricCtx),
+                             std::make_pair(&multilineOpts, &metricCtx),
+                             std::make_pair(&tagOpts, &metricCtx));
+        reader.SetContainerMetadatas(MakeContainerMetadatas("test_pod_uid"));
+        reader.SetContainerCustomMetadatas({{"env_config_tag", "custom_value"}, {"", "ignored_custom"}});
+        reader.SetContainerExtraTags({{"app_name", "hago"}, {"", "ignored"}});
+        reader.SetMetrics();
+
+        APSARA_TEST_TRUE_FATAL(HasMetricLabel(reader.mMetricLabels, DEFAULT_LOG_TAG_NAMESPACE, "test_namespace"));
+        APSARA_TEST_TRUE_FATAL(HasMetricLabel(reader.mMetricLabels, DEFAULT_LOG_TAG_POD_NAME, "test_pod"));
+        APSARA_TEST_TRUE_FATAL(HasMetricLabel(reader.mMetricLabels, DEFAULT_LOG_TAG_POD_UID, "test_pod_uid"));
+        APSARA_TEST_TRUE_FATAL(HasMetricLabel(reader.mMetricLabels, DEFAULT_LOG_TAG_CONTAINER_NAME, "test_container"));
+        APSARA_TEST_TRUE_FATAL(HasMetricLabel(reader.mMetricLabels, DEFAULT_LOG_TAG_CONTAINER_IP, "test_container_ip"));
+        APSARA_TEST_TRUE_FATAL(HasMetricLabel(reader.mMetricLabels, DEFAULT_LOG_TAG_IMAGE_NAME, "test_image"));
+        APSARA_TEST_TRUE_FATAL(HasMetricLabel(reader.mMetricLabels, "env_config_tag", "custom_value"));
+        APSARA_TEST_TRUE_FATAL(HasMetricLabel(reader.mMetricLabels, "app_name", "hago"));
+        APSARA_TEST_FALSE_FATAL(HasMetricLabelKey(reader.mMetricLabels, ""));
+    }
+
+    {
+        Json::Value configJson;
+        std::string errorMsg;
+        APSARA_TEST_TRUE_FATAL(ParseJsonTable(R"({
+            "Tags": {
+                "K8sPodNameTagKey": "my_pod",
+                "K8sPodUidTagKey": ""
+            }
+        })",
+                                              configJson,
+                                              errorMsg));
+        FileTagOptions tagOpts;
+        APSARA_TEST_TRUE_FATAL(tagOpts.Init(configJson, metricCtx, "input_file", true));
+
+        LogFileReader reader(logPathDir,
+                             utf8File,
+                             DevInode(1112, 2223),
+                             std::make_pair(&metricReaderOpts, &metricCtx),
+                             std::make_pair(&multilineOpts, &metricCtx),
+                             std::make_pair(&tagOpts, &metricCtx));
+        reader.SetContainerMetadatas(MakeContainerMetadatas("test_pod_uid"));
+        reader.SetMetrics();
+
+        APSARA_TEST_TRUE_FATAL(HasMetricLabel(reader.mMetricLabels, "my_pod", "test_pod"));
+        APSARA_TEST_FALSE_FATAL(HasMetricLabelKey(reader.mMetricLabels, DEFAULT_LOG_TAG_POD_NAME));
+        APSARA_TEST_FALSE_FATAL(HasMetricLabelKey(reader.mMetricLabels, DEFAULT_LOG_TAG_POD_UID));
+        APSARA_TEST_TRUE_FATAL(HasMetricLabel(reader.mMetricLabels, DEFAULT_LOG_TAG_NAMESPACE, "test_namespace"));
+    }
+
+    {
+        Json::Value configJson;
+        std::string errorMsg;
+        APSARA_TEST_TRUE_FATAL(ParseJsonTable(R"({})", configJson, errorMsg));
+        FileTagOptions tagOpts;
+        APSARA_TEST_TRUE_FATAL(tagOpts.Init(configJson, metricCtx, "input_file", true));
+
+        LogFileReader reader(logPathDir,
+                             utf8File,
+                             DevInode(1113, 2224),
+                             std::make_pair(&metricReaderOpts, &metricCtx),
+                             std::make_pair(&multilineOpts, &metricCtx),
+                             std::make_pair(&tagOpts, &metricCtx));
+        reader.SetMetrics();
+
+        APSARA_TEST_TRUE_FATAL(HasMetricLabelKey(reader.mMetricLabels, METRIC_LABEL_KEY_FILE_NAME));
+        APSARA_TEST_TRUE_FATAL(HasMetricLabelKey(reader.mMetricLabels, METRIC_LABEL_KEY_FILE_DEV));
+        APSARA_TEST_TRUE_FATAL(HasMetricLabelKey(reader.mMetricLabels, METRIC_LABEL_KEY_FILE_INODE));
+        APSARA_TEST_FALSE_FATAL(HasMetricLabelKey(reader.mMetricLabels, DEFAULT_LOG_TAG_POD_NAME));
+        APSARA_TEST_FALSE_FATAL(HasMetricLabelKey(reader.mMetricLabels, "app_name"));
+    }
+
+    {
+        Json::Value configJson;
+        std::string errorMsg;
+        APSARA_TEST_TRUE_FATAL(ParseJsonTable(R"({
+            "Tags": {
+                "K8sPodNameTagKey": "file_name",
+                "K8sNamespaceTagKey": "project"
+            }
+        })",
+                                              configJson,
+                                              errorMsg));
+        FileTagOptions tagOpts;
+        APSARA_TEST_TRUE_FATAL(tagOpts.Init(configJson, metricCtx, "input_file", true));
+
+        LogFileReader reader(logPathDir,
+                             utf8File,
+                             DevInode(1114, 2225),
+                             std::make_pair(&metricReaderOpts, &metricCtx),
+                             std::make_pair(&multilineOpts, &metricCtx),
+                             std::make_pair(&tagOpts, &metricCtx));
+        reader.SetContainerMetadatas(MakeContainerMetadatas("test_pod_uid"));
+        reader.SetContainerCustomMetadatas({{METRIC_LABEL_KEY_FILE_INODE, "should_not_overwrite"}});
+        reader.SetContainerExtraTags({{METRIC_LABEL_KEY_PROJECT, "hijack_project"},
+                                      {METRIC_LABEL_KEY_PIPELINE_NAME, "hijack_pipeline"},
+                                      {"app_name", "hago"}});
+        reader.SetMetrics();
+
+        APSARA_TEST_TRUE_FATAL(
+            HasMetricLabel(reader.mMetricLabels, METRIC_LABEL_KEY_FILE_NAME, reader.GetConvertedPath()));
+        APSARA_TEST_FALSE_FATAL(HasMetricLabel(reader.mMetricLabels, METRIC_LABEL_KEY_FILE_NAME, "test_pod"));
+        APSARA_TEST_FALSE_FATAL(HasMetricLabelKey(reader.mMetricLabels, METRIC_LABEL_KEY_PROJECT));
+        APSARA_TEST_FALSE_FATAL(HasMetricLabelKey(reader.mMetricLabels, METRIC_LABEL_KEY_PIPELINE_NAME));
+        APSARA_TEST_TRUE_FATAL(HasMetricLabel(
+            reader.mMetricLabels, METRIC_LABEL_KEY_FILE_INODE, std::to_string(reader.GetDevInode().inode)));
+        APSARA_TEST_FALSE_FATAL(
+            HasMetricLabel(reader.mMetricLabels, METRIC_LABEL_KEY_FILE_INODE, "should_not_overwrite"));
+        APSARA_TEST_TRUE_FATAL(HasMetricLabel(reader.mMetricLabels, "app_name", "hago"));
+        APSARA_TEST_TRUE_FATAL(HasMetricLabel(reader.mMetricLabels, DEFAULT_LOG_TAG_POD_UID, "test_pod_uid"));
+    }
+}
+
+void LogFileReaderUnittest::TestContainerMetricLabelsRebind() {
+    const std::string configName = "container_metric_labels_rebind";
+    auto pluginMetricManager = CreateFilePluginMetricManager(configName);
+    FileServer::GetInstance()->AddPluginMetricManager(configName, pluginMetricManager);
+
+    CollectionPipelineContext metricCtx;
+    metricCtx.SetConfigName(configName);
+    FileDiscoveryOptions containerDiscoveryOpts;
+    containerDiscoveryOpts.SetEnableContainerDiscoveryFlag(true);
+    auto containerInfos = std::make_shared<std::vector<ContainerInfo>>();
+    ContainerInfo newContainer;
+    newContainer.mRawContainerInfo = std::make_shared<RawContainerInfo>();
+    newContainer.mRawContainerInfo->mID = "new-container-id";
+    newContainer.mRawContainerInfo->mMetadatas = MakeContainerMetadatas("new_pod_uid");
+    newContainer.mRawContainerInfo->mCustomMetadatas = {{"env_config_tag", "new_custom"}};
+    newContainer.mRealBaseDirs = {logPathDir};
+    newContainer.mExtraTags = {{"app_name", "new_app"}};
+    containerInfos->push_back(newContainer);
+    containerDiscoveryOpts.SetContainerInfo(containerInfos);
+    FileServer::GetInstance()->AddFileDiscoveryConfig(configName, &containerDiscoveryOpts, &metricCtx);
+    std::shared_ptr<void> managerGuard(nullptr, [&configName](void*) {
+        FileServer::GetInstance()->RemovePluginMetricManager(configName);
+        FileServer::GetInstance()->RemoveFileDiscoveryConfig(configName);
+    });
+
+    MultilineOptions multilineOpts;
+    FileReaderOptions metricReaderOpts;
+    metricReaderOpts.mInputType = FileReaderOptions::InputType::InputFile;
+    Json::Value configJson;
+    std::string errorMsg;
+    APSARA_TEST_TRUE_FATAL(ParseJsonTable(R"({})", configJson, errorMsg));
+    FileTagOptions tagOpts;
+    APSARA_TEST_TRUE_FATAL(tagOpts.Init(configJson, metricCtx, "input_file", true));
+
+    LogFileReader reader(logPathDir,
+                         utf8File,
+                         DevInode(3333, 4444),
+                         std::make_pair(&metricReaderOpts, &metricCtx),
+                         std::make_pair(&multilineOpts, &metricCtx),
+                         std::make_pair(&tagOpts, &metricCtx));
+    reader.SetContainerID("old-container-id");
+    reader.SetContainerMetadatas(MakeContainerMetadatas("old_pod_uid"));
+    reader.SetContainerCustomMetadatas({{"env_config_tag", "old_custom"}});
+    reader.SetContainerExtraTags({{"app_name", "old_app"}});
+    reader.SetMetrics();
+    APSARA_TEST_TRUE_FATAL(HasMetricLabel(reader.mMetricLabels, DEFAULT_LOG_TAG_POD_UID, "old_pod_uid"));
+    APSARA_TEST_TRUE_FATAL(HasMetricLabel(reader.mMetricLabels, "env_config_tag", "old_custom"));
+    APSARA_TEST_TRUE_FATAL(HasMetricLabel(reader.mMetricLabels, "app_name", "old_app"));
+
+    const int64_t consumedOffset = 64;
+    reader.mLastFilePos = consumedOffset;
+
+    APSARA_TEST_TRUE_FATAL(reader.UpdateContainerInfo());
+    APSARA_TEST_EQUAL_FATAL(reader.GetContainerID(), "new-container-id");
+    APSARA_TEST_TRUE_FATAL(HasMetricLabel(reader.mMetricLabels, DEFAULT_LOG_TAG_POD_UID, "new_pod_uid"));
+    APSARA_TEST_FALSE_FATAL(HasMetricLabel(reader.mMetricLabels, DEFAULT_LOG_TAG_POD_UID, "old_pod_uid"));
+    APSARA_TEST_TRUE_FATAL(HasMetricLabel(reader.mMetricLabels, "env_config_tag", "new_custom"));
+    APSARA_TEST_TRUE_FATAL(HasMetricLabel(reader.mMetricLabels, "app_name", "new_app"));
+    APSARA_TEST_TRUE_FATAL(reader.mSourceReadOffsetBytes != nullptr);
+    APSARA_TEST_EQUAL_FATAL(reader.mSourceReadOffsetBytes->GetValue(), (uint64_t)consumedOffset);
+}
+
+void LogFileReaderUnittest::TestContainerMetricLabelsKeepOnSameLabels() {
+    const std::string configName = "container_metric_labels_keep";
+    auto pluginMetricManager = CreateFilePluginMetricManager(configName);
+    FileServer::GetInstance()->AddPluginMetricManager(configName, pluginMetricManager);
+
+    CollectionPipelineContext metricCtx;
+    metricCtx.SetConfigName(configName);
+    FileDiscoveryOptions containerDiscoveryOpts;
+    containerDiscoveryOpts.SetEnableContainerDiscoveryFlag(true);
+    auto containerInfos = std::make_shared<std::vector<ContainerInfo>>();
+    ContainerInfo newContainer;
+    newContainer.mRawContainerInfo = std::make_shared<RawContainerInfo>();
+    newContainer.mRawContainerInfo->mID = "new-container-id";
+    newContainer.mRawContainerInfo->mMetadatas = MakeContainerMetadatas("same_pod_uid");
+    newContainer.mRawContainerInfo->mCustomMetadatas = {{"env_config_tag", "same_custom"}};
+    newContainer.mRealBaseDirs = {logPathDir};
+    newContainer.mExtraTags = {{"app_name", "same_app"}};
+    containerInfos->push_back(newContainer);
+    containerDiscoveryOpts.SetContainerInfo(containerInfos);
+    FileServer::GetInstance()->AddFileDiscoveryConfig(configName, &containerDiscoveryOpts, &metricCtx);
+    std::shared_ptr<void> managerGuard(nullptr, [&configName](void*) {
+        FileServer::GetInstance()->RemovePluginMetricManager(configName);
+        FileServer::GetInstance()->RemoveFileDiscoveryConfig(configName);
+    });
+
+    MultilineOptions multilineOpts;
+    FileReaderOptions metricReaderOpts;
+    metricReaderOpts.mInputType = FileReaderOptions::InputType::InputFile;
+    Json::Value configJson;
+    std::string errorMsg;
+    APSARA_TEST_TRUE_FATAL(ParseJsonTable(R"({})", configJson, errorMsg));
+    FileTagOptions tagOpts;
+    APSARA_TEST_TRUE_FATAL(tagOpts.Init(configJson, metricCtx, "input_file", true));
+
+    LogFileReader reader(logPathDir,
+                         utf8File,
+                         DevInode(5555, 6666),
+                         std::make_pair(&metricReaderOpts, &metricCtx),
+                         std::make_pair(&multilineOpts, &metricCtx),
+                         std::make_pair(&tagOpts, &metricCtx));
+    reader.SetContainerID("old-container-id");
+    reader.SetContainerMetadatas(MakeContainerMetadatas("same_pod_uid"));
+    reader.SetContainerCustomMetadatas({{"env_config_tag", "same_custom"}});
+    reader.SetContainerExtraTags({{"app_name", "same_app"}});
+    reader.SetMetrics();
+    APSARA_TEST_TRUE_FATAL(reader.mOutEventsTotal != nullptr);
+    ADD_COUNTER(reader.mOutEventsTotal, 7);
+    APSARA_TEST_EQUAL_FATAL(reader.mOutEventsTotal->GetValue(), 7ULL);
+    auto* oldRecord = reader.mMetricsRecordRef.get();
+
+    APSARA_TEST_TRUE_FATAL(reader.UpdateContainerInfo());
+    APSARA_TEST_EQUAL_FATAL(reader.GetContainerID(), "new-container-id");
+    APSARA_TEST_EQUAL_FATAL(reader.mMetricsRecordRef.get(), oldRecord);
+    APSARA_TEST_EQUAL_FATAL(reader.mOutEventsTotal->GetValue(), 7ULL);
+    APSARA_TEST_TRUE_FATAL(HasMetricLabel(reader.mMetricLabels, DEFAULT_LOG_TAG_POD_UID, "same_pod_uid"));
+}
+
 class LogMultiBytesUnittest : public ::testing::Test {
 public:
     static void SetUpTestCase() {
@@ -900,6 +1354,264 @@ void LogMultiBytesUnittest::TestReadGBK() {
     std::string expectedPart(expectedContent.get());
     expectedPart = expectedPart.substr(0, BUFFER_SIZE_UTF8);
     APSARA_TEST_STREQ_FATAL(expectedPart.c_str(), logBuffer.rawBuffer.data());
+}
+
+class LogFileReaderNoSplitUnittest : public ::testing::Test {
+public:
+    static void SetUpTestCase() {
+        logPathDir = GetProcessExecutionDir();
+        if (PATH_SEPARATOR[0] == logPathDir.back()) {
+            logPathDir.resize(logPathDir.size() - 1);
+        }
+        logPathDir += PATH_SEPARATOR + "testDataSet" + PATH_SEPARATOR + "LogFileReaderUnittest";
+        gbkFile = "gbk.txt";
+        utf8File = "utf8.txt";
+    }
+
+    static void TearDownTestCase() {}
+
+    void SetUp() override {
+        readerOpts.mInputType = FileReaderOptions::InputType::InputFile;
+        std::string filepath = logPathDir + PATH_SEPARATOR + utf8File;
+        std::unique_ptr<FILE, decltype(&std::fclose)> fp(std::fopen(filepath.c_str(), "rb"), &std::fclose);
+        if (!fp.get()) {
+            return;
+        }
+        std::fseek(fp.get(), 0, SEEK_END);
+        long filesize = std::ftell(fp.get());
+        std::fseek(fp.get(), 0, SEEK_SET);
+        expectedContent.reset(new char[filesize + 1]);
+        fread(expectedContent.get(), filesize, 1, fp.get());
+        expectedContent[filesize] = '\0';
+        for (long i = filesize - 1; i >= 0; --i) {
+            if (expectedContent[i] == '\n') {
+                expectedContent[i] = 0;
+                break;
+            };
+        }
+        FileServer::GetInstance()->AddFileDiscoveryConfig("", &discoveryOpts, &ctx);
+    }
+
+    void TearDown() override {
+        LogFileReader::BUFFER_SIZE = 1024 * 512;
+        FileServer::GetInstance()->RemoveFileDiscoveryConfig("");
+    }
+
+    void TestReadUTF8NoSplit();
+    void TestReadGBKNoSplit();
+
+    std::unique_ptr<char[]> expectedContent;
+    static std::string logPathDir;
+    static std::string gbkFile;
+    static std::string utf8File;
+
+protected:
+    FileDiscoveryOptions discoveryOpts;
+    FileReaderOptions readerOpts;
+    FileTagOptions fileTagOpts;
+    CollectionPipelineContext ctx;
+};
+
+UNIT_TEST_CASE(LogFileReaderNoSplitUnittest, TestReadUTF8NoSplit);
+UNIT_TEST_CASE(LogFileReaderNoSplitUnittest, TestReadGBKNoSplit);
+
+std::string LogFileReaderNoSplitUnittest::logPathDir;
+std::string LogFileReaderNoSplitUnittest::gbkFile;
+std::string LogFileReaderNoSplitUnittest::utf8File;
+
+void LogFileReaderNoSplitUnittest::TestReadUTF8NoSplit() {
+    { // WHOLE_FILE, buffer big enough, force read: returns all data with \n preserved (not split by line)
+        Json::Value config;
+        config["Multiline.Mode"] = "whole_file";
+        MultilineOptions multilineOpts;
+        multilineOpts.Init(config, ctx, "");
+        FileReaderOptions readerOpts;
+        readerOpts.mInputType = FileReaderOptions::InputType::InputFile;
+        LogFileReader reader(logPathDir,
+                             utf8File,
+                             DevInode(),
+                             std::make_pair(&readerOpts, &ctx),
+                             std::make_pair(&multilineOpts, &ctx),
+                             std::make_pair(&fileTagOpts, &ctx));
+        reader.UpdateReaderManual();
+        reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
+        int64_t fileSize = reader.mLogFileOp.GetFileSize();
+        reader.CheckFileSignatureAndOffset(true);
+
+        LogBuffer logBuffer;
+        bool moreData = false;
+        reader.ReadUTF8(logBuffer, fileSize, moreData, false);
+        APSARA_TEST_FALSE_FATAL(moreData);
+        APSARA_TEST_TRUE_FATAL(logBuffer.rawBuffer.data() != NULL);
+        std::string result(logBuffer.rawBuffer.data(), logBuffer.rawBuffer.size());
+        APSARA_TEST_TRUE_FATAL(result.find('\n') != std::string::npos);
+        APSARA_TEST_STREQ_FATAL(expectedContent.get(), logBuffer.rawBuffer.data());
+    }
+    { // WHOLE_FILE, buffer too small: forced split at buffer boundary, moreData=true
+        Json::Value config;
+        config["Multiline.Mode"] = "whole_file";
+        MultilineOptions multilineOpts;
+        multilineOpts.Init(config, ctx, "");
+        FileReaderOptions readerOpts;
+        readerOpts.mInputType = FileReaderOptions::InputType::InputFile;
+        LogFileReader reader(logPathDir,
+                             utf8File,
+                             DevInode(),
+                             std::make_pair(&readerOpts, &ctx),
+                             std::make_pair(&multilineOpts, &ctx),
+                             std::make_pair(&fileTagOpts, &ctx));
+        LogFileReader::BUFFER_SIZE = 15;
+        reader.UpdateReaderManual();
+        reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
+        int64_t fileSize = reader.mLogFileOp.GetFileSize();
+        reader.CheckFileSignatureAndOffset(true);
+
+        LogBuffer logBuffer;
+        bool moreData = false;
+        reader.ReadUTF8(logBuffer, fileSize, moreData);
+        APSARA_TEST_TRUE_FATAL(moreData);
+        size_t firstReadLen = logBuffer.rawBuffer.size();
+        APSARA_TEST_GT_FATAL(firstReadLen, 0UL);
+        APSARA_TEST_LE_FATAL(firstReadLen, (size_t)LogFileReader::BUFFER_SIZE);
+    }
+    { // WHOLE_FILE, buffer too small, read all: combined data equals expected
+        Json::Value config;
+        config["Multiline.Mode"] = "whole_file";
+        MultilineOptions multilineOpts;
+        multilineOpts.Init(config, ctx, "");
+        FileReaderOptions readerOpts;
+        readerOpts.mInputType = FileReaderOptions::InputType::InputFile;
+        LogFileReader reader(logPathDir,
+                             utf8File,
+                             DevInode(),
+                             std::make_pair(&readerOpts, &ctx),
+                             std::make_pair(&multilineOpts, &ctx),
+                             std::make_pair(&fileTagOpts, &ctx));
+        reader.UpdateReaderManual();
+        reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
+        int64_t fileSize = reader.mLogFileOp.GetFileSize();
+        reader.CheckFileSignatureAndOffset(true);
+        LogFileReader::BUFFER_SIZE = fileSize - 13;
+
+        std::string combined;
+        bool moreData = true;
+        while (moreData) {
+            LogBuffer logBuffer;
+            reader.ReadUTF8(logBuffer, fileSize, moreData);
+            if (logBuffer.rawBuffer.data() != NULL) {
+                if (!combined.empty()) {
+                    combined += '\n';
+                }
+                combined.append(logBuffer.rawBuffer.data(), logBuffer.rawBuffer.size());
+            }
+        }
+        if (combined.empty()) {
+            LogBuffer logBuffer;
+            reader.ReadUTF8(logBuffer, fileSize, moreData, false);
+            if (logBuffer.rawBuffer.data() != NULL) {
+                combined.append(logBuffer.rawBuffer.data(), logBuffer.rawBuffer.size());
+            }
+        }
+        APSARA_TEST_STREQ_FATAL(expectedContent.get(), combined.c_str());
+    }
+}
+
+void LogFileReaderNoSplitUnittest::TestReadGBKNoSplit() {
+    { // WHOLE_FILE, GBK, buffer big enough, force read: returns all data with \n preserved
+        Json::Value config;
+        config["Multiline.Mode"] = "whole_file";
+        MultilineOptions multilineOpts;
+        multilineOpts.Init(config, ctx, "");
+        FileReaderOptions readerOpts;
+        readerOpts.mInputType = FileReaderOptions::InputType::InputFile;
+        readerOpts.mFileEncoding = FileReaderOptions::Encoding::GBK;
+        LogFileReader reader(logPathDir,
+                             gbkFile,
+                             DevInode(),
+                             std::make_pair(&readerOpts, &ctx),
+                             std::make_pair(&multilineOpts, &ctx),
+                             std::make_pair(&fileTagOpts, &ctx));
+        reader.UpdateReaderManual();
+        reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
+        int64_t fileSize = reader.mLogFileOp.GetFileSize();
+        reader.CheckFileSignatureAndOffset(true);
+
+        LogBuffer logBuffer;
+        bool moreData = false;
+        reader.ReadGBK(logBuffer, fileSize, moreData, false);
+        APSARA_TEST_FALSE_FATAL(moreData);
+        APSARA_TEST_TRUE_FATAL(logBuffer.rawBuffer.data() != NULL);
+        std::string result(logBuffer.rawBuffer.data(), logBuffer.rawBuffer.size());
+        APSARA_TEST_TRUE_FATAL(result.find('\n') != std::string::npos);
+        APSARA_TEST_STREQ_FATAL(expectedContent.get(), logBuffer.rawBuffer.data());
+    }
+    { // WHOLE_FILE, GBK, buffer too small: forced split, logTooLongSplitFlag triggered
+        Json::Value config;
+        config["Multiline.Mode"] = "whole_file";
+        MultilineOptions multilineOpts;
+        multilineOpts.Init(config, ctx, "");
+        FileReaderOptions readerOpts;
+        readerOpts.mInputType = FileReaderOptions::InputType::InputFile;
+        readerOpts.mFileEncoding = FileReaderOptions::Encoding::GBK;
+        LogFileReader reader(logPathDir,
+                             gbkFile,
+                             DevInode(),
+                             std::make_pair(&readerOpts, &ctx),
+                             std::make_pair(&multilineOpts, &ctx),
+                             std::make_pair(&fileTagOpts, &ctx));
+        LogFileReader::BUFFER_SIZE = 14;
+        reader.UpdateReaderManual();
+        reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
+        int64_t fileSize = reader.mLogFileOp.GetFileSize();
+        reader.CheckFileSignatureAndOffset(true);
+
+        LogBuffer logBuffer;
+        bool moreData = false;
+        reader.ReadGBK(logBuffer, fileSize, moreData);
+        APSARA_TEST_TRUE_FATAL(moreData);
+        APSARA_TEST_GT_FATAL(logBuffer.rawBuffer.size(), 0UL);
+    }
+    { // WHOLE_FILE, GBK, buffer too small, read all: combined data equals expected
+        Json::Value config;
+        config["Multiline.Mode"] = "whole_file";
+        MultilineOptions multilineOpts;
+        multilineOpts.Init(config, ctx, "");
+        FileReaderOptions readerOpts;
+        readerOpts.mInputType = FileReaderOptions::InputType::InputFile;
+        readerOpts.mFileEncoding = FileReaderOptions::Encoding::GBK;
+        LogFileReader reader(logPathDir,
+                             gbkFile,
+                             DevInode(),
+                             std::make_pair(&readerOpts, &ctx),
+                             std::make_pair(&multilineOpts, &ctx),
+                             std::make_pair(&fileTagOpts, &ctx));
+        reader.UpdateReaderManual();
+        reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
+        int64_t fileSize = reader.mLogFileOp.GetFileSize();
+        reader.CheckFileSignatureAndOffset(true);
+        LogFileReader::BUFFER_SIZE = fileSize - 11;
+
+        std::string combined;
+        bool moreData = true;
+        while (moreData) {
+            LogBuffer logBuffer;
+            reader.ReadGBK(logBuffer, fileSize, moreData);
+            if (logBuffer.rawBuffer.data() != NULL) {
+                if (!combined.empty()) {
+                    combined += '\n';
+                }
+                combined.append(logBuffer.rawBuffer.data(), logBuffer.rawBuffer.size());
+            }
+        }
+        if (combined.empty()) {
+            LogBuffer logBuffer;
+            reader.ReadGBK(logBuffer, fileSize, moreData, false);
+            if (logBuffer.rawBuffer.data() != NULL) {
+                combined.append(logBuffer.rawBuffer.data(), logBuffer.rawBuffer.size());
+            }
+        }
+        APSARA_TEST_STREQ_FATAL(expectedContent.get(), combined.c_str());
+    }
 }
 
 class LogFileReaderCheckpointUnittest : public ::testing::Test {
@@ -1095,6 +1807,530 @@ void LogFileReaderHoleUnittest::TestReadLogJsonHoleOnTheRight() {
 UNIT_TEST_CASE(LogFileReaderHoleUnittest, TestReadLogHoleInTheMiddle);
 UNIT_TEST_CASE(LogFileReaderHoleUnittest, TestReadLogHoleOnTheLeft);
 UNIT_TEST_CASE(LogFileReaderHoleUnittest, TestReadLogJsonHoleOnTheRight);
+
+class WholeFileOverwriteUnittest : public ::testing::Test {
+public:
+    void TestOverwriteSameSize();
+    void TestOverwriteLargerSize();
+    void TestOverwriteSmallerSize();
+
+protected:
+    static void SetUpTestCase() {
+        srand(time(NULL));
+        gRootDir = GetProcessExecutionDir();
+        gLogName = "test.log";
+        if (PATH_SEPARATOR[0] == gRootDir.at(gRootDir.size() - 1)) {
+            gRootDir.resize(gRootDir.size() - 1);
+        }
+        gRootDir += PATH_SEPARATOR + "testDataSet" + PATH_SEPARATOR + "WholeFileOverwriteUnittest";
+        gLogPath = gRootDir + PATH_SEPARATOR + gLogName;
+        bfs::remove_all(gRootDir);
+    }
+
+    static void TearDownTestCase() {}
+    void SetUp() override {
+        bfs::create_directories(gRootDir);
+        mReaderOpts.mInputType = FileReaderOptions::InputType::InputFile;
+        mMultilineOpts.mMode = MultilineOptions::Mode::WHOLE_FILE;
+        mMultilineOpts.mFileWriteMode = MultilineOptions::FileWriteMode::OVERWRITE;
+    }
+    void TearDown() override { bfs::remove_all(gRootDir); }
+
+    static std::string gRootDir;
+    static std::string gLogName;
+    static std::string gLogPath;
+
+private:
+    FileDiscoveryOptions mDiscoveryOpts;
+    FileReaderOptions mReaderOpts;
+    MultilineOptions mMultilineOpts;
+    FileTagOptions mTagOpts;
+    CollectionPipelineContext mCtx;
+
+    bool writeLog(const std::string& logPath, const std::string& logContent) {
+        std::ofstream writer(logPath.c_str(), std::fstream::out | std::fstream::trunc | std::ios_base::binary);
+        if (!writer) {
+            return false;
+        }
+        writer << logContent;
+        writer.close();
+        return true;
+    }
+};
+
+std::string WholeFileOverwriteUnittest::gRootDir;
+std::string WholeFileOverwriteUnittest::gLogName;
+std::string WholeFileOverwriteUnittest::gLogPath;
+
+void WholeFileOverwriteUnittest::TestOverwriteSameSize() {
+    std::string content1 = R"({"key":"value1","data":"aaa"})";
+    APSARA_TEST_TRUE_FATAL(writeLog(gLogPath, content1));
+
+    LogFileReader reader(gRootDir,
+                         gLogName,
+                         DevInode(),
+                         std::make_pair(&mReaderOpts, &mCtx),
+                         std::make_pair(&mMultilineOpts, &mCtx),
+                         std::make_pair(&mTagOpts, &mCtx));
+    reader.UpdateReaderManual();
+    reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
+    APSARA_TEST_TRUE_FATAL(reader.CheckFileSignatureAndOffset(true));
+
+    // First read: data goes to cache (WHOLE_FILE mode caches until flush timeout)
+    {
+        Event event(gRootDir, "", EVENT_MODIFY, 0);
+        LogBuffer logbuf;
+        reader.ReadLog(logbuf, &event);
+    }
+    // Flush timeout: force read cached data
+    {
+        auto pEvent = reader.CreateFlushTimeoutEvent();
+        LogBuffer logbuf;
+        reader.ReadLog(logbuf, pEvent.get());
+        APSARA_TEST_EQUAL_FATAL(std::string(logbuf.rawBuffer.data(), logbuf.rawBuffer.size()), content1);
+    }
+    APSARA_TEST_EQUAL_FATAL(reader.mLastFilePos, (int64_t)content1.size());
+
+    // Overwrite with same-size content (same signature prefix)
+    std::this_thread::sleep_for(std::chrono::seconds(1)); // ensure mtime changes
+    std::string content2 = R"({"key":"value2","data":"bbb"})";
+    APSARA_TEST_EQUAL_FATAL(content1.size(), content2.size());
+    APSARA_TEST_TRUE_FATAL(writeLog(gLogPath, content2));
+
+    // CheckFileSignatureAndOffset should detect mtime change and reset position
+    APSARA_TEST_TRUE_FATAL(reader.CheckFileSignatureAndOffset(true));
+    APSARA_TEST_EQUAL_FATAL(reader.mLastFilePos, 0);
+    APSARA_TEST_TRUE_FATAL(reader.mCache.empty());
+
+    // Read again: should get complete new content
+    {
+        Event event(gRootDir, "", EVENT_MODIFY, 0);
+        LogBuffer logbuf;
+        reader.ReadLog(logbuf, &event);
+    }
+    {
+        auto pEvent = reader.CreateFlushTimeoutEvent();
+        LogBuffer logbuf;
+        reader.ReadLog(logbuf, pEvent.get());
+        APSARA_TEST_EQUAL_FATAL(std::string(logbuf.rawBuffer.data(), logbuf.rawBuffer.size()), content2);
+    }
+}
+
+void WholeFileOverwriteUnittest::TestOverwriteLargerSize() {
+    std::string content1 = R"({"key":"v1"})";
+    APSARA_TEST_TRUE_FATAL(writeLog(gLogPath, content1));
+
+    LogFileReader reader(gRootDir,
+                         gLogName,
+                         DevInode(),
+                         std::make_pair(&mReaderOpts, &mCtx),
+                         std::make_pair(&mMultilineOpts, &mCtx),
+                         std::make_pair(&mTagOpts, &mCtx));
+    reader.UpdateReaderManual();
+    reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
+    APSARA_TEST_TRUE_FATAL(reader.CheckFileSignatureAndOffset(true));
+
+    {
+        Event event(gRootDir, "", EVENT_MODIFY, 0);
+        LogBuffer logbuf;
+        reader.ReadLog(logbuf, &event);
+    }
+    {
+        auto pEvent = reader.CreateFlushTimeoutEvent();
+        LogBuffer logbuf;
+        reader.ReadLog(logbuf, pEvent.get());
+        APSARA_TEST_EQUAL_FATAL(std::string(logbuf.rawBuffer.data(), logbuf.rawBuffer.size()), content1);
+    }
+
+    // Overwrite with larger content
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+    std::string content2 = R"({"key":"value2","extra":"more_data_here"})";
+    APSARA_TEST_TRUE_FATAL(writeLog(gLogPath, content2));
+
+    APSARA_TEST_TRUE_FATAL(reader.CheckFileSignatureAndOffset(true));
+    APSARA_TEST_EQUAL_FATAL(reader.mLastFilePos, 0);
+
+    {
+        Event event(gRootDir, "", EVENT_MODIFY, 0);
+        LogBuffer logbuf;
+        reader.ReadLog(logbuf, &event);
+    }
+    {
+        auto pEvent = reader.CreateFlushTimeoutEvent();
+        LogBuffer logbuf;
+        reader.ReadLog(logbuf, pEvent.get());
+        APSARA_TEST_EQUAL_FATAL(std::string(logbuf.rawBuffer.data(), logbuf.rawBuffer.size()), content2);
+    }
+}
+
+void WholeFileOverwriteUnittest::TestOverwriteSmallerSize() {
+    std::string content1 = R"({"key":"value1","extra":"some_data"})";
+    APSARA_TEST_TRUE_FATAL(writeLog(gLogPath, content1));
+
+    LogFileReader reader(gRootDir,
+                         gLogName,
+                         DevInode(),
+                         std::make_pair(&mReaderOpts, &mCtx),
+                         std::make_pair(&mMultilineOpts, &mCtx),
+                         std::make_pair(&mTagOpts, &mCtx));
+    reader.UpdateReaderManual();
+    reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
+    APSARA_TEST_TRUE_FATAL(reader.CheckFileSignatureAndOffset(true));
+
+    {
+        Event event(gRootDir, "", EVENT_MODIFY, 0);
+        LogBuffer logbuf;
+        reader.ReadLog(logbuf, &event);
+    }
+    {
+        auto pEvent = reader.CreateFlushTimeoutEvent();
+        LogBuffer logbuf;
+        reader.ReadLog(logbuf, pEvent.get());
+        APSARA_TEST_EQUAL_FATAL(std::string(logbuf.rawBuffer.data(), logbuf.rawBuffer.size()), content1);
+    }
+
+    // Overwrite with smaller content
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+    std::string content2 = R"({"key":"v2"})";
+    APSARA_TEST_TRUE_FATAL(writeLog(gLogPath, content2));
+
+    APSARA_TEST_TRUE_FATAL(reader.CheckFileSignatureAndOffset(true));
+    APSARA_TEST_EQUAL_FATAL(reader.mLastFilePos, 0);
+
+    {
+        Event event(gRootDir, "", EVENT_MODIFY, 0);
+        LogBuffer logbuf;
+        reader.ReadLog(logbuf, &event);
+    }
+    {
+        auto pEvent = reader.CreateFlushTimeoutEvent();
+        LogBuffer logbuf;
+        reader.ReadLog(logbuf, pEvent.get());
+        APSARA_TEST_EQUAL_FATAL(std::string(logbuf.rawBuffer.data(), logbuf.rawBuffer.size()), content2);
+    }
+}
+
+UNIT_TEST_CASE(WholeFileOverwriteUnittest, TestOverwriteSameSize);
+UNIT_TEST_CASE(WholeFileOverwriteUnittest, TestOverwriteLargerSize);
+UNIT_TEST_CASE(WholeFileOverwriteUnittest, TestOverwriteSmallerSize);
+
+class WholeFileOverwriteLargeUnittest : public ::testing::Test {
+public:
+    void TestLargeFileChunkedDrain();
+    void TestOverwriteDuringAccumulation();
+    void TestChunkLineAlignment();
+    void TestChunkCharAlignment();
+    void TestAppendModeNoReset();
+
+protected:
+    static void SetUpTestCase() {
+        srand(time(NULL));
+        gRootDir = GetProcessExecutionDir();
+        gLogName = "test_large.log";
+        if (PATH_SEPARATOR[0] == gRootDir.at(gRootDir.size() - 1)) {
+            gRootDir.resize(gRootDir.size() - 1);
+        }
+        gRootDir += PATH_SEPARATOR + "testDataSet" + PATH_SEPARATOR + "WholeFileOverwriteLargeUnittest";
+        gLogPath = gRootDir + PATH_SEPARATOR + gLogName;
+        bfs::remove_all(gRootDir);
+    }
+
+    static void TearDownTestCase() {}
+    void SetUp() override {
+        bfs::create_directories(gRootDir);
+        mReaderOpts.mInputType = FileReaderOptions::InputType::InputFile;
+        mMultilineOpts.mMode = MultilineOptions::Mode::WHOLE_FILE;
+        mMultilineOpts.mFileWriteMode = MultilineOptions::FileWriteMode::OVERWRITE;
+    }
+    void TearDown() override { bfs::remove_all(gRootDir); }
+
+    static std::string gRootDir;
+    static std::string gLogName;
+    static std::string gLogPath;
+
+private:
+    FileDiscoveryOptions mDiscoveryOpts;
+    FileReaderOptions mReaderOpts;
+    MultilineOptions mMultilineOpts;
+    FileTagOptions mTagOpts;
+    CollectionPipelineContext mCtx;
+
+    bool writeLog(const std::string& logPath, const std::string& logContent) {
+        std::ofstream writer(logPath.c_str(), std::fstream::out | std::fstream::trunc | std::ios_base::binary);
+        if (!writer) {
+            return false;
+        }
+        writer << logContent;
+        writer.close();
+        return true;
+    }
+};
+
+std::string WholeFileOverwriteLargeUnittest::gRootDir;
+std::string WholeFileOverwriteLargeUnittest::gLogName;
+std::string WholeFileOverwriteLargeUnittest::gLogPath;
+
+void WholeFileOverwriteLargeUnittest::TestLargeFileChunkedDrain() {
+    // Create content larger than BUFFER_SIZE (512KB)
+    std::string content(600 * 1024, 'A'); // 600KB
+    APSARA_TEST_TRUE_FATAL(writeLog(gLogPath, content));
+
+    LogFileReader reader(gRootDir,
+                         gLogName,
+                         DevInode(),
+                         std::make_pair(&mReaderOpts, &mCtx),
+                         std::make_pair(&mMultilineOpts, &mCtx),
+                         std::make_pair(&mTagOpts, &mCtx));
+    reader.UpdateReaderManual();
+    reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
+    APSARA_TEST_TRUE_FATAL(reader.CheckFileSignatureAndOffset(true));
+
+    // First read: entire file goes to cache (one-shot read bypasses BUFFER_SIZE)
+    {
+        Event event(gRootDir, "", EVENT_MODIFY, 0);
+        LogBuffer logbuf;
+        reader.ReadLog(logbuf, &event);
+        // Data should be in cache, not emitted (WHOLE_FILE caches until flush timeout)
+        APSARA_TEST_TRUE_FATAL(logbuf.rawBuffer.empty());
+    }
+
+    // Flush timeout: should trigger chunked drain
+    std::string reconstructed;
+    int totalChunks = 0;
+    bool moreData = true;
+    while (moreData) {
+        auto pEvent = reader.CreateFlushTimeoutEvent();
+        LogBuffer logbuf;
+        moreData = reader.ReadLog(logbuf, pEvent.get());
+        if (!logbuf.rawBuffer.empty()) {
+            APSARA_TEST_TRUE_FATAL(logbuf.wholeFileSeq >= 0);
+            APSARA_TEST_EQUAL_FATAL(logbuf.wholeFileSeq, totalChunks);
+            reconstructed.append(logbuf.rawBuffer.data(), logbuf.rawBuffer.size());
+            totalChunks++;
+        }
+    }
+    APSARA_TEST_TRUE_FATAL(totalChunks > 1); // must have been split
+    APSARA_TEST_EQUAL_FATAL(reconstructed, content);
+    // All chunks should report the same total
+    APSARA_TEST_EQUAL_FATAL(
+        totalChunks, static_cast<int>((content.size() + LogFileReader::BUFFER_SIZE - 1) / LogFileReader::BUFFER_SIZE));
+}
+
+void WholeFileOverwriteLargeUnittest::TestOverwriteDuringAccumulation() {
+    // Write initial content and read it fully
+    std::string content1(600 * 1024, 'B');
+    APSARA_TEST_TRUE_FATAL(writeLog(gLogPath, content1));
+
+    LogFileReader reader(gRootDir,
+                         gLogName,
+                         DevInode(),
+                         std::make_pair(&mReaderOpts, &mCtx),
+                         std::make_pair(&mMultilineOpts, &mCtx),
+                         std::make_pair(&mTagOpts, &mCtx));
+    reader.UpdateReaderManual();
+    reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
+    APSARA_TEST_TRUE_FATAL(reader.CheckFileSignatureAndOffset(true));
+
+    // Read into cache
+    {
+        Event event(gRootDir, "", EVENT_MODIFY, 0);
+        LogBuffer logbuf;
+        reader.ReadLog(logbuf, &event);
+    }
+    // Drain first content
+    {
+        bool moreData = true;
+        while (moreData) {
+            auto pEvent = reader.CreateFlushTimeoutEvent();
+            LogBuffer logbuf;
+            moreData = reader.ReadLog(logbuf, pEvent.get());
+        }
+    }
+
+    // Overwrite with new content
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+    std::string content2(700 * 1024, 'C');
+    APSARA_TEST_TRUE_FATAL(writeLog(gLogPath, content2));
+
+    // CheckFileSignatureAndOffset should detect mtime change and reset
+    APSARA_TEST_TRUE_FATAL(reader.CheckFileSignatureAndOffset(true));
+    APSARA_TEST_EQUAL_FATAL(reader.mLastFilePos, 0);
+    APSARA_TEST_TRUE_FATAL(reader.mCache.empty());
+
+    // Read new content
+    {
+        Event event(gRootDir, "", EVENT_MODIFY, 0);
+        LogBuffer logbuf;
+        reader.ReadLog(logbuf, &event);
+    }
+
+    // Drain and verify we get new content, not old
+    std::string reconstructed;
+    {
+        bool moreData = true;
+        while (moreData) {
+            auto pEvent = reader.CreateFlushTimeoutEvent();
+            LogBuffer logbuf;
+            moreData = reader.ReadLog(logbuf, pEvent.get());
+            if (!logbuf.rawBuffer.empty()) {
+                reconstructed.append(logbuf.rawBuffer.data(), logbuf.rawBuffer.size());
+            }
+        }
+    }
+    APSARA_TEST_EQUAL_FATAL(reconstructed, content2);
+}
+
+void WholeFileOverwriteLargeUnittest::TestChunkLineAlignment() {
+    // Multi-line content larger than BUFFER_SIZE: every non-final chunk must end on a line boundary
+    // so each chunk shown downstream (no reassembly) contains only whole lines.
+    std::string content;
+    content.reserve(600 * 1024);
+    int lineNo = 0;
+    while (content.size() < 600UL * 1024) {
+        std::string line = "this is log line number " + ToString(lineNo++) + " with some padding text here\n";
+        content += line;
+    }
+    APSARA_TEST_TRUE_FATAL(writeLog(gLogPath, content));
+
+    LogFileReader reader(gRootDir,
+                         gLogName,
+                         DevInode(),
+                         std::make_pair(&mReaderOpts, &mCtx),
+                         std::make_pair(&mMultilineOpts, &mCtx),
+                         std::make_pair(&mTagOpts, &mCtx));
+    reader.UpdateReaderManual();
+    reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
+    APSARA_TEST_TRUE_FATAL(reader.CheckFileSignatureAndOffset(true));
+
+    {
+        Event event(gRootDir, "", EVENT_MODIFY, 0);
+        LogBuffer logbuf;
+        reader.ReadLog(logbuf, &event);
+    }
+
+    std::vector<std::string> chunks;
+    bool moreData = true;
+    while (moreData) {
+        auto pEvent = reader.CreateFlushTimeoutEvent();
+        LogBuffer logbuf;
+        moreData = reader.ReadLog(logbuf, pEvent.get());
+        if (!logbuf.rawBuffer.empty()) {
+            chunks.emplace_back(logbuf.rawBuffer.data(), logbuf.rawBuffer.size());
+        }
+    }
+    APSARA_TEST_TRUE_FATAL(chunks.size() > 1); // must have been split
+    std::string reconstructed;
+    for (size_t i = 0; i < chunks.size(); ++i) {
+        reconstructed += chunks[i];
+        if (i + 1 < chunks.size()) {
+            // every non-final chunk ends on a complete line
+            APSARA_TEST_EQUAL_FATAL(chunks[i].back(), '\n');
+            APSARA_TEST_TRUE_FATAL(chunks[i].size() <= LogFileReader::BUFFER_SIZE);
+        }
+    }
+    APSARA_TEST_EQUAL_FATAL(reconstructed, content);
+}
+
+void WholeFileOverwriteLargeUnittest::TestChunkCharAlignment() {
+    // A single huge line of multibyte UTF-8 characters (no newline) must never be split inside a
+    // character: every chunk length stays a multiple of the 3-byte character width.
+    const std::string ch = "\xE4\xB8\xAD"; // "中", 3 bytes
+    std::string content;
+    content.reserve(600 * 1024);
+    while (content.size() < 600UL * 1024) {
+        content += ch;
+    }
+    APSARA_TEST_TRUE_FATAL(content.size() % 3 == 0);
+    APSARA_TEST_TRUE_FATAL(writeLog(gLogPath, content));
+
+    LogFileReader reader(gRootDir,
+                         gLogName,
+                         DevInode(),
+                         std::make_pair(&mReaderOpts, &mCtx),
+                         std::make_pair(&mMultilineOpts, &mCtx),
+                         std::make_pair(&mTagOpts, &mCtx));
+    reader.UpdateReaderManual();
+    reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
+    APSARA_TEST_TRUE_FATAL(reader.CheckFileSignatureAndOffset(true));
+
+    {
+        Event event(gRootDir, "", EVENT_MODIFY, 0);
+        LogBuffer logbuf;
+        reader.ReadLog(logbuf, &event);
+    }
+
+    std::string reconstructed;
+    bool moreData = true;
+    int totalChunks = 0;
+    while (moreData) {
+        auto pEvent = reader.CreateFlushTimeoutEvent();
+        LogBuffer logbuf;
+        moreData = reader.ReadLog(logbuf, pEvent.get());
+        if (!logbuf.rawBuffer.empty()) {
+            // chunk boundary never splits a 3-byte character
+            APSARA_TEST_EQUAL_FATAL(logbuf.rawBuffer.size() % 3, 0UL);
+            reconstructed.append(logbuf.rawBuffer.data(), logbuf.rawBuffer.size());
+            totalChunks++;
+        }
+    }
+    APSARA_TEST_TRUE_FATAL(totalChunks > 1);
+    APSARA_TEST_EQUAL_FATAL(reconstructed, content);
+}
+
+void WholeFileOverwriteLargeUnittest::TestAppendModeNoReset() {
+    // Test that append mode does NOT reset position on mtime change
+    FileReaderOptions appendOpts;
+    appendOpts.mInputType = FileReaderOptions::InputType::InputFile;
+    MultilineOptions appendMultilineOpts;
+    appendMultilineOpts.mMode = MultilineOptions::Mode::WHOLE_FILE;
+    appendMultilineOpts.mFileWriteMode = MultilineOptions::FileWriteMode::APPEND;
+
+    std::string content1 = "initial content\n";
+    APSARA_TEST_TRUE_FATAL(writeLog(gLogPath, content1));
+
+    LogFileReader reader(gRootDir,
+                         gLogName,
+                         DevInode(),
+                         std::make_pair(&appendOpts, &mCtx),
+                         std::make_pair(&appendMultilineOpts, &mCtx),
+                         std::make_pair(&mTagOpts, &mCtx));
+    reader.UpdateReaderManual();
+    reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
+    APSARA_TEST_TRUE_FATAL(reader.CheckFileSignatureAndOffset(true));
+
+    // Read initial content
+    {
+        Event event(gRootDir, "", EVENT_MODIFY, 0);
+        LogBuffer logbuf;
+        reader.ReadLog(logbuf, &event);
+    }
+    {
+        auto pEvent = reader.CreateFlushTimeoutEvent();
+        LogBuffer logbuf;
+        reader.ReadLog(logbuf, pEvent.get());
+        APSARA_TEST_EQUAL_FATAL(std::string(logbuf.rawBuffer.data(), logbuf.rawBuffer.size()), "initial content");
+    }
+    int64_t posAfterFirstRead = reader.mLastFilePos;
+    APSARA_TEST_TRUE_FATAL(posAfterFirstRead > 0);
+
+    // Append more content (mtime changes)
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+    {
+        std::ofstream writer(gLogPath.c_str(), std::fstream::out | std::fstream::app | std::ios_base::binary);
+        writer << "appended content\n";
+        writer.close();
+    }
+
+    // CheckFileSignatureAndOffset should NOT reset position for append mode
+    APSARA_TEST_TRUE_FATAL(reader.CheckFileSignatureAndOffset(true));
+    APSARA_TEST_EQUAL_FATAL(reader.mLastFilePos, posAfterFirstRead);
+}
+
+UNIT_TEST_CASE(WholeFileOverwriteLargeUnittest, TestLargeFileChunkedDrain);
+UNIT_TEST_CASE(WholeFileOverwriteLargeUnittest, TestOverwriteDuringAccumulation);
+UNIT_TEST_CASE(WholeFileOverwriteLargeUnittest, TestChunkLineAlignment);
+UNIT_TEST_CASE(WholeFileOverwriteLargeUnittest, TestChunkCharAlignment);
+UNIT_TEST_CASE(WholeFileOverwriteLargeUnittest, TestAppendModeNoReset);
 
 } // namespace logtail
 

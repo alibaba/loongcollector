@@ -53,7 +53,7 @@ void PollingModify::Start() {
         = FileServer::GetInstance()->GetMetricsRecordRef().CreateIntGauge(METRIC_RUNNER_FILE_POLLING_MODIFY_CACHE_SIZE);
 
     mRuningFlag = true;
-    mThreadPtr = CreateThread([this]() { Polling(); });
+    mThreadPtr = CreateThread("PollingModify", [this]() { Polling(); });
 }
 
 void PollingModify::Stop() {

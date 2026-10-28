@@ -34,6 +34,7 @@
 #include "plugin/input/InputContainerStdio.h"
 #include "plugin/input/InputFile.h"
 #include "plugin/input/InputForward.h"
+#include "plugin/input/InputInternalAgentLogs.h"
 #include "plugin/input/InputInternalAlarms.h"
 #include "plugin/input/InputInternalMatchedContainerInfo.h"
 #include "plugin/input/InputInternalMetrics.h"
@@ -56,12 +57,16 @@
 #include "plugin/flusher/kafka/FlusherKafka.h"
 #endif
 #if defined(__linux__) && !defined(__ANDROID__)
+#include "plugin/input/InputAgentSight.h"
+#include "plugin/input/InputCpuProfiling.h"
 #include "plugin/input/InputFileSecurity.h"
 #include "plugin/input/InputHostMeta.h"
 #include "plugin/input/InputHostMonitor.h"
 #include "plugin/input/InputNetworkObserver.h"
 #include "plugin/input/InputNetworkSecurity.h"
 #include "plugin/input/InputProcessSecurity.h"
+#endif
+#if !defined(__ANDROID__)
 #include "plugin/input/InputPrometheus.h"
 #include "plugin/processor/inner/ProcessorPromParseMetricNative.h"
 #include "plugin/processor/inner/ProcessorPromRelabelMetricNative.h"
@@ -78,6 +83,8 @@ DEFINE_FLAG_BOOL(enable_ebpf_network_observer, "", true);
 DEFINE_FLAG_BOOL(enable_ebpf_process_secure, "", true);
 DEFINE_FLAG_BOOL(enable_ebpf_file_secure, "", true);
 DEFINE_FLAG_BOOL(enable_ebpf_network_secure, "", false);
+DEFINE_FLAG_BOOL(enable_ebpf_agentsight, "", true);
+DEFINE_FLAG_BOOL(enable_ebpf_cpu_profiling, "", false);
 
 using namespace std;
 
@@ -158,9 +165,11 @@ void PluginRegistry::LoadStaticPlugins() {
     RegisterContinuousInputCreator(new StaticInputCreator<InputInternalAlarms>(), true);
     RegisterContinuousInputCreator(new StaticInputCreator<InputInternalMetrics>(), true);
     RegisterContinuousInputCreator(new StaticInputCreator<InputInternalMatchedContainerInfo>(), true);
+#if !defined(__ANDROID__)
+    RegisterContinuousInputCreator(new StaticInputCreator<InputPrometheus>());
+#endif
 #if defined(__linux__) && !defined(__ANDROID__)
     RegisterContinuousInputCreator(new StaticInputCreator<InputContainerStdio>());
-    RegisterContinuousInputCreator(new StaticInputCreator<InputPrometheus>());
     // TODO: remove these gflag when plugin is stablized
     if (BOOL_FLAG(enable_ebpf_network_observer)) {
         RegisterContinuousInputCreator(new StaticInputCreator<InputNetworkObserver>(), false);
@@ -174,18 +183,26 @@ void PluginRegistry::LoadStaticPlugins() {
     if (BOOL_FLAG(enable_ebpf_network_secure)) {
         RegisterContinuousInputCreator(new StaticInputCreator<InputNetworkSecurity>(), true);
     }
+    if (BOOL_FLAG(enable_ebpf_agentsight)) {
+        // Match other eBPF security inputs: one winning pipeline per input_agentsight across config files.
+        RegisterContinuousInputCreator(new StaticInputCreator<InputAgentSight>(), true);
+    }
+    if (BOOL_FLAG(enable_ebpf_cpu_profiling)) {
+        RegisterContinuousInputCreator(new StaticInputCreator<InputCpuProfiling>(), false);
+    }
     RegisterContinuousInputCreator(new StaticInputCreator<InputHostMeta>(), true);
-    RegisterContinuousInputCreator(new StaticInputCreator<InputHostMonitor>(), true);
+    RegisterContinuousInputCreator(new StaticInputCreator<InputHostMonitor>(), false);
     RegisterContinuousInputCreator(new StaticInputCreator<InputForward>());
 #endif
     RegisterOnetimeInputCreator(new StaticInputCreator<InputStaticFile>());
+    RegisterOnetimeInputCreator(new StaticInputCreator<InputInternalAgentLogs>());
 
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorSplitLogStringNative>());
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorSplitMultilineLogStringNative>());
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorMergeMultilineLogNative>());
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorParseContainerLogNative>());
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorParseFromPBNative>());
-#if defined(__linux__) && !defined(__ANDROID__)
+#if !defined(__ANDROID__)
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorPromRelabelMetricNative>());
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorPromParseMetricNative>());
 #endif

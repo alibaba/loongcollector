@@ -66,6 +66,8 @@ public:
 
 #ifdef APSARA_UNIT_TEST_MAIN
     void Clear();
+    /// Exercises GetNextAvailableReader; holds mUpdateMux. Prefer this over calling GetNext directly from tests.
+    LogFileReaderPtr TestGetNextAvailableReader(const std::string& configName, size_t idx);
 #endif
 
 private:
@@ -75,6 +77,7 @@ private:
     void Run();
     void ReadFiles();
     void UpdateInputs();
+    // Precondition: caller holds mUpdateMux. Only used from ReadFiles and TestGetNextAvailableReader.
     LogFileReaderPtr GetNextAvailableReader(const std::string& configName, size_t idx);
 
     FileDiscoveryConfig GetFileDiscoveryConfig(const std::string& name, size_t idx) const;
@@ -96,7 +99,7 @@ private:
 
     std::multimap<std::string, std::pair<size_t, LogFileReaderPtr>> mPipelineNameReadersMap;
 
-    // accessed by main thread and input runner thread
+    // accessed by main thread and input runner thread (includes mDeletedInputs; access only while holding mUpdateMux).
     mutable std::mutex mUpdateMux;
     std::map<std::pair<std::string, size_t>, FileDiscoveryConfig> mInputFileDiscoveryConfigsMap;
     std::map<std::pair<std::string, size_t>, FileReaderConfig> mInputFileReaderConfigsMap;

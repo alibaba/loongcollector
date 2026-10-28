@@ -22,6 +22,7 @@ import (
 	"fmt"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
 
@@ -29,7 +30,7 @@ func ContainerProcessAlive(pid int) bool {
 	procStatPath := GetMountedFilePath(fmt.Sprintf("/proc/%d/stat", pid))
 	exist, err := util.PathExists(procStatPath)
 	if err != nil {
-		logger.Warning(context.Background(), "DETECT_CONTAINER_ALARM", "stat container proc path", procStatPath, "error", err)
+		logger.Warning(context.Background(), selfmonitor.DetectContainerAlarm, "stat container proc path", procStatPath, "error", err)
 	} else if !exist {
 		return false
 	}

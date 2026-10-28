@@ -31,6 +31,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	converter "github.com/alibaba/ilogtail/pkg/protocol/converter"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
 
@@ -209,7 +210,7 @@ func (k *FlusherKafka) Init(context pipeline.Context) error {
 	k.context = context
 	if len(k.Brokers) == 0 {
 		var err = errors.New("brokers ip is nil")
-		logger.Warning(k.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "init kafka flusher fail, error", err)
+		logger.Warning(k.context.GetRuntimeContext(), selfmonitor.FlusherInitAlarm, "init kafka flusher fail, error", err)
 		return err
 	}
 
@@ -224,7 +225,7 @@ func (k *FlusherKafka) Init(context pipeline.Context) error {
 
 	convert, err := k.getConverter()
 	if err != nil {
-		logger.Warning(k.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "init kafka flusher converter fail, error", err)
+		logger.Warning(k.context.GetRuntimeContext(), selfmonitor.FlusherInitAlarm, "init kafka flusher converter fail, error", err)
 		return err
 	}
 	k.converter = convert
@@ -232,7 +233,7 @@ func (k *FlusherKafka) Init(context pipeline.Context) error {
 	// Obtain topic keys from dynamic topic expression
 	topicKeys, err := fmtstr.CompileKeys(k.Topic)
 	if err != nil {
-		logger.Warning(k.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "init kafka flusher fail, error", err)
+		logger.Warning(k.context.GetRuntimeContext(), selfmonitor.FlusherInitAlarm, "init kafka flusher fail, error", err)
 		return err
 	}
 	k.topicKeys = topicKeys
@@ -246,13 +247,13 @@ func (k *FlusherKafka) Init(context pipeline.Context) error {
 
 	saramaConfig, err := newSaramaConfig(k)
 	if err != nil {
-		logger.Warning(k.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "init kafka flusher fail, error", err)
+		logger.Warning(k.context.GetRuntimeContext(), selfmonitor.FlusherInitAlarm, "init kafka flusher fail, error", err)
 		return err
 	}
 
 	producer, err := sarama.NewAsyncProducer(k.Brokers, saramaConfig)
 	if err != nil {
-		logger.Warning(k.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "init kafka flusher fail, error", err)
+		logger.Warning(k.context.GetRuntimeContext(), selfmonitor.FlusherInitAlarm, "init kafka flusher fail, error", err)
 		return err
 	}
 
@@ -264,7 +265,7 @@ func (k *FlusherKafka) Init(context pipeline.Context) error {
 			select {
 			case err := <-errors:
 				if err != nil {
-					logger.Warning(k.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM", "flush kafka write data fail, error", err)
+					logger.Warning(k.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "flush kafka write data fail, error", err)
 				}
 			case <-success:
 				// Do Nothing
@@ -288,7 +289,7 @@ func (k *FlusherKafka) Flush(projectName string, logstoreName string, configName
 		logger.Debug(k.context.GetRuntimeContext(), "[LogGroup] topic", logGroup.Topic, "logstore", logGroup.Category, "logcount", len(logGroup.Logs), "tags", logGroup.LogTags)
 		logs, values, err := k.converter.ToByteStreamWithSelectedFields(logGroup, k.selectFields)
 		if err != nil {
-			logger.Warning(k.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM", "flush kafka convert log fail, error", err)
+			logger.Warning(k.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "flush kafka convert log fail, error", err)
 		}
 		for index, log := range logs.([][]byte) {
 			k.flush(log, values[index])
@@ -303,7 +304,7 @@ func (k *FlusherKafka) Export(groupEventsArray []*models.PipelineGroupEvents, ct
 			"tags", groupEvents.Group.GetTags().Iterator())
 		logs, values, err := k.converter.ToByteStreamWithSelectedFieldsV2(groupEvents, k.selectFields)
 		if err != nil {
-			logger.Warning(k.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM", "flush kafka convert log fail, error", err)
+			logger.Warning(k.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "flush kafka convert log fail, error", err)
 		}
 		for index, log := range logs.([][]byte) {
 			k.flush(log, values[index])
@@ -317,7 +318,7 @@ func (k *FlusherKafka) flush(log []byte, valueMap map[string]string) {
 	if len(k.topicKeys) > 0 {
 		formattedTopic, err := fmtstr.FormatTopic(valueMap, k.Topic)
 		if err != nil {
-			logger.Warning(k.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM", "flush kafka format topic fail, error", err)
+			logger.Warning(k.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "flush kafka format topic fail, error", err)
 		} else {
 			topic = *formattedTopic
 		}
@@ -445,7 +446,7 @@ func newSaramaConfig(config *FlusherKafka) (*sarama.Config, error) {
 	k.Producer.Partitioner = partitioner
 
 	if err := k.Validate(); err != nil {
-		logger.Warning(config.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "Invalid kafka configuration, error", err)
+		logger.Warning(config.context.GetRuntimeContext(), selfmonitor.FlusherInitAlarm, "Invalid kafka configuration, error", err)
 		return nil, err
 	}
 	return k, nil

@@ -6,6 +6,15 @@
 
 使用本插件时，必须在启动参数中配置[AK和SK](../../../configuration/system-config.md)。
 
+
+## 事件能力
+
+列含义见 [概览 · 事件能力列说明](../../overview.md#事件能力列说明)。
+
+| Log | Metric | Span |
+| --- | --- | --- |
+| ✓ | ✓ | ✓ |
+
 ## 版本
 
 [Stable](../../stability-level.md)
@@ -41,7 +50,7 @@
 
 采集`/home/test-log/`路径下的所有文件名匹配`*.log`规则的文件，并将采集结果发送到SLS。
 
-``` yaml
+```yaml
 enable: true
 inputs:
   - Type: input_file

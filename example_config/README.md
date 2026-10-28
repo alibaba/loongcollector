@@ -1,21 +1,23 @@
-# The Example Config Directory
+# Example Config Directory
 
 ## About
 
-This folder contains example configs for iLogtail.
+本目录存放 **LoongCollector** 的示例配置与入门脚手架（曾用名 iLogtail 的配置示例亦多迁移至此）。
 
-`quick_start`, `start_with_docker` and `start_with_k8s` are 3 complete basic examples that accord with [Installation Manual](https://ilogtail.gitbook.io/ilogtail-docs/installation).
+- `quick_start`、`start_with_docker`、`start_with_k8s`：端到端入门示例，可与中文安装文档对照使用。
+- `data_pipelines`：按场景拆分的流水线片段，**默认使用 YAML**，突出 processor / aggregator 等组合；命名约定见下文贡献说明。
+- `user_contrib`：社区贡献的采集模版草稿或说明。
 
-The `data_pipelines` directory contains more advanced examples for different use cases. Please feel free to add one if it doesn't cover your case.
+## 重要说明（与文档维护约定一致）
 
-The `user_contrib` directory is convenient for developers to freely contribute collection templates.
+1. **本目录不是「权威规格」**：插件参数、默认值、合法组合以**仍在构建与测试中的源码**及 **E2E / 单测** 加载的配置为准。复制示例到生产前请对照当前版本文档或代码。
+2. **流水线配置推荐使用 YAML**：与社区文档及新 PR 默认保持一致；若发现与实现不符的示例，应修正示例或补充测试，避免仅改文档。
+3. **`loongcollector_config.json` 等进程级文件** 仍为 JSON，这是产品行为，与「采集 YAML」不矛盾。
 
-## 贡献指南
+## 贡献指南（节选）
 
-`example_config/data_pipelines`目录包含场景化的采集配置模版，重点突出processor/aggregator插件功能。目录下都模版以`<senario-keyplugin>.yaml`命名，例如`nginx-regex.yaml`，`file-delimiter.yaml`。若找不到具体场景可以用笼统的file命名，若要用到多个插件请仅使用一个或多个不可替换的关键插件命名，模版都约定存放在`example_config/data_pipelines`目录下。
+`example_config/data_pipelines` 目录下模版以 `<场景-关键插件>.yaml` 命名，例如 `nginx-regex.yaml`、`file-delimiter.yaml`。模版内注释需说明适用场景及部署前必须替换的占位项。
 
-模版内注释需要说明清楚适用场景和应用前需要替换的部分。
+原则上模版应精简、正交，便于组合。若不需强调 input/flusher，可使用通用 `input_file` / `flusher_stdout`，避免无意义的重复示例。
 
-原则上模版应尽量全面精简正交，便于用户理解后查找，自由组合。模版中若不需要突出input或flusher的使用，直接使用input_log / flusher_stdout即可，避免意义不大的重复建设。
-
-提交模版时，Issue / PR 请打上标签`example config`。
+提交模版时，Issue / PR 建议打上 **`example config`** 标签。

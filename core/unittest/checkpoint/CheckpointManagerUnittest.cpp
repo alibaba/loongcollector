@@ -12,16 +12,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <fstream>
+#include <memory>
+
+#include "app_config/AppConfig.h"
+#include "collection_pipeline/CollectionPipelineContext.h"
+#include "common/DevInode.h"
 #include "common/FileSystemUtil.h"
 #include "common/Flags.h"
+#include "common/HashUtil.h"
+#include "file_server/FileServer.h"
 #include "file_server/checkpoint/CheckPointManager.h"
 #include "unittest/Unittest.h"
 
 DECLARE_FLAG_INT32(checkpoint_find_max_file_count);
+DECLARE_FLAG_INT32(check_point_check_interval);
+DECLARE_FLAG_INT32(mem_check_point_time_out);
 
 namespace logtail {
 
 std::string kTestRootDir;
+const std::string kMatchedConfig = "checkpoint_gc_matched_config";
 
 class CheckpointManagerUnittest : public ::testing::Test {
 public:
@@ -30,14 +41,117 @@ public:
         bfs::remove_all(kTestRootDir);
         bfs::create_directories(kTestRootDir);
         AppConfig::GetInstance()->SetLoongcollectorConfDir(kTestRootDir);
+
+        // Register a discovery config matching kTestRootDir/*.log so that the GC's
+        // config-match criterion passes for checkpoints created with kMatchedConfig.
+        Json::Value inputJson(Json::objectValue);
+        inputJson["Type"] = Json::Value("input_file");
+        inputJson["FilePaths"] = Json::Value(Json::arrayValue);
+        inputJson["FilePaths"].append(Json::Value((bfs::path(kTestRootDir) / "*.log").string()));
+        sCtx.SetConfigName(kMatchedConfig);
+        ASSERT_TRUE(sDiscoveryOpts.Init(inputJson, sCtx, "test"));
+        FileServer::GetInstance()->AddFileDiscoveryConfig(kMatchedConfig, &sDiscoveryOpts, &sCtx);
     }
 
-    static void TearDownTestCase() { bfs::remove_all(kTestRootDir); }
+    static void TearDownTestCase() {
+        FileServer::GetInstance()->RemoveFileDiscoveryConfig(kMatchedConfig);
+        bfs::remove_all(kTestRootDir);
+    }
+
+    void SetUp() override {
+        CheckPointManager::Instance()->RemoveAllCheckPoint();
+        sDiscoveryOpts.SetMaxCheckpointDirSearchDepth(0);
+        AppConfig::GetInstance()->mCheckPointFilePath = (bfs::path(kTestRootDir) / "file_check_point").string();
+        bfs::remove(AppConfig::GetInstance()->mCheckPointFilePath);
+        bfs::remove(AppConfig::GetInstance()->mCheckPointFilePath + ".bak");
+    }
+
+    void TearDown() override {
+        CheckPointManager::Instance()->RemoveAllCheckPoint();
+        bfs::remove(AppConfig::GetInstance()->mCheckPointFilePath);
+        bfs::remove(AppConfig::GetInstance()->mCheckPointFilePath + ".bak");
+    }
 
     void TestSearchFilePathByDevInodeInDirectory();
+    void TestAddCheckPointStaleFileNotOverwriteActive();
+    void TestAddCheckPointActiveOverwriteStale();
+    void TestAddCheckPointBothExistLastWriterWins();
+    void TestAddCheckPointNeitherExistLastWriterWins();
+    void TestPendingSurvivesDumpRound();
+    void TestPendingSurvivesTwoDumpRounds();
+    void TestConsumeDeletesPending();
+    void TestDumpRoundErasesOverwrittenPending();
+    void TestDumpFailureStillEndsRound();
+    void TestEndDumpRoundClearsDirCheckpoints();
+    void TestDumpPersistsPendingAndActiveThenLoad();
+    void TestLoadParseFailureKeepsTable();
+    void TestGcEvictsWhenConfigNotMatched();
+    void TestGcEvictsWhenFileGone();
+    void TestGcFindsRotatedFileAndUpdatesRealPath();
+    void TestGcUsesResidencyTimeoutWhenSearchTruncated();
+    void TestGcFindsRotatedFileInSubdirectory();
+    void TestGcEvictsRotatedFileWhenSignatureChanged();
+    void TestGcEvictsWhenResidencyTimeout();
+    void TestGcKeepsFreshEntryDespiteOldEventTime();
+    void TestGcRespectsCheckInterval();
+
+private:
+    // Ownership is transferred to AddCheckPoint via release(); unique_ptr keeps construction
+    // exception-safe until that hand-off.
+    static std::unique_ptr<CheckPoint> MakeCheckPoint(const std::string& fileName,
+                                                      const DevInode& devInode,
+                                                      int64_t offset,
+                                                      const std::string& configName,
+                                                      const std::string& realFileName = "") {
+        return std::unique_ptr<CheckPoint>(new CheckPoint(fileName,
+                                                          "" /* resolvedFileName */,
+                                                          offset,
+                                                          0 /* signatureSize */,
+                                                          0 /* signatureHash */,
+                                                          devInode,
+                                                          configName,
+                                                          realFileName,
+                                                          false /* fileOpenFlag */,
+                                                          false /* containerStopped */,
+                                                          "" /* containerID */,
+                                                          false /* lastForceRead */));
+    }
+
+    static std::string CreateFile(const std::string& name) {
+        const std::string path = (bfs::path(kTestRootDir) / name).string();
+        std::ofstream(path) << name;
+        return path;
+    }
+
+    static FileDiscoveryOptions sDiscoveryOpts;
+    static CollectionPipelineContext sCtx;
 };
 
+FileDiscoveryOptions CheckpointManagerUnittest::sDiscoveryOpts;
+CollectionPipelineContext CheckpointManagerUnittest::sCtx;
+
 UNIT_TEST_CASE(CheckpointManagerUnittest, TestSearchFilePathByDevInodeInDirectory);
+UNIT_TEST_CASE(CheckpointManagerUnittest, TestAddCheckPointStaleFileNotOverwriteActive);
+UNIT_TEST_CASE(CheckpointManagerUnittest, TestAddCheckPointActiveOverwriteStale);
+UNIT_TEST_CASE(CheckpointManagerUnittest, TestAddCheckPointBothExistLastWriterWins);
+UNIT_TEST_CASE(CheckpointManagerUnittest, TestAddCheckPointNeitherExistLastWriterWins);
+UNIT_TEST_CASE(CheckpointManagerUnittest, TestPendingSurvivesDumpRound);
+UNIT_TEST_CASE(CheckpointManagerUnittest, TestPendingSurvivesTwoDumpRounds);
+UNIT_TEST_CASE(CheckpointManagerUnittest, TestConsumeDeletesPending);
+UNIT_TEST_CASE(CheckpointManagerUnittest, TestDumpRoundErasesOverwrittenPending);
+UNIT_TEST_CASE(CheckpointManagerUnittest, TestDumpFailureStillEndsRound);
+UNIT_TEST_CASE(CheckpointManagerUnittest, TestEndDumpRoundClearsDirCheckpoints);
+UNIT_TEST_CASE(CheckpointManagerUnittest, TestDumpPersistsPendingAndActiveThenLoad);
+UNIT_TEST_CASE(CheckpointManagerUnittest, TestLoadParseFailureKeepsTable);
+UNIT_TEST_CASE(CheckpointManagerUnittest, TestGcEvictsWhenConfigNotMatched);
+UNIT_TEST_CASE(CheckpointManagerUnittest, TestGcEvictsWhenFileGone);
+UNIT_TEST_CASE(CheckpointManagerUnittest, TestGcFindsRotatedFileAndUpdatesRealPath);
+UNIT_TEST_CASE(CheckpointManagerUnittest, TestGcUsesResidencyTimeoutWhenSearchTruncated);
+UNIT_TEST_CASE(CheckpointManagerUnittest, TestGcFindsRotatedFileInSubdirectory);
+UNIT_TEST_CASE(CheckpointManagerUnittest, TestGcEvictsRotatedFileWhenSignatureChanged);
+UNIT_TEST_CASE(CheckpointManagerUnittest, TestGcEvictsWhenResidencyTimeout);
+UNIT_TEST_CASE(CheckpointManagerUnittest, TestGcKeepsFreshEntryDespiteOldEventTime);
+UNIT_TEST_CASE(CheckpointManagerUnittest, TestGcRespectsCheckInterval);
 
 void CheckpointManagerUnittest::TestSearchFilePathByDevInodeInDirectory() {
     const std::string kRotateFileName = "test.log.5";
@@ -71,8 +185,10 @@ void CheckpointManagerUnittest::TestSearchFilePathByDevInodeInDirectory() {
             std::ofstream(kFilePath + "." + std::to_string(idx)) << "";
         }
         std::map<DevInode, SplitedFilePath> cache;
-        auto const filePath = SearchFilePathByDevInodeInDirectory(kTestRootDir, 0, devInode, &cache);
+        bool searchTruncated = false;
+        auto const filePath = SearchFilePathByDevInodeInDirectory(kTestRootDir, 0, devInode, &cache, &searchTruncated);
         EXPECT_FALSE(filePath);
+        EXPECT_TRUE(searchTruncated);
         EXPECT_EQ(cache.size(), INT32_FLAG(checkpoint_find_max_file_count) + 1);
 
         INT32_FLAG(checkpoint_find_max_file_count) = bakLimit;
@@ -90,10 +206,505 @@ void CheckpointManagerUnittest::TestSearchFilePathByDevInodeInDirectory() {
         auto filePath = SearchFilePathByDevInodeInDirectory(kTestRootDir, 0, devInode, nullptr);
         EXPECT_FALSE(filePath);
 
-        filePath = SearchFilePathByDevInodeInDirectory(kTestRootDir, 2, devInode, nullptr);
+        std::map<DevInode, SplitedFilePath> cache;
+        filePath = SearchFilePathByDevInodeInDirectory(kTestRootDir, 2, devInode, &cache);
         EXPECT_TRUE(filePath);
         EXPECT_EQ(filePath.value(), kSubDirFilePath);
+        ASSERT_EQ(cache.count(devInode), 1U);
+        EXPECT_EQ(cache.at(devInode).mFileDir, kSubDir.string());
+        EXPECT_EQ(cache.at(devInode).mFileName, kRotateFileName);
     }
+}
+
+// Fake rotation: a new file B reuses the inode of a deleted file A. Both readers dump a
+// checkpoint under the same (dev, inode, config) key. The stale checkpoint of the deleted
+// file A must not overwrite the active checkpoint of the still-existing file B.
+void CheckpointManagerUnittest::TestAddCheckPointStaleFileNotOverwriteActive() {
+    CheckPointManager::Instance()->RemoveAllCheckPoint();
+    const std::string configName = "test-config";
+    const std::string activeFile = (bfs::path(kTestRootDir) / "active.log").string();
+    const std::string deletedFile = (bfs::path(kTestRootDir) / "deleted.log").string();
+    std::ofstream(activeFile) << "active";
+    // deletedFile is never created on disk -> its checkpoint is stale.
+
+    fsutil::PathStat ps;
+    EXPECT_TRUE(fsutil::PathStat::stat(activeFile, ps));
+    const DevInode reusedDevInode = ps.GetDevInode();
+
+    // Active reader dumps first, then the stale reader of the deleted file (same inode).
+    CheckPointManager::Instance()->AddCheckPoint(
+        MakeCheckPoint(activeFile, reusedDevInode, 1000, configName).release());
+    CheckPointManager::Instance()->AddCheckPoint(MakeCheckPoint(deletedFile, reusedDevInode, 0, configName).release());
+
+    CheckPointPtr cpt;
+    EXPECT_TRUE(CheckPointManager::Instance()->GetCheckPoint(reusedDevInode, configName, cpt));
+    EXPECT_EQ(cpt->mFileName, activeFile);
+    EXPECT_EQ(cpt->mOffset, 1000);
+    EXPECT_EQ(CheckPointManager::Instance()->GetAllFileCheckPoint().size(), 1UL);
+
+    CheckPointManager::Instance()->RemoveAllCheckPoint();
+    bfs::remove(activeFile);
+}
+
+// Order independence: even when the stale checkpoint is added first, the later active
+// checkpoint of the still-existing file must win.
+void CheckpointManagerUnittest::TestAddCheckPointActiveOverwriteStale() {
+    CheckPointManager::Instance()->RemoveAllCheckPoint();
+    const std::string configName = "test-config";
+    const std::string activeFile = (bfs::path(kTestRootDir) / "active2.log").string();
+    const std::string deletedFile = (bfs::path(kTestRootDir) / "deleted2.log").string();
+    std::ofstream(activeFile) << "active";
+
+    fsutil::PathStat ps;
+    EXPECT_TRUE(fsutil::PathStat::stat(activeFile, ps));
+    const DevInode reusedDevInode = ps.GetDevInode();
+
+    CheckPointManager::Instance()->AddCheckPoint(MakeCheckPoint(deletedFile, reusedDevInode, 0, configName).release());
+    CheckPointManager::Instance()->AddCheckPoint(
+        MakeCheckPoint(activeFile, reusedDevInode, 2000, configName).release());
+
+    CheckPointPtr cpt;
+    EXPECT_TRUE(CheckPointManager::Instance()->GetCheckPoint(reusedDevInode, configName, cpt));
+    EXPECT_EQ(cpt->mFileName, activeFile);
+    EXPECT_EQ(cpt->mOffset, 2000);
+    EXPECT_EQ(CheckPointManager::Instance()->GetAllFileCheckPoint().size(), 1UL);
+
+    CheckPointManager::Instance()->RemoveAllCheckPoint();
+    bfs::remove(activeFile);
+}
+
+// Both files exist (e.g. hard links sharing an inode): legacy last-writer-wins is preserved.
+void CheckpointManagerUnittest::TestAddCheckPointBothExistLastWriterWins() {
+    CheckPointManager::Instance()->RemoveAllCheckPoint();
+    const std::string configName = "test-config";
+    const std::string file1 = (bfs::path(kTestRootDir) / "link1.log").string();
+    const std::string file2 = (bfs::path(kTestRootDir) / "link2.log").string();
+    std::ofstream(file1) << "data";
+    try {
+        bfs::create_hard_link(file1, file2);
+    } catch (const bfs::filesystem_error& e) {
+        // Some filesystems / container overlays / permission setups reject hard links. Skip
+        // rather than abort so CI without hard-link support stays green. The bundled gtest
+        // predates GTEST_SKIP, so fall back to a logged early return (see BPFWrapperUnittest).
+#if defined(GTEST_HAS_SKIP) && GTEST_HAS_SKIP
+        GTEST_SKIP() << "hard link not supported in this environment: " << e.what();
+#else
+        GTEST_LOG_(INFO) << "Skipped: hard link not supported in this environment "
+                            "(no GTEST_SKIP in this gtest build): "
+                         << e.what();
+        return;
+#endif
+    }
+
+    fsutil::PathStat ps;
+    EXPECT_TRUE(fsutil::PathStat::stat(file1, ps));
+    const DevInode devInode = ps.GetDevInode();
+
+    CheckPointManager::Instance()->AddCheckPoint(MakeCheckPoint(file1, devInode, 100, configName).release());
+    CheckPointManager::Instance()->AddCheckPoint(MakeCheckPoint(file2, devInode, 200, configName).release());
+
+    CheckPointPtr cpt;
+    EXPECT_TRUE(CheckPointManager::Instance()->GetCheckPoint(devInode, configName, cpt));
+    EXPECT_EQ(cpt->mFileName, file2);
+    EXPECT_EQ(cpt->mOffset, 200);
+
+    CheckPointManager::Instance()->RemoveAllCheckPoint();
+    bfs::remove(file1);
+    bfs::remove(file2);
+}
+
+// Neither file exists (both stale): fall back to legacy last-writer-wins, no state dropped.
+void CheckpointManagerUnittest::TestAddCheckPointNeitherExistLastWriterWins() {
+    CheckPointManager::Instance()->RemoveAllCheckPoint();
+    const std::string configName = "test-config";
+    const std::string gone1 = (bfs::path(kTestRootDir) / "gone1.log").string();
+    const std::string gone2 = (bfs::path(kTestRootDir) / "gone2.log").string();
+    const DevInode devInode(12345, 67890); // does not match any real file
+
+    CheckPointManager::Instance()->AddCheckPoint(MakeCheckPoint(gone1, devInode, 100, configName).release());
+    CheckPointManager::Instance()->AddCheckPoint(MakeCheckPoint(gone2, devInode, 200, configName).release());
+
+    CheckPointPtr cpt;
+    EXPECT_TRUE(CheckPointManager::Instance()->GetCheckPoint(devInode, configName, cpt));
+    EXPECT_EQ(cpt->mFileName, gone2);
+    EXPECT_EQ(cpt->mOffset, 200);
+
+    CheckPointManager::Instance()->RemoveAllCheckPoint();
+}
+
+// A pending handoff entry (written outside any dump round) must survive a periodic
+// dump, while the live reader snapshot written inside the round is erased.
+void CheckpointManagerUnittest::TestPendingSurvivesDumpRound() {
+    const std::string pendingPath = CreateFile("pending_survive.log");
+    const std::string activePath = CreateFile("active_survive.log");
+    const DevInode pendingDev = GetFileDevInode(pendingPath);
+    const DevInode activeDev = GetFileDevInode(activePath);
+    auto* manager = CheckPointManager::Instance();
+
+    manager->AddCheckPoint(MakeCheckPoint(pendingPath, pendingDev, 10, "cfg_pending").release());
+
+    manager->BeginDumpRound();
+    manager->AddCheckPoint(MakeCheckPoint(activePath, activeDev, 20, "cfg_active").release());
+    EXPECT_TRUE(manager->DumpCheckPointToLocal());
+    manager->EndDumpRound();
+
+    CheckPointPtr pendingCpt;
+    CheckPointPtr activeCpt;
+    EXPECT_TRUE(manager->GetCheckPoint(pendingDev, "cfg_pending", pendingCpt));
+    EXPECT_EQ(pendingCpt->mOffset, 10);
+    EXPECT_FALSE(manager->GetCheckPoint(activeDev, "cfg_active", activeCpt));
+    EXPECT_EQ(manager->GetAllFileCheckPoint().size(), 1UL);
+}
+
+// The mid-rebuild race needs the pending entry to survive an arbitrary number of
+// periodic dumps, not just the first one.
+void CheckpointManagerUnittest::TestPendingSurvivesTwoDumpRounds() {
+    const std::string pendingPath = CreateFile("pending_two_rounds.log");
+    const std::string activePath = CreateFile("active_two_rounds.log");
+    const DevInode pendingDev = GetFileDevInode(pendingPath);
+    const DevInode activeDev = GetFileDevInode(activePath);
+    auto* manager = CheckPointManager::Instance();
+
+    manager->AddCheckPoint(MakeCheckPoint(pendingPath, pendingDev, 10, "cfg_pending").release());
+
+    for (int round = 0; round < 2; ++round) {
+        manager->BeginDumpRound();
+        manager->AddCheckPoint(MakeCheckPoint(activePath, activeDev, 20 + round, "cfg_active").release());
+        EXPECT_TRUE(manager->DumpCheckPointToLocal());
+        manager->EndDumpRound();
+    }
+
+    CheckPointPtr pendingCpt;
+    CheckPointPtr activeCpt;
+    EXPECT_TRUE(manager->GetCheckPoint(pendingDev, "cfg_pending", pendingCpt));
+    EXPECT_EQ(pendingCpt->mOffset, 10);
+    EXPECT_FALSE(manager->GetCheckPoint(activeDev, "cfg_active", activeCpt));
+}
+
+// InitReader consumes a pending entry with GetCheckPoint + DeleteCheckPoint.
+void CheckpointManagerUnittest::TestConsumeDeletesPending() {
+    const std::string path = CreateFile("consume.log");
+    const DevInode devInode = GetFileDevInode(path);
+    auto* manager = CheckPointManager::Instance();
+
+    manager->AddCheckPoint(MakeCheckPoint(path, devInode, 64, "cfg_consume").release());
+
+    CheckPointPtr cpt;
+    EXPECT_TRUE(manager->GetCheckPoint(devInode, "cfg_consume", cpt));
+    EXPECT_EQ(cpt->mOffset, 64);
+    manager->DeleteCheckPoint(devInode, "cfg_consume");
+    EXPECT_FALSE(manager->GetCheckPoint(devInode, "cfg_consume", cpt));
+    EXPECT_TRUE(manager->GetAllFileCheckPoint().empty());
+}
+
+// If a key is pending but a live reader with the same key writes during the round
+// (InitReader with tailExisted skipped consumption), the round erase wins: same
+// behavior as the old RemoveAllCheckPoint, and the live reader will be dumped again
+// next round.
+void CheckpointManagerUnittest::TestDumpRoundErasesOverwrittenPending() {
+    const std::string path = CreateFile("overwritten.log");
+    const DevInode devInode = GetFileDevInode(path);
+    auto* manager = CheckPointManager::Instance();
+
+    manager->AddCheckPoint(MakeCheckPoint(path, devInode, 5, "cfg_overwrite").release());
+
+    manager->BeginDumpRound();
+    manager->AddCheckPoint(MakeCheckPoint(path, devInode, 50, "cfg_overwrite").release());
+    manager->EndDumpRound();
+
+    CheckPointPtr cpt;
+    EXPECT_FALSE(manager->GetCheckPoint(devInode, "cfg_overwrite", cpt));
+}
+
+// Dump-to-local failure must not change the clearing semantics: the round's
+// snapshots are erased (readers still hold the state), pending entries stay.
+void CheckpointManagerUnittest::TestDumpFailureStillEndsRound() {
+    const std::string pendingPath = CreateFile("dump_fail_pending.log");
+    const std::string activePath = CreateFile("dump_fail_active.log");
+    const DevInode pendingDev = GetFileDevInode(pendingPath);
+    const DevInode activeDev = GetFileDevInode(activePath);
+    auto* manager = CheckPointManager::Instance();
+
+    manager->AddCheckPoint(MakeCheckPoint(pendingPath, pendingDev, 10, "cfg_pending").release());
+
+    const std::string notDir = (bfs::path(kTestRootDir) / "not_a_dir").string();
+    std::ofstream(notDir) << "file";
+    const std::string oldPath = AppConfig::GetInstance()->mCheckPointFilePath;
+    AppConfig::GetInstance()->mCheckPointFilePath = (bfs::path(notDir) / "file_check_point").string();
+
+    manager->BeginDumpRound();
+    manager->AddCheckPoint(MakeCheckPoint(activePath, activeDev, 20, "cfg_active").release());
+    EXPECT_FALSE(manager->DumpCheckPointToLocal());
+    manager->EndDumpRound();
+
+    AppConfig::GetInstance()->mCheckPointFilePath = oldPath;
+
+    CheckPointPtr pendingCpt;
+    CheckPointPtr activeCpt;
+    EXPECT_TRUE(manager->GetCheckPoint(pendingDev, "cfg_pending", pendingCpt));
+    EXPECT_FALSE(manager->GetCheckPoint(activeDev, "cfg_active", activeCpt));
+}
+
+// Dir checkpoints are staging-only and must be cleared every round, same as the old
+// RemoveAllCheckPoint behavior.
+void CheckpointManagerUnittest::TestEndDumpRoundClearsDirCheckpoints() {
+    auto* manager = CheckPointManager::Instance();
+    const std::string subDir = (bfs::path(kTestRootDir) / "watched_sub").string();
+    manager->AddDirCheckPoint(subDir);
+
+    DirCheckPointPtr dirCpt;
+    EXPECT_TRUE(manager->GetDirCheckPoint(kTestRootDir, dirCpt));
+
+    manager->BeginDumpRound();
+    manager->EndDumpRound();
+    EXPECT_FALSE(manager->GetDirCheckPoint(kTestRootDir, dirCpt));
+}
+
+// The single table is the single source of truth for serialization: a dump taken
+// mid-rebuild persists both live snapshots and pending entries, and a restart can
+// load both back.
+void CheckpointManagerUnittest::TestDumpPersistsPendingAndActiveThenLoad() {
+    const std::string pendingPath = CreateFile("persist_pending.log");
+    const std::string activePath = CreateFile("persist_active.log");
+    const DevInode pendingDev = GetFileDevInode(pendingPath);
+    const DevInode activeDev = GetFileDevInode(activePath);
+    auto* manager = CheckPointManager::Instance();
+
+    manager->AddCheckPoint(MakeCheckPoint(pendingPath, pendingDev, 11, "cfg_pending").release());
+
+    manager->BeginDumpRound();
+    manager->AddCheckPoint(MakeCheckPoint(activePath, activeDev, 22, "cfg_active").release());
+    EXPECT_TRUE(manager->DumpCheckPointToLocal());
+    manager->EndDumpRound();
+
+    manager->RemoveAllCheckPoint();
+    manager->LoadCheckPoint();
+
+    CheckPointPtr pendingCpt;
+    CheckPointPtr activeCpt;
+    EXPECT_TRUE(manager->GetCheckPoint(pendingDev, "cfg_pending", pendingCpt));
+    EXPECT_EQ(pendingCpt->mOffset, 11);
+    EXPECT_TRUE(manager->GetCheckPoint(activeDev, "cfg_active", activeCpt));
+    EXPECT_EQ(activeCpt->mOffset, 22);
+}
+
+void CheckpointManagerUnittest::TestLoadParseFailureKeepsTable() {
+    const std::string path = CreateFile("load_invalid.log");
+    const DevInode devInode = GetFileDevInode(path);
+    auto* manager = CheckPointManager::Instance();
+
+    manager->AddCheckPoint(MakeCheckPoint(path, devInode, 42, "cfg_invalid").release());
+    std::ofstream(AppConfig::GetInstance()->mCheckPointFilePath) << "{not-json";
+    manager->LoadCheckPoint();
+
+    CheckPointPtr cpt;
+    EXPECT_TRUE(manager->GetCheckPoint(devInode, "cfg_invalid", cpt));
+    EXPECT_EQ(cpt->mOffset, 42);
+}
+
+void CheckpointManagerUnittest::TestGcEvictsWhenConfigNotMatched() {
+    const std::string path = CreateFile("gc_config_gone.log");
+    const DevInode devInode = GetFileDevInode(path);
+    auto* manager = CheckPointManager::Instance();
+
+    manager->AddCheckPoint(MakeCheckPoint(path, devInode, 1, "cfg_unregistered").release());
+
+    auto bakInterval = INT32_FLAG(check_point_check_interval);
+    INT32_FLAG(check_point_check_interval) = -1;
+    manager->CheckTimeoutCheckPoint();
+    INT32_FLAG(check_point_check_interval) = bakInterval;
+
+    CheckPointPtr cpt;
+    EXPECT_FALSE(manager->GetCheckPoint(devInode, "cfg_unregistered", cpt));
+}
+
+void CheckpointManagerUnittest::TestGcEvictsWhenFileGone() {
+    const std::string path = CreateFile("gc_file_gone.log");
+    const DevInode devInode = GetFileDevInode(path);
+    auto* manager = CheckPointManager::Instance();
+
+    manager->AddCheckPoint(MakeCheckPoint(path, devInode, 1, kMatchedConfig).release());
+    bfs::remove(path);
+
+    auto bakInterval = INT32_FLAG(check_point_check_interval);
+    INT32_FLAG(check_point_check_interval) = -1;
+    manager->CheckTimeoutCheckPoint();
+    INT32_FLAG(check_point_check_interval) = bakInterval;
+
+    CheckPointPtr cpt;
+    EXPECT_FALSE(manager->GetCheckPoint(devInode, kMatchedConfig, cpt));
+}
+
+void CheckpointManagerUnittest::TestGcFindsRotatedFileAndUpdatesRealPath() {
+    const std::string fileName = "gc_rotated.log";
+    const std::string path = CreateFile(fileName);
+    const std::string rotatedPath = path + ".1";
+    const DevInode devInode = GetFileDevInode(path);
+    auto* manager = CheckPointManager::Instance();
+
+    auto checkPoint = MakeCheckPoint(path, devInode, 1, kMatchedConfig);
+    checkPoint->mSignatureSize = static_cast<uint32_t>(fileName.size());
+    checkPoint->mSignatureHash = static_cast<uint64_t>(HashSignatureString(fileName.data(), fileName.size()));
+    manager->AddCheckPoint(checkPoint.release());
+    bfs::rename(path, rotatedPath);
+    CreateFile(fileName);
+    EXPECT_NE(GetFileDevInode(path), devInode);
+
+    auto bakInterval = INT32_FLAG(check_point_check_interval);
+    INT32_FLAG(check_point_check_interval) = -1;
+    manager->CheckTimeoutCheckPoint();
+    INT32_FLAG(check_point_check_interval) = bakInterval;
+
+    CheckPointPtr cpt;
+    EXPECT_TRUE(manager->GetCheckPoint(devInode, kMatchedConfig, cpt));
+    EXPECT_EQ(cpt->mRealFileName, rotatedPath);
+}
+
+void CheckpointManagerUnittest::TestGcEvictsRotatedFileWhenSignatureChanged() {
+    const std::string fileName = "gc_rotated_signature.log";
+    const std::string path = CreateFile(fileName);
+    const std::string rotatedPath = path + ".1";
+    const DevInode devInode = GetFileDevInode(path);
+    auto* manager = CheckPointManager::Instance();
+
+    auto checkPoint = MakeCheckPoint(path, devInode, 1, kMatchedConfig);
+    checkPoint->mSignatureSize = static_cast<uint32_t>(fileName.size());
+    checkPoint->mSignatureHash = static_cast<uint64_t>(HashSignatureString(fileName.data(), fileName.size()));
+    manager->AddCheckPoint(checkPoint.release());
+    bfs::rename(path, rotatedPath);
+    std::ofstream(rotatedPath) << "changed signature";
+
+    auto bakInterval = INT32_FLAG(check_point_check_interval);
+    INT32_FLAG(check_point_check_interval) = -1;
+    manager->CheckTimeoutCheckPoint();
+    INT32_FLAG(check_point_check_interval) = bakInterval;
+
+    CheckPointPtr cpt;
+    EXPECT_FALSE(manager->GetCheckPoint(devInode, kMatchedConfig, cpt));
+}
+
+void CheckpointManagerUnittest::TestGcUsesResidencyTimeoutWhenSearchTruncated() {
+    const std::string fileName = "gc_truncated.log";
+    const std::string path = CreateFile(fileName);
+    const std::string rotatedPath = path + ".1";
+    const DevInode devInode = GetFileDevInode(path);
+    auto* manager = CheckPointManager::Instance();
+
+    auto checkPoint = MakeCheckPoint(path, devInode, 1, kMatchedConfig);
+    checkPoint->mSignatureSize = static_cast<uint32_t>(fileName.size());
+    checkPoint->mSignatureHash = static_cast<uint64_t>(HashSignatureString(fileName.data(), fileName.size()));
+    manager->AddCheckPoint(checkPoint.release());
+    bfs::rename(path, rotatedPath);
+
+    auto bakInterval = INT32_FLAG(check_point_check_interval);
+    auto bakLimit = INT32_FLAG(checkpoint_find_max_file_count);
+    auto bakTimeout = INT32_FLAG(mem_check_point_time_out);
+    INT32_FLAG(check_point_check_interval) = -1;
+    INT32_FLAG(checkpoint_find_max_file_count) = -1;
+    INT32_FLAG(mem_check_point_time_out) = 10;
+    manager->CheckTimeoutCheckPoint();
+
+    CheckPointPtr cpt;
+    EXPECT_TRUE(manager->GetCheckPoint(devInode, kMatchedConfig, cpt));
+    EXPECT_TRUE(cpt->mRealFileName.empty());
+
+    cpt->mMemInsertTime = static_cast<int32_t>(time(nullptr)) - INT32_FLAG(mem_check_point_time_out) - 1;
+    manager->CheckTimeoutCheckPoint();
+
+    INT32_FLAG(mem_check_point_time_out) = bakTimeout;
+    INT32_FLAG(checkpoint_find_max_file_count) = bakLimit;
+    INT32_FLAG(check_point_check_interval) = bakInterval;
+    EXPECT_FALSE(manager->GetCheckPoint(devInode, kMatchedConfig, cpt));
+}
+
+void CheckpointManagerUnittest::TestGcFindsRotatedFileInSubdirectory() {
+    const std::string fileName = "gc_nested.log";
+    const std::string path = CreateFile(fileName);
+    const bfs::path rotatedDir = bfs::path(kTestRootDir) / "gc_nested" / "archive";
+    bfs::create_directories(rotatedDir);
+    const std::string rotatedPath = (rotatedDir / (fileName + ".1")).string();
+    const DevInode devInode = GetFileDevInode(path);
+    auto* manager = CheckPointManager::Instance();
+
+    auto checkPoint = MakeCheckPoint(path, devInode, 1, kMatchedConfig);
+    checkPoint->mSignatureSize = static_cast<uint32_t>(fileName.size());
+    checkPoint->mSignatureHash = static_cast<uint64_t>(HashSignatureString(fileName.data(), fileName.size()));
+    manager->AddCheckPoint(checkPoint.release());
+    bfs::rename(path, rotatedPath);
+    sDiscoveryOpts.SetMaxCheckpointDirSearchDepth(2);
+
+    auto bakInterval = INT32_FLAG(check_point_check_interval);
+    INT32_FLAG(check_point_check_interval) = -1;
+    manager->CheckTimeoutCheckPoint();
+    INT32_FLAG(check_point_check_interval) = bakInterval;
+
+    CheckPointPtr cpt;
+    EXPECT_TRUE(manager->GetCheckPoint(devInode, kMatchedConfig, cpt));
+    EXPECT_EQ(cpt->mRealFileName, rotatedPath);
+}
+
+void CheckpointManagerUnittest::TestGcEvictsWhenResidencyTimeout() {
+    const std::string path = CreateFile("gc_residency.log");
+    const DevInode devInode = GetFileDevInode(path);
+    auto* manager = CheckPointManager::Instance();
+
+    manager->AddCheckPoint(MakeCheckPoint(path, devInode, 1, kMatchedConfig).release());
+
+    CheckPointPtr cpt;
+    EXPECT_TRUE(manager->GetCheckPoint(devInode, kMatchedConfig, cpt));
+    cpt->mMemInsertTime = (int32_t)time(NULL) - 100;
+
+    auto bakInterval = INT32_FLAG(check_point_check_interval);
+    auto bakTimeout = INT32_FLAG(mem_check_point_time_out);
+    INT32_FLAG(check_point_check_interval) = -1;
+    INT32_FLAG(mem_check_point_time_out) = 10;
+    manager->CheckTimeoutCheckPoint();
+    INT32_FLAG(check_point_check_interval) = bakInterval;
+    INT32_FLAG(mem_check_point_time_out) = bakTimeout;
+
+    EXPECT_FALSE(manager->GetCheckPoint(devInode, kMatchedConfig, cpt));
+}
+
+// The timeout criterion must use the in-memory residency clock, not the file's last
+// event time: an idle file refreshed into the table must not be evicted while its
+// rebuild event is still queued.
+void CheckpointManagerUnittest::TestGcKeepsFreshEntryDespiteOldEventTime() {
+    const std::string path = CreateFile("gc_idle_file.log");
+    const DevInode devInode = GetFileDevInode(path);
+    auto* manager = CheckPointManager::Instance();
+
+    auto checkPoint = MakeCheckPoint(path, devInode, 1, kMatchedConfig);
+    checkPoint->mLastUpdateTime = 1; // file idle for decades in business time
+    manager->AddCheckPoint(checkPoint.release());
+
+    auto bakInterval = INT32_FLAG(check_point_check_interval);
+    auto bakTimeout = INT32_FLAG(mem_check_point_time_out);
+    INT32_FLAG(check_point_check_interval) = -1;
+    INT32_FLAG(mem_check_point_time_out) = 3600;
+    manager->CheckTimeoutCheckPoint();
+    INT32_FLAG(check_point_check_interval) = bakInterval;
+    INT32_FLAG(mem_check_point_time_out) = bakTimeout;
+
+    CheckPointPtr cpt;
+    EXPECT_TRUE(manager->GetCheckPoint(devInode, kMatchedConfig, cpt));
+    EXPECT_EQ(cpt->mOffset, 1);
+}
+
+void CheckpointManagerUnittest::TestGcRespectsCheckInterval() {
+    const std::string path = CreateFile("gc_gate.log");
+    const DevInode devInode = GetFileDevInode(path);
+    auto* manager = CheckPointManager::Instance();
+
+    // Entry would be evicted (config never registered), but the gate blocks the run.
+    manager->AddCheckPoint(MakeCheckPoint(path, devInode, 1, "cfg_unregistered").release());
+
+    auto bakInterval = INT32_FLAG(check_point_check_interval);
+    INT32_FLAG(check_point_check_interval) = INT32_MAX;
+    manager->CheckTimeoutCheckPoint();
+    INT32_FLAG(check_point_check_interval) = bakInterval;
+
+    CheckPointPtr cpt;
+    EXPECT_TRUE(manager->GetCheckPoint(devInode, "cfg_unregistered", cpt));
 }
 
 } // namespace logtail

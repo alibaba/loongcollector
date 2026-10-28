@@ -4,6 +4,15 @@
 
 `processor_desensitize_native` 插件对事件指定字段内容进行脱敏。
 
+
+## 事件能力
+
+列含义见 [概览 · 事件能力列说明](../../overview.md#事件能力列说明)。
+
+| Log | Metric | Span |
+| --- | --- | --- |
+| ✓ | — | — |
+
 ## 版本
 
 [Stable](../../stability-level.md)
@@ -41,7 +50,7 @@ enable: true
 inputs:
   - Type: input_file
     FilePaths: 
-      - /home/test-log/reg.log
+      - /home/test-log/sen.log
 processors:
   - Type: processor_desensitize_native
     SourceKey: content
@@ -58,7 +67,7 @@ flushers:
 
 ```json
 {
-    "__tag__:__path__": "/home/test-log/reg.log",
+    "__tag__:__path__": "/home/test-log/sen.log",
     "content": "{\"account\":\"1812213231432969\",\"password\":\"******\"}",
     "__time__": "1657161810"
 }

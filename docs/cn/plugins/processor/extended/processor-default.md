@@ -4,11 +4,13 @@
 
 `processor_default`插件不对数据任何操作，只是简单的数据透传。[源代码](https://github.com/alibaba/loongcollector/blob/main/plugins/processor/defaultone/processor_default.go)
 
-## 支持的Event类型
+## 事件能力
 
-| LogGroup(v1) | EventTypeLogging | EventTypeMetric | EventTypeSpan |
-| ------------ | ---------------- | --------------- | ------------- |
-|      ✅      |      ✅           |       ✅        |       ✅      |
+列含义见 [概览 · 事件能力列说明](../../overview.md#事件能力列说明)。
+
+| v1 接口 | v2 接口 | Log | Metric | Span |
+| --- | --- | --- | --- | --- |
+| ✓ | ✓ | v1&v2 | 透传未知 | 透传未知 |
 
 ## 版本
 
@@ -56,6 +58,6 @@ flushers:
 {
     "__tag__:__path__":"/home/test-log/default.log",
     "content":"2022/07/14/11:32:47 test log",
-    "__time__":"1657769827"}
+    "__time__":"1657769827"
 }
 ```

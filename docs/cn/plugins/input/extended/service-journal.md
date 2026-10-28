@@ -4,6 +4,15 @@
 
 `service_journal` 插件支持从原始的二进制文件中采集Linux系统的Journal（systemd）日志。systemd是专用于 Linux 操作系统的系统与服务管理器。当作为启动进程(PID=1)运行时，它将作为初始化系统运行，启动并维护各种用户空间的服务。 systemd统一管理所有Unit的日志（包括内核和应用日志），配置文件一般在`/etc/systemd/journald.conf`中。[源代码](https://github.com/alibaba/loongcollector/blob/main/plugins/input/journal/input_journal.go)
 
+
+## 事件能力
+
+列含义见 [概览 · 事件能力列说明](../../overview.md#事件能力列说明)。
+
+| Log | Metric | Span |
+| --- | --- | --- |
+| ✓ | — | — |
+
 ## 版本
 
 [Stable](../../stability-level.md)
@@ -18,7 +27,7 @@
 
 ### 相关限制
 
-* Logtail支持版本为0.16.18及以上。
+* **LoongCollector**（及与其实现同源的采集组件）需满足本插件所需版本能力；历史文档曾写作 Logtail，对应能力自 **0.16.18** 起可用。
 * 运行的操作系统需支持Journal日志格式。
 
 ### 适用场景
@@ -117,7 +126,7 @@ flushers:
 
 ### 样例2
 
-Kubernetes场景下，使用Logtail的DaemonSet模式采集宿主机的系统日志，由于日志中有很多并不重要的字段，使用处理插件只挑选较为重要的日志字段。
+Kubernetes 场景下，使用 LoongCollector 的 **DaemonSet** 部署采集宿主机 Journal 时，日志字段较多，可配合处理插件只保留重要字段。
 
 * 采集配置2
 
@@ -128,7 +137,7 @@ inputs:
     ParsePriority: true
     ParseSyslogFacility: true
     JournalPaths:
-      - "/logtail_host/var/log/journal"
+      - "/logtail_host/var/log/journal"   # 典型 Chart 下宿主机挂载路径，卷名常沿用历史命名 logtail_host
 processors:
   - Type: processor_filter_regex
     Exclude:
@@ -154,15 +163,15 @@ flushers:
 
 ```json
 {
-    "MESSAGE":  "ejected connection from \"192.168.0.251:48914\" (error \"EOF\", ServerName "")",
-    "PRIORITY":  "informational",
-    "SYSLOG_IDENTIFIER":  "etcd",
+    "MESSAGE": "ejected connection from \"192.168.0.251:48914\" (error \"EOF\", ServerName \"\")",
+    "PRIORITY": "informational",
+    "SYSLOG_IDENTIFIER": "etcd",
     "_EXE": "/opt/etcd-v3.3.8/etcd",
-    "_HOSTNAME":  "iZb*****************ueZ",
-    "_PID":  "10590",
-    "_SYSTEMD_UNIT":  "etcd.service",
-    "__source__":  "***.***.***.***",
-    "__tag__:__hostname__":  "logtail-ds-dp48x", 
-    "_realtime_timestamp_":  "1547975837008708",
+    "_HOSTNAME": "iZb*****************ueZ",
+    "_PID": "10590",
+    "_SYSTEMD_UNIT": "etcd.service",
+    "__source__": "***.***.***.***",
+    "__tag__:__hostname__": "loongcollector-ds-dp48x",
+    "_realtime_timestamp_": "1547975837008708"
 }
 ```

@@ -57,7 +57,7 @@ jobs:
 
   actions-timeline:
     needs: [BuildCoreWindows]
-    runs-on: ubuntu-latest
+    runs-on: loongcollector-small-runner
     permissions:
       actions: read
     steps:

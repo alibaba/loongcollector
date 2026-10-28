@@ -4,6 +4,16 @@
 
 `processor_fields_with_condition`插件支持根据日志部分字段的取值，动态进行字段扩展或删除。[源代码](https://github.com/alibaba/loongcollector/blob/main/plugins/processor/fieldswithcondition/processor_fields_with_condition.go)
 
+## 事件能力
+
+列含义见 [概览 · 事件能力列说明](../../overview.md#事件能力列说明)。
+
+| v1 接口 | v2 接口 | Log | Metric | Span |
+| --- | --- | --- | --- | --- |
+| ✓ | ✓ | v1&v2 | 透传 | 透传 |
+
+> v2 场景下对每条 Log 事件按条件扩展/删除字段（输入 Log 输出 Log），Metric/Span 事件显式透传（不处理但不丢弃）；当未命中条件且 DropIfNotMatchCondition=true 时该 Log 被丢弃。
+
 ## 版本
 
 [Stable](../../stability-level.md)

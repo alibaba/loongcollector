@@ -18,6 +18,7 @@
 
 #include "MetricTypes.h"
 #include "application/Application.h"
+#include "common/SafeThread.h"
 #include "logger/Logger.h"
 #include "monitor/MetricManager.h"
 #include "monitor/metric_constants/MetricConstants.h"
@@ -37,7 +38,7 @@ void Timer::Init() {
         }
     }
     InitMetrics();
-    mThreadRes = async(launch::async, &Timer::Run, this);
+    LaunchAsync(mThreadRes, "Timer", &Timer::Run, this);
 }
 
 void Timer::Stop() {

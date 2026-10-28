@@ -51,12 +51,6 @@ private:
 
     void Run(uint32_t threadNo);
 
-    bool Serialize(const PipelineEventGroup& group,
-                   bool enableNanosecond,
-                   const std::string& logstore,
-                   std::string& res,
-                   std::string& errorMsg);
-
     uint32_t mThreadCount = 1;
     std::vector<std::future<void>> mThreadRes;
     std::atomic_bool mIsFlush = false;

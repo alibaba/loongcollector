@@ -16,6 +16,8 @@
 
 #pragma once
 
+#include <cstdint>
+
 #include <string>
 #include <utility>
 
@@ -28,8 +30,9 @@ namespace logtail {
 
 class MultilineOptions {
 public:
-    enum class Mode { CUSTOM, JSON };
+    enum class Mode { CUSTOM, JSON, WHOLE_FILE };
     enum class UnmatchedContentTreatment { DISCARD, SINGLE_LINE };
+    enum class FileWriteMode { APPEND, OVERWRITE }; // NOLINT(readability-identifier-naming)
 
     bool Init(const Json::Value& config, const CollectionPipelineContext& ctx, const std::string& pluginType);
     const std::shared_ptr<boost::regex>& GetStartPatternReg() const { return mStartPatternRegPtr; }
@@ -38,6 +41,8 @@ public:
     bool IsMultiline() const { return mIsMultiline; }
 
     Mode mMode = Mode::CUSTOM;
+    FileWriteMode mFileWriteMode = FileWriteMode::APPEND;
+    uint32_t mMaxWholeFileBytes = 10 * 1024 * 1024;
     std::string mStartPattern;
     std::string mContinuePattern;
     std::string mEndPattern;

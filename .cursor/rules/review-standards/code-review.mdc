@@ -1,0 +1,6 @@
+---
+description: Code Review Rule. Use this rule when you need expert code review for quality, security, and maintainability. This rule should be used proactively after writing logical chunks of code, before merging pull requests, or when explicitly asked to review code. Example: After implementing a new feature in a Go plugin, use this rule to review the code for potential issues. Example: When asked '请对 PR 1234 进行代码评审', 'Code Review fork/feature/x', '将 fork/feature/x 对比 main 进行CR' use this rule to perform a thorough security-focused review.
+globs: 
+alwaysApply: false
+---
+@.cursor/rules/review-standards/code-review.md

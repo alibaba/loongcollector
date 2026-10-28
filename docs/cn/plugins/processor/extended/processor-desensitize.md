@@ -4,6 +4,16 @@
 
 `processor_desensitize`插件可以通过正则表达式匹配并实现文本日志中敏感数据的脱敏。[源代码](https://github.com/alibaba/loongcollector/tree/main/plugins/processor/processor_desensitize.go)
 
+## 事件能力
+
+列含义见 [概览 · 事件能力列说明](../../overview.md#事件能力列说明)。
+
+| v1 接口 | v2 接口 | Log | Metric | Span |
+| --- | --- | --- | --- | --- |
+| ✓ | ✓ | v1&v2 | 透传 | 透传 |
+
+> v2 场景下对每条 Log 事件进行脱敏（输入 Log 输出 Log），Metric/Span 事件显式透传（不处理但不丢弃）。
+
 ## 版本
 
 [Beta](../../stability-level.md)
@@ -31,7 +41,7 @@
 * 输入
   
 ```bash
-echo "[{'account':'1812213231432969','password':'04a23f38'}, {account':'1812213685634','password':'123a'}]" >> /home/test-ilogtail/test-log/processor-desensitize.log
+echo "[{'account':'1812213231432969','password':'04a23f38'}, {account':'1812213685634','password':'123a'}]" >> /home/test-loongcollector/test-log/processor-desensitize.log
 ```
 
 * 采集配置1
@@ -57,7 +67,7 @@ flushers:
 
 ```json
 {
-  "content":"********",
+  "content": "********"
 }
 ```
 
@@ -86,7 +96,7 @@ flushers:
 
 ```json
 {
-  "content":"[{'account':'1812213231432969','password':'********'}, {'account':'1812213685634','password':'********'}]",
+  "content": "[{'account':'1812213231432969','password':'********'}, {'account':'1812213685634','password':'********'}]"
 }
 ```
 
@@ -115,6 +125,6 @@ flushers:
 
 ```json
 {
-  "content":"[{'account':'1812213231432969','password':'9c525f463ba1c89d6badcd78b2b7bd79'}, {'account':'1812213685634','password':'1552c03e78d38d5005d4ce7b8018addf'}]",
+  "content": "[{'account':'1812213231432969','password':'9c525f463ba1c89d6badcd78b2b7bd79'}, {'account':'1812213685634','password':'1552c03e78d38d5005d4ce7b8018addf'}]"
 }
 ```

@@ -2,7 +2,16 @@
 
 ## 简介
 
-`aggregator_base` `aggregator`插件可以实现对单条日志的聚合。
+`aggregator_base` `aggregator` 插件可以实现对**单条数据**的聚合。
+
+
+## 事件能力
+
+列含义见 [概览 · 事件能力列说明](../overview.md#事件能力列说明)。
+
+| v1 接口 | v2 接口 | Log | Metric | Span |
+| --- | --- | --- | --- | --- |
+| ✓ | — | v1 | 透传未知 | 透传未知 |
 
 ## 版本
 

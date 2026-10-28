@@ -29,17 +29,16 @@ LoongCollector 目前提供以下4种模式进行配置设置：
 {
     "inputs": [
         {
-            "type": "plugin name"
+            "type": "plugin name",
             "detail": {
-                "Parameter1": "value"
+                "Parameter1": "value",
                 "Parameter2": 10
             }
-        },
-        { ... }
+        }
     ],
-    "processors": [ ... ],
-    "aggregators": [ ... ],
-    "flushers": [ ... ]
+    "processors": [],
+    "aggregators": [],
+    "flushers": []
 }
 ```
 

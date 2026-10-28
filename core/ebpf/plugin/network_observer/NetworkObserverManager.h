@@ -79,7 +79,7 @@ public:
     int AddOrUpdateConfig(const CollectionPipelineContext*,
                           uint32_t,
                           const PluginMetricManagerPtr&,
-                          const std::variant<SecurityOptions*, ObserverNetworkOption*>&) override;
+                          const PluginOptions&) override;
 
     int RemoveConfig(const std::string&) override;
 
@@ -101,8 +101,7 @@ public:
     void AcceptNetStatsEvent(struct conn_stats_event_t* event);
     void AcceptDataEvent(struct conn_data_event_t* event);
 
-    std::unique_ptr<PluginConfig> GeneratePluginConfig(
-        [[maybe_unused]] const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) override {
+    std::unique_ptr<PluginConfig> GeneratePluginConfig([[maybe_unused]] const PluginOptions& options) override {
         auto ebpfConfig = std::make_unique<PluginConfig>();
         ebpfConfig->mPluginType = PluginType::NETWORK_OBSERVE;
         return ebpfConfig;
@@ -134,11 +133,9 @@ public:
     void HandleHostMetadataUpdate(const std::vector<std::string>& podCidVec);
 
 protected:
-    int update([[maybe_unused]] const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) override {
-        return 0;
-    }
+    int update([[maybe_unused]] const PluginOptions& options) override { return 0; }
 
-    int resume(const std::variant<SecurityOptions*, ObserverNetworkOption*>&) override {
+    int resume(const PluginOptions&) override {
         mSuspendFlag = false;
         return 0;
     }

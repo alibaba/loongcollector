@@ -17,9 +17,14 @@
 #pragma once
 #include <ctime>
 
+#include <chrono>
 #include <optional>
 #include <string>
 #include <thread>
+
+#ifdef APSARA_UNIT_TEST_MAIN
+#include <functional>
+#endif
 
 #include "common/Strptime.h"
 #include "protobuf/sls/sls_logs.pb.h"
@@ -41,11 +46,37 @@ struct PreciseTimestampConfig {
 
 typedef timespec LogtailTime;
 
+#ifdef APSARA_UNIT_TEST_MAIN
+// Injectable clock for deterministic unit tests. Returns nanoseconds since Unix epoch.
+// thread_local ensures background threads spawned by pipelines always use the real clock,
+// while the test thread can safely override without data races.
+extern thread_local std::function<uint64_t()> gCurrentTimeNs;
+
+// RAII guard that temporarily pins the clock to a fixed value for the duration
+// of a test and restores the previous value on destruction.
+// Safe even when pipelines start background threads — each thread has its own copy.
+struct ScopedClockOverride {
+    explicit ScopedClockOverride(std::chrono::system_clock::time_point fixedNow) : mPrev(gCurrentTimeNs) {
+        const uint64_t fixedNs = static_cast<uint64_t>(
+            std::chrono::duration_cast<std::chrono::nanoseconds>(fixedNow.time_since_epoch()).count());
+        gCurrentTimeNs = [fixedNs]() -> uint64_t { return fixedNs; };
+    }
+    ~ScopedClockOverride() { gCurrentTimeNs = mPrev; }
+
+    ScopedClockOverride(const ScopedClockOverride&) = delete;
+    ScopedClockOverride& operator=(const ScopedClockOverride&) = delete;
+
+private:
+    std::function<uint64_t()> mPrev;
+};
+#endif
+
 // Convert @tm to string according to @format. TODO: Merge ConvertToTimeStamp and GetTimeStamp.
 std::string ConvertToTimeStamp(const time_t& tm, const std::string& format = "%Y%m%d%H%M%S");
 std::string GetTimeStamp(time_t tm, const std::string& format = "%Y%m%d%H%M%S", bool isLocal = true);
 
-// Get current time in us or ms.
+// Get current time in s, us, ms, or ns.
+uint64_t GetCurrentTimeInSeconds();
 uint64_t GetCurrentTimeInMicroSeconds();
 uint64_t GetCurrentTimeInMilliSeconds();
 uint64_t GetCurrentTimeInNanoSeconds();

@@ -22,7 +22,12 @@ import (
 )
 
 func AllGeneratedLog(ctx context.Context) (context.Context, error) {
-	command := fmt.Sprintf("rm -rf %s/*", config.TestConfig.GeneratedLogDir)
+	dir := config.TestConfig.GeneratedLogDir
+	if dir == "" {
+		return ctx, nil
+	}
+	// Remove generated files but keep the directory for the next scenario.
+	command := fmt.Sprintf("rm -rf %s/* && mkdir -p %s", dir, dir)
 	if _, err := setup.Env.ExecOnSource(ctx, command); err != nil {
 		return ctx, err
 	}

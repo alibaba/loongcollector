@@ -21,12 +21,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/alibaba/ilogtail/pkg/logger"
 	"reflect"
 	"strconv"
 	"time"
 
+	"github.com/alibaba/ilogtail/pkg/logger"
+
 	"github.com/elastic/beats/v7/winlogbeat/sys"
+
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
 // Checkpoint represents the state of an individual event log.
@@ -124,8 +127,7 @@ func addPairs(m map[string]string, key string, pairs []sys.KeyValue) {
 	}
 	val, err := json.Marshal(sub)
 	if err != nil {
-		logger.Warningf(context.Background(), "WINEVENTLOG_UTIL_ALARM",
-			"Call json.Marshal for %v failed %v", sub, err)
+		logger.Warningf(context.Background(), selfmonitor.WineventlogUtilAlarm, "Call json.Marshal for %v failed %v", sub, err)
 		return
 	}
 	m[key] = string(val)

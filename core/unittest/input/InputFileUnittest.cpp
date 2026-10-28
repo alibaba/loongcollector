@@ -91,6 +91,7 @@ void InputFileUnittest::OnSuccessfulInit() {
     input->CommitMetricsRecordRef();
     APSARA_TEST_FALSE(input->mEnableContainerDiscovery);
     APSARA_TEST_EQUAL(0U, input->mMaxCheckpointDirSearchDepth);
+    APSARA_TEST_EQUAL(0U, input->mFileDiscovery.GetMaxCheckpointDirSearchDepth());
     APSARA_TEST_EQUAL(0U, input->mExactlyOnceConcurrency);
     APSARA_TEST_FALSE(ctx.IsExactlyOnceEnabled());
 
@@ -114,6 +115,7 @@ void InputFileUnittest::OnSuccessfulInit() {
     input->CommitMetricsRecordRef();
     APSARA_TEST_TRUE(input->mEnableContainerDiscovery);
     APSARA_TEST_EQUAL(1U, input->mMaxCheckpointDirSearchDepth);
+    APSARA_TEST_EQUAL(1U, input->mFileDiscovery.GetMaxCheckpointDirSearchDepth());
     APSARA_TEST_EQUAL(1U, input->mExactlyOnceConcurrency);
     APSARA_TEST_TRUE(ctx.IsExactlyOnceEnabled());
 
@@ -137,6 +139,7 @@ void InputFileUnittest::OnSuccessfulInit() {
     input->CommitMetricsRecordRef();
     APSARA_TEST_FALSE(input->mEnableContainerDiscovery);
     APSARA_TEST_EQUAL(0U, input->mMaxCheckpointDirSearchDepth);
+    APSARA_TEST_EQUAL(0U, input->mFileDiscovery.GetMaxCheckpointDirSearchDepth());
     APSARA_TEST_EQUAL(0U, input->mExactlyOnceConcurrency);
     APSARA_TEST_FALSE(ctx.IsExactlyOnceEnabled());
 

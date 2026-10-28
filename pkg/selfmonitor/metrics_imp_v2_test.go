@@ -108,6 +108,16 @@ func TestStrMetricV2_Set(t *testing.T) {
 	}
 }
 
+func TestMetricTypeReturnsActualKind(t *testing.T) {
+	assert.Equal(t, CumulativeCounterType, NewCumulativeCounterMetric("c").Type())
+	assert.Equal(t, CounterType, NewCounterMetric("c").Type())
+	assert.Equal(t, GaugeType, NewGaugeMetric("g").Type())
+	assert.Equal(t, AverageType, NewAverageMetric("a").Type())
+	assert.Equal(t, MaxType, NewMaxMetricVector("m", nil, nil).WithLabels().Type())
+	assert.Equal(t, LatencyType, NewLatencyMetric("l").Type())
+	assert.Equal(t, StringType, NewStringMetric("s").Type())
+}
+
 func TestDelta(t *testing.T) {
 	ms := newMetricVector("test", CounterType, nil, nil)
 	delta := newDeltaCounter(ms, nil)

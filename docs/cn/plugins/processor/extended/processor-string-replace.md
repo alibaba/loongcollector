@@ -4,6 +4,16 @@
 
 `processor_string_replace processor`插件可以通过全文、正则匹配、去转义的方式实现文本日志的替换。
 
+## 事件能力
+
+列含义见 [概览 · 事件能力列说明](../../overview.md#事件能力列说明)。
+
+| v1 接口 | v2 接口 | Log | Metric | Span |
+| --- | --- | --- | --- | --- |
+| ✓ | ✓ | v1&v2 | 透传 | 透传 |
+
+> v2 场景下对每条 Log 事件进行字符串替换（输入 Log 输出 Log），Metric/Span 事件显式透传（不处理但不丢弃）。
+
 ## 版本
 
 [Stable](../../stability-level.md)
@@ -181,6 +191,7 @@ flushers:
     "content": "{\"UNAME\":\"\",\"GID\":\"\",\"PAID\":\"\",\"UUID\":\"\",\"STARTTIME\":\"\",\"ENDTIME\":\"\",\"UID\":\"2154212790\",\"page_num\":1,\"page_size\":10}",
     "__time__": "1680353730"
 }
+
 {
     "__tag__:__path__": "/home/test_log/string_replace.log",
     "content": "啊啊啊",

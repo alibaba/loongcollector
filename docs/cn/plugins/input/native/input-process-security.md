@@ -4,6 +4,14 @@
 
 `input_process_security`插件可以实现利用ebpf探针采集进程安全相关动作。
 
+## 事件能力
+
+列含义见 [概览 · 事件能力列说明](../../overview.md#事件能力列说明)。
+
+| Log | Metric | Span |
+| --- | --- | --- |
+| ✓ | — | — |
+
 ## 版本
 
 [Beta](../../stability-level.md)
@@ -110,6 +118,7 @@ flushers:
     "event_type": "kprobe",
     "__time__": "1758701451"
 }
+
 {
     "exec_id": "djQzYzExMjA0LnNxYS5uYTEzMTozNDYzOTcwNzQ4MDA2ODI4MDoxNDg3NDk=",
     "pid": "148749",

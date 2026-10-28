@@ -6,6 +6,8 @@ function arch() {
     echo amd64
   elif uname -m | grep -E "aarch64|arm64" &>/dev/null; then
     echo arm64
+  elif uname -m | grep -E "riscv64|riscv64gc" &>/dev/null; then
+    echo riscv64
   else
     echo sw64
   fi
@@ -13,6 +15,7 @@ function arch() {
 
 # Default values for build arguments
 VERSION=${VERSION:-edge}
+ENABLE_AGENTSIGHT=${ENABLE_AGENTSIGHT:-ON}
 ENABLE_COMPATIBLE_MODE=${ENABLE_COMPATIBLE_MODE:-OFF}
 ENABLE_STATIC_LINK_CRT=${ENABLE_STATIC_LINK_CRT:-OFF}
 WITHOUTGDB=${WITHOUTGDB:-ON}
@@ -82,6 +85,23 @@ done
 
 echo "echo 'StrictHostkeyChecking no' >> /etc/ssh/ssh_config" >> generated_files/gen_build.sh
 chmod 755 generated_files/gen_build.sh
-echo "mkdir -p core/build && cd core/build && cmake -DCMAKE_BUILD_TYPE=Release -DLOGTAIL_VERSION=${VERSION} -DBUILD_LOGTAIL_UT=OFF -DENABLE_COMPATIBLE_MODE=${ENABLE_COMPATIBLE_MODE} -DENABLE_STATIC_LINK_CRT=${ENABLE_STATIC_LINK_CRT} -DWITHOUTGDB=${WITHOUTGDB} -DWITHSPL=${WITHSPL} .. && make -sj${MAKE_JOBS} && cd - && ./scripts/upgrade_adapter_lib.sh && ./scripts/plugin_build.sh mod c-shared output ${VERSION} plugins.yml,external_plugins.yml go.mod" >> generated_files/gen_build.sh
+
+# Before CMake compiles C++ that includes agentsight.h: run the AgentSight crate so build.rs
+# executes cbindgen and writes include/agentsight.h (see coolbpf agentsight/build.rs).
+# This avoids any race with parallel make before libagentsight / header sync steps.
+# ENABLE_AGENTSIGHT is expanded at gen_build.sh generation time (this script's env).
+if [ "${ENABLE_AGENTSIGHT}" = "ON" ]; then
+  cat >> generated_files/gen_build.sh <<AGENTSIGHT_PREGEN
+# ---- AgentSight: generate include/agentsight.h (cbindgen in build.rs) before main CMake build ----
+# --features bpf-build is required: build.rs gates BPF skeleton generation (filewatch.skel.rs etc.)
+# on that feature while src/probes/*.rs include the skeletons unconditionally. Must match the
+# command in coolbpf src/agentsight/CMakeLists.txt (upstream fix 69fb1ee0).
+if [ -d core/_thirdparty/coolbpf/src/agentsight ]; then
+  ( cd core/_thirdparty/coolbpf/src/agentsight && cargo build --release --no-default-features --features bpf-build ) || { echo "build_edge_linux: AgentSight cargo build failed" >&2; exit 1; }
+fi
+AGENTSIGHT_PREGEN
+fi
+
+echo "mkdir -p core/build && cd core/build && cmake -DCMAKE_BUILD_TYPE=Release -DLOGTAIL_VERSION=${VERSION} -DBUILD_LOGTAIL_UT=OFF -DENABLE_AGENTSIGHT=${ENABLE_AGENTSIGHT} -DENABLE_COMPATIBLE_MODE=${ENABLE_COMPATIBLE_MODE} -DENABLE_STATIC_LINK_CRT=${ENABLE_STATIC_LINK_CRT} -DWITHOUTGDB=${WITHOUTGDB} -DWITHSPL=${WITHSPL} .. && make -sj${MAKE_JOBS} && cd - && ./scripts/upgrade_adapter_lib.sh && ./scripts/plugin_build.sh mod c-shared output ${VERSION} plugins.yml,external_plugins.yml go.mod" >> generated_files/gen_build.sh
 
 ./generated_files/gen_build.sh

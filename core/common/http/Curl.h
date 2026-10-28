@@ -30,6 +30,18 @@
 
 namespace logtail {
 
+// Installs the OpenSSL locking / thread-id callbacks that OpenSSL versions
+// prior to 1.1.0 require to be used safely from multiple threads. Without them,
+// concurrent SSL traffic from different threads races on OpenSSL's global
+// per-thread error-state hash table (ERR_get_state / ERR_remove_thread_state)
+// and crashes the process with SIGSEGV.
+//
+// It is a no-op when linked against OpenSSL >= 1.1.0 (which is thread-safe
+// internally), is safe to call multiple times, and never overrides a callback
+// another component already installed. MUST be called once during process
+// startup, before any thread performs SSL operations.
+void SetupOpenSSLThreadSupport();
+
 NetworkCode GetNetworkStatus(CURLcode code);
 
 CURL* CreateCurlHandler(const std::string& method,

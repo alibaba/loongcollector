@@ -891,6 +891,26 @@ void ProcessorParseLogTimeUnittest::TestParseLogTimeSecondCache() {
             APSARA_TEST_EQUAL(outTime.tv_nsec, c.exceptedLogTimeNanosecond);
         }
     }
+    { // case: %f format with trailing chars not in format
+        config["SourceFormat"] = "%Y-%m-%dT%H:%M:%S.%f";
+        config["SourceTimezone"] = "GMT+00:00";
+        ProcessorParseTimestampNative& processor = *(new ProcessorParseTimestampNative);
+        ProcessorInstance processorInstance(&processor, getPluginMeta());
+        APSARA_TEST_TRUE_FATAL(processorInstance.Init(config, mContext));
+
+        LogtailTime outTime = {0, 0};
+        uint64_t preciseTimestamp = 0;
+        StringView timeStrCache;
+        const std::string timeStr = "2026-03-09T14:39:49.985+08:00";
+
+        // cache is empty
+        bool ret1 = processor.ParseLogTime(timeStr, "/var/log/message", outTime, preciseTimestamp, timeStrCache);
+        APSARA_TEST_EQUAL(ret1, true);
+
+        // same string -> IsPrefixString hits the polluted cache -> enters fast path
+        bool ret2 = processor.ParseLogTime(timeStr, "/var/log/message", outTime, preciseTimestamp, timeStrCache);
+        APSARA_TEST_EQUAL(ret2, true);
+    }
 }
 
 void ProcessorParseLogTimeUnittest::TestAdjustTimeZone() {

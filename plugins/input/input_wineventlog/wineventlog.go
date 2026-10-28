@@ -25,6 +25,7 @@ import (
 
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pkg/util"
 	"github.com/alibaba/ilogtail/plugins/input/input_wineventlog/eventlog"
 )
@@ -150,8 +151,7 @@ func (w *WinEventLog) Stop() error {
 func (w *WinEventLog) run() bool {
 	err := w.eventLogger.Open(w.checkpoint)
 	if err != nil {
-		logger.Errorf(w.context.GetRuntimeContext(),
-			"WINEVENTLOG_MAIN_ALARM", "%s Open() error: %v, retry this after 60s, checkpoint: %v",
+		logger.Errorf(w.context.GetRuntimeContext(), selfmonitor.WineventlogMainAlarm, "%s Open() error: %v, retry this after 60s, checkpoint: %v",
 			w.logPrefix, err, w.checkpoint)
 		if util.RandomSleep(time.Duration(60)*time.Second, 0.1, w.shutdown) {
 			logger.Infof(w.context.GetRuntimeContext(), "%s Break because shutdown was signalled.", w.logPrefix)
@@ -163,7 +163,7 @@ func (w *WinEventLog) run() bool {
 		logger.Infof(w.context.GetRuntimeContext(), "%s Stopping %v", w.logPrefix, pluginType)
 		err := w.eventLogger.Close()
 		if err != nil {
-			logger.Warningf(w.context.GetRuntimeContext(), "WINEVENTLOG_MAIN_ALARM", "%s Close() error", w.logPrefix, err)
+			logger.Warningf(w.context.GetRuntimeContext(), selfmonitor.WineventlogMainAlarm, "%s Close() error", w.logPrefix, err)
 		}
 	}()
 
@@ -179,7 +179,7 @@ func (w *WinEventLog) run() bool {
 		// to reopen the event logger once Read returns error.
 		records, err := w.eventLogger.Read()
 		if err != nil {
-			logger.Warningf(w.context.GetRuntimeContext(), "WINEVENTLOG_MAIN_ALARM", "%s Read() error: %v, reopen after 60s",
+			logger.Warningf(w.context.GetRuntimeContext(), selfmonitor.WineventlogMainAlarm, "%s Read() error: %v, reopen after 60s",
 				w.logPrefix, err)
 			if util.RandomSleep(time.Duration(60)*time.Second, 0.1, w.shutdown) {
 				logger.Infof(w.context.GetRuntimeContext(), "%s Break because shutdown was signalled.", w.logPrefix)

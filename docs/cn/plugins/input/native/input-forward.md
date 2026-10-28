@@ -4,6 +4,14 @@
 
 `input_forward` 插件用于接收来自其他系统的数据转发请求，目前支持LoongSuite协议。该插件可以作为数据转发的接收端，通过配置的匹配规则来处理接收到的数据。[源代码](https://github.com/alibaba/loongcollector/blob/main/core/plugin/input/InputForward.h)
 
+## 事件能力
+
+列含义见 [概览 · 事件能力列说明](../../overview.md#事件能力列说明)。
+
+| Log | Metric | Span |
+| --- | --- | --- |
+| ✓ | ✓ | ✓ |
+
 ## 版本
 
 [Stable](../../stability-level.md)
@@ -41,7 +49,7 @@ metadata 中配置 key 为 `X-Loongsuite-Apm-Configname`，value 为采集配置
 * 采集配置
 
 ```yaml
-enabled: true
+enable: true
 inputs:
   - Type: input_forward
     Protocol: LoongSuite
@@ -59,6 +67,8 @@ flushers:
 通过gRPC客户端发送LoongSuite协议的转发请求，请求需要在metadata中包含`x-loongsuite-apm-configname: <采集配置名>`字段，数据内容在请求的data字段中，为 `PipelineEventGroup` PB 序列化的结果。
 
 * 输出
+
+以下为示意：实际字段取决于上游 PB 解析后的事件内容及下游 Flusher 序列化方式。
 
 ```json
 {

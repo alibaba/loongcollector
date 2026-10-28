@@ -19,10 +19,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/mindprince/gonvml"
+
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-
-	"github.com/mindprince/gonvml"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
 type InputGpuMetric struct {
@@ -57,7 +58,7 @@ func (r *InputGpuMetric) Collect(collector pipeline.Collector) error {
 func (r *InputGpuMetric) Start(collector pipeline.Collector) error {
 	err := gonvml.Initialize()
 	if err != nil {
-		logger.Warning(r.context.GetRuntimeContext(), "GPU_NVML_INIT_ALARM", "Couldn't initialize nvml, error", err)
+		logger.Warning(r.context.GetRuntimeContext(), selfmonitor.GPUNVMLInitAlarm, "Couldn't initialize nvml, error", err)
 		return err
 	}
 	defer gonvml.Shutdown()
@@ -77,7 +78,7 @@ func (r *InputGpuMetric) Start(collector pipeline.Collector) error {
 		case <-timer.C:
 			err := r.CollectGpuMetric()
 			if err != nil {
-				logger.Warning(r.context.GetRuntimeContext(), "GPU_NVML_COLLECT_ALARM", "GPU collect metric error", err)
+				logger.Warning(r.context.GetRuntimeContext(), selfmonitor.GPUNVMLCollectAlarm, "GPU collect metric error", err)
 				return nil
 			}
 			timer.Reset(time.Duration(r.CollectIntervalMs) * time.Millisecond)
@@ -89,7 +90,7 @@ func (r *InputGpuMetric) CollectGpuMetric() error {
 	t := time.Now()
 	numDevices, err := gonvml.DeviceCount()
 	if err != nil {
-		logger.Warning(r.context.GetRuntimeContext(), "GPU_NVML_DEVICE_COUNT_ALARM", "GPU DeviceCount error", err)
+		logger.Warning(r.context.GetRuntimeContext(), selfmonitor.GPUNVMLDeviceCountAlarm, "GPU DeviceCount error", err)
 		return err
 	}
 
@@ -100,7 +101,7 @@ func (r *InputGpuMetric) CollectGpuMetric() error {
 
 		device, err := gonvml.DeviceHandleByIndex(index)
 		if err != nil {
-			logger.Warning(r.context.GetRuntimeContext(), "GPU_NVML_DEVICE_INDEX_ALARM", "GPU DeviceHandleByIndex", index, "error", err)
+			logger.Warning(r.context.GetRuntimeContext(), selfmonitor.GPUNVMLDeviceIndexAlarm, "GPU DeviceHandleByIndex", index, "error", err)
 			return err
 		}
 		powerUsage, _ := device.PowerUsage()

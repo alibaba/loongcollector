@@ -4,6 +4,15 @@
 
 `processor_parse_json_native`插件解析事件中`Json`格式字段内容并提取新字段。
 
+
+## 事件能力
+
+列含义见 [概览 · 事件能力列说明](../../overview.md#事件能力列说明)。
+
+| Log | Metric | Span |
+| --- | --- | --- |
+| ✓ | — | — |
+
 ## 版本
 
 [Stable](../../stability-level.md)
@@ -43,7 +52,7 @@ inputs:
       - /home/test-log/json.log
 processors:
   - Type: processor_parse_json_native
-  SourceKey: content
+    SourceKey: content
 flushers:
   - Type: flusher_stdout
     OnlyStdout: true
@@ -54,14 +63,14 @@ flushers:
 ```json
 {
     "__tag__:__path__": "/home/test-log/json.log",
-    "url": "POST /PutData?Category=YunOsAccountOpLog HTTP/1.1", 
-    "ip": "10.200.98.220", 
-    "user-agent": "aliyun-sdk-java", 
+    "url": "POST /PutData?Category=YunOsAccountOpLog HTTP/1.1",
+    "ip": "10.200.98.220",
+    "user-agent": "aliyun-sdk-java",
     "request": {
-        "status": "200", 
+        "status": "200",
         "latency": "18204"
-    }, 
-    "time": "07/Jul/2022:10:30:28", 
+    },
+    "time": "07/Jul/2022:10:30:28",
     "__time__": "1657161028"
 }
 ```
