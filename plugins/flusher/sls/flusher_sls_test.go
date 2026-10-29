@@ -26,6 +26,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
+	converter "github.com/alibaba/ilogtail/pkg/protocol/converter"
 	"github.com/alibaba/ilogtail/pkg/util"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
 )
@@ -285,34 +286,56 @@ func TestSlsFlusher_FlushRetainsLegacyABI(t *testing.T) {
 }
 
 func BenchmarkSlsFlusherExport(b *testing.B) {
-	for _, mixed := range []bool{false, true} {
-		name := "logs"
-		if mixed {
-			name = "mixed"
-		}
-		b.Run(name, func(b *testing.B) {
-			flusher := &SlsFlusher{sendPipelineEventGroup: func(_, _ string, _ []byte, _ int, _ string) int { return 0 }}
-			if err := flusher.Init(mock.NewEmptyContext("project", "store", "config")); err != nil {
-				b.Fatal(err)
+	for _, legacy := range []bool{false, true} {
+		for _, mixed := range []bool{false, true} {
+			name := "peg/logs"
+			if legacy {
+				name = "legacy/logs"
 			}
-			events := make([]models.PipelineEvent, 100)
-			for i := range events {
-				if mixed && i%2 == 0 {
-					events[i] = models.NewSingleValueMetric("cpu", models.MetricTypeGauge, models.NewTags(), 100, 1.5)
-				} else {
-					log := models.NewLog("", nil, "", "", "", models.NewTags(), 100)
-					log.GetIndices().Add("content", "benchmark log payload")
-					events[i] = log
+			if mixed {
+				name = "peg/mixed"
+				if legacy {
+					name = "legacy/mixed"
 				}
 			}
-			groups := []*models.PipelineGroupEvents{{Group: models.NewGroup(models.NewMetadata(), models.NewTags()), Events: events}}
-			b.ReportAllocs()
-			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
-				if err := flusher.Export(groups, nil); err != nil {
+			b.Run(name, func(b *testing.B) {
+				flusher := &SlsFlusher{sendPipelineEventGroup: func(_, _ string, _ []byte, _ int, _ string) int { return 0 }}
+				flusher.sendPb = func(_, _ string, _ []byte, _ int) int { return 0 }
+				if err := flusher.Init(mock.NewEmptyContext("project", "store", "config")); err != nil {
 					b.Fatal(err)
 				}
-			}
-		})
+				events := make([]models.PipelineEvent, 100)
+				for i := range events {
+					if mixed && i%2 == 0 {
+						events[i] = models.NewSingleValueMetric("cpu", models.MetricTypeGauge, models.NewTags(), 100, 1.5)
+					} else {
+						log := models.NewLog("", nil, "", "", "", models.NewTags(), 100)
+						log.GetIndices().Add("content", "benchmark log payload")
+						events[i] = log
+					}
+				}
+				groups := []*models.PipelineGroupEvents{{Group: models.NewGroup(models.NewMetadata(), models.NewTags()), Events: events}}
+				b.ReportAllocs()
+				b.ResetTimer()
+				for i := 0; i < b.N; i++ {
+					if legacy {
+						for _, group := range groups {
+							converted, err := converter.PipelineGroupEventsToLogGroup(group)
+							if err != nil {
+								b.Fatal(err)
+							}
+							converted.Category = "store"
+							if err := flusher.sendLogGroup("config", converted); err != nil {
+								b.Fatal(err)
+							}
+						}
+						continue
+					}
+					if err := flusher.Export(groups, nil); err != nil {
+						b.Fatal(err)
+					}
+				}
+			})
+		}
 	}
 }
