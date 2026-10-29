@@ -181,7 +181,8 @@ typedef int (*PluginAdapterVersion)();
 
 namespace logtail {
 class GoPipelineBridgeUnittest;
-}
+class SelfMonitorMetricEvent;
+} // namespace logtail
 
 // Create by david zhang. 2017/09/02 22:22:12
 class LogtailPlugin {
@@ -264,7 +265,7 @@ public:
     std::string GetAllContainersMeta();
     std::string GetDiffContainersMeta();
 
-    bool GetGoSelfMonitorMetrics(std::vector<std::map<std::string, std::string>>& metricsList,
+    bool GetGoSelfMonitorMetrics(std::vector<logtail::SelfMonitorMetricEvent>& metricsList,
                                  const std::string& metricType);
     void SyncGoSelfMonitorAlarms();
 

@@ -133,18 +133,19 @@ TEST_F(GoPipelineBridgeUnittest, SelfMonitorMetricsPBUsesMatchingRelease) {
     UntypedMultiDoubleValues values({{"events", {UntypedValueMetricType::MetricTypeCounter, 42}}}, nullptr);
     metric->SetValue(values);
     sSelfMonitorPayload = SerializeGroup(group);
-    vector<map<string, string>> records;
+    vector<SelfMonitorMetricEvent> records;
     ASSERT_TRUE(LogtailPlugin::GetInstance()->GetGoSelfMonitorMetrics(records, "direct"));
     EXPECT_EQ("direct", sSelfMonitorMetricType);
     ASSERT_EQ(1U, records.size());
-    EXPECT_NE(string::npos, records[0]["counters"].find("42"));
+    EXPECT_EQ(42U, records[0].GetCounter("events"));
+    EXPECT_EQ("plugin_source", records[0].mCategory);
     EXPECT_EQ(1, sSelfMonitorFreeCount);
 }
 
 TEST_F(GoPipelineBridgeUnittest, SelfMonitorInvalidAndEmptyPBReleaseOnce) {
     EnableSelfMonitor();
     sSelfMonitorPayload = "invalid protobuf";
-    vector<map<string, string>> records;
+    vector<SelfMonitorMetricEvent> records;
     EXPECT_FALSE(LogtailPlugin::GetInstance()->GetGoSelfMonitorMetrics(records, "cpp_provided"));
     EXPECT_EQ("cpp_provided", sSelfMonitorMetricType);
     EXPECT_EQ(1, sSelfMonitorFreeCount);
@@ -161,7 +162,7 @@ TEST_F(GoPipelineBridgeUnittest, SelfMonitorInvalidAndEmptyPBReleaseOnce) {
 
 TEST_F(GoPipelineBridgeUnittest, SelfMonitorRequiresMatchingReleaseCallback) {
     EnableSelfMonitor(false);
-    vector<map<string, string>> records;
+    vector<SelfMonitorMetricEvent> records;
     EXPECT_FALSE(LogtailPlugin::GetInstance()->GetGoSelfMonitorMetrics(records, "direct"));
     LogtailPlugin::GetInstance()->SyncGoSelfMonitorAlarms();
     EXPECT_EQ(0, sSelfMonitorFreeCount);

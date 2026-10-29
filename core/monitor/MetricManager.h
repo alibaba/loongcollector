@@ -19,6 +19,7 @@
 #include <atomic>
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 
@@ -67,10 +68,10 @@ private:
     ReadMetrics() = default;
     mutable ReadWriteLock mReadWriteLock;
     MetricsRecord* mHead = nullptr;
-    std::vector<std::map<std::string, std::string>> mGoMetrics;
+    std::vector<SelfMonitorMetricEvent> mGoMetrics;
     void Clear();
     MetricsRecord* GetHead();
-    void UpdateGoCppProvidedMetrics(std::vector<std::map<std::string, std::string>>& metricsList);
+    void UpdateGoCppProvidedMetrics(const std::vector<SelfMonitorMetricEvent>& metricsList);
 
 public:
     ~ReadMetrics();
@@ -81,14 +82,11 @@ public:
     void ReadAsSelfMonitorMetricEvents(std::vector<SelfMonitorMetricEvent>& metricEventList) const;
     void UpdateMetrics();
 
-    // Parse self-monitor metrics pulled from Go as a serialized PipelineEventGroup
-    // protobuf (one MetricEvent per record) into the same map<string,string> form
-    // ("labels"/"counters"/"gauges" JSON) produced by the legacy GetGoMetrics path,
-    // so the pulled metrics can be consumed identically. This is the D3 receive side of
-    // the C++-pull path; it coexists with the legacy GetGoMetrics path (removed in D5).
-    // Returns false on a protobuf parse/transfer error.
-    static bool ParseGoMetricsPB(const std::string& pbData,
-                                 std::vector<std::map<std::string, std::string>>& metricsList);
+    // Parse borrowed Go-owned PB bytes directly into the retained metric snapshot.
+    // No native PipelineEventGroup, JSON strings or intermediate metric maps are
+    // constructed. The output owns its fields after the Go buffer is released.
+    // Empty input is a no-op; malformed PB leaves the output unchanged.
+    static bool ParseGoMetricsPB(std::string_view pbData, std::vector<SelfMonitorMetricEvent>& metricsList);
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class MetricManagerUnittest;

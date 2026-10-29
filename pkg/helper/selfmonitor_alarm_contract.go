@@ -26,8 +26,8 @@ import (
 )
 
 // Self-monitor alarm PB contract field keys.
-// These MUST stay aligned with C++ AlarmManager::FlushAllRegionAlarm (core/monitor/AlarmManager.cpp)
-// and the InnerGoAlarm struct (core/go_pipeline/LogtailPlugin.h).
+// These MUST stay aligned with AlarmManager::FlushAllRegionAlarm and
+// SelfMonitorServer::ReceiveGoAlarmsPB. No legacy CGO alarm structure is used.
 const (
 	AlarmFieldType     = "alarm_type"
 	AlarmFieldLevel    = "alarm_level"
@@ -110,24 +110,48 @@ func TransferPipelineEventGroupToAlarms(group *protocol.PipelineEventGroup) []se
 }
 
 func transferAlarmToLogEvent(msg *selfmonitor.AlarmExportMessage, t time.Time) (*protocol.LogEvent, error) {
-	fields := make(map[string]string, 10)
-	fields[AlarmFieldType] = msg.AlarmType
-	fields[AlarmFieldLevel] = msg.AlarmLevel
-	fields[AlarmFieldMessage] = msg.AlarmMessage
-	fields[AlarmFieldCount] = strconv.Itoa(msg.Count)
-	fields[AlarmFieldIP] = util.GetIPAddress()
-	fields[AlarmFieldOS] = runtime.GOOS
-	fields[AlarmFieldVersion] = config.BaseVersion
+	count := 7
 	if msg.ProjectName != "" {
-		fields[AlarmFieldProject] = msg.ProjectName
+		count++
 	}
 	if msg.Category != "" {
-		fields[AlarmFieldCategory] = msg.Category
+		count++
 	}
 	if msg.Config != "" {
-		fields[AlarmFieldConfig] = msg.Config
+		count++
 	}
-	return CreateLogEvent(t, false, fields)
+	// Allocate contents as one block instead of a map and one object per field.
+	contents := make([]protocol.LogEvent_Content, count)
+	refs := make([]*protocol.LogEvent_Content, count)
+	var rawSize uint64
+	i := 0
+	add := func(key, value string) {
+		contents[i].Key = util.ZeroCopyStringToBytes(key)
+		contents[i].Value = util.ZeroCopyStringToBytes(value)
+		refs[i] = &contents[i]
+		rawSize += uint64(len(value))
+		i++
+	}
+	add(AlarmFieldType, msg.AlarmType)
+	add(AlarmFieldLevel, msg.AlarmLevel)
+	add(AlarmFieldMessage, msg.AlarmMessage)
+	add(AlarmFieldCount, strconv.Itoa(msg.Count))
+	add(AlarmFieldIP, util.GetIPAddress())
+	add(AlarmFieldOS, runtime.GOOS)
+	add(AlarmFieldVersion, config.BaseVersion)
+	if msg.ProjectName != "" {
+		add(AlarmFieldProject, msg.ProjectName)
+	}
+	if msg.Category != "" {
+		add(AlarmFieldCategory, msg.Category)
+	}
+	if msg.Config != "" {
+		add(AlarmFieldConfig, msg.Config)
+	}
+	return &protocol.LogEvent{
+		Timestamp: uint64(t.Unix())*1e9 + uint64(t.Nanosecond()),
+		Contents:  refs, RawSize: rawSize,
+	}, nil
 }
 
 func transferLogEventToAlarm(logEvent *protocol.LogEvent) selfmonitor.AlarmExportMessage {

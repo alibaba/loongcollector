@@ -572,19 +572,19 @@ void LogtailPlugin::ProcessPipelineEventGroup(const std::string& configName,
 #endif
 }
 
-bool LogtailPlugin::GetGoSelfMonitorMetrics(std::vector<std::map<std::string, std::string>>& metricsList,
+bool LogtailPlugin::GetGoSelfMonitorMetrics(std::vector<SelfMonitorMetricEvent>& metricsList,
                                             const std::string& metricType) {
     if (!mPluginValid || mGetGoSelfMonitorMetricsPBFun == nullptr || mFreeSelfMonitorPBFun == nullptr) {
         return false;
     }
     GoString type{metricType.data(), static_cast<GoInt>(metricType.size())};
     SelfMonitorPBBuffer buffer = mGetGoSelfMonitorMetricsPBFun(type);
-    // Always release via Go, even if string allocation or protobuf parsing fails.
+    // Parse borrowed C bytes while the Go-owned allocation is guarded by RAII.
     std::unique_ptr<char, FreeSelfMonitorPBFun> data(buffer.data, mFreeSelfMonitorPBFun);
     if (buffer.data == nullptr) {
         return buffer.size == 0;
     }
-    return ReadMetrics::ParseGoMetricsPB(std::string(buffer.data, buffer.size), metricsList);
+    return ReadMetrics::ParseGoMetricsPB(std::string_view(buffer.data, buffer.size), metricsList);
 }
 
 void LogtailPlugin::SyncGoSelfMonitorAlarms() {
@@ -594,7 +594,7 @@ void LogtailPlugin::SyncGoSelfMonitorAlarms() {
     SelfMonitorPBBuffer buffer = mGetGoSelfMonitorAlarmsPBFun();
     std::unique_ptr<char, FreeSelfMonitorPBFun> data(buffer.data, mFreeSelfMonitorPBFun);
     if (buffer.data != nullptr && buffer.size != 0) {
-        SelfMonitorServer::GetInstance()->ReceiveGoAlarmsPB(std::string(buffer.data, buffer.size));
+        SelfMonitorServer::GetInstance()->ReceiveGoAlarmsPB(std::string_view(buffer.data, buffer.size));
     }
 }
 

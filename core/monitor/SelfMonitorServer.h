@@ -17,6 +17,7 @@
 #pragma once
 
 #include <string>
+#include <string_view>
 
 #include "collection_pipeline/CollectionPipeline.h"
 #include "monitor/Monitor.h"
@@ -38,12 +39,10 @@ public:
     void UpdateAlarmPipeline(CollectionPipelineContext* ctx, size_t inputIndex);
     void RemoveAlarmPipeline();
 
-    // Receive self-monitor alarms pulled from Go as a serialized PipelineEventGroup
-    // protobuf (one LogEvent per alarm) and forward each to AlarmManager. This is the
-    // D3 receive side of the C++-pull path; it coexists with the legacy
-    // LogtailPlugin::GetGoAlarms path (removed in D5). Returns the number of alarms
-    // merged.
-    int32_t ReceiveGoAlarmsPB(const std::string& pbData);
+    // Parse borrowed Go-owned PB bytes directly into AlarmManager. Field strings
+    // remain owned by the protobuf until AlarmManager copies the retained values.
+    // No native LogEvent/SourceBuffer is rebuilt. Returns the number merged.
+    int32_t ReceiveGoAlarmsPB(std::string_view pbData);
 
     void SendTaskStatus(); // use Alarm pipeline to send task status immediately in enterprise version
 
