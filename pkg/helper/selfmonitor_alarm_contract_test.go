@@ -29,9 +29,40 @@ import (
 	"github.com/alibaba/ilogtail/pkg/util"
 )
 
-// TestAlarmContractFieldNames verifies the field key constants match the C++
-// AlarmManager::FlushAllRegionAlarm log event content keys exactly.
-// C++ reference: core/monitor/AlarmManager.cpp lines 126-140.
+// Batch storage must preserve the wire contract without sharing mutable event
+// or pointer slices between alarms or between independently produced batches.
+func TestAlarmBatchStorageIsolation(t *testing.T) {
+	alarms := []selfmonitor.AlarmExportMessage{
+		{AlarmType: "FIRST", AlarmLevel: "2", AlarmMessage: "消息", Count: 1001, ProjectName: "project"},
+		{AlarmType: "SECOND", AlarmLevel: "3", AlarmMessage: "second", Count: -3, Category: "store", Config: "config/2"},
+		{AlarmType: "THIRD", AlarmLevel: "1", AlarmMessage: "third", Count: 0},
+	}
+	now := time.Unix(1700000000, 123)
+	group, err := TransferAlarmsToPipelineEventGroup(alarms, now)
+	require.NoError(t, err)
+	data, err := group.Marshal()
+	require.NoError(t, err)
+	var decoded protocol.PipelineEventGroup
+	require.NoError(t, decoded.Unmarshal(data))
+	assert.Equal(t, alarms, TransferPipelineEventGroupToAlarms(&decoded))
+	for _, event := range decoded.GetLogs().Events {
+		assert.Equal(t, uint64(now.UnixNano()), event.Timestamp)
+	}
+
+	// Appending to one event must not overwrite the next event's pointer slice.
+	first := group.GetLogs().Events[0]
+	first.Contents = append(first.Contents, &protocol.LogEvent_Content{
+		Key: []byte("extra"), Value: []byte("only-first"),
+	})
+	assert.Equal(t, alarms[1], transferLogEventToAlarm(group.GetLogs().Events[1]))
+	other, err := TransferAlarmsToPipelineEventGroup(alarms, now)
+	require.NoError(t, err)
+	first.Contents[0].Value = []byte("changed")
+	assert.Equal(t, "FIRST", transferLogEventToAlarm(other.GetLogs().Events[0]).AlarmType)
+}
+
+// TestAlarmContractFieldNames verifies that Go fields match the final alarm
+// contents produced by C++ AlarmManager::FlushAllRegionAlarm.
 func TestAlarmContractFieldNames(t *testing.T) {
 	cppFields := map[string]bool{
 		"alarm_type":    true,

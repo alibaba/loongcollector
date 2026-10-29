@@ -17,6 +17,7 @@
 #include "monitor/SelfMonitorServer.h"
 
 #include <limits>
+#include <memory>
 
 #include "MetricConstants.h"
 #include "Monitor.h"
@@ -231,9 +232,29 @@ int32_t SelfMonitorServer::ReceiveGoAlarmsPB(std::string_view pbData) {
     if (pbData.empty() || pbData.size() > static_cast<size_t>(std::numeric_limits<int>::max())) {
         return 0;
     }
-    models::PipelineEventGroup group;
-    auto* pbGroup = &group;
-    if (!pbGroup->ParseFromArray(pbData.data(), static_cast<int>(pbData.size()))) {
+    // ParseFromArray clears the root oneof and deletes its entire log subtree.
+    // Preserve that subtree across small batches instead. Move it out of the
+    // thread-local cache while in use, so concurrent threads and nested calls
+    // cannot modify an active parse. Oversized or failed parses are not retained.
+    constexpr size_t kMaxCachedPayloadSize = 64 * 1024;
+    constexpr size_t kMaxCachedStorageSize = 256 * 1024;
+    static thread_local std::unique_ptr<models::PipelineEventGroup> cachedGroup;
+    const bool canCache = pbData.size() <= kMaxCachedPayloadSize;
+    auto group = canCache ? std::move(cachedGroup) : nullptr;
+    if (!group) {
+        group = std::make_unique<models::PipelineEventGroup>();
+    }
+    auto* pbGroup = group.get();
+    // Merge must start from logically empty state, including fields unused by
+    // this receiver. Clear the log child rather than the root to retain capacity.
+    pbGroup->clear_metadata();
+    pbGroup->clear_tags();
+    const auto* reflection = pbGroup->GetReflection();
+    if (!reflection->GetUnknownFields(*pbGroup).empty()) {
+        reflection->MutableUnknownFields(pbGroup)->Clear();
+    }
+    pbGroup->mutable_logs()->Clear();
+    if (!pbGroup->MergeFromString(absl::string_view(pbData.data(), pbData.size()))) {
         LOG_WARNING(sLogger, ("receive go alarms pb", "failed to parse protobuf")("size", pbData.size()));
         return 0;
     }
@@ -251,20 +272,44 @@ int32_t SelfMonitorServer::ReceiveGoAlarmsPB(std::string_view pbData) {
         // Borrow fields in one pass; duplicate keys retain the last value.
         for (const auto& content : event.contents()) {
             const auto& key = content.key();
-            if (key == "alarm_type") {
-                alarmType = &content.value();
-            } else if (key == "alarm_level") {
-                alarmLevel = &content.value();
-            } else if (key == "alarm_message") {
-                alarmMessage = &content.value();
-            } else if (key == "alarm_count") {
-                alarmCount = &content.value();
-            } else if (key == "project_name") {
-                projectName = &content.value();
-            } else if (key == "category") {
-                category = &content.value();
-            } else if (key == "config") {
-                config = &content.value();
+            // Length dispatch skips unrelated metadata without a chain of
+            // comparisons. Still check the full key; order and last-value-wins
+            // behavior for duplicate contents remain unchanged.
+            switch (key.size()) {
+                case 10:
+                    if (key == "alarm_type") {
+                        alarmType = &content.value();
+                    }
+                    break;
+                case 11:
+                    if (key == "alarm_level") {
+                        alarmLevel = &content.value();
+                    } else if (key == "alarm_count") {
+                        alarmCount = &content.value();
+                    }
+                    break;
+                case 13:
+                    if (key == "alarm_message") {
+                        alarmMessage = &content.value();
+                    }
+                    break;
+                case 12:
+                    if (key == "project_name") {
+                        projectName = &content.value();
+                    }
+                    break;
+                case 8:
+                    if (key == "category") {
+                        category = &content.value();
+                    }
+                    break;
+                case 6:
+                    if (key == "config") {
+                        config = &content.value();
+                    }
+                    break;
+                default:
+                    break;
             }
         }
         if (alarmType->empty()) {
@@ -303,6 +348,11 @@ int32_t SelfMonitorServer::ReceiveGoAlarmsPB(std::string_view pbData) {
     }
     if (syncedAlarmCount > 0) {
         LOG_DEBUG(sLogger, ("receive go alarms pb", "finished")("synced", syncedAlarmCount));
+    }
+    // Account for retained string/map capacities and cleared repeated elements,
+    // not just the wire length. A large batch must not pin its high-water memory.
+    if (canCache && pbGroup->SpaceUsedLong() <= kMaxCachedStorageSize) {
+        cachedGroup = std::move(group);
     }
     return syncedAlarmCount;
 }

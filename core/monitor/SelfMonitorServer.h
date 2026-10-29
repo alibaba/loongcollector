@@ -41,7 +41,9 @@ public:
 
     // Parse borrowed Go-owned PB bytes directly into AlarmManager. Field strings
     // remain owned by the protobuf until AlarmManager copies the retained values.
-    // No native LogEvent/SourceBuffer is rebuilt. Returns the number merged.
+    // No native LogEvent/SourceBuffer is rebuilt. Small batches reuse a bounded,
+    // thread-local protobuf subtree; malformed batches publish nothing. Returns
+    // the number merged after the entire payload has parsed successfully.
     int32_t ReceiveGoAlarmsPB(std::string_view pbData);
 
     void SendTaskStatus(); // use Alarm pipeline to send task status immediately in enterprise version

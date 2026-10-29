@@ -79,20 +79,33 @@ func AlarmContractOptionalFields() []string {
 //	Category     -> "category"      (C++ AlarmMessage.mCategory, optional)
 //	Config       -> "config"        (C++ AlarmMessage.mConfig, optional)
 func TransferAlarmsToPipelineEventGroup(alarms []selfmonitor.AlarmExportMessage, t time.Time) (*protocol.PipelineEventGroup, error) {
-	logEvents := make([]*protocol.LogEvent, 0, len(alarms))
+	// Keep each batch in four contiguous slabs. Event/content pointers borrow these
+	// slabs until synchronous marshaling finishes; no backing storage is shared
+	// between batches, and the full alarm field contract remains unchanged.
+	count := 0
 	for i := range alarms {
-		logEvent, err := transferAlarmToLogEvent(&alarms[i], t)
-		if err != nil {
-			return nil, err
-		}
-		logEvents = append(logEvents, logEvent)
+		count += alarmContentCount(&alarms[i])
 	}
-	group := &protocol.PipelineEventGroup{
+	events := make([]protocol.LogEvent, len(alarms))
+	eventRefs := make([]*protocol.LogEvent, len(alarms))
+	contents := make([]protocol.LogEvent_Content, count)
+	contentRefs := make([]*protocol.LogEvent_Content, count)
+	timestamp := uint64(t.Unix())*1e9 + uint64(t.Nanosecond())
+	ip := util.GetIPAddress()
+	offset := 0
+	for i := range alarms {
+		count := alarmContentCount(&alarms[i])
+		fillAlarmLogEvent(&alarms[i], timestamp, ip, &events[i],
+			contents[offset:offset+count:offset+count],
+			contentRefs[offset:offset+count:offset+count])
+		eventRefs[i] = &events[i]
+		offset += count
+	}
+	return &protocol.PipelineEventGroup{
 		PipelineEvents: &protocol.PipelineEventGroup_Logs{
-			Logs: &protocol.PipelineEventGroup_LogEvents{Events: logEvents},
+			Logs: &protocol.PipelineEventGroup_LogEvents{Events: eventRefs},
 		},
-	}
-	return group, nil
+	}, nil
 }
 
 // TransferPipelineEventGroupToAlarms converts a PipelineEventGroup (containing LogEvents)
@@ -109,7 +122,7 @@ func TransferPipelineEventGroupToAlarms(group *protocol.PipelineEventGroup) []se
 	return alarms
 }
 
-func transferAlarmToLogEvent(msg *selfmonitor.AlarmExportMessage, t time.Time) (*protocol.LogEvent, error) {
+func alarmContentCount(msg *selfmonitor.AlarmExportMessage) int {
 	count := 7
 	if msg.ProjectName != "" {
 		count++
@@ -120,9 +133,14 @@ func transferAlarmToLogEvent(msg *selfmonitor.AlarmExportMessage, t time.Time) (
 	if msg.Config != "" {
 		count++
 	}
-	// Allocate contents as one block instead of a map and one object per field.
-	contents := make([]protocol.LogEvent_Content, count)
-	refs := make([]*protocol.LogEvent_Content, count)
+	return count
+}
+
+// fillAlarmLogEvent borrows one event's exact slices from the batch slabs.
+// Keys and immutable values remain valid through marshaling; no per-field copy
+// or per-alarm allocation is needed, apart from non-cached count strings.
+func fillAlarmLogEvent(msg *selfmonitor.AlarmExportMessage, timestamp uint64, ip string,
+	event *protocol.LogEvent, contents []protocol.LogEvent_Content, refs []*protocol.LogEvent_Content) {
 	var rawSize uint64
 	i := 0
 	add := func(key, value string) {
@@ -136,7 +154,7 @@ func transferAlarmToLogEvent(msg *selfmonitor.AlarmExportMessage, t time.Time) (
 	add(AlarmFieldLevel, msg.AlarmLevel)
 	add(AlarmFieldMessage, msg.AlarmMessage)
 	add(AlarmFieldCount, strconv.Itoa(msg.Count))
-	add(AlarmFieldIP, util.GetIPAddress())
+	add(AlarmFieldIP, ip)
 	add(AlarmFieldOS, runtime.GOOS)
 	add(AlarmFieldVersion, config.BaseVersion)
 	if msg.ProjectName != "" {
@@ -148,10 +166,9 @@ func transferAlarmToLogEvent(msg *selfmonitor.AlarmExportMessage, t time.Time) (
 	if msg.Config != "" {
 		add(AlarmFieldConfig, msg.Config)
 	}
-	return &protocol.LogEvent{
-		Timestamp: uint64(t.Unix())*1e9 + uint64(t.Nanosecond()),
-		Contents:  refs, RawSize: rawSize,
-	}, nil
+	event.Timestamp = timestamp
+	event.Contents = refs
+	event.RawSize = rawSize
 }
 
 func transferLogEventToAlarm(logEvent *protocol.LogEvent) selfmonitor.AlarmExportMessage {
