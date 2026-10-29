@@ -45,6 +45,7 @@ public:
     void TestCreateAndDeleteMetric();
     void TestParseGoMetricsPB();
     void TestParseGoMetricsPBInvalid();
+    void TestParseGoMetricsPBRepeatedBatch();
 };
 
 APSARA_UNIT_TEST_CASE(MetricManagerUnittest, TestCreateMetricAutoDelete, 0);
@@ -52,6 +53,31 @@ APSARA_UNIT_TEST_CASE(MetricManagerUnittest, TestCreateMetricAutoDeleteMultiThre
 APSARA_UNIT_TEST_CASE(MetricManagerUnittest, TestCreateAndDeleteMetric, 2);
 APSARA_UNIT_TEST_CASE(MetricManagerUnittest, TestParseGoMetricsPB, 3);
 APSARA_UNIT_TEST_CASE(MetricManagerUnittest, TestParseGoMetricsPBInvalid, 4);
+APSARA_UNIT_TEST_CASE(MetricManagerUnittest, TestParseGoMetricsPBRepeatedBatch, 5);
+
+void MetricManagerUnittest::TestParseGoMetricsPBRepeatedBatch() {
+    models::PipelineEventGroup pb;
+    for (int i = 0; i < 100; ++i) {
+        auto* metric = pb.mutable_metrics()->add_events();
+        metric->set_name("plugin");
+        (*metric->mutable_tags())["plugin_type"] = "flusher_stdout";
+        (*metric->mutable_tags())["pipeline_name"] = "config-" + std::to_string(i);
+        auto* values = metric->mutable_untypedmultidoublevalues()->mutable_values();
+        (*values)["events"].set_value(100);
+        (*values)["events"].set_metrictype(models::METRIC_TYPE_COUNTER);
+        (*values)["queue_size"].set_value(12.25);
+        (*values)["queue_size"].set_metrictype(models::METRIC_TYPE_GAUGE);
+    }
+    std::string bytes;
+    ASSERT_TRUE(pb.SerializeToString(&bytes));
+    for (int iteration = 0; iteration < 500; ++iteration) {
+        std::vector<SelfMonitorMetricEvent> records;
+        ASSERT_TRUE(ReadMetrics::ParseGoMetricsPB(bytes, records));
+        ASSERT_EQ(100U, records.size());
+        EXPECT_EQ(100U, records[0].GetCounter("events"));
+        EXPECT_EQ(12.25, records[0].GetGauge("queue_size"));
+    }
+}
 
 
 void MetricManagerUnittest::TestCreateMetricAutoDelete() {

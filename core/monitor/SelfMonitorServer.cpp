@@ -24,7 +24,6 @@
 #include "common/LogtailCommonFlags.h"
 #include "common/SafeThread.h"
 #include "go_pipeline/LogtailPlugin.h"
-#include "google/protobuf/arena.h"
 #include "monitor/AlarmManager.h"
 #include "protobuf/models/pipeline_event_group.pb.h"
 #include "runner/ProcessorRunner.h"
@@ -232,8 +231,8 @@ int32_t SelfMonitorServer::ReceiveGoAlarmsPB(std::string_view pbData) {
     if (pbData.empty() || pbData.size() > static_cast<size_t>(std::numeric_limits<int>::max())) {
         return 0;
     }
-    google::protobuf::Arena arena;
-    auto* pbGroup = models::PipelineEventGroup::default_instance().New(&arena);
+    models::PipelineEventGroup group;
+    auto* pbGroup = &group;
     if (!pbGroup->ParseFromArray(pbData.data(), static_cast<int>(pbData.size()))) {
         LOG_WARNING(sLogger, ("receive go alarms pb", "failed to parse protobuf")("size", pbData.size()));
         return 0;

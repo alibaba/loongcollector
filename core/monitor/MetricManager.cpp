@@ -22,7 +22,6 @@
 #include "Monitor.h"
 #include "app_config/AppConfig.h"
 #include "go_pipeline/LogtailPlugin.h"
-#include "google/protobuf/arena.h"
 #include "logger/Logger.h"
 #include "protobuf/models/pipeline_event_group.pb.h"
 #include "provider/Provider.h"
@@ -240,9 +239,10 @@ bool ReadMetrics::ParseGoMetricsPB(std::string_view pbData, std::vector<SelfMoni
     if (pbData.size() > static_cast<size_t>(std::numeric_limits<int>::max())) {
         return false;
     }
-    // PB allocations share one arena lifetime; only the final snapshot owns copies.
-    google::protobuf::Arena arena;
-    auto* pbGroup = models::PipelineEventGroup::default_instance().New(&arena);
+    // Keep protobuf ownership local; only the final snapshot retains field copies.
+    // A stack message also avoids sharing arena allocator state across libraries.
+    models::PipelineEventGroup group;
+    auto* pbGroup = &group;
     if (!pbGroup->ParseFromArray(pbData.data(), static_cast<int>(pbData.size()))) {
         LOG_WARNING(sLogger, ("receive go metrics pb", "failed to parse protobuf")("size", pbData.size()));
         return false;
