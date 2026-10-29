@@ -291,8 +291,8 @@ func GetContainerMeta(containerID string) *C.struct_containerMeta {
 	return returnStruct
 }
 
-// buildAlarmsPB preserves the shared alarm contract. Empty snapshots require
-// neither a protobuf envelope nor a cross-language allocation.
+// buildAlarmsPB sends business fields to C++; the final sender adds ip/os/ver.
+// Empty snapshots require neither a protobuf envelope nor a cross-language allocation.
 func buildAlarmsPB(alarms []selfmonitor.AlarmExportMessage, now time.Time) (*protocol.PipelineEventGroup, error) {
 	if len(alarms) == 0 {
 		return nil, nil

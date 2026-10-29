@@ -15,7 +15,6 @@
 package helper
 
 import (
-	"runtime"
 	"strconv"
 	"testing"
 	"time"
@@ -23,10 +22,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
-	"github.com/alibaba/ilogtail/pkg/util"
 )
 
 // Batch storage must preserve the wire contract without sharing mutable event
@@ -61,17 +58,14 @@ func TestAlarmBatchStorageIsolation(t *testing.T) {
 	assert.Equal(t, "FIRST", transferLogEventToAlarm(other.GetLogs().Events[0]).AlarmType)
 }
 
-// TestAlarmContractFieldNames verifies that Go fields match the final alarm
-// contents produced by C++ AlarmManager::FlushAllRegionAlarm.
+// Bridge fields match what C++ ReceiveGoAlarmsPB consumes. Output metadata is
+// intentionally absent: FlushAllRegionAlarm fills it at the final sender.
 func TestAlarmContractFieldNames(t *testing.T) {
 	cppFields := map[string]bool{
 		"alarm_type":    true,
 		"alarm_level":   true,
 		"alarm_message": true,
 		"alarm_count":   true,
-		"ip":            true,
-		"os":            true,
-		"ver":           true,
 		"project_name":  true,
 		"category":      true,
 		"config":        true,
@@ -125,9 +119,9 @@ func TestTransferAlarmsToPipelineEventGroup_AllFields(t *testing.T) {
 	assert.Equal(t, "3", contentMap[AlarmFieldLevel])
 	assert.Equal(t, "plugin crashed", contentMap[AlarmFieldMessage])
 	assert.Equal(t, "10", contentMap[AlarmFieldCount])
-	assert.Equal(t, util.GetIPAddress(), contentMap[AlarmFieldIP])
-	assert.Equal(t, runtime.GOOS, contentMap[AlarmFieldOS])
-	assert.Equal(t, config.BaseVersion, contentMap[AlarmFieldVersion])
+	assert.NotContains(t, contentMap, "ip")
+	assert.NotContains(t, contentMap, "os")
+	assert.NotContains(t, contentMap, "ver")
 	assert.Equal(t, "my-project", contentMap[AlarmFieldProject])
 	assert.Equal(t, "my-logstore", contentMap[AlarmFieldCategory])
 	assert.Equal(t, "my-config", contentMap[AlarmFieldConfig])

@@ -39,6 +39,7 @@ public:
     void TestReceiveGoAlarmsPBOneof();
     void TestReceiveGoAlarmsPBBatchSizes();
     void TestReceiveGoAlarmsPBConcurrent();
+    void TestReceiveGoAlarmsPBFinalMetadata();
 
 private:
     static void AddContent(models::LogEvent* event, const std::string& key, const std::string& value) {
@@ -61,7 +62,10 @@ private:
                                         "alarm_count",
                                         "project_name",
                                         "category",
-                                        "config"}) {
+                                        "config",
+                                        "ip",
+                                        "os",
+                                        "ver"}) {
                     if (log.HasContent(key)) {
                         auto value = log.GetContent(key);
                         fields[key] = std::string(value.data(), value.size());
@@ -74,7 +78,7 @@ private:
     }
 
     // Serialize a PipelineEventGroup of alarm LogEvents into PB bytes, mirroring the
-    // D3 Go pull payload produced by helper.TransferAlarmsToPipelineEventGroup.
+    // Go bridge payload produced by helper.TransferAlarmsToPipelineEventGroup.
     static std::string BuildAlarmsPB(const std::vector<std::map<std::string, std::string>>& alarms) {
         PipelineEventGroup group(std::make_shared<SourceBuffer>());
         for (const auto& alarm : alarms) {
@@ -259,6 +263,28 @@ void SelfMonitorServerUnittest::TestReceiveGoAlarmsPBConcurrent() {
     }
 }
 
+void SelfMonitorServerUnittest::TestReceiveGoAlarmsPBFinalMetadata() {
+    // New bridge payloads omit metadata. Old payloads may contain it, but the
+    // final sender always supplies its own values instead of forwarding them.
+    auto minimal = BuildAlarmsPB({{{"alarm_type", "MINIMAL_METADATA"}, {"alarm_message", "message"}}});
+    auto legacy = BuildAlarmsPB({{{"alarm_type", "LEGACY_METADATA"},
+                                  {"ip", "ignored-input"},
+                                  {"os", "ignored-input"},
+                                  {"ver", "ignored-input"}}});
+    auto* server = SelfMonitorServer::GetInstance();
+    APSARA_TEST_EQUAL(server->ReceiveGoAlarmsPB(minimal), 1);
+    APSARA_TEST_EQUAL(server->ReceiveGoAlarmsPB(legacy), 1);
+    auto alarms = FlushAlarms();
+    ASSERT_EQ(2U, alarms.size());
+    for (const auto& alarm : alarms) {
+        APSARA_TEST_EQUAL(alarm.at("ip"), LoongCollectorMonitor::mIpAddr);
+        APSARA_TEST_FALSE(alarm.at("os").empty());
+        APSARA_TEST_FALSE(alarm.at("ver").empty());
+        APSARA_TEST_TRUE(alarm.at("os") != "ignored-input");
+        APSARA_TEST_TRUE(alarm.at("ver") != "ignored-input");
+    }
+}
+
 APSARA_UNIT_TEST_CASE(SelfMonitorServerUnittest, TestReceiveGoAlarmsPB, 0);
 APSARA_UNIT_TEST_CASE(SelfMonitorServerUnittest, TestReceiveGoAlarmsPBInvalid, 1);
 APSARA_UNIT_TEST_CASE(SelfMonitorServerUnittest, TestReceiveGoAlarmsPBCrossBatch, 2);
@@ -267,6 +293,7 @@ APSARA_UNIT_TEST_CASE(SelfMonitorServerUnittest, TestReceiveGoAlarmsPBMalformedB
 APSARA_UNIT_TEST_CASE(SelfMonitorServerUnittest, TestReceiveGoAlarmsPBOneof, 5);
 APSARA_UNIT_TEST_CASE(SelfMonitorServerUnittest, TestReceiveGoAlarmsPBBatchSizes, 6);
 APSARA_UNIT_TEST_CASE(SelfMonitorServerUnittest, TestReceiveGoAlarmsPBConcurrent, 7);
+APSARA_UNIT_TEST_CASE(SelfMonitorServerUnittest, TestReceiveGoAlarmsPBFinalMetadata, 8);
 
 } // namespace logtail
 
