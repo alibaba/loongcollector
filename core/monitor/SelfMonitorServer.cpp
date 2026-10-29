@@ -25,6 +25,7 @@
 #include "common/LogtailCommonFlags.h"
 #include "common/SafeThread.h"
 #include "go_pipeline/LogtailPlugin.h"
+#include "google/protobuf/io/coded_stream.h"
 #include "monitor/AlarmManager.h"
 #include "protobuf/models/pipeline_event_group.pb.h"
 #include "runner/ProcessorRunner.h"
@@ -254,7 +255,11 @@ int32_t SelfMonitorServer::ReceiveGoAlarmsPB(std::string_view pbData) {
         reflection->MutableUnknownFields(pbGroup)->Clear();
     }
     pbGroup->mutable_logs()->Clear();
-    if (!pbGroup->MergeFromString(absl::string_view(pbData.data(), pbData.size()))) {
+    // Coded streams support the Protobuf versions used on every platform.
+    // Merge may stop at an end-group tag, so require complete consumption too.
+    google::protobuf::io::CodedInputStream input(reinterpret_cast<const uint8_t*>(pbData.data()),
+                                                 static_cast<int>(pbData.size()));
+    if (!pbGroup->MergeFromCodedStream(&input) || !input.ConsumedEntireMessage()) {
         LOG_WARNING(sLogger, ("receive go alarms pb", "failed to parse protobuf")("size", pbData.size()));
         return 0;
     }

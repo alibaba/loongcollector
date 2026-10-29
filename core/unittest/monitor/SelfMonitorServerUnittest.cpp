@@ -194,6 +194,12 @@ void SelfMonitorServerUnittest::TestReceiveGoAlarmsPBMalformedBatch() {
     truncated.append("\x1a\x05\x0a", 3); // A valid first message followed by a truncated logs field.
     APSARA_TEST_EQUAL(SelfMonitorServer::GetInstance()->ReceiveGoAlarmsPB(truncated), 0);
     APSARA_TEST_TRUE(FlushAlarms().empty());
+    for (char trailingTag : {'\x0c', '\x00'}) {
+        auto invalid = valid;
+        invalid.push_back(trailingTag);
+        APSARA_TEST_EQUAL(SelfMonitorServer::GetInstance()->ReceiveGoAlarmsPB(invalid), 0);
+        APSARA_TEST_TRUE(FlushAlarms().empty());
+    }
     APSARA_TEST_EQUAL(SelfMonitorServer::GetInstance()->ReceiveGoAlarmsPB(valid), 1);
     auto alarms = FlushAlarms();
     ASSERT_EQ(1U, alarms.size());
