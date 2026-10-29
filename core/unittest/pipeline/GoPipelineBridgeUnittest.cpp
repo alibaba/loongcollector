@@ -18,6 +18,7 @@
 
 #include "go_pipeline/LogtailPlugin.h"
 #include "models/PipelineEventGroup.h"
+#include "monitor/MetricManager.h"
 #include "protobuf/models/ProtocolConversion.h"
 #include "protobuf/models/pipeline_event_group.pb.h"
 #include "unittest/Unittest.h"
@@ -28,6 +29,30 @@ using namespace std;
 namespace logtail {
 
 namespace {
+
+string sSelfMonitorPayload;
+int sSelfMonitorFreeCount = 0;
+bool sSelfMonitorNullPayload = false;
+string sSelfMonitorMetricType;
+
+SelfMonitorPBBuffer MakeSelfMonitorPB() {
+    if (sSelfMonitorNullPayload) {
+        return {nullptr, 0};
+    }
+    char* data = new char[sSelfMonitorPayload.size() + 1];
+    std::copy(sSelfMonitorPayload.begin(), sSelfMonitorPayload.end(), data);
+    return {data, sSelfMonitorPayload.size()};
+}
+
+SelfMonitorPBBuffer GetTestMetricsPB(GoString type) {
+    sSelfMonitorMetricType.assign(type.p, type.n);
+    return MakeSelfMonitorPB();
+}
+
+void FreeTestSelfMonitorPB(char* data) {
+    ++sSelfMonitorFreeCount;
+    delete[] data;
+}
 
 void SendGroupToGoPlugin(const PipelineEventGroup& group, const string& packId) {
     models::PipelineEventGroup pb;
@@ -66,10 +91,94 @@ protected:
     void SetUp() override {
         mSourceBuffer = make_shared<SourceBuffer>();
         LogtailPluginMock::ResetProcessPipelineEventGroupStats();
+        auto* plugin = LogtailPlugin::GetInstance();
+        mOriginalValid = plugin->mPluginValid;
+        mOriginalMetrics = plugin->mGetGoSelfMonitorMetricsPBFun;
+        mOriginalAlarms = plugin->mGetGoSelfMonitorAlarmsPBFun;
+        mOriginalFree = plugin->mFreeSelfMonitorPBFun;
+        sSelfMonitorPayload.clear();
+        sSelfMonitorMetricType.clear();
+        sSelfMonitorFreeCount = 0;
+        sSelfMonitorNullPayload = false;
+    }
+
+    void TearDown() override {
+        auto* plugin = LogtailPlugin::GetInstance();
+        plugin->mPluginValid = mOriginalValid;
+        plugin->mGetGoSelfMonitorMetricsPBFun = mOriginalMetrics;
+        plugin->mGetGoSelfMonitorAlarmsPBFun = mOriginalAlarms;
+        plugin->mFreeSelfMonitorPBFun = mOriginalFree;
+    }
+
+    void EnableSelfMonitor(bool enableFree = true) {
+        auto* plugin = LogtailPlugin::GetInstance();
+        plugin->mPluginValid = true;
+        plugin->mGetGoSelfMonitorMetricsPBFun = GetTestMetricsPB;
+        plugin->mGetGoSelfMonitorAlarmsPBFun = MakeSelfMonitorPB;
+        plugin->mFreeSelfMonitorPBFun = enableFree ? FreeTestSelfMonitorPB : nullptr;
     }
 
     shared_ptr<SourceBuffer> mSourceBuffer;
+    bool mOriginalValid = false;
+    GetGoSelfMonitorMetricsPBFun mOriginalMetrics = nullptr;
+    GetGoSelfMonitorAlarmsPBFun mOriginalAlarms = nullptr;
+    FreeSelfMonitorPBFun mOriginalFree = nullptr;
 };
+
+TEST_F(GoPipelineBridgeUnittest, SelfMonitorMetricsPBUsesMatchingRelease) {
+    EnableSelfMonitor();
+    PipelineEventGroup group(mSourceBuffer);
+    auto* metric = group.AddMetricEvent();
+    metric->SetName("plugin_source");
+    UntypedMultiDoubleValues values({{"events", {UntypedValueMetricType::MetricTypeCounter, 42}}}, nullptr);
+    metric->SetValue(values);
+    sSelfMonitorPayload = SerializeGroup(group);
+    vector<map<string, string>> records;
+    ASSERT_TRUE(LogtailPlugin::GetInstance()->GetGoSelfMonitorMetrics(records, "direct"));
+    EXPECT_EQ("direct", sSelfMonitorMetricType);
+    ASSERT_EQ(1U, records.size());
+    EXPECT_NE(string::npos, records[0]["counters"].find("42"));
+    EXPECT_EQ(1, sSelfMonitorFreeCount);
+}
+
+TEST_F(GoPipelineBridgeUnittest, SelfMonitorInvalidAndEmptyPBReleaseOnce) {
+    EnableSelfMonitor();
+    sSelfMonitorPayload = "invalid protobuf";
+    vector<map<string, string>> records;
+    EXPECT_FALSE(LogtailPlugin::GetInstance()->GetGoSelfMonitorMetrics(records, "cpp_provided"));
+    EXPECT_EQ("cpp_provided", sSelfMonitorMetricType);
+    EXPECT_EQ(1, sSelfMonitorFreeCount);
+    LogtailPlugin::GetInstance()->SyncGoSelfMonitorAlarms();
+    EXPECT_EQ(2, sSelfMonitorFreeCount);
+    sSelfMonitorPayload.clear();
+    EXPECT_TRUE(LogtailPlugin::GetInstance()->GetGoSelfMonitorMetrics(records, "direct"));
+    EXPECT_EQ(3, sSelfMonitorFreeCount);
+    sSelfMonitorNullPayload = true;
+    EXPECT_TRUE(LogtailPlugin::GetInstance()->GetGoSelfMonitorMetrics(records, "direct"));
+    LogtailPlugin::GetInstance()->SyncGoSelfMonitorAlarms();
+    EXPECT_EQ(3, sSelfMonitorFreeCount);
+}
+
+TEST_F(GoPipelineBridgeUnittest, SelfMonitorRequiresMatchingReleaseCallback) {
+    EnableSelfMonitor(false);
+    vector<map<string, string>> records;
+    EXPECT_FALSE(LogtailPlugin::GetInstance()->GetGoSelfMonitorMetrics(records, "direct"));
+    LogtailPlugin::GetInstance()->SyncGoSelfMonitorAlarms();
+    EXPECT_EQ(0, sSelfMonitorFreeCount);
+    EXPECT_TRUE(sSelfMonitorMetricType.empty());
+}
+
+TEST_F(GoPipelineBridgeUnittest, SelfMonitorAlarmsPBUsesMatchingRelease) {
+    EnableSelfMonitor();
+    PipelineEventGroup group(mSourceBuffer);
+    auto* alarm = group.AddLogEvent();
+    alarm->SetContent(string("alarm_type"), string("PARSE_ERROR_ALARM"));
+    alarm->SetContent(string("alarm_message"), string("test PB alarm"));
+    alarm->SetContent(string("alarm_count"), string("2"));
+    sSelfMonitorPayload = SerializeGroup(group);
+    LogtailPlugin::GetInstance()->SyncGoSelfMonitorAlarms();
+    EXPECT_EQ(1, sSelfMonitorFreeCount);
+}
 
 TEST_F(GoPipelineBridgeUnittest, MetricGroupInvokesProcessPipelineEventGroup) {
     PipelineEventGroup group(mSourceBuffer);

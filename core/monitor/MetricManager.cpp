@@ -184,23 +184,20 @@ void ReadMetrics::ReadAsSelfMonitorMetricEvents(std::vector<SelfMonitorMetricEve
 }
 
 void ReadMetrics::UpdateMetrics() {
-// Todo: windows 上的 cgo 内存有问题，调用 GetGoMetrics 函数时可能会 crash，需要修复
-#ifndef _MSC_VER
     // go指标在Cpp指标前获取，是为了在 Cpp 部分指标做 SnapShot
     // 前（即调用 ReadMetrics::GetInstance()->UpdateMetrics() 函数），把go部分的进程级指标填写到 Cpp
     // 的进程级指标中去，随Cpp的进程级指标一起输出
     if (LogtailPlugin::GetInstance()->IsPluginOpened()) {
         vector<map<string, string>> goCppProvidedMetircsList;
-        LogtailPlugin::GetInstance()->GetGoMetrics(goCppProvidedMetircsList, METRIC_EXPORT_TYPE_CPP);
+        LogtailPlugin::GetInstance()->GetGoSelfMonitorMetrics(goCppProvidedMetircsList, METRIC_EXPORT_TYPE_CPP);
         UpdateGoCppProvidedMetrics(goCppProvidedMetircsList);
 
         {
             WriteLock lock(mReadWriteLock);
             mGoMetrics.clear();
-            LogtailPlugin::GetInstance()->GetGoMetrics(mGoMetrics, METRIC_EXPORT_TYPE_GO);
+            LogtailPlugin::GetInstance()->GetGoSelfMonitorMetrics(mGoMetrics, METRIC_EXPORT_TYPE_GO);
         }
     }
-#endif
     // 获取c++指标
     MetricsRecord* snapshot = WriteMetrics::GetInstance()->DoSnapshot();
     MetricsRecord* toDelete;
@@ -238,8 +235,25 @@ void ReadMetrics::UpdateGoCppProvidedMetrics(vector<map<string, string>>& metric
         return;
     }
 
-    for (auto metrics : metricsList) {
-        for (auto metric : metrics) {
+    for (const auto& metrics : metricsList) {
+        std::map<std::string, std::string> values;
+        const auto gauges = metrics.find("gauges");
+        if (gauges != metrics.end()) {
+            Json::Value parsed;
+            Json::CharReaderBuilder builder;
+            std::unique_ptr<Json::CharReader> reader(builder.newCharReader());
+            const auto& json = gauges->second;
+            if (!reader->parse(json.data(), json.data() + json.size(), &parsed, nullptr) || !parsed.isObject()) {
+                LOG_WARNING(sLogger, ("go process metrics", "invalid gauges JSON"));
+                continue;
+            }
+            for (const auto& name : parsed.getMemberNames()) {
+                values[name] = parsed[name].asString();
+            }
+        } else {
+            values = metrics;
+        }
+        for (const auto& metric : values) {
             if (metric.first == METRIC_AGENT_MEMORY_GO) {
                 LoongCollectorMonitor::GetInstance()->SetAgentGoMemory(stoi(metric.second));
             }

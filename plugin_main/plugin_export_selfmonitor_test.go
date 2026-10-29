@@ -24,6 +24,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
+	"github.com/alibaba/ilogtail/pluginmanager"
 )
 
 // TestMarshalAlarmsPBRoundTrip verifies that alarms marshaled on the Go side for the
@@ -67,6 +68,39 @@ func TestMarshalAlarmsPBRoundTrip(t *testing.T) {
 		assert.Equal(t, want.Category, got[i].Category)
 		assert.Equal(t, want.Config, got[i].Config)
 	}
+}
+
+func TestMarshalMetricsPBCppProvided(t *testing.T) {
+	data, err := marshalMetricsPB([]map[string]string{{
+		selfmonitor.MetricAgentMemoryGo: "123", selfmonitor.MetricAgentGoRoutinesTotal: "45",
+	}}, time.Unix(1700000000, 0))
+	require.NoError(t, err)
+	var pb protocol.PipelineEventGroup
+	require.NoError(t, pb.Unmarshal(data))
+	records := helper.TransferPipelineEventGroupToMetrics(&pb)
+	require.Len(t, records, 1)
+	assert.Equal(t, "agent", records[0].Category)
+	assert.Equal(t, float64(123), records[0].Gauges[selfmonitor.MetricAgentMemoryGo])
+	assert.Equal(t, float64(45), records[0].Gauges[selfmonitor.MetricAgentGoRoutinesTotal])
+}
+
+func TestSelfMonitorPBExportsAllocateAndRelease(t *testing.T) {
+	for i := 0; i < 100; i++ {
+		buffer := GetGoSelfMonitorMetricsPB(pluginmanager.MetricExportTypeCpp)
+		require.NotNil(t, buffer.data)
+		require.Positive(t, uint64(buffer.size))
+		FreeSelfMonitorPB(buffer.data)
+		alarms := GetGoSelfMonitorAlarmsPB()
+		FreeSelfMonitorPB(alarms.data)
+	}
+	FreeSelfMonitorPB(nil)
+}
+
+func TestMarshalMetricsPBRejectsInvalidRecord(t *testing.T) {
+	_, err := marshalMetricsPB([]map[string]string{{"go_memory_used_mb": "invalid"}}, time.Now())
+	require.Error(t, err)
+	_, err = marshalMetricsPB([]map[string]string{{"labels": "invalid json"}}, time.Now())
+	require.Error(t, err)
 }
 
 // TestMarshalAlarmsPBEmpty verifies an empty alarm batch still produces a valid,
