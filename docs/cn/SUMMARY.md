@@ -141,6 +141,8 @@
     * [SLS](plugins/flusher/native/flusher-sls.md)
     * [多Flusher路由](plugins/flusher/native/router.md)
   * 扩展输出插件
+    * [DataHub](plugins/flusher/extended/flusher-aliyun-datahub.md)
+    * [ODPS](plugins/flusher/extended/flusher-aliyun-odps.md)
     * [ClickHouse](plugins/flusher/extended/flusher-clickhouse.md)
     * [Apache Doris](plugins/flusher/extended/flusher-doris.md)
     * [ElasticSearch](plugins/flusher/extended/flusher-elasticsearch.md)
