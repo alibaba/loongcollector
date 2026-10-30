@@ -71,7 +71,8 @@ class HttpResponse {
                                    const std::string& intf,
                                    bool followRedirects,
                                    const std::optional<CurlTLS>& tls,
-                                   const std::optional<CurlSocket>& socket);
+                                   const std::optional<CurlSocket>& socket,
+                                   const std::string& unixSocketPath);
 
 public:
     HttpResponse()

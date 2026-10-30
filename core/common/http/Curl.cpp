@@ -202,11 +202,36 @@ CURL* CreateCurlHandler(const string& method,
                         const string& intf,
                         bool followRedirects,
                         const optional<CurlTLS>& tls,
-                        const optional<CurlSocket>& socket // socket is used async, the lifespan must be longer
-) {
+                        const optional<CurlSocket>& socket, // socket is used async, the lifespan must be longer
+                        const string& unixSocketPath) {
     CURL* curl = curl_easy_init();
     if (curl == nullptr) {
         return nullptr;
+    }
+
+    if (!unixSocketPath.empty()) {
+        // Same rule as Go's net package used by Prometheus: a leading '@' or NUL selects the abstract
+        // namespace on Linux and Windows; other platforms treat the value as a literal path.
+#if defined(__linux__) || defined(_WIN32)
+        const bool isAbstract = unixSocketPath.front() == '@' || unixSocketPath.front() == '\0';
+#else
+        const bool isAbstract = false;
+#endif
+        const size_t nameOffset = isAbstract ? 1 : 0;
+        CURLcode rc = CURLE_BAD_FUNCTION_ARGUMENT;
+        // curl takes C strings: an empty name or one with embedded NUL would silently change the target
+        if (unixSocketPath.size() > nameOffset && unixSocketPath.find('\0', nameOffset) == string::npos) {
+            rc = curl_easy_setopt(curl,
+                                  isAbstract ? CURLOPT_ABSTRACT_UNIX_SOCKET : CURLOPT_UNIX_SOCKET_PATH,
+                                  unixSocketPath.c_str() + nameOffset);
+        }
+        if (rc != CURLE_OK) {
+            LOG_ERROR(sLogger, ("failed to set unix socket path", unixSocketPath)("errMsg", curl_easy_strerror(rc)));
+            curl_easy_cleanup(curl);
+            return nullptr;
+        }
+        // Environment proxies must not redirect a local socket request.
+        curl_easy_setopt(curl, CURLOPT_NOPROXY, "*");
     }
 
     string totalUrl = httpsFlag ? "https://" : "http://";
@@ -253,7 +278,7 @@ CURL* CreateCurlHandler(const string& method,
 
     curl_easy_setopt(curl, CURLOPT_TIMEOUT, timeout);
     // Loopback traffic must egress via lo; binding it to a physical interface makes it unreachable.
-    if (!intf.empty() && !IsLoopbackAddress(endpoint)) {
+    if (!intf.empty() && unixSocketPath.empty() && !IsLoopbackAddress(endpoint)) {
         curl_easy_setopt(curl, CURLOPT_INTERFACE, intf.c_str());
     }
 
@@ -290,7 +315,8 @@ bool SendHttpRequest(unique_ptr<HttpRequest>&& request, HttpResponse& response) 
                                    AppConfig::GetInstance()->GetBindInterface(),
                                    request->mFollowRedirects,
                                    request->mTls,
-                                   request->mSocket);
+                                   request->mSocket,
+                                   request->mUnixSocketPath);
     if (curl == NULL) {
         LOG_ERROR(sLogger,
                   ("failed to init curl handler", "failed to init curl client")("request address", request.get()));
@@ -350,7 +376,8 @@ bool AddRequestToMultiCurlHandler(CURLM* multiCurl, unique_ptr<AsynHttpRequest>&
                                    AppConfig::GetInstance()->GetBindInterface(),
                                    request->mFollowRedirects,
                                    request->mTls,
-                                   request->mSocket);
+                                   request->mSocket,
+                                   request->mUnixSocketPath);
     if (curl == NULL) {
         request->mResponse.SetNetworkStatus(NetworkCode::Other, "failed to init curl handler");
         LOG_ERROR(sLogger, ("failed to send request", "failed to init curl handler")("request address", request.get()));
