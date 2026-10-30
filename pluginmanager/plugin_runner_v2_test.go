@@ -19,11 +19,14 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
+	"github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
 func TestPluginV2Runner_ReceiveRawLog(t *testing.T) {
@@ -126,4 +129,45 @@ func TestPluginV2Runner_ReceivePipelineEventGroup_Log(t *testing.T) {
 	assert.Len(t, ctx.logs, 1)
 	_, ok := ctx.logs[0].Events[0].(*models.Log)
 	assert.True(t, ok)
+}
+
+type timerMetricInput struct{}
+
+func (*timerMetricInput) Init(pipeline.Context) (int, error) { return 0, nil }
+func (*timerMetricInput) Description() string                { return "timer counter regression" }
+func (*timerMetricInput) Read(ctx pipeline.PipelineContext) error {
+	event := models.NewSingleValueMetric("timer_metric", models.MetricTypeCounter, models.NewTags(), time.Now().UnixNano(), 1)
+	ctx.Collector().Collect(models.NewGroup(models.NewMetadata(), models.NewTags()), event)
+	return nil
+}
+
+func TestPluginV2Runner_MetricTimerRecordsSourceCounters(t *testing.T) {
+	ctx := &ContextImp{}
+	ctx.InitContext("project", "store", "timer-pipeline")
+	output := helper.NewObservePipelineContext(4)
+	runner := &pluginv2Runner{
+		LogstoreConfig:   &LogstoreConfig{Context: ctx, GlobalConfig: &config.GlobalConfig{}},
+		InputPipeContext: output,
+	}
+	require.NoError(t, runner.addMetricInput(&pipeline.PluginMeta{PluginID: "1", PluginType: "timer_metric"}, &timerMetricInput{}, int(time.Hour/time.Millisecond)))
+	require.Same(t, runner.MetricPlugins[0], runner.TimerRunner[0].state)
+	// A non-input timer must not be mistaken for a failing input plugin.
+	runner.TimerRunner = append(runner.TimerRunner, &timerRunner{state: struct{}{}})
+	control := pipeline.NewAsyncControl()
+	defer control.WaitCancel()
+	runner.runMetricInput(control)
+	select {
+	case group := <-output.Collector().Observe():
+		require.Len(t, group.Events, 1)
+	case <-time.After(3 * time.Second):
+		t.Fatal("metric input timer did not publish an event")
+	}
+	records := ctx.ExportMetricRecords()
+	require.Len(t, records, 2)
+	for _, record := range records {
+		counters, category := parseExportedRecord(t, record)
+		require.Contains(t, []string{selfmonitor.MetricLabelValueMetricCategoryPlugin, selfmonitor.MetricLabelValueMetricCategoryPluginSource}, category)
+		assert.Equal(t, "1.0000", counters[selfmonitor.MetricPluginOutEventsTotal])
+		assert.Equal(t, "1.0000", counters[selfmonitor.MetricPluginOutEventGroupsTotal])
+	}
 }

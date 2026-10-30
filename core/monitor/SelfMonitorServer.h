@@ -91,6 +91,7 @@ private:
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class InputInternalAlarmsUnittest;
     friend class InputInternalMetricsUnittest;
+    friend class SelfMonitorServerUnittest;
 #endif
 };
 
