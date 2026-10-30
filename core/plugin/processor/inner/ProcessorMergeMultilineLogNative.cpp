@@ -22,6 +22,7 @@
 
 #include "app_config/AppConfig.h"
 #include "common/ParamExtractor.h"
+#include "file_server/reader/LogFileReader.h"
 #include "logger/Logger.h"
 #include "models/LogEvent.h"
 #include "monitor/metric_constants/MetricConstants.h"
@@ -59,6 +60,8 @@ bool ProcessorMergeMultilineLogNative::Init(const Json::Value& config) {
                            mContext->GetRegion());
     } else if (mergeType == "flag") {
         mMergeType = MergeType::BY_FLAG;
+    } else if (mergeType == "json") {
+        mMergeType = MergeType::BY_JSON;
     } else if (mergeType == "regex") {
         if (!mMultiline.Init(config, *mContext, sName)) {
             return false;
@@ -90,6 +93,8 @@ void ProcessorMergeMultilineLogNative::Process(PipelineEventGroup& logGroup) {
         // If there is no part log in the logGroup, this part of the logic does not need to be executed.
         MergeLogsByFlag(logGroup);
         logGroup.DelMetadata(EventGroupMetaKey::HAS_PART_LOG);
+    } else if (mMergeType == MergeType::BY_JSON) {
+        MergeLogsByJson(logGroup);
     }
 }
 
@@ -116,6 +121,9 @@ void ProcessorMergeMultilineLogNative::MergeLogsByFlag(PipelineEventGroup& logGr
     std::vector<LogEvent*> events;
     bool isPartialLog = false;
     size_t begin = 0;
+    size_t accumulatedSize = 0;
+    size_t maxSize = mMaxMergeBlockSize > 0 ? mMaxMergeBlockSize : LogFileReader::BUFFER_SIZE;
+    StringView logPath = logGroup.GetMetadata(EventGroupMetaKey::LOG_FILE_PATH_RESOLVED);
     for (size_t cur = 0; cur < sourceEvents.size(); ++cur) {
         if (!IsSupportedEvent(sourceEvents[cur])) {
             if (events.empty()) {
@@ -132,6 +140,7 @@ void ProcessorMergeMultilineLogNative::MergeLogsByFlag(PipelineEventGroup& logGr
             continue;
         }
         events.emplace_back(sourceEvent);
+        accumulatedSize += sourceEvent->GetContent(mSourceKey).size();
         if (isPartialLog) {
             // case: p p p ... p(last) notP(cur)
             if (!sourceEvent->HasContent(PartLogFlag)) {
@@ -139,6 +148,16 @@ void ProcessorMergeMultilineLogNative::MergeLogsByFlag(PipelineEventGroup& logGr
                 sourceEvents[size++] = std::move(sourceEvents[begin]);
                 begin = cur + 1;
                 isPartialLog = false;
+                accumulatedSize = 0;
+            } else if (accumulatedSize > maxSize) {
+                // 单个拆片块累积超过工作缓冲区上限(max_read_buffer_size),强制切分:
+                // 输出当前块,后续拆片作为新块继续拼接。拆片间无分隔符,拼接后仍与原始行逐字节一致(数据不丢)。
+                MergeEvents(events, false);
+                sourceEvents[size++] = std::move(sourceEvents[begin]);
+                begin = cur + 1;
+                isPartialLog = false;
+                accumulatedSize = 0;
+                HandleMergeSizeExceeded(sourceEvents[size - 1].Cast<LogEvent>().GetContent(mSourceKey), logPath);
             }
         } else {
             if (sourceEvent->HasContent(PartLogFlag)) {
@@ -148,6 +167,7 @@ void ProcessorMergeMultilineLogNative::MergeLogsByFlag(PipelineEventGroup& logGr
                 MergeEvents(events, false);
                 sourceEvents[size++] = std::move(sourceEvents[begin]);
                 begin = cur + 1;
+                accumulatedSize = 0;
             }
         }
     }
@@ -172,7 +192,25 @@ void ProcessorMergeMultilineLogNative::MergeLogsByRegex(PipelineEventGroup& logG
     std::vector<LogEvent*> events;
     std::string exception;
     bool isPartialLog = false;
+    size_t accumulatedSize = 0;
+    size_t maxSize = mMaxMergeBlockSize > 0 ? mMaxMergeBlockSize : LogFileReader::BUFFER_SIZE;
     StringView logPath = logGroup.GetMetadata(EventGroupMetaKey::LOG_FILE_PATH_RESOLVED);
+
+    // 累积事件并统计当前合并块大小,与超限强制切分逻辑配合。
+    auto pushEvent = [&](LogEvent* e) {
+        events.emplace_back(e);
+        accumulatedSize += e->GetContent(mSourceKey).size();
+    };
+    // 强制切分:当前逻辑块累积超过工作缓冲区上限(max_read_buffer_size)时,把已累积部分合并输出,
+    // 后续行仍作为同一逻辑块的延续继续累积(cut and continue)。结构可能被破坏,但数据不丢。
+    auto forceSplit = [&](size_t cur) {
+        MergeEvents(events, true);
+        sourceEvents[newSize++] = std::move(sourceEvents[begin]);
+        accumulatedSize = 0;
+        begin = cur + 1;
+        HandleMergeSizeExceeded(sourceEvents[newSize - 1].Cast<LogEvent>().GetContent(mSourceKey), logPath);
+    };
+
     if (mMultiline.GetStartPatternReg() == nullptr && mMultiline.GetContinuePatternReg() == nullptr
         && mMultiline.GetEndPatternReg() != nullptr) {
         // if only end pattern is given, then it will stick to this state
@@ -224,7 +262,7 @@ void ProcessorMergeMultilineLogNative::MergeLogsByRegex(PipelineEventGroup& logG
                 regex = *mMultiline.GetContinuePatternReg();
             }
             if (BoostRegexSearch(sourceVal.data(), sourceVal.size(), regex, exception)) {
-                events.emplace_back(sourceEvent);
+                pushEvent(sourceEvent);
                 begin = cur;
                 isPartialLog = true;
             } else if (mMultiline.GetEndPatternReg() != nullptr && mMultiline.GetStartPatternReg() == nullptr
@@ -244,12 +282,15 @@ void ProcessorMergeMultilineLogNative::MergeLogsByRegex(PipelineEventGroup& logG
             if (mMultiline.GetContinuePatternReg() != nullptr
                 && BoostRegexSearch(
                     sourceVal.data(), sourceVal.size(), *mMultiline.GetContinuePatternReg(), exception)) {
-                events.emplace_back(sourceEvent);
+                pushEvent(sourceEvent);
+                if (accumulatedSize > maxSize) {
+                    forceSplit(cur);
+                }
                 continue;
             }
             if (mMultiline.GetEndPatternReg() != nullptr) {
                 // case: start + end or continue + end or end
-                events.emplace_back(sourceEvent);
+                pushEvent(sourceEvent);
                 if (mMultiline.GetContinuePatternReg() != nullptr) {
                     // current line is not matched against the continue pattern, so the end pattern will decide if
                     // the current log is a match or not
@@ -257,9 +298,11 @@ void ProcessorMergeMultilineLogNative::MergeLogsByRegex(PipelineEventGroup& logG
                             sourceVal.data(), sourceVal.size(), *mMultiline.GetEndPatternReg(), exception)) {
                         MergeEvents(events, true);
                         sourceEvents[newSize++] = std::move(sourceEvents[begin]);
+                        accumulatedSize = 0;
                     } else {
                         HandleUnmatchLogs(sourceEvents, newSize, begin, cur, logPath);
                         events.clear();
+                        accumulatedSize = 0;
                     }
                     isPartialLog = false;
                 } else {
@@ -268,6 +311,7 @@ void ProcessorMergeMultilineLogNative::MergeLogsByRegex(PipelineEventGroup& logG
                             sourceVal.data(), sourceVal.size(), *mMultiline.GetEndPatternReg(), exception)) {
                         MergeEvents(events, true);
                         sourceEvents[newSize++] = std::move(sourceEvents[begin]);
+                        accumulatedSize = 0;
                         if (mMultiline.GetStartPatternReg() != nullptr) {
                             isPartialLog = false;
                         } else {
@@ -283,18 +327,20 @@ void ProcessorMergeMultilineLogNative::MergeLogsByRegex(PipelineEventGroup& logG
                     // case: start
                     if (!BoostRegexSearch(
                             sourceVal.data(), sourceVal.size(), *mMultiline.GetStartPatternReg(), exception)) {
-                        events.emplace_back(sourceEvent);
+                        pushEvent(sourceEvent);
                     } else {
                         MergeEvents(events, true);
                         sourceEvents[newSize++] = std::move(sourceEvents[begin]);
+                        accumulatedSize = 0;
                         begin = cur;
-                        events.emplace_back(sourceEvent);
+                        pushEvent(sourceEvent);
                     }
                 } else {
                     // case: start + continue
                     // continue pattern is given, but current line is not matched against the continue pattern
                     MergeEvents(events, true);
                     sourceEvents[newSize++] = std::move(sourceEvents[begin]);
+                    accumulatedSize = 0;
                     if (!BoostRegexSearch(
                             sourceVal.data(), sourceVal.size(), *mMultiline.GetStartPatternReg(), exception)) {
                         // when no end pattern is given, the only chance to enter unmatched state is when both start
@@ -304,10 +350,14 @@ void ProcessorMergeMultilineLogNative::MergeLogsByRegex(PipelineEventGroup& logG
                         isPartialLog = false;
                     } else {
                         begin = cur;
-                        events.emplace_back(sourceEvent);
+                        pushEvent(sourceEvent);
                     }
                 }
             }
+        }
+        // 强制切分:当前逻辑块仍在累积(isPartialLog)但已超过工作缓冲区上限时,切出一段(cut and continue)。
+        if (isPartialLog && !events.empty() && accumulatedSize > maxSize) {
+            forceSplit(cur);
         }
     }
     // when in unmatched state, the unmatched log is handled one by one, so there is no need for additional handle
@@ -380,6 +430,127 @@ void ProcessorMergeMultilineLogNative::HandleUnmatchLogs(
             logEvents[newSize++] = std::move(logEvents[i]);
         }
     }
+}
+
+void ProcessorMergeMultilineLogNative::HandleMergeSizeExceeded(StringView mergedContent, StringView logPath) {
+    if (!AlarmManager::GetInstance()->IsLowLevelAlarmValid()) {
+        return;
+    }
+    LOG_WARNING(mContext->GetLogger(),
+                ("merged log block exceeds max_read_buffer_size, forced to split",
+                 "")("first 1KB", mergedContent.substr(0, 1024).to_string())("filepath", logPath.to_string())(
+                    "processor", sName)("config", mContext->GetConfigName()));
+    mContext->GetAlarm().SendAlarmWarning(
+        SPLIT_LOG_FAIL_ALARM,
+        "merged log block exceeds max_read_buffer_size and forced to split. processor: " + sName
+            + " config: " + mContext->GetConfigName(),
+        mContext->GetRegion(),
+        mContext->GetProjectName(),
+        mContext->GetConfigName(),
+        mContext->GetLogstoreName());
+}
+
+void ProcessorMergeMultilineLogNative::MergeLogsByJson(PipelineEventGroup& logGroup) {
+    auto& sourceEvents = logGroup.MutableEvents();
+    size_t newSize = 0;
+    std::vector<LogEvent*> events;
+    size_t begin = 0;
+    int braceDepth = 0;
+    bool inQuote = false;
+    bool pendingEscape = false;
+    size_t accumulatedSize = 0;
+    size_t maxSize = mMaxMergeBlockSize > 0 ? mMaxMergeBlockSize : LogFileReader::BUFFER_SIZE;
+    StringView logPath = logGroup.GetMetadata(EventGroupMetaKey::LOG_FILE_PATH_RESOLVED);
+
+    for (size_t cur = 0; cur < sourceEvents.size(); ++cur) {
+        if (!IsSupportedEvent(sourceEvents[cur])) {
+            if (events.empty()) {
+                begin = cur;
+            }
+            for (size_t i = begin; i < sourceEvents.size(); ++i) {
+                sourceEvents[newSize++] = std::move(sourceEvents[i]);
+            }
+            sourceEvents.resize(newSize);
+            return;
+        }
+        LogEvent* sourceEvent = &sourceEvents[cur].Cast<LogEvent>();
+        if (sourceEvent->Empty()) {
+            continue;
+        }
+
+        StringView content = sourceEvent->GetContent(mSourceKey);
+
+        for (size_t i = 0; i < content.size(); ++i) {
+            if (pendingEscape) {
+                pendingEscape = false;
+                continue;
+            }
+            char c = content[i];
+            switch (c) {
+                case '\\':
+                    if (inQuote) {
+                        if (i + 1 < content.size()) {
+                            ++i;
+                        } else {
+                            pendingEscape = true;
+                        }
+                    }
+                    break;
+                case '"':
+                    inQuote = !inQuote;
+                    break;
+                case '{':
+                    if (!inQuote) {
+                        braceDepth++;
+                    }
+                    break;
+                case '}':
+                    if (!inQuote) {
+                        braceDepth--;
+                    }
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        if (events.empty()) {
+            begin = cur;
+        }
+        events.emplace_back(sourceEvent);
+        accumulatedSize += content.size();
+
+        if (braceDepth <= 0) {
+            if (braceDepth < 0) {
+                LOG_DEBUG(
+                    mContext->GetLogger(),
+                    ("JSON brace depth went negative, possible malformed input", "")("braceDepth", braceDepth)(
+                        "filepath", logPath.to_string())("processor", sName)("config", mContext->GetConfigName()));
+            }
+            MergeEvents(events, true);
+            sourceEvents[newSize++] = std::move(sourceEvents[begin]);
+            events.clear();
+            braceDepth = 0;
+            inQuote = false;
+            pendingEscape = false;
+            accumulatedSize = 0;
+        } else if (accumulatedSize > maxSize) {
+            MergeEvents(events, true);
+            sourceEvents[newSize++] = std::move(sourceEvents[begin]);
+            events.clear();
+            braceDepth = 0;
+            inQuote = false;
+            pendingEscape = false;
+            accumulatedSize = 0;
+            HandleMergeSizeExceeded(sourceEvents[newSize - 1].Cast<LogEvent>().GetContent(mSourceKey), logPath);
+        }
+    }
+
+    if (!events.empty()) {
+        MergeEvents(events, true);
+        sourceEvents[newSize++] = std::move(sourceEvents[begin]);
+    }
+    sourceEvents.resize(newSize);
 }
 
 } // namespace logtail
