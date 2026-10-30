@@ -46,3 +46,65 @@ Feature: input internal metrics to prometheus
     """
     __name__: agent_cpu
     """
+
+  @e2e @docker-compose
+  Scenario: TestGoSelfMonitorCounterPrometheusRemoteWrite
+    Given {docker-compose} environment
+    Given subcribe data from {prometheus} with config
+    """
+    prometheus_url: http://prometheus:9090
+    query: plugin_out_events_total{pipeline_name="go-self-monitor-source",plugin_type="metric_mock"} > 0
+    """
+    Given {go-self-monitor-source} local config as below
+    """
+    enable: true
+    global:
+      StructureType: v2
+      InputIntervalMs: 100
+    inputs:
+      - Type: metric_mock
+    flushers:
+      - Type: flusher_prometheus
+        Endpoint: "http://prometheus:9090/api/v1/write"
+    """
+    Given {go-self-monitor-metrics} local config as below
+    """
+    enable: true
+    global:
+      StructureType: v2
+    inputs:
+      - Type: input_internal_metrics
+        Agent:
+          Enable: false
+        Runner:
+          Enable: false
+        Pipeline:
+          Enable: false
+        PluginSource:
+          Enable: false
+        Plugin:
+          Enable: true
+          Interval: 1
+        Component:
+          Enable: false
+    flushers:
+      - Type: flusher_prometheus
+        Endpoint: "http://prometheus:9090/api/v1/write"
+        SeriesLimit: 1000
+        Compression: "snappy"
+        Concurrency: 1
+        QueueCapacity: 4096
+        DropEventWhenQueueFull: false
+    """
+    Given loongcollector depends on containers {["prometheus"]}
+    When start docker-compose {input_internal_metrics_prometheus}
+    # SelfMonitorServer exports once per 60-second tick; query only the Go source.
+    Then wait {90} seconds
+    Then there is at least {1} logs
+    Then the log fields match kv
+    """
+    __name__: plugin_out_events_total
+    pipeline_name: go-self-monitor-source
+    plugin_type: metric_mock
+    """
+    Then the log field {__value__} greater than or equal to {1}
