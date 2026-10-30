@@ -36,6 +36,8 @@
 #include "plugin/flusher/sls/PackIdManager.h"
 #include "plugin/flusher/sls/SLSClientManager.h"
 #include "plugin/flusher/sls/SLSConstant.h"
+#include "protobuf/models/ProtocolConversion.h"
+#include "protobuf/models/pipeline_event_group.pb.h"
 #include "unittest/Unittest.h"
 #ifdef __ENTERPRISE__
 #include "config/provider/EnterpriseConfigProvider.h"
@@ -80,6 +82,8 @@ public:
     void TestSerializeAndPushAllEmptyGroups();
     void TestSerializeAndPushGroupListSerializeFail();
     void OnGoPipelineSend();
+    void TestSendPipelineEventGroup();
+    void TestSendPipelineEventGroupProfile();
 
 protected:
     static void SetUpTestCase() {
@@ -2145,6 +2149,131 @@ void FlusherSLSUnittest::OnGoPipelineSend() {
     }
 }
 
+
+void FlusherSLSUnittest::TestSendPipelineEventGroup() {
+    Json::Value config, optionalGoPipeline;
+    config["Type"] = "flusher_sls";
+    config["Project"] = "test_project";
+    config["Logstore"] = "test_logstore";
+    config["Region"] = "test_region";
+    config["Endpoint"] = "test_region.log.aliyuncs.com";
+    FlusherSLS flusher;
+    flusher.SetContext(ctx);
+    flusher.CreateMetricsRecordRef(FlusherSLS::sName, "1");
+    ASSERT_TRUE(flusher.Init(config, optionalGoPipeline));
+    flusher.CommitMetricsRecordRef();
+    flusher.mShardHashKeys = {"route"};
+    for (int type = 0; type < 3; ++type) {
+        PipelineEventGroup group(make_shared<SourceBuffer>());
+        group.SetMetadata(EventGroupMetaKey::SOURCE_ID, string("source-id"));
+        group.SetTag(LOG_RESERVED_KEY_SOURCE, "127.0.0.1");
+        group.SetTag(LOG_RESERVED_KEY_TOPIC, "go-topic");
+        group.SetTag(LOG_RESERVED_KEY_MACHINE_UUID, "go-uuid");
+        group.SetTag(string("route"), string("configured-route"));
+        if (type == 0) {
+            auto* log = group.AddLogEvent();
+            log->SetTimestamp(1700000000, 123);
+            log->SetContent(string("content"), string("go-log"));
+        } else if (type == 1) {
+            auto* metric = group.AddMetricEvent();
+            metric->SetTimestamp(1700000000);
+            metric->SetName("go_counter");
+            metric->SetValue(UntypedSingleValue{42});
+        } else {
+            auto* span = group.AddSpanEvent();
+            span->SetTimestamp(1700000000);
+            span->SetName("go-span");
+            span->SetTraceId("trace-id");
+            span->SetSpanId("span-id");
+        }
+        models::PipelineEventGroup pb;
+        string error;
+        ASSERT_TRUE(TransferPipelineEventGroupToPB(group, pb, error)) << error;
+        // A per-call override must not leak into the next request.
+        ASSERT_TRUE(flusher.Send(pb, type == 0 ? "explicit-hash" : "", type == 0 ? "override" : ""));
+        vector<SenderQueueItem*> items;
+        SenderQueueManager::GetInstance()->GetAvailableItems(items, 80);
+        ASSERT_EQ(1U, items.size());
+        auto* item = static_cast<SLSSenderQueueItem*>(items[0]);
+        EXPECT_EQ(type == 0 ? "override" : "test_logstore", item->mLogstore);
+        BatchedEvents tags;
+        tags.mTags.Insert("route", "configured-route");
+        EXPECT_EQ(type == 0 ? "explicit-hash" : flusher.GetShardHashKey(tags), item->mShardHashKey);
+        EXPECT_EQ(RawDataType::EVENT_GROUP, item->mType);
+        string data;
+        data.resize(item->mRawSize);
+        ASSERT_TRUE(flusher.mCompressor->UnCompress(item->mData, data, error)) << error;
+        sls_logs::LogGroup result;
+        ASSERT_TRUE(result.ParseFromString(data));
+        ASSERT_EQ(1, result.logs_size());
+        EXPECT_EQ("go-topic", result.topic());
+        EXPECT_EQ("127.0.0.1", result.source());
+        EXPECT_EQ("go-uuid", result.machineuuid());
+        map<string, string> contents;
+        for (const auto& content : result.logs(0).contents()) {
+            contents[content.key()] = content.value();
+        }
+        if (type == 0) {
+            EXPECT_EQ("go-log", contents["content"]);
+        } else if (type == 1) {
+            EXPECT_EQ("go_counter", contents["__name__"]);
+            EXPECT_EQ("42", contents["__value__"]);
+        } else {
+            EXPECT_NE(string::npos, data.find("go-span"));
+            EXPECT_NE(string::npos, data.find("trace-id"));
+        }
+        bool packId = false;
+        for (const auto& tag : result.logtags()) {
+            if (tag.key() == "__pack_id__") {
+                packId = true;
+            }
+        }
+        EXPECT_TRUE(packId);
+        SenderQueueManager::GetInstance()->RemoveItem(item->mQueueKey, item);
+    }
+    EXPECT_EQ("test_logstore", flusher.mLogstore);
+    models::PipelineEventGroup empty;
+    EXPECT_FALSE(flusher.Send(empty, ""));
+    empty.mutable_logs()->add_events(); // Empty log serializes to no usable SLS payload.
+    EXPECT_FALSE(flusher.Send(empty, ""));
+}
+
+void FlusherSLSUnittest::TestSendPipelineEventGroupProfile() {
+    FlusherSLS flusher;
+    flusher.mProject = "profile-project";
+    flusher.mLogstore = "logtail_containers";
+    models::PipelineEventGroup pb;
+    auto* log = pb.mutable_logs()->add_events();
+    log->set_timestamp(1700000000000000000ULL);
+    auto* content = log->add_contents();
+    content->set_key("container");
+    content->set_value("profile-container");
+    ASSERT_FALSE(flusher.HasContext());
+    ASSERT_TRUE(flusher.Send(pb, "profile-hash", "profile-override"));
+    vector<SenderQueueItem*> items;
+    SenderQueueManager::GetInstance()->GetAvailableItems(items, 80);
+    ASSERT_EQ(1U, items.size());
+    auto* item = static_cast<SLSSenderQueueItem*>(items[0]);
+    EXPECT_EQ("profile-override", item->mLogstore);
+    EXPECT_EQ("profile-hash", item->mShardHashKey);
+    sls_logs::LogGroup result;
+    ASSERT_TRUE(result.ParseFromString(item->mData));
+    ASSERT_EQ(1, result.logs_size());
+    EXPECT_EQ("profile-container", result.logs(0).contents(0).value());
+    SenderQueueManager::GetInstance()->RemoveItem(item->mQueueKey, item);
+    // Without configured keys or an explicit hash, preserve the empty value.
+    ASSERT_TRUE(flusher.Send(pb, ""));
+    items.clear();
+    SenderQueueManager::GetInstance()->GetAvailableItems(items, 80);
+    ASSERT_EQ(1U, items.size());
+    item = static_cast<SLSSenderQueueItem*>(items[0]);
+    EXPECT_TRUE(item->mShardHashKey.empty());
+    EXPECT_EQ("logtail_containers", item->mLogstore);
+    SenderQueueManager::GetInstance()->RemoveItem(item->mQueueKey, item);
+}
+
+UNIT_TEST_CASE(FlusherSLSUnittest, TestSendPipelineEventGroup)
+UNIT_TEST_CASE(FlusherSLSUnittest, TestSendPipelineEventGroupProfile)
 UNIT_TEST_CASE(FlusherSLSUnittest, OnSuccessfulInit)
 UNIT_TEST_CASE(FlusherSLSUnittest, OnFailedInit)
 UNIT_TEST_CASE(FlusherSLSUnittest, OnPipelineUpdate)

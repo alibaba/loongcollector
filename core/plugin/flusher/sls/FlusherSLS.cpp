@@ -36,6 +36,7 @@
 #include "plugin/flusher/sls/SLSResponse.h"
 #include "plugin/flusher/sls/SLSUtil.h"
 #include "plugin/flusher/sls/SendResult.h"
+#include "protobuf/models/ProtocolConversion.h"
 #include "provider/Provider.h"
 #include "runner/FlusherRunner.h"
 #include "sls_logs.pb.h"
@@ -944,11 +945,53 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
 #endif
 }
 
+bool FlusherSLS::Send(const models::PipelineEventGroup& pbGroup, const string& shardHashKey, const string& logstore) {
+    PipelineEventGroup group(make_shared<SourceBuffer>());
+    string errorMsg;
+    if (!TransferPBToPipelineEventGroup(pbGroup, group, errorMsg)) {
+        LOG_WARNING(sLogger, ("failed to convert PipelineEventGroup PB", errorMsg));
+        return false;
+    }
+    BatchedEvents batch(std::move(group.MutableEvents()),
+                        std::move(group.GetSizedTags()),
+                        std::move(group.GetSourceBuffer()),
+                        group.GetMetadata(EventGroupMetaKey::SOURCE_ID),
+                        std::move(group.GetExactlyOnceCheckpoint()));
+    // Resolve routing before serialization moves the batch. Never change the
+    // shared flusher's configuration for a per-call override.
+    string hash = shardHashKey;
+    if (hash.empty() && !mShardHashKeys.empty()) {
+        hash = GetShardHashKey(batch);
+    }
+    AddPackId(batch);
+    string data;
+    if (mGroupSerializer) {
+        if (!mGroupSerializer->DoSerialize(std::move(batch), data, errorMsg)) {
+            LOG_WARNING(sLogger, ("failed to serialize PipelineEventGroup PB", errorMsg));
+            return false;
+        }
+    } else if (!HasContext()) {
+        // The container profile flusher is not initialized as a pipeline plugin.
+        SLSEventGroupSerializer serializer(this);
+        if (!serializer.DoSerialize(std::move(batch), data, errorMsg)) {
+            LOG_WARNING(sLogger, ("failed to serialize profile PipelineEventGroup PB", errorMsg));
+            return false;
+        }
+    } else {
+        return false;
+    }
+    return Send(std::move(data), hash, logstore);
+}
+
 bool FlusherSLS::Send(string&& data, const string& shardHashKey, const string& logstore) {
     string compressedData;
     if (mCompressor) {
         string errorMsg;
         if (!mCompressor->DoCompress(data, compressedData, errorMsg)) {
+            if (!HasContext()) {
+                LOG_WARNING(sLogger, ("failed to compress profile data", errorMsg));
+                return false;
+            }
             LOG_WARNING(mContext->GetLogger(),
                         ("failed to compress data",
                          errorMsg)("action", "discard data")("plugin", sName)("config", mContext->GetConfigName()));

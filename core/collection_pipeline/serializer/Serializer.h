@@ -47,6 +47,10 @@ template <typename T>
 class Serializer {
 public:
     Serializer(Flusher* f) : mFlusher(f) {
+        // Profile flushers have no pipeline context or component metric labels.
+        if (!f->HasContext()) {
+            return;
+        }
         WriteMetrics::GetInstance()->CreateMetricsRecordRef(
             mMetricsRecordRef,
             MetricCategory::METRIC_CATEGORY_COMPONENT,

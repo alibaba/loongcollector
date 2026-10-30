@@ -246,9 +246,10 @@ public:
                         int shardHashSize);
 
     // SendPipelineEventGroup is the PipelineEventGroup-PB counterpart of SendPbV2.
-    // It coexists with SendPb/SendPbV2 (C1); C3 will honor logstore/shardHash on a
-    // dedicated FlusherSLS byte path. Return codes match SendPbV2: 0 ok, -1 send
-    // or parse failure, -2 config not found.
+    // It coexists with legacy SendPb/SendPbV2 and forwards each call's routing
+    // overrides to the typed FlusherSLS path. Return codes match SendPbV2:
+    // 0 accepted (including disabled profile reporting), -1 parse/send failure,
+    // -2 config missing or without an SLS flusher.
     static int SendPipelineEventGroup(const char* configName,
                                       int32_t configNameSize,
                                       const char* logstore,
