@@ -282,7 +282,10 @@ private:
     StopBuiltInModulesFun mStopBuiltInModulesFun;
     StartFun mStartFun;
     volatile bool mPluginValid;
+    // The fixed container reporting path owns its context for the flusher lifetime.
+    logtail::CollectionPipelineContext mPluginContainerContext;
     logtail::FlusherSLS mPluginContainerConfig;
+    std::mutex mPluginContainerMutex;
     ProcessPipelineEventGroupFun mProcessPipelineEventGroupFun;
     GetContainerMetaFun mGetContainerMetaFun;
     GetAllContainerMetaFun mGetAllContainerMetaFun;

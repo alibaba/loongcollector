@@ -322,6 +322,32 @@ TEST_F(GoPipelineBridgeUnittest, SendPipelineEventGroupContainerConfigQueuesPayl
     }
 }
 
+
+TEST_F(GoPipelineBridgeUnittest, SendPbContainerConfigSharesProfileContext) {
+    sls_logs::LogGroup group;
+    auto* log = group.add_logs();
+    log->set_time(1700000000);
+    auto* content = log->add_contents();
+    content->set_key("container");
+    content->set_value("legacy-container");
+    string data = group.SerializeAsString();
+    GetProfileSender()->SetDefaultProfileProjectName("bridge-profile-project");
+    EXPECT_EQ(0,
+              LogtailPlugin::SendPbV2(
+                  "logtail_containers", 18, "", 0, const_cast<char*>(data.data()), data.size(), 1, "", 0));
+    vector<SenderQueueItem*> items;
+    SenderQueueManager::GetInstance()->GetAvailableItems(items, 80);
+    EXPECT_EQ(1U, items.size());
+    if (items.size() == 1) {
+        auto* item = static_cast<SLSSenderQueueItem*>(items[0]);
+        string output(item->mRawSize, 0), error;
+        EXPECT_TRUE(UncompressContainer(item->mData, output, error));
+        EXPECT_EQ(data, output);
+        EXPECT_EQ("logtail_containers", item->mLogstore);
+        SenderQueueManager::GetInstance()->RemoveItem(item->mQueueKey, item);
+    }
+}
+
 } // namespace logtail
 
 UNIT_TEST_MAIN

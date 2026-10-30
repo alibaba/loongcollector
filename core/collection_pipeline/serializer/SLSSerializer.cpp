@@ -172,7 +172,7 @@ bool SLSEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, stri
         return false;
     }
 
-    bool enableNs = mFlusher->HasContext() && mFlusher->GetContext().GetGlobalConfig().mEnableTimestampNanosecond;
+    bool enableNs = mFlusher->GetContext().GetGlobalConfig().mEnableTimestampNanosecond;
 
     // caculate serialized logGroup size first, where some critical results can be cached
     vector<size_t> logSZ(group.mEvents.size());
@@ -278,7 +278,7 @@ void SLSEventGroupSerializer::CalculateMetricEventSize(
         if (e.GetTimestamp() < 1e9) {
             LOG_WARNING(sLogger,
                         ("metric event timestamp is less than 1e9", "discard event")("timestamp", e.GetTimestamp())(
-                            "config", (mFlusher->HasContext() ? mFlusher->GetContext().GetConfigName() : string())));
+                            "config", mFlusher->GetContext().GetConfigName()));
             continue;
         }
         if (e.Is<UntypedSingleValue>()) {
@@ -299,10 +299,9 @@ void SLSEventGroupSerializer::CalculateMetricEventSize(
             logGroupSZ += GetLogSize(contentSZ, false, logSZ[i]);
         } else if (e.Is<UntypedMultiDoubleValues>()) {
             if (e.GetValue<UntypedMultiDoubleValues>()->ValuesSize() == 0) {
-                LOG_WARNING(
-                    sLogger,
-                    ("metric event multi value is empty", "discard event")(
-                        "config", (mFlusher->HasContext() ? mFlusher->GetContext().GetConfigName() : string())));
+                LOG_WARNING(sLogger,
+                            ("metric event multi value is empty",
+                             "discard event")("config", mFlusher->GetContext().GetConfigName()));
                 continue;
             }
             size_t contentSZ = 0;
@@ -320,9 +319,9 @@ void SLSEventGroupSerializer::CalculateMetricEventSize(
             }
             logGroupSZ += GetLogSize(contentSZ, false, logSZ[i]);
         } else {
-            LOG_WARNING(sLogger,
-                        ("invalid metric event type", "discard event")(
-                            "config", (mFlusher->HasContext() ? mFlusher->GetContext().GetConfigName() : string())));
+            LOG_WARNING(
+                sLogger,
+                ("invalid metric event type", "discard event")("config", mFlusher->GetContext().GetConfigName()));
             continue;
         }
     }
@@ -437,8 +436,7 @@ void SLSEventGroupSerializer::SerializeMetricEvent(LogGroupSerializer& serialize
             if (metricEventContentCache[i].mMetricEventContentCache.empty()) {
                 LOG_ERROR(sLogger,
                           ("metric event single value size mismatch", "should never happen")(
-                              "config", (mFlusher->HasContext() ? mFlusher->GetContext().GetConfigName() : string()))(
-                              "expected", 1)("actual", 0));
+                              "config", mFlusher->GetContext().GetConfigName())("expected", 1)("actual", 0));
                 continue;
             }
             serializer.StartToAddLog(logSZ[i]);
@@ -456,8 +454,7 @@ void SLSEventGroupSerializer::SerializeMetricEvent(LogGroupSerializer& serialize
             if (metricEventContentCache[i].mMetricEventContentCache.size() != multiValue->ValuesSize()) {
                 LOG_ERROR(sLogger,
                           ("metric event multi value size mismatch", "should never happen")(
-                              "config", (mFlusher->HasContext() ? mFlusher->GetContext().GetConfigName() : string()))(
-                              "expected", multiValue->ValuesSize())(
+                              "config", mFlusher->GetContext().GetConfigName())("expected", multiValue->ValuesSize())(
                               "actual", metricEventContentCache[i].mMetricEventContentCache.size()));
                 continue;
             }

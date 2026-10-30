@@ -82,6 +82,9 @@ public:
 
     CompressType GetCompressType() const { return mCompressor ? mCompressor->GetCompressType() : CompressType::NONE; }
 
+    // Initialize the fixed container reporting endpoint without a native batcher.
+    bool InitForProfile(CollectionPipelineContext& context);
+
     // Go v2 batches are already formed. Preserve each call's routing overrides.
     bool
     Send(const models::PipelineEventGroup& group, const std::string& shardHashKey, const std::string& logstore = "");

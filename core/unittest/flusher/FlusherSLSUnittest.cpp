@@ -2248,7 +2248,8 @@ void FlusherSLSUnittest::TestSendPipelineEventGroupProfile() {
     auto* content = log->add_contents();
     content->set_key("container");
     content->set_value("profile-container");
-    ASSERT_FALSE(flusher.HasContext());
+    ASSERT_TRUE(flusher.InitForProfile(ctx));
+    ASSERT_TRUE(flusher.HasContext());
     ASSERT_TRUE(flusher.Send(pb, "profile-hash", "profile-override"));
     vector<SenderQueueItem*> items;
     SenderQueueManager::GetInstance()->GetAvailableItems(items, 80);

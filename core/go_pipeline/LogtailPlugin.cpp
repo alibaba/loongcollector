@@ -64,6 +64,7 @@ LogtailPlugin::LogtailPlugin() {
     mLoadGlobalConfigFun = NULL;
     mPluginValid = false;
     mPluginContainerConfig.mLogstore = "logtail_containers";
+    mPluginContainerContext.SetConfigName("logtail_containers");
     mPluginContainerConfig.mAliuid = STRING_FLAG(logtail_profile_aliuid);
     mPluginContainerConfig.mCompressor = CompressorFactory::GetInstance()->Create(CompressType::ZSTD);
 
@@ -249,12 +250,22 @@ int LogtailPlugin::SendPbV2(const char* configName,
     // LOG_DEBUG(sLogger, ("send pb", configNameStr)("pb size", pbSize)("lines", lines));
     FlusherSLS* pConfig = NULL;
     if (configNameStr == containerConfig->mLogstore) {
+        auto* plugin = LogtailPlugin::GetInstance();
+        lock_guard<mutex> lock(plugin->mPluginContainerMutex);
         pConfig = containerConfig;
         pConfig->mProject = GetProfileSender()->GetDefaultProfileProjectName();
         pConfig->mRegion = GetProfileSender()->GetDefaultProfileRegion();
         if (pConfig->mProject.empty()) {
             return 0;
         }
+        if (!pConfig->InitForProfile(plugin->mPluginContainerContext)) {
+            return -1;
+        }
+        string hash;
+        if (shardHashSize > 0 && shardHash != nullptr) {
+            hash.assign(shardHash, static_cast<size_t>(shardHashSize));
+        }
+        return pConfig->Send(string(pbBuffer, pbSize), hash, logstore) ? 0 : -1;
     } else {
         shared_ptr<CollectionPipeline> p = CollectionPipelineManager::GetInstance()->FindConfigByName(configNameStr);
         if (!p) {
@@ -304,6 +315,8 @@ int LogtailPlugin::SendPipelineEventGroup(const char* configName,
     }
 
     if (configNameStr == containerConfig->mLogstore) {
+        auto* plugin = LogtailPlugin::GetInstance();
+        lock_guard<mutex> lock(plugin->mPluginContainerMutex);
         containerConfig->mProject = GetProfileSender()->GetDefaultProfileProjectName();
         containerConfig->mRegion = GetProfileSender()->GetDefaultProfileRegion();
         if (containerConfig->mProject.empty()) {
@@ -313,6 +326,9 @@ int LogtailPlugin::SendPipelineEventGroup(const char* configName,
         string hash;
         if (shardHashSize > 0 && shardHash != nullptr) {
             hash.assign(shardHash, static_cast<size_t>(shardHashSize));
+        }
+        if (!containerConfig->InitForProfile(plugin->mPluginContainerContext)) {
+            return -1;
         }
         return containerConfig->Send(pbGroup, hash, logstore) ? 0 : -1;
     }

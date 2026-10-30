@@ -945,6 +945,19 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
 #endif
 }
 
+bool FlusherSLS::InitForProfile(CollectionPipelineContext& context) {
+    if (!mGroupSerializer) {
+        SetContext(context);
+        context.SetSLSInfo(this);
+        mGroupSerializer = make_unique<SLSEventGroupSerializer>(this);
+    }
+    // A fixed pipeline keeps one queue while the configured profile destination
+    // may change. SenderQueueItem carries each request's logstore override.
+    GenerateQueueKey(mLogstore);
+    return SenderQueueManager::GetInstance()->GetQueue(mQueueKey) != nullptr
+        || SenderQueueManager::GetInstance()->CreateQueue(mQueueKey, mPluginID, mLogstore, context, {});
+}
+
 bool FlusherSLS::Send(const models::PipelineEventGroup& pbGroup, const string& shardHashKey, const string& logstore) {
     PipelineEventGroup group(make_shared<SourceBuffer>());
     string errorMsg;
@@ -965,19 +978,8 @@ bool FlusherSLS::Send(const models::PipelineEventGroup& pbGroup, const string& s
     }
     AddPackId(batch);
     string data;
-    if (mGroupSerializer) {
-        if (!mGroupSerializer->DoSerialize(std::move(batch), data, errorMsg)) {
-            LOG_WARNING(sLogger, ("failed to serialize PipelineEventGroup PB", errorMsg));
-            return false;
-        }
-    } else if (!HasContext()) {
-        // The container profile flusher is not initialized as a pipeline plugin.
-        SLSEventGroupSerializer serializer(this);
-        if (!serializer.DoSerialize(std::move(batch), data, errorMsg)) {
-            LOG_WARNING(sLogger, ("failed to serialize profile PipelineEventGroup PB", errorMsg));
-            return false;
-        }
-    } else {
+    if (!mGroupSerializer || !mGroupSerializer->DoSerialize(std::move(batch), data, errorMsg)) {
+        LOG_WARNING(sLogger, ("failed to serialize PipelineEventGroup PB", errorMsg));
         return false;
     }
     return Send(std::move(data), hash, logstore);
@@ -988,10 +990,6 @@ bool FlusherSLS::Send(string&& data, const string& shardHashKey, const string& l
     if (mCompressor) {
         string errorMsg;
         if (!mCompressor->DoCompress(data, compressedData, errorMsg)) {
-            if (!HasContext()) {
-                LOG_WARNING(sLogger, ("failed to compress profile data", errorMsg));
-                return false;
-            }
             LOG_WARNING(mContext->GetLogger(),
                         ("failed to compress data",
                          errorMsg)("action", "discard data")("plugin", sName)("config", mContext->GetConfigName()));
