@@ -64,18 +64,22 @@ string JoinFile(const string& dir, const string& name) {
     return (filesystem::path(dir) / name).lexically_normal().string();
 }
 
-bool ExistsPath(const string& path) {
-    error_code ec;
-    return !path.empty() && filesystem::exists(path, ec);
-}
-
 bool ExistsDir(const string& path) {
     error_code ec;
     return !path.empty() && filesystem::is_directory(path, ec);
 }
 
-void AppendIfExists(Json::Value& filePaths, const string& path) {
-    if (ExistsPath(path)) {
+bool HasNonEmptyFile(const string& path) {
+    error_code ec;
+    if (path.empty() || !filesystem::is_regular_file(path, ec) || ec) {
+        return false;
+    }
+    const auto size = filesystem::file_size(path, ec);
+    return !ec && size > 0;
+}
+
+void AppendIfNonEmptyFile(Json::Value& filePaths, const string& path) {
+    if (HasNonEmptyFile(path)) {
         filePaths.append(path);
     }
 }
@@ -145,6 +149,39 @@ private:
 };
 
 const string ProcessorAgentLogTag::sName = "processor_agent_log_tag";
+
+class ProcessorAgentLogDropEmpty : public Processor {
+public:
+    static const string sName;
+
+    const string& Name() const override { return sName; }
+
+    bool Init(const Json::Value&) override { return true; }
+
+    void Process(PipelineEventGroup& logGroup) override {
+        auto& events = logGroup.MutableEvents();
+        size_t wIdx = 0;
+        for (size_t rIdx = 0; rIdx < events.size(); ++rIdx) {
+            bool keep = true;
+            if (events[rIdx].Is<LogEvent>()) {
+                keep = !TrimSpace(events[rIdx].Cast<LogEvent>().GetContent("content").to_string()).empty();
+            }
+            if (!keep) {
+                continue;
+            }
+            if (wIdx != rIdx) {
+                events[wIdx] = std::move(events[rIdx]);
+            }
+            ++wIdx;
+        }
+        events.resize(wIdx);
+    }
+
+protected:
+    bool IsSupportedEvent(const PipelineEventPtr& e) const override { return true; }
+};
+
+const string ProcessorAgentLogDropEmpty::sName = "processor_agent_log_drop_empty";
 
 class ProcessorAgentLogMicrotime : public Processor {
 public:
@@ -427,7 +464,7 @@ bool InputInternalAgentLogs::createStaticFileInput(size_t inputIdx,
     if (runtimeKind != RuntimeLogKind::None && !appendRuntimeLogProcessors(processors, runtimeKind)) {
         return false;
     }
-    return true;
+    return appendDropEmptyContentProcessor(processors);
 }
 
 bool InputInternalAgentLogs::appendAgentLogTagProcessor(vector<unique_ptr<ProcessorInstance>>& processors) {
@@ -437,6 +474,17 @@ bool InputInternalAgentLogs::appendAgentLogTagProcessor(vector<unique_ptr<Proces
     if (!mAliuid.empty()) {
         detail["Aliuid"] = mAliuid;
     }
+    if (!instance->Init(detail, *mContext)) {
+        return false;
+    }
+    processors.emplace_back(std::move(instance));
+    return true;
+}
+
+bool InputInternalAgentLogs::appendDropEmptyContentProcessor(vector<unique_ptr<ProcessorInstance>>& processors) {
+    auto instance = make_unique<ProcessorInstance>(new ProcessorAgentLogDropEmpty(),
+                                                   mContext->GetPipeline().GenNextPluginMeta(false));
+    Json::Value detail;
     if (!instance->Init(detail, *mContext)) {
         return false;
     }
@@ -544,30 +592,30 @@ Json::Value InputInternalAgentLogs::buildWholeSmallConfig() const {
     Json::Value cfg;
     cfg["Type"] = InputStaticFile::sName;
     Json::Value filePaths(Json::arrayValue);
-    AppendIfExists(filePaths, GetAgentAppInfoFile());
-    AppendIfExists(filePaths, GetInotifyWatcherDirsDumpFileName());
-    AppendIfExists(filePaths, GetCrashStackFileName());
+    AppendIfNonEmptyFile(filePaths, GetAgentAppInfoFile());
+    AppendIfNonEmptyFile(filePaths, GetInotifyWatcherDirsDumpFileName());
+    AppendIfNonEmptyFile(filePaths, GetCrashStackFileName());
 
     const string confDir = AppConfig::GetInstance()->GetLoongcollectorConfDir();
     if (BOOL_FLAG(logtail_mode)) {
-        AppendIfExists(filePaths, GetAgentConfigFile());
-        AppendIfExists(filePaths, JoinFile(GetProcessExecutionDir(), "docker_path_config.json"));
-        AppendIfExists(filePaths, JoinFile(GetProcessExecutionDir(), "checkpoint/docker_path_config.json"));
+        AppendIfNonEmptyFile(filePaths, GetAgentConfigFile());
+        AppendIfNonEmptyFile(filePaths, JoinFile(GetProcessExecutionDir(), "docker_path_config.json"));
+        AppendIfNonEmptyFile(filePaths, JoinFile(GetProcessExecutionDir(), "checkpoint/docker_path_config.json"));
     } else {
-        AppendIfExists(filePaths, JoinFile(JoinFile(confDir, "instance_config/local"), LOONGCOLLECTOR_CONFIG));
-        AppendIfExists(filePaths, JoinFile(GetAgentDataDir(), "docker_path_config.json"));
+        AppendIfNonEmptyFile(filePaths, JoinFile(JoinFile(confDir, "instance_config/local"), LOONGCOLLECTOR_CONFIG));
+        AppendIfNonEmptyFile(filePaths, JoinFile(GetAgentDataDir(), "docker_path_config.json"));
     }
-    AppendIfExists(filePaths, JoinFile(GetAgentDataDir(), "onetime_config_info.json"));
-    AppendIfExists(filePaths, JoinFile(confDir, "apsara_log_conf.json"));
-    AppendIfExists(filePaths, JoinFile(confDir, "plugin_logger.xml"));
-    AppendIfExists(filePaths, JoinFile(confDir, "user_defined_id"));
-    AppendIfExists(filePaths, JoinFile(GetAgentLogDir(), "logger_initialization.log"));
-    AppendIfExists(filePaths, JoinFile(JoinFile(GetAgentLogDir(), "self_metrics"), "self_metrics.log"));
-    AppendIfExists(filePaths, JoinFile(GetLegacyUserLocalConfigFilePath(), "user_log_config.json"));
+    AppendIfNonEmptyFile(filePaths, JoinFile(GetAgentDataDir(), "onetime_config_info.json"));
+    AppendIfNonEmptyFile(filePaths, JoinFile(confDir, "apsara_log_conf.json"));
+    AppendIfNonEmptyFile(filePaths, JoinFile(confDir, "plugin_logger.xml"));
+    AppendIfNonEmptyFile(filePaths, JoinFile(confDir, "user_defined_id"));
+    AppendIfNonEmptyFile(filePaths, JoinFile(GetAgentLogDir(), "logger_initialization.log"));
+    AppendIfNonEmptyFile(filePaths, JoinFile(JoinFile(GetAgentLogDir(), "self_metrics"), "self_metrics.log"));
+    AppendIfNonEmptyFile(filePaths, JoinFile(GetLegacyUserLocalConfigFilePath(), "user_log_config.json"));
 
     const char* staticContainer = getenv("ALIYUN_LOG_STATIC_CONTAINER_INFO");
     if (staticContainer != nullptr && staticContainer[0] != '\0') {
-        AppendIfExists(filePaths, staticContainer);
+        AppendIfNonEmptyFile(filePaths, staticContainer);
     }
 
     cfg["FilePaths"] = filePaths;
@@ -596,7 +644,7 @@ Json::Value InputInternalAgentLogs::buildFileCheckpointConfig() const {
     Json::Value cfg;
     cfg["Type"] = InputStaticFile::sName;
     Json::Value filePaths(Json::arrayValue);
-    AppendIfExists(filePaths, GetCheckPointFileName());
+    AppendIfNonEmptyFile(filePaths, GetCheckPointFileName());
     cfg["FilePaths"] = filePaths;
     cfg["Multiline"]["Mode"] = "whole_file";
     return cfg;
