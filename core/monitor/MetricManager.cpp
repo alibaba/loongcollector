@@ -14,17 +14,15 @@
 
 #include "MetricManager.h"
 
-#include <iomanip>
-#include <set>
-#include <sstream>
+#include <cmath>
 
-#include "json/json.h"
+#include <limits>
+#include <set>
 
 #include "Monitor.h"
 #include "app_config/AppConfig.h"
 #include "go_pipeline/LogtailPlugin.h"
 #include "logger/Logger.h"
-#include "protobuf/models/ProtocolConversion.h"
 #include "protobuf/models/pipeline_event_group.pb.h"
 #include "provider/Provider.h"
 
@@ -36,19 +34,6 @@ namespace logtail {
 
 const string METRIC_EXPORT_TYPE_GO = "direct";
 const string METRIC_EXPORT_TYPE_CPP = "cpp_provided";
-
-namespace {
-// Format a gauge value to match the legacy GetGoMetrics map form byte-for-byte.
-// The Go side serializes gauges via strconv.FormatFloat(v, 'f', 4, 64) (see
-// pkg/selfmonitor/metrics_imp_v2.go), i.e. fixed notation with 4 fractional
-// digits. std::to_string(double) instead emits 6 digits ("12" -> "12.000000"),
-// which diverges from the legacy string shape downstream parsers expect.
-std::string FormatGoMetricGauge(double value) {
-    std::ostringstream oss;
-    oss << std::fixed << std::setprecision(4) << value;
-    return oss.str();
-}
-} // namespace
 
 WriteMetrics::~WriteMetrics() {
     Clear();
@@ -174,33 +159,31 @@ void ReadMetrics::ReadAsSelfMonitorMetricEvents(std::vector<SelfMonitorMetricEve
     // c++ metrics
     MetricsRecord* tmp = mHead;
     while (tmp) {
-        metricEventList.emplace_back(SelfMonitorMetricEvent(tmp));
+        metricEventList.emplace_back(tmp);
         tmp = tmp->GetNext();
     }
     // go metrics
-    for (auto metrics : mGoMetrics) {
-        metricEventList.emplace_back(SelfMonitorMetricEvent(move(metrics)));
-    }
+    // Readers need an independent snapshot, but no longer reconstruct it from JSON.
+    metricEventList.insert(metricEventList.end(), mGoMetrics.begin(), mGoMetrics.end());
 }
 
 void ReadMetrics::UpdateMetrics() {
-// Todo: windows 上的 cgo 内存有问题，调用 GetGoMetrics 函数时可能会 crash，需要修复
-#ifndef _MSC_VER
     // go指标在Cpp指标前获取，是为了在 Cpp 部分指标做 SnapShot
     // 前（即调用 ReadMetrics::GetInstance()->UpdateMetrics() 函数），把go部分的进程级指标填写到 Cpp
     // 的进程级指标中去，随Cpp的进程级指标一起输出
     if (LogtailPlugin::GetInstance()->IsPluginOpened()) {
-        vector<map<string, string>> goCppProvidedMetircsList;
-        LogtailPlugin::GetInstance()->GetGoMetrics(goCppProvidedMetircsList, METRIC_EXPORT_TYPE_CPP);
+        vector<SelfMonitorMetricEvent> goCppProvidedMetircsList;
+        LogtailPlugin::GetInstance()->GetGoSelfMonitorMetrics(goCppProvidedMetircsList, METRIC_EXPORT_TYPE_CPP);
         UpdateGoCppProvidedMetrics(goCppProvidedMetircsList);
 
+        vector<SelfMonitorMetricEvent> goMetrics;
+        LogtailPlugin::GetInstance()->GetGoSelfMonitorMetrics(goMetrics, METRIC_EXPORT_TYPE_GO);
         {
             WriteLock lock(mReadWriteLock);
-            mGoMetrics.clear();
-            LogtailPlugin::GetInstance()->GetGoMetrics(mGoMetrics, METRIC_EXPORT_TYPE_GO);
+            mGoMetrics.swap(goMetrics);
         }
+        // Release the old snapshot outside the reader lock.
     }
-#endif
     // 获取c++指标
     MetricsRecord* snapshot = WriteMetrics::GetInstance()->DoSnapshot();
     MetricsRecord* toDelete;
@@ -232,75 +215,54 @@ void ReadMetrics::Clear() {
     }
 }
 
-// metrics from Go that are provided by cpp
-void ReadMetrics::UpdateGoCppProvidedMetrics(vector<map<string, string>>& metricsList) {
-    if (metricsList.size() == 0) {
-        return;
-    }
-
-    for (auto metrics : metricsList) {
-        for (auto metric : metrics) {
-            if (metric.first == METRIC_AGENT_MEMORY_GO) {
-                LoongCollectorMonitor::GetInstance()->SetAgentGoMemory(stoi(metric.second));
+// Process gauges already have numeric PB values; update the C++ owner directly.
+void ReadMetrics::UpdateGoCppProvidedMetrics(const vector<SelfMonitorMetricEvent>& metricsList) {
+    for (const auto& metrics : metricsList) {
+        for (const auto& metric : metrics.GetGauges()) {
+            if (!std::isfinite(metric.second) || metric.second < 0
+                || metric.second >= static_cast<double>(std::numeric_limits<uint64_t>::max())) {
+                continue;
             }
-            if (metric.first == METRIC_AGENT_GO_ROUTINES_TOTAL) {
-                LoongCollectorMonitor::GetInstance()->SetAgentGoRoutinesTotal(stoi(metric.second));
+            if (metric.first == METRIC_AGENT_MEMORY_GO) {
+                LoongCollectorMonitor::GetInstance()->SetAgentGoMemory(static_cast<uint64_t>(metric.second));
+            } else if (metric.first == METRIC_AGENT_GO_ROUTINES_TOTAL) {
+                LoongCollectorMonitor::GetInstance()->SetAgentGoRoutinesTotal(static_cast<uint64_t>(metric.second));
             }
         }
     }
 }
 
-bool ReadMetrics::ParseGoMetricsPB(const std::string& pbData,
-                                   std::vector<std::map<std::string, std::string>>& metricsList) {
+bool ReadMetrics::ParseGoMetricsPB(std::string_view pbData, std::vector<SelfMonitorMetricEvent>& metricsList) {
     if (pbData.empty()) {
         return true;
     }
-    models::PipelineEventGroup pbGroup;
-    if (!pbGroup.ParseFromString(pbData)) {
+    if (pbData.size() > static_cast<size_t>(std::numeric_limits<int>::max())) {
+        return false;
+    }
+    // Keep protobuf ownership local; only the final snapshot retains field copies.
+    // A stack message also avoids sharing arena allocator state across libraries.
+    models::PipelineEventGroup group;
+    auto* pbGroup = &group;
+    if (!pbGroup->ParseFromArray(pbData.data(), static_cast<int>(pbData.size()))) {
         LOG_WARNING(sLogger, ("receive go metrics pb", "failed to parse protobuf")("size", pbData.size()));
         return false;
     }
-    PipelineEventGroup eventGroup(std::make_shared<SourceBuffer>());
-    std::string errMsg;
-    if (!TransferPBToPipelineEventGroup(pbGroup, eventGroup, errMsg)) {
-        LOG_WARNING(sLogger, ("receive go metrics pb", "failed to transfer pb")("err", errMsg));
+    if (!pbGroup->has_metrics()) {
+        // Non-metric groups were ignored by the old self-monitor conversion.
+        return pbGroup->logs().events_size() > 0 || pbGroup->spans().events_size() > 0;
+    }
+    if (pbGroup->metrics().events_size() == 0) {
         return false;
     }
-
-    Json::StreamWriterBuilder writerBuilder;
-    writerBuilder["indentation"] = "";
-    for (auto& eventPtr : eventGroup.GetEvents()) {
-        if (!eventPtr.Is<MetricEvent>()) {
-            continue;
+    // Validate the whole batch before appending, retaining failure atomicity.
+    for (const auto& metric : pbGroup->metrics().events()) {
+        if (!metric.has_untypedsinglevalue() && !metric.has_untypedmultidoublevalues()) {
+            return false;
         }
-        const MetricEvent& metricEvent = eventPtr.Cast<MetricEvent>();
-        // category is carried in MetricEvent.Name; reinsert it as the metric_category
-        // label so the record matches the GetGoMetrics map form expected by
-        // SelfMonitorMetricEvent(const std::map&).
-        Json::Value labels(Json::objectValue);
-        labels["metric_category"] = metricEvent.GetName().to_string();
-        for (auto tag = metricEvent.TagsBegin(); tag != metricEvent.TagsEnd(); ++tag) {
-            labels[tag->first.to_string()] = tag->second.to_string();
-        }
-        Json::Value counters(Json::objectValue);
-        Json::Value gauges(Json::objectValue);
-        const auto* multiValues = metricEvent.GetValue<UntypedMultiDoubleValues>();
-        if (multiValues != nullptr) {
-            for (auto it = multiValues->ValuesBegin(); it != multiValues->ValuesEnd(); ++it) {
-                const std::string name = it->first.to_string();
-                const UntypedMultiDoubleValue& value = it->second;
-                if (value.MetricType == UntypedValueMetricType::MetricTypeCounter) {
-                    counters[name] = std::to_string(static_cast<uint64_t>(value.Value));
-                } else {
-                    gauges[name] = FormatGoMetricGauge(value.Value);
-                }
-            }
-        }
-        std::map<std::string, std::string> record;
-        record["labels"] = Json::writeString(writerBuilder, labels);
-        record["counters"] = Json::writeString(writerBuilder, counters);
-        record["gauges"] = Json::writeString(writerBuilder, gauges);
-        metricsList.emplace_back(std::move(record));
+    }
+    metricsList.reserve(metricsList.size() + pbGroup->metrics().events_size());
+    for (const auto& metric : pbGroup->metrics().events()) {
+        metricsList.emplace_back(metric);
     }
     return true;
 }

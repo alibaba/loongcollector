@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"runtime"
 	"runtime/debug"
+	"strconv"
 	"sync"
 	"time"
 	"unsafe"
@@ -30,6 +31,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/helper/containercenter"
 	"github.com/alibaba/ilogtail/pkg/helper/k8smeta"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pkg/util"
 	"github.com/alibaba/ilogtail/pluginmanager"
@@ -61,43 +63,13 @@ struct containerMeta{
 	char** envsVal;
 };
 
-typedef struct {
-    char* key;
-    char* value;
-} KeyValue;
-
-typedef struct {
-    KeyValue** keyValues;
-    int count;
-} PluginMetric;
-
-typedef struct {
-    PluginMetric** metrics;
-    int count;
-} PluginMetrics;
-
-typedef struct {
-    char* alarmType;
-    char* alarmLevel;
-    char* alarmMessage;
-    char* projectName;
-    char* category;
-    char* config;
-    int count;
-} InnerGoAlarm;
-
-typedef struct {
-    InnerGoAlarm** alarms;
-    int count;
-} InnerGoAlarms;
-
 // PBBuffer carries a serialized PipelineEventGroup protobuf that the C++ self-monitor
-// timer pulls from Go via GetGoSelfMonitor*PB. data is allocated inside
-// libGoPluginBase.so; after the C++ caller copies the bytes on receive it must
+// timer pulls from Go via GetGoSelfMonitor*PB. Go marshals directly into data
+// allocated inside libGoPluginBase.so; after C++ finishes parsing the borrowed bytes it must
 // release the buffer via FreeSelfMonitorPB (never free() directly) so that allocation
-// and release stay in the same module and no memory crosses the module boundary. size
+// and release stay in the same module. C++ borrows the buffer but never owns it. size
 // is the byte length; it is size_t (unsigned, pointer-sized) rather than int so the
-// cross-language length matches the C++ std::string consumer and cannot overflow or go
+// cross-language length matches the C++ string_view consumer and cannot overflow or go
 // negative on the ABI boundary. data is NULL and size is 0 when there is nothing to
 // pull or on marshal failure.
 typedef struct {
@@ -105,29 +77,6 @@ typedef struct {
     size_t size;
 } PBBuffer;
 
-static KeyValue** makeKeyValueArray(int size) {
-    return malloc(sizeof(KeyValue*) * size);
-}
-
-static void setArrayKeyValue(KeyValue **a, KeyValue *s, int n) {
-    a[n] = s;
-}
-
-static PluginMetric** makePluginMetricArray(int size) {
-    return malloc(sizeof(PluginMetric*) * size);
-}
-
-static void setArrayPluginMetric(PluginMetric **a, PluginMetric *s, int n) {
-    a[n] = s;
-}
-
-static InnerGoAlarm** makeInnerGoAlarmArray(int size) {
-    return malloc(sizeof(InnerGoAlarm*) * size);
-}
-
-static void setArrayInnerGoAlarm(InnerGoAlarm **a, InnerGoAlarm *s, int n) {
-    a[n] = s;
-}
 */
 import "C" //nolint:typecheck
 
@@ -342,133 +291,144 @@ func GetContainerMeta(containerID string) *C.struct_containerMeta {
 	return returnStruct
 }
 
-//export GetGoMetrics
-func GetGoMetrics(metricType string) *C.PluginMetrics {
-	results := pluginmanager.GetMetrics(metricType)
-	// 统计所有键值对的总数，用于分配内存
-	numMetrics := len(results)
+// buildAlarmsPB sends business fields to C++; the final sender adds ip/os/ver.
+// Empty snapshots require neither a protobuf envelope nor a cross-language allocation.
+func buildAlarmsPB(alarms []selfmonitor.AlarmExportMessage, now time.Time) (*protocol.PipelineEventGroup, error) {
+	if len(alarms) == 0 {
+		return nil, nil
+	}
+	return helper.TransferAlarmsToPipelineEventGroup(alarms, now)
+}
 
-	cPluginMetrics := (*C.PluginMetrics)(C.malloc(C.sizeof_PluginMetrics))
-	cPluginMetrics.count = C.int(numMetrics)
-	cPluginMetrics.metrics = C.makePluginMetricArray(cPluginMetrics.count)
-	// 填充 PluginMetrics 中的 keyValues
-	for i, metric := range results {
-		metricLen := len(metric)
-		cMetric := (*C.PluginMetric)(C.malloc(C.sizeof_PluginMetric))
-		cMetric.count = C.int(metricLen)
-		cMetric.keyValues = C.makeKeyValueArray(cMetric.count)
-
-		j := 0
-		for k, v := range metric {
-			cKey := C.CString(k)
-			cValue := C.CString(v)
-			cKeyValue := (*C.KeyValue)(C.malloc(C.sizeof_KeyValue))
-			cKeyValue.key = cKey
-			cKeyValue.value = cValue
-
-			C.setArrayKeyValue(cMetric.keyValues, cKeyValue, C.int(j))
-			runtime.KeepAlive(cKeyValue)
-			runtime.KeepAlive(cKey)
-			runtime.KeepAlive(cValue)
-			j++
+// buildMetricsPB fills the final protobuf directly from exported JSON fields.
+// Numeric maps and a MetricExportRecord batch are unnecessary intermediates.
+// PB bytes borrow immutable decoded strings only until synchronous marshaling.
+func buildMetricsPB(rawMetrics []map[string]string, now time.Time) (*protocol.PipelineEventGroup, error) {
+	if len(rawMetrics) == 0 {
+		return nil, nil
+	}
+	events := make([]protocol.MetricEvent, len(rawMetrics))
+	refs := make([]*protocol.MetricEvent, len(rawMetrics))
+	timestamp := uint64(now.Unix())*1e9 + uint64(now.Nanosecond())
+	for i, raw := range rawMetrics {
+		event := &events[i]
+		refs[i] = event
+		event.Timestamp = timestamp
+		values := make(map[string]*protocol.UntypedMultiDoubleValue)
+		if labelsJSON, ok := raw[selfmonitor.MetricLabelPrefix]; ok {
+			var labels map[string]string
+			if labelsJSON != "" {
+				if err := json.Unmarshal([]byte(labelsJSON), &labels); err != nil {
+					return nil, fmt.Errorf("parse self-monitor labels: %w", err)
+				}
+			}
+			event.Name = util.ZeroCopyStringToBytes(labels[selfmonitor.MetricLabelKeyMetricCategory])
+			if len(labels) > 1 {
+				event.Tags = make(map[string][]byte, len(labels)-1)
+			}
+			for name, value := range labels {
+				if name == selfmonitor.MetricLabelKeyMetricCategory {
+					continue
+				}
+				if event.Tags == nil {
+					event.Tags = make(map[string][]byte)
+				}
+				event.Tags[name] = util.ZeroCopyStringToBytes(value)
+			}
+			// Reuse one decoding map for counters/gauges. This also preserves the
+			// existing invalid numeric value -> zero contract.
+			var fields map[string]string
+			for _, field := range [...]struct {
+				key  string
+				kind protocol.UntypedValueMetricType
+			}{
+				{selfmonitor.MetricCounterPrefix, protocol.UntypedValueMetricType_METRIC_TYPE_COUNTER},
+				{selfmonitor.MetricGaugePrefix, protocol.UntypedValueMetricType_METRIC_TYPE_GAUGE},
+			} {
+				clear(fields)
+				if raw[field.key] != "" {
+					if err := json.Unmarshal([]byte(raw[field.key]), &fields); err != nil {
+						return nil, fmt.Errorf("parse self-monitor %s: %w", field.key, err)
+					}
+				}
+				for name, text := range fields {
+					value, err := strconv.ParseFloat(text, 64)
+					if err != nil {
+						value = 0
+					}
+					if field.kind == protocol.UntypedValueMetricType_METRIC_TYPE_COUNTER {
+						value = float64(uint64(value))
+					}
+					values[name] = &protocol.UntypedMultiDoubleValue{MetricType: field.kind, Value: value}
+				}
+			}
+		} else {
+			// cpp_provided process gauges are already a flat name/value map.
+			event.Name = []byte("agent")
+			for name, text := range raw {
+				value, err := strconv.ParseFloat(text, 64)
+				if err != nil {
+					return nil, fmt.Errorf("parse self-monitor gauge %s: %w", name, err)
+				}
+				values[name] = &protocol.UntypedMultiDoubleValue{MetricType: protocol.UntypedValueMetricType_METRIC_TYPE_GAUGE, Value: value}
+			}
 		}
-		C.setArrayPluginMetric(cPluginMetrics.metrics, cMetric, C.int(i))
-		runtime.KeepAlive(cMetric)
+		event.Value = &protocol.MetricEvent_UntypedMultiDoubleValues{
+			UntypedMultiDoubleValues: &protocol.UntypedMultiDoubleValues{Values: values},
+		}
 	}
-	return cPluginMetrics
+	return &protocol.PipelineEventGroup{
+		PipelineEvents: &protocol.PipelineEventGroup_Metrics{
+			Metrics: &protocol.PipelineEventGroup_MetricEvents{Events: refs},
+		},
+	}, nil
 }
 
-//export GetGoAlarms
-func GetGoAlarms() *C.InnerGoAlarms {
-	results := pluginmanager.GetAlarmMessages()
-	cAlarms := (*C.InnerGoAlarms)(C.malloc(C.sizeof_InnerGoAlarms))
-	cAlarms.count = C.int(len(results))
-	cAlarms.alarms = C.makeInnerGoAlarmArray(cAlarms.count)
-	for i, alarm := range results {
-		cAlarm := (*C.InnerGoAlarm)(C.malloc(C.sizeof_InnerGoAlarm))
-		cAlarm.alarmType = C.CString(alarm.AlarmType)
-		cAlarm.alarmLevel = C.CString(alarm.AlarmLevel)
-		cAlarm.alarmMessage = C.CString(alarm.AlarmMessage)
-		cAlarm.projectName = C.CString(alarm.ProjectName)
-		cAlarm.category = C.CString(alarm.Category)
-		cAlarm.config = C.CString(alarm.Config)
-		cAlarm.count = C.int(alarm.Count)
-		C.setArrayInnerGoAlarm(cAlarms.alarms, cAlarm, C.int(i))
-		runtime.KeepAlive(cAlarm)
-	}
-	return cAlarms
-}
-
-// marshalAlarmsPB collects Go self-monitor alarms into a PipelineEventGroup PB
-// (one LogEvent per alarm) using the D2 contract helper and returns the serialized
-// bytes. These bytes are what GetGoSelfMonitorAlarmsPB hands to C++ when C++ pulls;
-// factored out of the CGO export so it can be unit-tested without cgo types.
-func marshalAlarmsPB(alarms []selfmonitor.AlarmExportMessage, now time.Time) ([]byte, error) {
-	group, err := helper.TransferAlarmsToPipelineEventGroup(alarms, now)
+// toPBBuffer marshals directly into the final C allocation. No temporary Go
+// payload or C.CBytes copy is needed. C++ borrows this allocation only until it
+// calls FreeSelfMonitorPB; both allocation and release stay inside the Go module.
+func toPBBuffer(group *protocol.PipelineEventGroup, err error) C.PBBuffer {
 	if err != nil {
-		return nil, err
+		logger.Error(context.Background(), selfmonitor.PluginAlarm, "build self-monitor PB error", err)
+		return C.PBBuffer{}
 	}
-	return group.Marshal()
+	if group == nil {
+		return C.PBBuffer{}
+	}
+	size := group.Size()
+	if size == 0 {
+		return C.PBBuffer{}
+	}
+	data := C.malloc(C.size_t(size))
+	buf := unsafe.Slice((*byte)(data), size)
+	n, err := group.MarshalToSizedBuffer(buf)
+	if err != nil || n != size {
+		C.free(data)
+		logger.Error(context.Background(), selfmonitor.PluginAlarm, "marshal self-monitor PB error", err, "size", size, "written", n)
+		return C.PBBuffer{}
+	}
+	return C.PBBuffer{data: (*C.char)(data), size: C.size_t(size)}
 }
 
-// marshalMetricsPB collects Go self-monitor metrics of the given export type into a
-// PipelineEventGroup PB (one MetricEvent per record) using the D2 contract helper
-// and returns the serialized bytes, the payload GetGoSelfMonitorMetricsPB hands to
-// C++ on pull and that ReadMetrics::ParseGoMetricsPB consumes.
-func marshalMetricsPB(rawMetrics []map[string]string, now time.Time) ([]byte, error) {
-	group := helper.TransferRawMetricsToPipelineEventGroup(rawMetrics, now)
-	return group.Marshal()
-}
-
-// toPBBuffer copies data into a buffer allocated inside libGoPluginBase.so. The C++
-// caller copies the bytes on receive and then releases the buffer via
-// FreeSelfMonitorPB (not free()), keeping allocation and release in the same module
-// so no memory crosses the boundary. An empty or failed marshal yields a nil buffer,
-// which the receiver treats as no-op.
-func toPBBuffer(data []byte, err error) C.PBBuffer {
-	var buf C.PBBuffer
-	if err != nil {
-		logger.Error(context.Background(), selfmonitor.PluginAlarm, "marshal self-monitor PB error", err)
-		return buf
-	}
-	if len(data) == 0 {
-		return buf
-	}
-	buf.data = (*C.char)(C.CBytes(data))
-	buf.size = C.size_t(len(data))
-	return buf
-}
-
-// GetGoSelfMonitorAlarmsPB lets the C++ self-monitor timer pull Go self-monitor
-// alarms as a serialized PipelineEventGroup protobuf. C++ copies the bytes into a
-// std::string, feeds them to SelfMonitorServer::ReceiveGoAlarmsPB, then releases the
-// buffer via FreeSelfMonitorPB. This is the D3 pull path (C++ drives collection,
-// mirroring the legacy getter structure); it coexists with the legacy GetGoAlarms CGO
-// struct path (removed in D5). Runtime wiring (LoadMethod + the timer call) lands in
-// D4, matching this PR's deferred-wiring stance on the receive side.
+// GetGoSelfMonitorAlarmsPB returns alarm PB bytes for the C++ timer on every
+// platform. The receiver parses the borrowed buffer and releases it via Go.
 //
 //export GetGoSelfMonitorAlarmsPB
 func GetGoSelfMonitorAlarmsPB() C.PBBuffer {
-	data, err := marshalAlarmsPB(pluginmanager.GetAlarmMessages(), time.Now())
-	return toPBBuffer(data, err)
+	return toPBBuffer(buildAlarmsPB(pluginmanager.GetAlarmMessages(), time.Now()))
 }
 
-// GetGoSelfMonitorMetricsPB lets the C++ self-monitor timer pull Go self-monitor
-// metrics of the given export type as a serialized PipelineEventGroup protobuf. C++
-// copies the bytes into a std::string, feeds them to ReadMetrics::ParseGoMetricsPB,
-// then releases the buffer via FreeSelfMonitorPB. This is the D3 pull path; it
-// coexists with the legacy GetGoMetrics CGO struct path (removed in D5). Runtime
-// wiring lands in D4.
+// GetGoSelfMonitorMetricsPB returns metric PB bytes for the C++ timer on every
+// platform. The receiver consumes typed fields without a JSON round trip.
 //
 //export GetGoSelfMonitorMetricsPB
 func GetGoSelfMonitorMetricsPB(metricType string) C.PBBuffer {
-	data, err := marshalMetricsPB(pluginmanager.GetMetrics(metricType), time.Now())
-	return toPBBuffer(data, err)
+	return toPBBuffer(buildMetricsPB(pluginmanager.GetMetrics(metricType), time.Now()))
 }
 
 // FreeSelfMonitorPB releases a PBBuffer.data block previously returned by
 // GetGoSelfMonitorAlarmsPB / GetGoSelfMonitorMetricsPB. Both the allocation
-// (C.CBytes in toPBBuffer) and this release run inside libGoPluginBase.so, so the
+// (C.malloc in toPBBuffer) and this release run inside libGoPluginBase.so, so the
 // buffer is never freed across the module boundary — this satisfies the dynamic
 // library rule that memory must be allocated and freed within the same module and
 // avoids relying on a shared CRT heap under static-CRT linking (the cross-boundary

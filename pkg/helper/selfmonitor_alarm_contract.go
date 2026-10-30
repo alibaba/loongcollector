@@ -15,44 +15,36 @@
 package helper
 
 import (
-	"runtime"
 	"strconv"
 	"time"
 
-	"github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
 
-// Self-monitor alarm PB contract field keys.
-// These MUST stay aligned with C++ AlarmManager::FlushAllRegionAlarm (core/monitor/AlarmManager.cpp)
-// and the InnerGoAlarm struct (core/go_pipeline/LogtailPlugin.h).
+// Self-monitor alarm bridge field keys consumed by SelfMonitorServer::ReceiveGoAlarmsPB.
+// Transport only the business fields retained by AlarmManager. The final C++
+// FlushAllRegionAlarm adds ip/os/ver when it creates the outgoing alarm event.
 const (
 	AlarmFieldType     = "alarm_type"
 	AlarmFieldLevel    = "alarm_level"
 	AlarmFieldMessage  = "alarm_message"
 	AlarmFieldCount    = "alarm_count"
-	AlarmFieldIP       = "ip"
-	AlarmFieldOS       = "os"
-	AlarmFieldVersion  = "ver"
 	AlarmFieldProject  = "project_name"
 	AlarmFieldCategory = "category"
 	AlarmFieldConfig   = "config"
 )
 
 // AlarmContractFields returns the ordered list of required field keys in the
-// self-monitor alarm PB contract. Optional fields (project_name, category, config)
-// are included only when non-empty, matching the C++ behavior.
+// Go-to-C++ bridge contract. Final output metadata (ip/os/ver) is added by C++;
+// optional project_name, category and config are sent only when non-empty.
 func AlarmContractFields() []string {
 	return []string{
 		AlarmFieldType,
 		AlarmFieldLevel,
 		AlarmFieldMessage,
 		AlarmFieldCount,
-		AlarmFieldIP,
-		AlarmFieldOS,
-		AlarmFieldVersion,
 	}
 }
 
@@ -69,7 +61,7 @@ func AlarmContractOptionalFields() []string {
 // PipelineEventGroup containing LogEvents, using the existing PipelineEventGroup PB
 // as the transport format. Each alarm becomes one LogEvent with key-value Contents.
 //
-// Field mapping aligns with C++ AlarmManager::FlushAllRegionAlarm:
+// Field mapping for the C++ alarm receiver; this is not the final output event:
 //
 //	AlarmType    -> "alarm_type"    (C++ AlarmMessage.mMessageType)
 //	AlarmLevel   -> "alarm_level"   (C++ AlarmMessage.mLevel)
@@ -79,20 +71,32 @@ func AlarmContractOptionalFields() []string {
 //	Category     -> "category"      (C++ AlarmMessage.mCategory, optional)
 //	Config       -> "config"        (C++ AlarmMessage.mConfig, optional)
 func TransferAlarmsToPipelineEventGroup(alarms []selfmonitor.AlarmExportMessage, t time.Time) (*protocol.PipelineEventGroup, error) {
-	logEvents := make([]*protocol.LogEvent, 0, len(alarms))
+	// Keep each batch in four contiguous slabs. Event/content pointers borrow these
+	// slabs until synchronous marshaling finishes; no backing storage is shared
+	// between batches. Final output metadata is deliberately not allocated here.
+	count := 0
 	for i := range alarms {
-		logEvent, err := transferAlarmToLogEvent(&alarms[i], t)
-		if err != nil {
-			return nil, err
-		}
-		logEvents = append(logEvents, logEvent)
+		count += alarmContentCount(&alarms[i])
 	}
-	group := &protocol.PipelineEventGroup{
+	events := make([]protocol.LogEvent, len(alarms))
+	eventRefs := make([]*protocol.LogEvent, len(alarms))
+	contents := make([]protocol.LogEvent_Content, count)
+	contentRefs := make([]*protocol.LogEvent_Content, count)
+	timestamp := uint64(t.Unix())*1e9 + uint64(t.Nanosecond())
+	offset := 0
+	for i := range alarms {
+		count := alarmContentCount(&alarms[i])
+		fillAlarmLogEvent(&alarms[i], timestamp, &events[i],
+			contents[offset:offset+count:offset+count],
+			contentRefs[offset:offset+count:offset+count])
+		eventRefs[i] = &events[i]
+		offset += count
+	}
+	return &protocol.PipelineEventGroup{
 		PipelineEvents: &protocol.PipelineEventGroup_Logs{
-			Logs: &protocol.PipelineEventGroup_LogEvents{Events: logEvents},
+			Logs: &protocol.PipelineEventGroup_LogEvents{Events: eventRefs},
 		},
-	}
-	return group, nil
+	}, nil
 }
 
 // TransferPipelineEventGroupToAlarms converts a PipelineEventGroup (containing LogEvents)
@@ -109,25 +113,50 @@ func TransferPipelineEventGroupToAlarms(group *protocol.PipelineEventGroup) []se
 	return alarms
 }
 
-func transferAlarmToLogEvent(msg *selfmonitor.AlarmExportMessage, t time.Time) (*protocol.LogEvent, error) {
-	fields := make(map[string]string, 10)
-	fields[AlarmFieldType] = msg.AlarmType
-	fields[AlarmFieldLevel] = msg.AlarmLevel
-	fields[AlarmFieldMessage] = msg.AlarmMessage
-	fields[AlarmFieldCount] = strconv.Itoa(msg.Count)
-	fields[AlarmFieldIP] = util.GetIPAddress()
-	fields[AlarmFieldOS] = runtime.GOOS
-	fields[AlarmFieldVersion] = config.BaseVersion
+func alarmContentCount(msg *selfmonitor.AlarmExportMessage) int {
+	count := 4
 	if msg.ProjectName != "" {
-		fields[AlarmFieldProject] = msg.ProjectName
+		count++
 	}
 	if msg.Category != "" {
-		fields[AlarmFieldCategory] = msg.Category
+		count++
 	}
 	if msg.Config != "" {
-		fields[AlarmFieldConfig] = msg.Config
+		count++
 	}
-	return CreateLogEvent(t, false, fields)
+	return count
+}
+
+// fillAlarmLogEvent borrows one event's exact slices from the batch slabs.
+// Keys and immutable values remain valid through marshaling; no per-field copy
+// or per-alarm allocation is needed, apart from non-cached count strings.
+func fillAlarmLogEvent(msg *selfmonitor.AlarmExportMessage, timestamp uint64,
+	event *protocol.LogEvent, contents []protocol.LogEvent_Content, refs []*protocol.LogEvent_Content) {
+	var rawSize uint64
+	i := 0
+	add := func(key, value string) {
+		contents[i].Key = util.ZeroCopyStringToBytes(key)
+		contents[i].Value = util.ZeroCopyStringToBytes(value)
+		refs[i] = &contents[i]
+		rawSize += uint64(len(value))
+		i++
+	}
+	add(AlarmFieldType, msg.AlarmType)
+	add(AlarmFieldLevel, msg.AlarmLevel)
+	add(AlarmFieldMessage, msg.AlarmMessage)
+	add(AlarmFieldCount, strconv.Itoa(msg.Count))
+	if msg.ProjectName != "" {
+		add(AlarmFieldProject, msg.ProjectName)
+	}
+	if msg.Category != "" {
+		add(AlarmFieldCategory, msg.Category)
+	}
+	if msg.Config != "" {
+		add(AlarmFieldConfig, msg.Config)
+	}
+	event.Timestamp = timestamp
+	event.Contents = refs
+	event.RawSize = rawSize
 }
 
 func transferLogEventToAlarm(logEvent *protocol.LogEvent) selfmonitor.AlarmExportMessage {

@@ -16,10 +16,18 @@
 
 #include "SelfMonitorMetricEvent.h"
 
+#include <cmath>
+
+#include <algorithm>
+#include <array>
+#include <limits>
+#include <vector>
+
 #include "common/HashUtil.h"
 #include "common/JsonUtil.h"
 #include "common/TimeUtil.h"
 #include "logger/Logger.h"
+#include "protobuf/models/metric_event.pb.h"
 
 using namespace std;
 
@@ -118,10 +126,65 @@ SelfMonitorMetricEvent::SelfMonitorMetricEvent(const std::map<std::string, std::
     CreateKey();
 }
 
+SelfMonitorMetricEvent::SelfMonitorMetricEvent(const models::MetricEvent& metricRecord)
+    : mCategory(metricRecord.name()) {
+    // Match the sorted JSON label insertion used by the legacy constructor.
+    // Protobuf map iteration order varies, but identical labels must keep one key.
+    using TagIterator = decltype(metricRecord.tags().begin());
+    constexpr size_t kInlineLabels = 8;
+    std::array<TagIterator, kInlineLabels> inlineLabels;
+    std::vector<TagIterator> overflowLabels;
+    TagIterator* labels = inlineLabels.data();
+    if (metricRecord.tags().size() > kInlineLabels) {
+        overflowLabels.resize(metricRecord.tags().size());
+        labels = overflowLabels.data();
+    }
+    size_t labelCount = 0;
+    for (auto it = metricRecord.tags().begin(); it != metricRecord.tags().end(); ++it) {
+        if (it->first == "metric_category") {
+            mCategory = it->second;
+        } else {
+            labels[labelCount++] = it;
+        }
+    }
+    std::sort(labels, labels + labelCount, [](const auto& a, const auto& b) { return a->first < b->first; });
+    for (size_t i = 0; i < labelCount; ++i) {
+        const auto& label = labels[i];
+        mLabels.emplace(label->first, label->second);
+    }
+    for (const auto& item : metricRecord.untypedmultidoublevalues().values()) {
+        const double value = item.second.value();
+        if (item.second.metrictype() != models::METRIC_TYPE_GAUGE) {
+            // Avoid undefined float-to-integer conversion for malformed payloads.
+            mCounters.emplace(item.first,
+                              std::isfinite(value) && value >= 0
+                                      && value < static_cast<double>(std::numeric_limits<uint64_t>::max())
+                                  ? static_cast<uint64_t>(value)
+                                  : 0);
+        } else {
+            mGauges.emplace(item.first, value);
+        }
+    }
+    CreateKey();
+}
+
+const std::unordered_map<std::string, double>& SelfMonitorMetricEvent::GetGauges() const {
+    return mGauges;
+}
+
 void SelfMonitorMetricEvent::CreateKey() {
-    string key = "category:" + mCategory;
+    size_t keySize = 9 + mCategory.size();
     for (const auto& label : mLabels) {
-        key += (";" + label.first + ":" + label.second);
+        keySize += 2 + label.first.size() + label.second.size();
+    }
+    string key;
+    key.reserve(keySize);
+    key.append("category:").append(mCategory);
+    for (const auto& label : mLabels) {
+        key.push_back(';');
+        key.append(label.first);
+        key.push_back(':');
+        key.append(label.second);
     }
     mKey = HashString(key);
     mUpdatedFlag = true;

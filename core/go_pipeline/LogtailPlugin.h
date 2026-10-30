@@ -20,6 +20,7 @@
 #include <stddef.h>
 #endif
 
+#include <cstddef>
 #include <cstdint>
 
 #include <numeric>
@@ -79,35 +80,12 @@ struct innerContainerMeta {
     char** envsVal;
 };
 
+// Matches PBBuffer in libGoPluginBase. Release data only through the allocating
+// module's FreeSelfMonitorPB callback, including when Windows uses a static CRT.
 typedef struct {
-    char* key;
-    char* value;
-} InnerKeyValue;
-
-typedef struct {
-    InnerKeyValue** keyValues;
-    int count;
-} InnerPluginMetric;
-
-typedef struct {
-    InnerPluginMetric** metrics;
-    int count;
-} InnerPluginMetrics;
-
-typedef struct {
-    char* alarmType;
-    char* alarmLevel;
-    char* alarmMessage;
-    char* projectName;
-    char* category;
-    char* config;
-    int count;
-} InnerGoAlarm;
-
-typedef struct {
-    InnerGoAlarm** alarms;
-    int count;
-} InnerGoAlarms;
+    char* data;
+    size_t size;
+} SelfMonitorPBBuffer;
 
 struct K8sContainerMeta {
     std::string PodName;
@@ -160,8 +138,9 @@ typedef GoInt (*ProcessPipelineEventGroupFun)(GoString c, GoSlice l, GoString p)
 typedef struct innerContainerMeta* (*GetContainerMetaFun)(GoString containerID);
 typedef char* (*GetAllContainerMetaFun)();
 typedef char* (*GetDiffContainerMetaFun)();
-typedef InnerPluginMetrics* (*GetGoMetricsFun)(GoString metricType);
-typedef InnerGoAlarms* (*GetGoAlarmsFun)();
+typedef SelfMonitorPBBuffer (*GetGoSelfMonitorMetricsPBFun)(GoString metricType);
+typedef SelfMonitorPBBuffer (*GetGoSelfMonitorAlarmsPBFun)();
+typedef void (*FreeSelfMonitorPBFun)(char* data);
 
 // Methods export by adapter.
 typedef int (*IsValidToSendFun)(long long logstoreKey);
@@ -199,6 +178,11 @@ typedef void (*RegisterSendPipelineEventGroupFun)(SendPipelineEventGroupFun send
 
 typedef int (*PluginAdapterVersion)();
 }
+
+namespace logtail {
+class GoPipelineBridgeUnittest;
+class SelfMonitorMetricEvent;
+} // namespace logtail
 
 // Create by david zhang. 2017/09/02 22:22:12
 class LogtailPlugin {
@@ -281,8 +265,9 @@ public:
     std::string GetAllContainersMeta();
     std::string GetDiffContainersMeta();
 
-    void GetGoMetrics(std::vector<std::map<std::string, std::string>>& metircsList, const std::string& metricType);
-    void GetGoAlarms();
+    bool GetGoSelfMonitorMetrics(std::vector<logtail::SelfMonitorMetricEvent>& metricsList,
+                                 const std::string& metricType);
+    void SyncGoSelfMonitorAlarms();
 
 private:
     void* mPluginBasePtr;
@@ -301,8 +286,13 @@ private:
     GetContainerMetaFun mGetContainerMetaFun;
     GetAllContainerMetaFun mGetAllContainerMetaFun;
     GetDiffContainerMetaFun mGetDiffContainerMetaFun;
-    GetGoMetricsFun mGetGoMetricsFun;
-    GetGoAlarmsFun mGetGoAlarmsFun;
+    GetGoSelfMonitorMetricsPBFun mGetGoSelfMonitorMetricsPBFun = nullptr;
+    GetGoSelfMonitorAlarmsPBFun mGetGoSelfMonitorAlarmsPBFun = nullptr;
+    FreeSelfMonitorPBFun mFreeSelfMonitorPBFun = nullptr;
+
+#ifdef APSARA_UNIT_TEST_MAIN
+    friend class logtail::GoPipelineBridgeUnittest;
+#endif
 
     // Configuration for plugin system in JSON format.
     Json::Value mPluginCfg;

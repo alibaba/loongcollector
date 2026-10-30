@@ -12,11 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "json/json.h"
+
 #include "MetricConstants.h"
 #include "MetricRecord.h"
 #include "Monitor.h"
 #include "monitor/MetricManager.h"
 #include "monitor/metric_models/SelfMonitorMetricEvent.h"
+#include "protobuf/models/metric_event.pb.h"
 #include "unittest/Unittest.h"
 
 namespace logtail {
@@ -31,6 +34,7 @@ public:
     void TestMerge();
     void TestSendInterval();
     void TestGlobalMetrics();
+    void TestCreateFromPB();
 
 private:
     std::shared_ptr<SourceBuffer> mSourceBuffer;
@@ -43,6 +47,58 @@ APSARA_UNIT_TEST_CASE(SelfMonitorMetricEventUnittest, TestCreateFromGoMetricMap,
 APSARA_UNIT_TEST_CASE(SelfMonitorMetricEventUnittest, TestMerge, 2);
 APSARA_UNIT_TEST_CASE(SelfMonitorMetricEventUnittest, TestSendInterval, 3);
 APSARA_UNIT_TEST_CASE(SelfMonitorMetricEventUnittest, TestGlobalMetrics, 4);
+APSARA_UNIT_TEST_CASE(SelfMonitorMetricEventUnittest, TestCreateFromPB, 5);
+
+void SelfMonitorMetricEventUnittest::TestCreateFromPB() {
+    models::MetricEvent pb;
+    pb.set_name("plugin");
+    (*pb.mutable_tags())["plugin_type"] = "input_file";
+    (*pb.mutable_tags())["pipeline_name"] = "pipeline_test";
+    (*pb.mutable_tags())["plugin_id"] = "1";
+    auto* values = pb.mutable_untypedmultidoublevalues()->mutable_values();
+    (*values)["events"].set_value(100);
+    (*values)["events"].set_metrictype(models::METRIC_TYPE_COUNTER);
+    (*values)["delay"].set_value(12.25);
+    (*values)["delay"].set_metrictype(models::METRIC_TYPE_GAUGE);
+    SelfMonitorMetricEvent typed(pb);
+    SelfMonitorMetricEvent legacy(std::map<std::string, std::string>{
+        {"labels",
+         R"({"metric_category":"plugin","pipeline_name":"pipeline_test","plugin_id":"1","plugin_type":"input_file"})"},
+        {"counters", R"({"events":"100"})"},
+        {"gauges", R"({"delay":"12.2500"})"}});
+    EXPECT_EQ(legacy.mKey, typed.mKey);
+    EXPECT_EQ(legacy.GetCounter("events"), typed.GetCounter("events"));
+    EXPECT_EQ(legacy.GetGauge("delay"), typed.GetGauge("delay"));
+    EXPECT_EQ(legacy.GetLabel("plugin_type"), typed.GetLabel("plugin_type"));
+    // A different PB insertion order must preserve the aggregation identity.
+    models::MetricEvent reverse;
+    reverse.set_name("plugin");
+    (*reverse.mutable_tags())["plugin_id"] = "1";
+    (*reverse.mutable_tags())["pipeline_name"] = "pipeline_test";
+    (*reverse.mutable_tags())["plugin_type"] = "input_file";
+    EXPECT_EQ(typed.mKey, SelfMonitorMetricEvent(reverse).mKey);
+    pb.Clear();
+    EXPECT_EQ("input_file", typed.GetLabel("plugin_type"));
+    EXPECT_EQ(100U, typed.GetCounter("events"));
+    EXPECT_EQ(12.25, typed.GetGauge("delay"));
+    // The heap fallback for larger label sets must use the same identity rule.
+    std::map<std::string, std::string> metricMap
+        = {{"labels", R"({"metric_category":"plugin"})"}, {"counters", "{}"}, {"gauges", "{}"}};
+    Json::Value labels(Json::objectValue);
+    labels["metric_category"] = "plugin";
+    for (int i = 0; i < 32; ++i) {
+        const std::string key = "source_" + std::to_string(i);
+        (*reverse.mutable_tags())[key] = "source-value-" + std::to_string(i);
+        labels[key] = "source-value-" + std::to_string(i);
+    }
+    (*reverse.mutable_tags())["metric_category"] = "plugin";
+    reverse.mutable_tags()->erase("plugin_id");
+    reverse.mutable_tags()->erase("pipeline_name");
+    reverse.mutable_tags()->erase("plugin_type");
+    Json::StreamWriterBuilder builder;
+    metricMap["labels"] = Json::writeString(builder, labels);
+    EXPECT_EQ(SelfMonitorMetricEvent(metricMap).mKey, SelfMonitorMetricEvent(reverse).mKey);
+}
 
 void SelfMonitorMetricEventUnittest::TestCreateFromMetricEvent() {
     std::vector<std::pair<std::string, std::string>> labels;
