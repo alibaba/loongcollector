@@ -123,6 +123,10 @@ protected:
         plugin->mFreeSelfMonitorPBFun = enableFree ? FreeTestSelfMonitorPB : nullptr;
     }
 
+    bool UncompressContainer(const string& input, string& output, string& error) {
+        return LogtailPlugin::GetInstance()->mPluginContainerConfig.mCompressor->UnCompress(input, output, error);
+    }
+
     shared_ptr<SourceBuffer> mSourceBuffer;
     string mOriginalProfileProject;
     bool mOriginalValid = false;
@@ -307,8 +311,7 @@ TEST_F(GoPipelineBridgeUnittest, SendPipelineEventGroupContainerConfigQueuesPayl
         EXPECT_EQ("profile-override", item->mLogstore);
         string data(item->mRawSize, '\0');
         string error;
-        EXPECT_TRUE(
-            LogtailPlugin::GetInstance()->mPluginContainerConfig.mCompressor->UnCompress(item->mData, data, error));
+        EXPECT_TRUE(UncompressContainer(item->mData, data, error));
         sls_logs::LogGroup result;
         EXPECT_TRUE(result.ParseFromString(data));
         EXPECT_EQ(1, result.logs_size());
