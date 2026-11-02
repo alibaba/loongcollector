@@ -20,6 +20,7 @@
 #include <string>
 
 #include "collection_pipeline/CollectionPipeline.h"
+#include "collection_pipeline/plugin/PluginRegistry.h"
 #include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "common/FileSystemUtil.h"
 #include "common/Flags.h"
@@ -46,6 +47,9 @@ public:
     void TestAddTimeoutEvent();
 
 protected:
+    static void SetUpTestCase() { PluginRegistry::GetInstance()->LoadPlugins(); }
+    static void TearDownTestCase() { PluginRegistry::GetInstance()->UnloadPlugins(); }
+
     void SetUp() override {
         logPathDir = GetProcessExecutionDir();
         if (PATH_SEPARATOR[0] == logPathDir.back()) {
@@ -72,7 +76,6 @@ protected:
         unique_ptr<Json::Value> configJson;
         string configStr, errorMsg;
         unique_ptr<CollectionConfig> config;
-        unique_ptr<CollectionPipeline> pipeline;
 
         std::string jsonLogPathDir = UnitTestHelper::JsonEscapeDirPath(NormalizeNativePath(logPathDir));
         // new pipeline
@@ -104,11 +107,11 @@ protected:
 
         config.reset(new CollectionConfig(mConfigName, std::move(configJson), "/fake/path"));
         APSARA_TEST_TRUE(config->Parse());
-        pipeline.reset(new CollectionPipeline());
-        APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
-        ctx.SetPipeline(*pipeline.get());
+        mPipeline = make_unique<CollectionPipeline>();
+        APSARA_TEST_TRUE(mPipeline->Init(std::move(*config)));
+        ctx.SetPipeline(*mPipeline);
         ctx.SetConfigName(mConfigName);
-        ctx.SetProcessQueueKey(0);
+        ctx.SetProcessQueueKey(mPipeline->GetContext().GetProcessQueueKey());
 
         discoveryOpts = FileDiscoveryOptions();
         discoveryOpts.Init(inputConfigJson, ctx, "test");
@@ -119,7 +122,7 @@ protected:
         FileServer::GetInstance()->AddFileReaderConfig(mConfigName, &readerOpts, &ctx);
         FileServer::GetInstance()->AddMultilineConfig(mConfigName, &multilineOpts, &ctx);
         FileServer::GetInstance()->AddFileTagConfig(mConfigName, &tagOpts, &ctx);
-        ProcessQueueManager::GetInstance()->CreateOrUpdateCountBoundedQueue(0, 0, ctx);
+        ProcessQueueManager::GetInstance()->CreateOrUpdateCountBoundedQueue(ctx.GetProcessQueueKey(), 0, ctx);
         ProcessQueueManager::GetInstance()->EnablePop(mConfigName);
     }
 
@@ -145,6 +148,8 @@ private:
     FileReaderOptions readerOpts;
     MultilineOptions multilineOpts;
     FileTagOptions tagOpts;
+    // Keep the pipeline alive for the context and use its allocated queue key.
+    unique_ptr<CollectionPipeline> mPipeline;
     CollectionPipelineContext ctx;
     FileDiscoveryConfig mConfig;
 };

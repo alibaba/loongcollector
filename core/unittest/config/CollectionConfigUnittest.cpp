@@ -2463,9 +2463,9 @@ void CollectionConfigUnittest::NativeInputWithGoPlugin() const {
         APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
         config.reset(new CollectionConfig(configName, std::move(configJson), filepath));
         const bool available = PluginRegistry::GetInstance()->IsValidNativeInputPlugin(inputType, false);
-        APSARA_TEST_EQUAL_DESC(available, config->Parse(), inputType);
-        APSARA_TEST_FALSE_DESC(config->mHasGoInput, inputType);
-        APSARA_TEST_EQUAL_DESC(available, config->mHasNativeInput, inputType);
+        EXPECT_EQ(available, config->Parse()) << inputType;
+        EXPECT_FALSE(config->mHasGoInput) << inputType;
+        EXPECT_EQ(available, config->mHasNativeInput) << inputType;
 
         // native input + Go flusher only
         configStr = R"(
@@ -2487,9 +2487,9 @@ void CollectionConfigUnittest::NativeInputWithGoPlugin() const {
         APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
         config.reset(new CollectionConfig(configName, std::move(configJson), filepath));
 
-        APSARA_TEST_EQUAL_DESC(available, config->Parse(), inputType);
-        APSARA_TEST_FALSE_DESC(config->mHasGoInput, inputType);
-        APSARA_TEST_EQUAL_DESC(available, config->mHasNativeInput, inputType);
+        EXPECT_EQ(available, config->Parse()) << inputType;
+        EXPECT_FALSE(config->mHasGoInput) << inputType;
+        EXPECT_EQ(available, config->mHasNativeInput) << inputType;
     }
 }
 
