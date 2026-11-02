@@ -19,6 +19,7 @@
 
 #include <condition_variable>
 #include <cstdlib>
+#include <future>
 #include <thread>
 #include <vector>
 
@@ -141,10 +142,12 @@ void PrometheusInputRunnerUnittest::OnSuccessfulStartAndStop() {
 }
 
 void PrometheusInputRunnerUnittest::TestHasRegisteredPlugins() {
-    PrometheusInputRunner::GetInstance()->Init();
+    auto runner = PrometheusInputRunner::GetInstance();
+    runner->Init();
 
-    // not in use
-    APSARA_TEST_FALSE(PrometheusInputRunner::GetInstance()->HasRegisteredPlugins());
+    // A running heartbeat must not count as a registered plugin, so empty-config Stop still applies.
+    APSARA_TEST_TRUE(runner->mThreadRes.wait_for(chrono::seconds(0)) == future_status::timeout);
+    APSARA_TEST_FALSE(runner->HasRegisteredPlugins());
 
     // in use
     PrometheusInputRunner::GetInstance()->Init();

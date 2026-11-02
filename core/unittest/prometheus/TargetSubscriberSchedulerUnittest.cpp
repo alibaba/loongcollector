@@ -54,6 +54,7 @@ public:
     void TestTargetsInfoToString();
     void TestBuildSubscriberTimerEvent();
     void TestCollectLoadAndDrainScrapeDelay();
+    void TestLoadUsesJobScrapeInterval();
     void TestJobStatisticsAreIsolated();
     void TestRaceConditionBetweenCancelAndCallback();
 
@@ -829,6 +830,32 @@ void TargetSubscriberSchedulerUnittest::TestCollectLoadAndDrainScrapeDelay() {
     APSARA_TEST_EQUAL(4UL, statistics.mScrapeDelaySeconds);
 }
 
+void TargetSubscriberSchedulerUnittest::TestLoadUsesJobScrapeInterval() {
+    auto targetSubscriber = make_shared<TargetSubscriberScheduler>();
+    APSARA_TEST_TRUE(targetSubscriber->Init(mConfig["ScrapeConfig"]));
+    APSARA_TEST_EQUAL(30, targetSubscriber->mScrapeConfigPtr->mScrapeIntervalSeconds);
+    std::vector<PromTargetInfo> targetGroup;
+    APSARA_TEST_TRUE(targetSubscriber->ParseScrapeSchedulerGroup(R"JSON([
+        {
+            "targets": ["192.168.22.31:6443"],
+            "labels": {
+                "__address__": "192.168.22.31:6443",
+                "__scrape_interval__": "5s",
+                "__scrape_timeout__": "5s"
+            }
+        }
+    ])JSON",
+                                                                 targetGroup));
+    targetSubscriber->mScrapeSchedulerMap = targetSubscriber->BuildScrapeSchedulerSet(targetGroup);
+    APSARA_TEST_EQUAL(1UL, targetSubscriber->mScrapeSchedulerMap.size());
+    auto scheduler = targetSubscriber->mScrapeSchedulerMap.begin()->second;
+    APSARA_TEST_EQUAL(5UL, scheduler->GetScrapeIntervalSeconds());
+    scheduler->mScrapeResponseSizeBytes = 90;
+
+    // Matches Operator's targetItem.Load, which ignores the per-target override: 90 / 30, not 90 / 5.
+    APSARA_TEST_EQUAL(3UL, targetSubscriber->CollectLoadAndDrainScrapeDelay().mLoad);
+}
+
 void TargetSubscriberSchedulerUnittest::TestJobStatisticsAreIsolated() {
     auto firstSubscriber = make_shared<TargetSubscriberScheduler>();
     auto secondSubscriber = make_shared<TargetSubscriberScheduler>();
@@ -971,6 +998,7 @@ UNIT_TEST_CASE(TargetSubscriberSchedulerUnittest, TestTargetLabels)
 UNIT_TEST_CASE(TargetSubscriberSchedulerUnittest, TestTargetsInfoToString)
 UNIT_TEST_CASE(TargetSubscriberSchedulerUnittest, TestBuildSubscriberTimerEvent)
 UNIT_TEST_CASE(TargetSubscriberSchedulerUnittest, TestCollectLoadAndDrainScrapeDelay)
+UNIT_TEST_CASE(TargetSubscriberSchedulerUnittest, TestLoadUsesJobScrapeInterval)
 UNIT_TEST_CASE(TargetSubscriberSchedulerUnittest, TestJobStatisticsAreIsolated)
 UNIT_TEST_CASE(TargetSubscriberSchedulerUnittest, TestRaceConditionBetweenCancelAndCallback)
 
