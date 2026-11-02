@@ -723,7 +723,16 @@ void TargetSubscriberSchedulerUnittest::TestTargetsInfoToString() {
     string errorMsg;
     Json::Value data;
     APSARA_TEST_TRUE(ParseJsonTable(targetSubscriber->TargetsInfoToString(), data, errorMsg));
-    APSARA_TEST_TRUE(data[prometheus::AGENT_INFO] == snapshot.ToJson());
+    const auto& agentInfo = data[prometheus::AGENT_INFO];
+    APSARA_TEST_EQUAL(8U, agentInfo.size());
+    APSARA_TEST_EQUAL(snapshot.mCpuLimit, agentInfo[prometheus::CPU_LIMIT].asFloat());
+    APSARA_TEST_EQUAL(snapshot.mCpuUsage, agentInfo[prometheus::CPU_USAGE].asDouble());
+    APSARA_TEST_EQUAL(snapshot.mMemLimit, agentInfo[prometheus::MEM_LIMIT].asInt64());
+    APSARA_TEST_EQUAL(snapshot.mMemUsage, agentInfo[prometheus::MEM_USAGE].asDouble());
+    APSARA_TEST_EQUAL(snapshot.mLoad, agentInfo[prometheus::LOAD].asUInt64());
+    APSARA_TEST_EQUAL(snapshot.mScrapeDelaySeconds, agentInfo[prometheus::SCRAPE_DELAY_SECONDS].asUInt64());
+    APSARA_TEST_EQUAL(snapshot.mHttpSinkInItemsTotal, agentInfo[prometheus::HTTP_SINK_IN_ITEMS_TOTAL].asUInt64());
+    APSARA_TEST_EQUAL(snapshot.mHttpSinkOutFailed, agentInfo[prometheus::HTTP_SINK_OUT_FAILED].asUInt64());
     APSARA_TEST_EQUAL(3U, data[prometheus::TARGETS_INFO].size());
     for (const auto& targetInfo : data[prometheus::TARGETS_INFO]) {
         const auto& target = targetSubscriber->mScrapeSchedulerMap.at(targetInfo[prometheus::HASH].asString());
@@ -787,8 +796,17 @@ void TargetSubscriberSchedulerUnittest::TestBuildSubscriberTimerEvent() {
     Json::Value body;
     string errorMsg;
     APSARA_TEST_TRUE(ParseJsonTable(request->mBody, body, errorMsg));
-    APSARA_TEST_TRUE(body[prometheus::AGENT_INFO]
-                     == PrometheusInputRunner::GetInstance()->GetAgentInfoSnapshot().ToJson());
+    auto snapshot = PrometheusInputRunner::GetInstance()->GetAgentInfoSnapshot();
+    const auto& agentInfo = body[prometheus::AGENT_INFO];
+    APSARA_TEST_EQUAL(8U, agentInfo.size());
+    APSARA_TEST_EQUAL(snapshot.mCpuLimit, agentInfo[prometheus::CPU_LIMIT].asFloat());
+    APSARA_TEST_EQUAL(snapshot.mCpuUsage, agentInfo[prometheus::CPU_USAGE].asDouble());
+    APSARA_TEST_EQUAL(snapshot.mMemLimit, agentInfo[prometheus::MEM_LIMIT].asInt64());
+    APSARA_TEST_EQUAL(snapshot.mMemUsage, agentInfo[prometheus::MEM_USAGE].asDouble());
+    APSARA_TEST_EQUAL(snapshot.mLoad, agentInfo[prometheus::LOAD].asUInt64());
+    APSARA_TEST_EQUAL(snapshot.mScrapeDelaySeconds, agentInfo[prometheus::SCRAPE_DELAY_SECONDS].asUInt64());
+    APSARA_TEST_EQUAL(snapshot.mHttpSinkInItemsTotal, agentInfo[prometheus::HTTP_SINK_IN_ITEMS_TOTAL].asUInt64());
+    APSARA_TEST_EQUAL(snapshot.mHttpSinkOutFailed, agentInfo[prometheus::HTTP_SINK_OUT_FAILED].asUInt64());
 
     subscriber->mETag.clear();
     auto eventWithoutETag = subscriber->BuildSubscriberTimerEvent(execTime);

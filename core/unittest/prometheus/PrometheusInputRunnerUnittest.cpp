@@ -499,9 +499,18 @@ void PrometheusInputRunnerUnittest::TestSendHeartbeatRequest() {
     string errorMsg;
     APSARA_TEST_TRUE(ParseJsonTable(capturedRequest->mBody, body, errorMsg));
     APSARA_TEST_EQUAL(1U, body.size());
-    APSARA_TEST_TRUE(body[prometheus::AGENT_INFO] == runner->GetAgentInfoSnapshot().ToJson());
-    APSARA_TEST_EQUAL(8U, body[prometheus::AGENT_INFO].size());
-    APSARA_TEST_EQUAL(0UL, body[prometheus::AGENT_INFO][prometheus::SCRAPE_DELAY_SECONDS].asUInt64());
+    auto snapshot = runner->GetAgentInfoSnapshot();
+    const auto& agentInfo = body[prometheus::AGENT_INFO];
+    APSARA_TEST_EQUAL(8U, agentInfo.size());
+    APSARA_TEST_EQUAL(snapshot.mCpuLimit, agentInfo[prometheus::CPU_LIMIT].asFloat());
+    APSARA_TEST_EQUAL(snapshot.mCpuUsage, agentInfo[prometheus::CPU_USAGE].asDouble());
+    APSARA_TEST_EQUAL(snapshot.mMemLimit, agentInfo[prometheus::MEM_LIMIT].asInt64());
+    APSARA_TEST_EQUAL(snapshot.mMemUsage, agentInfo[prometheus::MEM_USAGE].asDouble());
+    APSARA_TEST_EQUAL(snapshot.mLoad, agentInfo[prometheus::LOAD].asUInt64());
+    APSARA_TEST_EQUAL(snapshot.mScrapeDelaySeconds, agentInfo[prometheus::SCRAPE_DELAY_SECONDS].asUInt64());
+    APSARA_TEST_EQUAL(snapshot.mHttpSinkInItemsTotal, agentInfo[prometheus::HTTP_SINK_IN_ITEMS_TOTAL].asUInt64());
+    APSARA_TEST_EQUAL(snapshot.mHttpSinkOutFailed, agentInfo[prometheus::HTTP_SINK_OUT_FAILED].asUInt64());
+    APSARA_TEST_EQUAL(0UL, agentInfo[prometheus::SCRAPE_DELAY_SECONDS].asUInt64());
 }
 
 void PrometheusInputRunnerUnittest::TestHeartbeatResponses() {
