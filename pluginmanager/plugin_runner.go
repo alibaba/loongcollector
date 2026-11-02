@@ -34,8 +34,6 @@ const (
 	ctxKeySource = "source"
 	ctxKeyTopic  = "topic"
 	ctxKeyTags   = "tags"
-
-	tagKeyLogTopic = "__log_topic__"
 )
 
 type PluginRunner interface {

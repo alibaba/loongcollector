@@ -220,8 +220,7 @@ func notifyPipelineRemoved(config *LogstoreConfig) {
 	if config == nil || config.PluginRunner == nil {
 		return
 	}
-	switch runner := config.PluginRunner.(type) {
-	case *pluginRunner:
+	if runner, ok := config.PluginRunner.(*pluginRunner); ok {
 		for _, sw := range runner.ServicePlugins {
 			if cleaner, ok := sw.Input.(pipeline.PipelineRemovedCleaner); ok {
 				cleaner.OnPipelineRemoved()
