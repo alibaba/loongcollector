@@ -64,6 +64,7 @@ LogtailPlugin::LogtailPlugin() {
     mLoadGlobalConfigFun = NULL;
     mPluginValid = false;
     mPluginContainerConfig.mLogstore = "logtail_containers";
+    mPluginContainerContext.SetConfigName("logtail_containers");
     mPluginContainerConfig.mAliuid = STRING_FLAG(logtail_profile_aliuid);
     mPluginContainerConfig.mCompressor = CompressorFactory::GetInstance()->Create(CompressType::ZSTD);
 
@@ -249,12 +250,22 @@ int LogtailPlugin::SendPbV2(const char* configName,
     // LOG_DEBUG(sLogger, ("send pb", configNameStr)("pb size", pbSize)("lines", lines));
     FlusherSLS* pConfig = NULL;
     if (configNameStr == containerConfig->mLogstore) {
+        auto* plugin = LogtailPlugin::GetInstance();
+        lock_guard<mutex> lock(plugin->mPluginContainerMutex);
         pConfig = containerConfig;
         pConfig->mProject = GetProfileSender()->GetDefaultProfileProjectName();
         pConfig->mRegion = GetProfileSender()->GetDefaultProfileRegion();
         if (pConfig->mProject.empty()) {
             return 0;
         }
+        if (!pConfig->InitForProfile(plugin->mPluginContainerContext)) {
+            return -1;
+        }
+        string hash;
+        if (shardHashSize > 0 && shardHash != nullptr) {
+            hash.assign(shardHash, static_cast<size_t>(shardHashSize));
+        }
+        return pConfig->Send(string(pbBuffer, pbSize), hash, logstore) ? 0 : -1;
     } else {
         shared_ptr<CollectionPipeline> p = CollectionPipelineManager::GetInstance()->FindConfigByName(configNameStr);
         if (!p) {
@@ -304,9 +315,22 @@ int LogtailPlugin::SendPipelineEventGroup(const char* configName,
     }
 
     if (configNameStr == containerConfig->mLogstore) {
-        // Container profile still uses SendPb (LogGroup). C1 does not push PEG
-        // onto the profile flusher's native batcher; C3 will wire this path.
-        return 0;
+        auto* plugin = LogtailPlugin::GetInstance();
+        lock_guard<mutex> lock(plugin->mPluginContainerMutex);
+        containerConfig->mProject = GetProfileSender()->GetDefaultProfileProjectName();
+        containerConfig->mRegion = GetProfileSender()->GetDefaultProfileRegion();
+        if (containerConfig->mProject.empty()) {
+            // An empty profile project explicitly disables container reporting.
+            return 0;
+        }
+        string hash;
+        if (shardHashSize > 0 && shardHash != nullptr) {
+            hash.assign(shardHash, static_cast<size_t>(shardHashSize));
+        }
+        if (!containerConfig->InitForProfile(plugin->mPluginContainerContext)) {
+            return -1;
+        }
+        return containerConfig->Send(pbGroup, hash, logstore) ? 0 : -1;
     }
 
     shared_ptr<CollectionPipeline> p = CollectionPipelineManager::GetInstance()->FindConfigByName(configNameStr);
@@ -327,28 +351,11 @@ int LogtailPlugin::SendPipelineEventGroup(const char* configName,
     }
     FlusherSLS* pConfig = const_cast<FlusherSLS*>(static_cast<const FlusherSLS*>(plugin));
 
-    PipelineEventGroup group(std::make_shared<SourceBuffer>());
-    string errMsg;
-    if (!TransferPBToPipelineEventGroup(pbGroup, group, errMsg)) {
-        LOG_WARNING(sLogger,
-                    ("error", "SendPipelineEventGroup transfer PB failed")("err", errMsg)("config", configNameStr));
-        return -1;
+    string hash;
+    if (shardHashSize > 0 && shardHash != nullptr) {
+        hash.assign(shardHash, static_cast<size_t>(shardHashSize));
     }
-
-    // C1 delivers via the native object path so C2 can land before C3. logstore
-    // and shardHash are accepted (same ABI as SendPbV2) and will be honored by
-    // C3's byte-oriented FlusherSLS::Send(PipelineEventGroup PB) path.
-    if (!logstore.empty() && logstore != pConfig->mLogstore) {
-        LOG_DEBUG(sLogger,
-                  ("SendPipelineEventGroup logstore override deferred to C3", logstore)("flusher logstore",
-                                                                                        pConfig->mLogstore));
-    }
-    if (shardHashSize > 0 && shardHash != NULL) {
-        LOG_DEBUG(
-            sLogger,
-            ("SendPipelineEventGroup shardHash deferred to C3", string(shardHash, static_cast<size_t>(shardHashSize))));
-    }
-    return pConfig->Send(std::move(group)) ? 0 : -1;
+    return pConfig->Send(pbGroup, hash, logstore) ? 0 : -1;
 }
 
 bool LogtailPlugin::LoadPluginBase() {

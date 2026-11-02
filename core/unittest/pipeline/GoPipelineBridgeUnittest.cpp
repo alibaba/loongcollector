@@ -16,11 +16,13 @@
 
 #include "gtest/gtest.h"
 
+#include "collection_pipeline/queue/SenderQueueManager.h"
 #include "go_pipeline/LogtailPlugin.h"
 #include "models/PipelineEventGroup.h"
 #include "monitor/MetricManager.h"
 #include "protobuf/models/ProtocolConversion.h"
 #include "protobuf/models/pipeline_event_group.pb.h"
+#include "provider/Provider.h"
 #include "unittest/Unittest.h"
 #include "unittest/pipeline/LogtailPluginMock.h"
 
@@ -92,6 +94,8 @@ protected:
         mSourceBuffer = make_shared<SourceBuffer>();
         LogtailPluginMock::ResetProcessPipelineEventGroupStats();
         auto* plugin = LogtailPlugin::GetInstance();
+        mOriginalProfileProject = GetProfileSender()->GetDefaultProfileProjectName();
+        GetProfileSender()->SetDefaultProfileProjectName("");
         mOriginalValid = plugin->mPluginValid;
         mOriginalMetrics = plugin->mGetGoSelfMonitorMetricsPBFun;
         mOriginalAlarms = plugin->mGetGoSelfMonitorAlarmsPBFun;
@@ -104,6 +108,7 @@ protected:
 
     void TearDown() override {
         auto* plugin = LogtailPlugin::GetInstance();
+        GetProfileSender()->SetDefaultProfileProjectName(mOriginalProfileProject);
         plugin->mPluginValid = mOriginalValid;
         plugin->mGetGoSelfMonitorMetricsPBFun = mOriginalMetrics;
         plugin->mGetGoSelfMonitorAlarmsPBFun = mOriginalAlarms;
@@ -118,7 +123,12 @@ protected:
         plugin->mFreeSelfMonitorPBFun = enableFree ? FreeTestSelfMonitorPB : nullptr;
     }
 
+    bool UncompressContainer(const string& input, string& output, string& error) {
+        return LogtailPlugin::GetInstance()->mPluginContainerConfig.mCompressor->UnCompress(input, output, error);
+    }
+
     shared_ptr<SourceBuffer> mSourceBuffer;
+    string mOriginalProfileProject;
     bool mOriginalValid = false;
     GetGoSelfMonitorMetricsPBFun mOriginalMetrics = nullptr;
     GetGoSelfMonitorAlarmsPBFun mOriginalAlarms = nullptr;
@@ -280,8 +290,62 @@ TEST_F(GoPipelineBridgeUnittest, SendPipelineEventGroupContainerConfigEmptyProje
     ASSERT_FALSE(serialized.empty());
 
     // Matches LogtailPlugin constructor: mPluginContainerConfig.mLogstore = "logtail_containers".
-    // C1 accepts the PEG and no-ops the profile flusher (still on SendPb).
+    // An empty profile project explicitly disables reporting, as with SendPbV2.
     EXPECT_EQ(0, CallSendPipelineEventGroup("logtail_containers", serialized));
+}
+
+
+TEST_F(GoPipelineBridgeUnittest, SendPipelineEventGroupContainerConfigQueuesPayload) {
+    PipelineEventGroup group(mSourceBuffer);
+    auto* log = group.AddLogEvent();
+    log->SetTimestamp(1700000000);
+    log->SetContent(string("container"), string("real-container"));
+    const string serialized = SerializeGroup(group);
+    GetProfileSender()->SetDefaultProfileProjectName("bridge-profile-project");
+    EXPECT_EQ(0, CallSendPipelineEventGroup("logtail_containers", serialized, "profile-override"));
+    vector<SenderQueueItem*> items;
+    SenderQueueManager::GetInstance()->GetAvailableItems(items, 80);
+    EXPECT_EQ(1U, items.size());
+    if (items.size() == 1) {
+        auto* item = static_cast<SLSSenderQueueItem*>(items[0]);
+        EXPECT_EQ("profile-override", item->mLogstore);
+        string data(item->mRawSize, '\0');
+        string error;
+        EXPECT_TRUE(UncompressContainer(item->mData, data, error));
+        sls_logs::LogGroup result;
+        EXPECT_TRUE(result.ParseFromString(data));
+        EXPECT_EQ(1, result.logs_size());
+        if (result.logs_size() == 1) {
+            EXPECT_EQ("real-container", result.logs(0).contents(0).value());
+        }
+        SenderQueueManager::GetInstance()->RemoveItem(item->mQueueKey, item);
+    }
+}
+
+
+TEST_F(GoPipelineBridgeUnittest, SendPbContainerConfigSharesProfileContext) {
+    sls_logs::LogGroup group;
+    auto* log = group.add_logs();
+    log->set_time(1700000000);
+    auto* content = log->add_contents();
+    content->set_key("container");
+    content->set_value("legacy-container");
+    string data = group.SerializeAsString();
+    GetProfileSender()->SetDefaultProfileProjectName("bridge-profile-project");
+    EXPECT_EQ(0,
+              LogtailPlugin::SendPbV2(
+                  "logtail_containers", 18, "", 0, const_cast<char*>(data.data()), data.size(), 1, "", 0));
+    vector<SenderQueueItem*> items;
+    SenderQueueManager::GetInstance()->GetAvailableItems(items, 80);
+    EXPECT_EQ(1U, items.size());
+    if (items.size() == 1) {
+        auto* item = static_cast<SLSSenderQueueItem*>(items[0]);
+        string output(item->mRawSize, 0), error;
+        EXPECT_TRUE(UncompressContainer(item->mData, output, error));
+        EXPECT_EQ(data, output);
+        EXPECT_EQ("logtail_containers", item->mLogstore);
+        SenderQueueManager::GetInstance()->RemoveItem(item->mQueueKey, item);
+    }
 }
 
 } // namespace logtail
