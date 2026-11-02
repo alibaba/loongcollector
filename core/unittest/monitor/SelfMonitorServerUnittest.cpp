@@ -18,6 +18,7 @@
 
 #include "models/PipelineEventGroup.h"
 #include "monitor/AlarmManager.h"
+#include "monitor/MetricManager.h"
 #include "monitor/SelfMonitorServer.h"
 #include "protobuf/models/ProtocolConversion.h"
 #include "protobuf/models/pipeline_event_group.pb.h"
@@ -32,6 +33,7 @@ public:
         FlushAlarms();
     }
     void TestReceiveGoAlarmsPB();
+    void TestGoMetricsPipelineRoundTrip();
     void TestReceiveGoAlarmsPBInvalid();
     void TestReceiveGoAlarmsPBCrossBatch();
     void TestReceiveGoAlarmsPBDuplicateFields();
@@ -300,6 +302,74 @@ APSARA_UNIT_TEST_CASE(SelfMonitorServerUnittest, TestReceiveGoAlarmsPBOneof, 5);
 APSARA_UNIT_TEST_CASE(SelfMonitorServerUnittest, TestReceiveGoAlarmsPBBatchSizes, 6);
 APSARA_UNIT_TEST_CASE(SelfMonitorServerUnittest, TestReceiveGoAlarmsPBConcurrent, 7);
 APSARA_UNIT_TEST_CASE(SelfMonitorServerUnittest, TestReceiveGoAlarmsPBFinalMetadata, 8);
+
+
+// Combine the Go PB contract with rule filtering, aggregation, and typed output.
+void SelfMonitorServerUnittest::TestGoMetricsPipelineRoundTrip() {
+    auto* server = SelfMonitorServer::GetInstance();
+    auto* originalRules = server->mSelfMonitorMetricRules;
+    SelfMonitorMetricRules rules{};
+    rules.mPluginMetricsRule.mEnable = true;
+    rules.mPluginMetricsRule.mInterval = 1;
+    rules.mPluginSourceMetricsRule.mEnable = false;
+    server->mSelfMonitorMetricRules = &rules;
+    server->mSelfMonitorMetricEventMap.clear();
+
+    models::PipelineEventGroup pb;
+    auto* metric = pb.mutable_metrics()->add_events();
+    metric->set_name("plugin");
+    (*metric->mutable_tags())["pipeline_name"] = "go-source";
+    (*metric->mutable_tags())["plugin_type"] = "metric_mock";
+    auto* values = metric->mutable_untypedmultidoublevalues()->mutable_values();
+    (*values)["out_events_total"].set_metrictype(models::METRIC_TYPE_COUNTER);
+    (*values)["out_events_total"].set_value(3);
+    (*values)["queue_size"].set_metrictype(models::METRIC_TYPE_GAUGE);
+    (*values)["queue_size"].set_value(1.5);
+    // Adding a repeated message may invalidate its previous element pointer.
+    models::MetricEvent source(*metric);
+    source.set_name("plugin_source");
+    pb.mutable_metrics()->add_events()->CopyFrom(source);
+    std::vector<SelfMonitorMetricEvent> records;
+    EXPECT_TRUE(ReadMetrics::ParseGoMetricsPB(pb.SerializeAsString(), records));
+    server->PushSelfMonitorMetricEvents(records);
+    server->PushSelfMonitorMetricEvents(records);
+
+    PipelineEventGroup output(std::make_shared<SourceBuffer>());
+    server->ReadAsPipelineEventGroup(output);
+    models::PipelineEventGroup exported;
+    std::string error;
+    EXPECT_TRUE(TransferPipelineEventGroupToPB(output, exported, error)) << error;
+    EXPECT_EQ(1, exported.metrics().events_size());
+    if (exported.metrics().events_size() == 1) {
+        const auto& event = exported.metrics().events(0);
+        EXPECT_EQ("plugin", event.name());
+        EXPECT_GT(event.timestamp(), 0U);
+        EXPECT_EQ("go-source", event.tags().at("pipeline_name"));
+        EXPECT_EQ("metric_mock", event.tags().at("plugin_type"));
+        const auto& result = event.untypedmultidoublevalues().values();
+        EXPECT_EQ(models::METRIC_TYPE_COUNTER, result.at("out_events_total").metrictype());
+        EXPECT_DOUBLE_EQ(6, result.at("out_events_total").value());
+        EXPECT_EQ(models::METRIC_TYPE_GAUGE, result.at("queue_size").metrictype());
+        EXPECT_DOUBLE_EQ(1.5, result.at("queue_size").value());
+    }
+    PipelineEventGroup idle(std::make_shared<SourceBuffer>());
+    server->ReadAsPipelineEventGroup(idle);
+    EXPECT_TRUE(idle.GetEvents().empty());
+    server->PushSelfMonitorMetricEvents(records);
+    PipelineEventGroup next(std::make_shared<SourceBuffer>());
+    server->ReadAsPipelineEventGroup(next);
+    EXPECT_EQ(1U, next.GetEvents().size());
+    if (!next.GetEvents().empty()) {
+        const auto* nextValues = next.GetEvents()[0].Cast<MetricEvent>().GetValue<UntypedMultiDoubleValues>();
+        UntypedMultiDoubleValue value{};
+        EXPECT_TRUE(nextValues->GetValue("out_events_total", value));
+        EXPECT_DOUBLE_EQ(3, value.Value);
+    }
+    server->mSelfMonitorMetricEventMap.clear();
+    server->mSelfMonitorMetricRules = originalRules;
+}
+
+APSARA_UNIT_TEST_CASE(SelfMonitorServerUnittest, TestGoMetricsPipelineRoundTrip, 9);
 
 } // namespace logtail
 
