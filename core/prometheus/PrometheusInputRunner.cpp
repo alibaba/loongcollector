@@ -231,7 +231,6 @@ void PrometheusInputRunner::RunRegistrationAndHeartbeat(const shared_ptr<StopTok
         if (result == HeartbeatResult::NotRegistered) {
             registered = false;
             SET_GAUGE(mPromRegisterState, 0);
-            continue;
         }
         nextHeartbeatTime += interval;
         auto now = SteadyNow();

@@ -57,6 +57,7 @@ public:
     void TestRestartWaitsForOldLoop();
     void TestDestructorWaitsForWorker();
     void TestHeartbeatCadence();
+    void TestRepeatedNotRegisteredUsesHeartbeatCadence();
 
 protected:
     void SetUp() override {
@@ -649,7 +650,7 @@ void PrometheusInputRunnerUnittest::TestRegistrationAndHeartbeatLoop() {
     runner->mSleepFor = [&](chrono::steady_clock::duration interval) {
         waits.push_back(interval);
         now += interval;
-        if (waits.size() == 4) {
+        if (waits.size() == 5) {
             stop->mStopped.store(true);
         }
     };
@@ -667,11 +668,54 @@ void PrometheusInputRunnerUnittest::TestRegistrationAndHeartbeatLoop() {
                                           prometheus::HEARTBEAT_COLLECTOR_PATH};
     APSARA_TEST_TRUE(requests == expectedRequests);
     const vector<chrono::steady_clock::duration> expectedWaits{chrono::seconds(1),
+                                                               chrono::seconds(prometheus::RefeshIntervalSeconds),
                                                                chrono::seconds(1),
                                                                chrono::seconds(prometheus::RefeshIntervalSeconds),
                                                                chrono::seconds(prometheus::RefeshIntervalSeconds)};
     APSARA_TEST_TRUE(waits == expectedWaits);
     runner->RemoveScrapeInput(subscriber->GetId());
+}
+
+void PrometheusInputRunnerUnittest::TestRepeatedNotRegisteredUsesHeartbeatCadence() {
+    auto runner = PrometheusInputRunner::GetInstance();
+    auto stop = make_shared<PrometheusInputRunner::StopToken>();
+    auto now = chrono::steady_clock::time_point{};
+    vector<chrono::steady_clock::duration> registrationTimes;
+    vector<chrono::steady_clock::duration> heartbeatTimes;
+    vector<chrono::steady_clock::duration> waits;
+    runner->mSteadyNow = [&]() { return now; };
+    runner->mHttpRequestSender = [&](unique_ptr<HttpRequest>&& request, HttpResponse& response) {
+        if (request->mUrl == prometheus::REGISTER_COLLECTOR_PATH) {
+            registrationTimes.push_back(now.time_since_epoch());
+            if (registrationTimes.size() > 3) {
+                stop->mStopped.store(true);
+            }
+            response.SetStatusCode(200);
+        } else {
+            APSARA_TEST_EQUAL(prometheus::HEARTBEAT_COLLECTOR_PATH, request->mUrl);
+            heartbeatTimes.push_back(now.time_since_epoch());
+            now += chrono::milliseconds(100);
+            response.SetStatusCode(404);
+            response.AddHeader(prometheus::PROMETHEUS_COLLECTOR_PROTOCOL_VERSION, "v1");
+            *response.GetBody<string>() = R"({"msg":"NotRegistered"})";
+        }
+        return true;
+    };
+    runner->mSleepFor = [&](chrono::steady_clock::duration duration) {
+        waits.push_back(duration);
+        now += duration;
+        if (waits.size() == 3) {
+            stop->mStopped.store(true);
+        }
+    };
+    runner->RunRegistrationAndHeartbeat(stop);
+
+    const vector<chrono::steady_clock::duration> expectedTimes{
+        chrono::seconds(0), chrono::seconds(5), chrono::seconds(10)};
+    const vector<chrono::steady_clock::duration> expectedWaits(3, chrono::milliseconds(4900));
+    APSARA_TEST_TRUE(registrationTimes == expectedTimes);
+    APSARA_TEST_TRUE(heartbeatTimes == expectedTimes);
+    APSARA_TEST_TRUE(waits == expectedWaits);
 }
 
 void PrometheusInputRunnerUnittest::TestStopDuringHeartbeat() {
@@ -902,6 +946,7 @@ UNIT_TEST_CASE(PrometheusInputRunnerUnittest, TestStoppedTokenRejectsRequests)
 UNIT_TEST_CASE(PrometheusInputRunnerUnittest, TestRestartWaitsForOldLoop)
 UNIT_TEST_CASE(PrometheusInputRunnerUnittest, TestDestructorWaitsForWorker)
 UNIT_TEST_CASE(PrometheusInputRunnerUnittest, TestHeartbeatCadence)
+UNIT_TEST_CASE(PrometheusInputRunnerUnittest, TestRepeatedNotRegisteredUsesHeartbeatCadence)
 
 } // namespace logtail
 
