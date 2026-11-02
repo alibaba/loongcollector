@@ -231,7 +231,13 @@ CURL* CreateCurlHandler(const string& method,
             return nullptr;
         }
         // Environment proxies must not redirect a local socket request.
-        curl_easy_setopt(curl, CURLOPT_NOPROXY, "*");
+        rc = curl_easy_setopt(curl, CURLOPT_PROXY, "");
+        if (rc != CURLE_OK) {
+            LOG_ERROR(sLogger,
+                      ("failed to disable proxy for unix socket", unixSocketPath)("errMsg", curl_easy_strerror(rc)));
+            curl_easy_cleanup(curl);
+            return nullptr;
+        }
     }
 
     string totalUrl = httpsFlag ? "https://" : "http://";
