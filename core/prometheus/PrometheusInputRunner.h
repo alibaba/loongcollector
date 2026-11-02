@@ -100,8 +100,7 @@ private:
                                      uint32_t maxTryCnt
                                      = static_cast<uint32_t>(INT32_FLAG(default_http_request_max_try_cnt)),
                                      const std::shared_ptr<StopToken>& stop = nullptr) const;
-    HttpResponse SendRegisterMessage(const std::string& url,
-                                     const std::shared_ptr<StopToken>& stop = nullptr) const;
+    HttpResponse SendRegisterMessage(const std::string& url, const std::shared_ptr<StopToken>& stop = nullptr) const;
     HeartbeatResult SendHeartbeat(const std::shared_ptr<StopToken>& stop = nullptr);
     PrometheusAgentInfo RefreshAgentInfoSnapshot();
 

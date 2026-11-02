@@ -179,9 +179,8 @@ void PrometheusInputRunner::Init() {
     }
     if (!mServiceHost.empty()) {
         mStopToken = make_shared<StopToken>();
-        LaunchAsync(mThreadRes, "PrometheusHeartbeat", [this, stop = mStopToken]() {
-            RunRegistrationAndHeartbeat(stop);
-        });
+        LaunchAsync(
+            mThreadRes, "PrometheusHeartbeat", [this, stop = mStopToken]() { RunRegistrationAndHeartbeat(stop); });
     }
 }
 
@@ -400,10 +399,9 @@ HttpResponse PrometheusInputRunner::SendOperatorRequest(const string& method,
     return httpResponse;
 }
 
-HttpResponse PrometheusInputRunner::SendRegisterMessage(const string& url,
-                                                        const shared_ptr<StopToken>& stop) const {
-    map<string, string> headers{{prometheus::PROMETHEUS_COLLECTOR_PROTOCOL_VERSION,
-                                prometheus::PROMETHEUS_COLLECTOR_PROTOCOL_VERSION_V1}};
+HttpResponse PrometheusInputRunner::SendRegisterMessage(const string& url, const shared_ptr<StopToken>& stop) const {
+    map<string, string> headers{
+        {prometheus::PROMETHEUS_COLLECTOR_PROTOCOL_VERSION, prometheus::PROMETHEUS_COLLECTOR_PROTOCOL_VERSION_V1}};
     return SendOperatorRequest(HTTP_GET,
                                url,
                                "pod_name=" + mPodName,
@@ -420,10 +418,10 @@ PrometheusInputRunner::HeartbeatResult PrometheusInputRunner::SendHeartbeat(cons
     }
     Json::Value body;
     body[prometheus::AGENT_INFO] = RefreshAgentInfoSnapshot().ToJson();
-    map<string, string> headers{{prometheus::PROMETHEUS_COLLECTOR_PROTOCOL_VERSION,
-                                prometheus::PROMETHEUS_COLLECTOR_PROTOCOL_VERSION_V1},
-                               {CONTENT_TYPE, prometheus::APPLICATION_JSON},
-                               {prometheus::ACCEPT, prometheus::APPLICATION_JSON}};
+    map<string, string> headers{
+        {prometheus::PROMETHEUS_COLLECTOR_PROTOCOL_VERSION, prometheus::PROMETHEUS_COLLECTOR_PROTOCOL_VERSION_V1},
+        {CONTENT_TYPE, prometheus::APPLICATION_JSON},
+        {prometheus::ACCEPT, prometheus::APPLICATION_JSON}};
     auto response = SendOperatorRequest(HTTP_POST,
                                         prometheus::HEARTBEAT_COLLECTOR_PATH,
                                         string(prometheus::COLLECTOR_ID) + "=" + URLEncode(mPodName),

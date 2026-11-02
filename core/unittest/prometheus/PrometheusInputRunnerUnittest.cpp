@@ -14,14 +14,15 @@
  * limitations under the License.
  */
 
-#include "json/json.h"
-#include "json/value.h"
+#include <cstdlib>
 
 #include <condition_variable>
-#include <cstdlib>
 #include <future>
 #include <thread>
 #include <vector>
+
+#include "json/json.h"
+#include "json/value.h"
 
 #include "app_config/AppConfig.h"
 #include "common/JsonUtil.h"
@@ -317,16 +318,12 @@ void PrometheusInputRunnerUnittest::TestSendOperatorRequest() {
         return true;
     };
 
-    map<string, string> headers{{prometheus::PROMETHEUS_COLLECTOR_PROTOCOL_VERSION,
-                                 prometheus::PROMETHEUS_COLLECTOR_PROTOCOL_VERSION_V1},
-                                {prometheus::ACCEPT, prometheus::APPLICATION_JSON}};
+    map<string, string> headers{
+        {prometheus::PROMETHEUS_COLLECTOR_PROTOCOL_VERSION, prometheus::PROMETHEUS_COLLECTOR_PROTOCOL_VERSION_V1},
+        {prometheus::ACCEPT, prometheus::APPLICATION_JSON}};
     const string body = R"({"AgentInfo":{"Load":1024}})";
-    auto response = runner->SendOperatorRequest(HTTP_POST,
-                                                prometheus::HEARTBEAT_COLLECTOR_PATH,
-                                                "collector_id=test_pod",
-                                                headers,
-                                                body,
-                                                3);
+    auto response = runner->SendOperatorRequest(
+        HTTP_POST, prometheus::HEARTBEAT_COLLECTOR_PATH, "collector_id=test_pod", headers, body, 3);
 
     APSARA_TEST_EQUAL(204, response.GetStatusCode());
     APSARA_TEST_TRUE(capturedRequest != nullptr);
@@ -363,8 +360,7 @@ void PrometheusInputRunnerUnittest::TestSendRegisterMessage() {
                       capturedRequest->mHeader.at(prometheus::PROMETHEUS_COLLECTOR_PROTOCOL_VERSION));
     APSARA_TEST_TRUE(capturedRequest->mBody.empty());
     APSARA_TEST_EQUAL(10U, capturedRequest->mTimeout);
-    APSARA_TEST_EQUAL(static_cast<uint32_t>(INT32_FLAG(default_http_request_max_try_cnt)),
-                      capturedRequest->mMaxTryCnt);
+    APSARA_TEST_EQUAL(static_cast<uint32_t>(INT32_FLAG(default_http_request_max_try_cnt)), capturedRequest->mMaxTryCnt);
 }
 
 void PrometheusInputRunnerUnittest::TestAgentInfoToJson() {
@@ -471,15 +467,15 @@ void PrometheusInputRunnerUnittest::TestSendHeartbeatRequest() {
     }
     unique_ptr<HttpRequest> capturedRequest;
     int sendCount = 0;
-    runner->mHttpRequestSender = [&capturedRequest, &sendCount](unique_ptr<HttpRequest>&& request,
-                                                             HttpResponse& response) {
-        ++sendCount;
-        capturedRequest = std::move(request);
-        response.SetStatusCode(204);
-        response.AddHeader(prometheus::PROMETHEUS_COLLECTOR_PROTOCOL_VERSION,
-                           prometheus::PROMETHEUS_COLLECTOR_PROTOCOL_VERSION_V1);
-        return true;
-    };
+    runner->mHttpRequestSender
+        = [&capturedRequest, &sendCount](unique_ptr<HttpRequest>&& request, HttpResponse& response) {
+              ++sendCount;
+              capturedRequest = std::move(request);
+              response.SetStatusCode(204);
+              response.AddHeader(prometheus::PROMETHEUS_COLLECTOR_PROTOCOL_VERSION,
+                                 prometheus::PROMETHEUS_COLLECTOR_PROTOCOL_VERSION_V1);
+              return true;
+          };
 
     auto result = runner->SendHeartbeat();
     APSARA_TEST_EQUAL(PrometheusInputRunner::HeartbeatResult::Success, result);
@@ -548,18 +544,18 @@ void PrometheusInputRunnerUnittest::TestHeartbeatResponses() {
     for (const auto& testCase : cases) {
         SCOPED_TRACE(to_string(testCase.status) + ":" + testCase.version + ":" + testCase.body);
         int sendCount = 0;
-        runner->mHttpRequestSender = [&testCase, &sendCount](unique_ptr<HttpRequest>&& request,
-                                                          HttpResponse& response) {
-            ++sendCount;
-            APSARA_TEST_EQUAL(prometheus::HEARTBEAT_COLLECTOR_PATH, request->mUrl);
-            response.SetStatusCode(testCase.status);
-            response.SetNetworkStatus(testCase.networkCode, "test network status");
-            *response.GetBody<string>() = testCase.body;
-            if (!testCase.version.empty()) {
-                response.AddHeader("x-prometheus-collector-protocol-version", testCase.version);
-            }
-            return testCase.networkCode == NetworkCode::Ok && testCase.status != 0;
-        };
+        runner->mHttpRequestSender
+            = [&testCase, &sendCount](unique_ptr<HttpRequest>&& request, HttpResponse& response) {
+                  ++sendCount;
+                  APSARA_TEST_EQUAL(prometheus::HEARTBEAT_COLLECTOR_PATH, request->mUrl);
+                  response.SetStatusCode(testCase.status);
+                  response.SetNetworkStatus(testCase.networkCode, "test network status");
+                  *response.GetBody<string>() = testCase.body;
+                  if (!testCase.version.empty()) {
+                      response.AddHeader("x-prometheus-collector-protocol-version", testCase.version);
+                  }
+                  return testCase.networkCode == NetworkCode::Ok && testCase.status != 0;
+              };
         APSARA_TEST_EQUAL(testCase.expected, runner->SendHeartbeat());
         APSARA_TEST_EQUAL(1, sendCount);
     }
@@ -575,16 +571,8 @@ void PrometheusInputRunnerUnittest::TestHeartbeatFailureDropsScrapeDelay() {
     APSARA_TEST_TRUE(subscriber->Init(config));
     PromTargetInfo targetInfo;
     targetInfo.mHash = "heartbeat-target";
-    auto scheduler = make_shared<ScrapeScheduler>(subscriber->mScrapeConfigPtr,
-                                                  "localhost",
-                                                  80,
-                                                  prometheus::HTTP,
-                                                  "/metrics",
-                                                  30,
-                                                  10,
-                                                  0,
-                                                  0,
-                                                  targetInfo);
+    auto scheduler = make_shared<ScrapeScheduler>(
+        subscriber->mScrapeConfigPtr, "localhost", 80, prometheus::HTTP, "/metrics", 30, 10, 0, 0, targetInfo);
     scheduler->mScrapeResponseSizeBytes = 90;
     scheduler->mExecDelayCount = 7;
     subscriber->mScrapeSchedulerMap.emplace(targetInfo.mHash, scheduler);
@@ -671,18 +659,17 @@ void PrometheusInputRunnerUnittest::TestRegistrationAndHeartbeatLoop() {
     APSARA_TEST_EQUAL(3, heartbeatCount);
     APSARA_TEST_EQUAL(11000UL, runner->mUnRegisterMs.load());
     const vector<string> expectedRequests{prometheus::REGISTER_COLLECTOR_PATH,
-                                         prometheus::REGISTER_COLLECTOR_PATH,
-                                         prometheus::HEARTBEAT_COLLECTOR_PATH,
-                                         prometheus::REGISTER_COLLECTOR_PATH,
-                                         prometheus::REGISTER_COLLECTOR_PATH,
-                                         prometheus::HEARTBEAT_COLLECTOR_PATH,
-                                         prometheus::HEARTBEAT_COLLECTOR_PATH};
+                                          prometheus::REGISTER_COLLECTOR_PATH,
+                                          prometheus::HEARTBEAT_COLLECTOR_PATH,
+                                          prometheus::REGISTER_COLLECTOR_PATH,
+                                          prometheus::REGISTER_COLLECTOR_PATH,
+                                          prometheus::HEARTBEAT_COLLECTOR_PATH,
+                                          prometheus::HEARTBEAT_COLLECTOR_PATH};
     APSARA_TEST_TRUE(requests == expectedRequests);
-    const vector<chrono::steady_clock::duration> expectedWaits{
-        chrono::seconds(1),
-        chrono::seconds(1),
-        chrono::seconds(prometheus::RefeshIntervalSeconds),
-        chrono::seconds(prometheus::RefeshIntervalSeconds)};
+    const vector<chrono::steady_clock::duration> expectedWaits{chrono::seconds(1),
+                                                               chrono::seconds(1),
+                                                               chrono::seconds(prometheus::RefeshIntervalSeconds),
+                                                               chrono::seconds(prometheus::RefeshIntervalSeconds)};
     APSARA_TEST_TRUE(waits == expectedWaits);
     runner->RemoveScrapeInput(subscriber->GetId());
 }
@@ -712,8 +699,7 @@ void PrometheusInputRunnerUnittest::TestStopDuringHeartbeat() {
         } else {
             APSARA_TEST_EQUAL(prometheus::UNREGISTER_COLLECTOR_PATH, request->mUrl);
             APSARA_TEST_EQUAL("v1", request->mHeader.at(prometheus::PROMETHEUS_COLLECTOR_PROTOCOL_VERSION));
-            APSARA_TEST_EQUAL(static_cast<uint32_t>(INT32_FLAG(default_http_request_max_try_cnt)),
-                              request->mMaxTryCnt);
+            APSARA_TEST_EQUAL(static_cast<uint32_t>(INT32_FLAG(default_http_request_max_try_cnt)), request->mMaxTryCnt);
             unregistered = true;
             response.SetStatusCode(200);
             cv.notify_all();
@@ -816,12 +802,11 @@ void PrometheusInputRunnerUnittest::TestHeartbeatCadence() {
     auto stop = make_shared<PrometheusInputRunner::StopToken>();
     auto now = chrono::steady_clock::time_point{};
     runner->mSteadyNow = [&]() { return now; };
-    const vector<chrono::milliseconds> requestDurations{
-        chrono::milliseconds(3000),
-        chrono::milliseconds(500),
-        chrono::milliseconds(12000),
-        chrono::milliseconds(5000),
-        chrono::milliseconds(3000)};
+    const vector<chrono::milliseconds> requestDurations{chrono::milliseconds(3000),
+                                                        chrono::milliseconds(500),
+                                                        chrono::milliseconds(12000),
+                                                        chrono::milliseconds(5000),
+                                                        chrono::milliseconds(3000)};
     vector<chrono::steady_clock::duration> starts;
     vector<chrono::steady_clock::duration> waits;
     runner->mHttpRequestSender = [&](unique_ptr<HttpRequest>&& request, HttpResponse& response) {
