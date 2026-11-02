@@ -53,6 +53,7 @@ public:
     void TestHeartbeatFailureDropsScrapeDelay();
     void TestRegistrationAndHeartbeatLoop();
     void TestStopDuringHeartbeat();
+    void TestStopWaitsForRegistration();
     void TestStoppedTokenRejectsRequests();
     void TestRestartWaitsForOldLoop();
     void TestDestructorWaitsForWorker();
@@ -771,6 +772,82 @@ void PrometheusInputRunnerUnittest::TestStopDuringHeartbeat() {
     APSARA_TEST_EQUAL(1, heartbeatCount);
 }
 
+void PrometheusInputRunnerUnittest::TestStopWaitsForRegistration() {
+    auto runner = PrometheusInputRunner::GetInstance();
+    for (bool reRegistration : {false, true}) {
+        for (bool registrationFails : {false, true}) {
+            SCOPED_TRACE(string(reRegistration ? "re-registration" : "initial registration")
+                         + (registrationFails ? ": timeout" : ": success"));
+            mutex stateMutex;
+            condition_variable cv;
+            bool registrationStarted = false;
+            bool releaseRegistration = false;
+            bool registrationFinished = false;
+            bool unregistered = false;
+            int registerCount = 0;
+            int heartbeatCount = 0;
+            runner->mHttpRequestSender = [&](unique_ptr<HttpRequest>&& request, HttpResponse& response) {
+                unique_lock<mutex> lock(stateMutex);
+                if (request->mUrl == prometheus::REGISTER_COLLECTOR_PATH) {
+                    APSARA_TEST_FALSE(unregistered);
+                    ++registerCount;
+                    if (!reRegistration || registerCount > 1) {
+                        registrationStarted = true;
+                        cv.notify_all();
+                        cv.wait(lock, [&]() { return releaseRegistration; });
+                        registrationFinished = true;
+                        if (registrationFails) {
+                            response.SetNetworkStatus(NetworkCode::Timeout, "registration timeout");
+                            return false;
+                        }
+                    }
+                    response.SetStatusCode(200);
+                } else if (request->mUrl == prometheus::HEARTBEAT_COLLECTOR_PATH) {
+                    ++heartbeatCount;
+                    if (reRegistration && heartbeatCount == 1) {
+                        response.SetStatusCode(404);
+                        response.AddHeader(prometheus::PROMETHEUS_COLLECTOR_PROTOCOL_VERSION, "v1");
+                        *response.GetBody<string>() = R"({"msg":"NotRegistered"})";
+                    } else {
+                        response.SetStatusCode(204);
+                    }
+                } else {
+                    APSARA_TEST_EQUAL(prometheus::UNREGISTER_COLLECTOR_PATH, request->mUrl);
+                    APSARA_TEST_TRUE(registrationFinished);
+                    unregistered = true;
+                    response.SetStatusCode(200);
+                    cv.notify_all();
+                }
+                return true;
+            };
+            runner->Init();
+            {
+                unique_lock<mutex> lock(stateMutex);
+                APSARA_TEST_TRUE(cv.wait_for(lock, chrono::seconds(2), [&]() { return registrationStarted; }));
+            }
+            promise<void> stopStarted;
+            auto stopping = async(launch::async, [&]() {
+                stopStarted.set_value();
+                runner->Stop();
+            });
+            stopStarted.get_future().wait();
+            bool unregisterBeforeRegistrationCompletion;
+            {
+                unique_lock<mutex> lock(stateMutex);
+                unregisterBeforeRegistrationCompletion
+                    = cv.wait_for(lock, chrono::milliseconds(100), [&]() { return unregistered; });
+                releaseRegistration = true;
+            }
+            cv.notify_all();
+            stopping.wait();
+            runner->mThreadRes.wait();
+            APSARA_TEST_FALSE(unregisterBeforeRegistrationCompletion);
+            APSARA_TEST_TRUE(unregistered);
+            APSARA_TEST_TRUE(runner->mStopToken->mStopped.load());
+        }
+    }
+}
+
 void PrometheusInputRunnerUnittest::TestStoppedTokenRejectsRequests() {
     auto runner = PrometheusInputRunner::GetInstance();
     auto stop = make_shared<PrometheusInputRunner::StopToken>();
@@ -942,6 +1019,7 @@ UNIT_TEST_CASE(PrometheusInputRunnerUnittest, TestHeartbeatResponses)
 UNIT_TEST_CASE(PrometheusInputRunnerUnittest, TestHeartbeatFailureDropsScrapeDelay)
 UNIT_TEST_CASE(PrometheusInputRunnerUnittest, TestRegistrationAndHeartbeatLoop)
 UNIT_TEST_CASE(PrometheusInputRunnerUnittest, TestStopDuringHeartbeat)
+UNIT_TEST_CASE(PrometheusInputRunnerUnittest, TestStopWaitsForRegistration)
 UNIT_TEST_CASE(PrometheusInputRunnerUnittest, TestStoppedTokenRejectsRequests)
 UNIT_TEST_CASE(PrometheusInputRunnerUnittest, TestRestartWaitsForOldLoop)
 UNIT_TEST_CASE(PrometheusInputRunnerUnittest, TestDestructorWaitsForWorker)

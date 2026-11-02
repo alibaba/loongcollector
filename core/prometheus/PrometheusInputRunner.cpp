@@ -385,12 +385,16 @@ HttpResponse PrometheusInputRunner::SendOperatorRequest(const string& method,
     HttpResponse httpResponse;
     auto request = make_unique<HttpRequest>(
         method, false, mServiceHost, mServicePort, url, query, headers, body, timeout, maxTryCnt);
+    unique_lock<mutex> requestLock;
     if (stop) {
-        lock_guard<mutex> lock(stop->mRequestMutex);
+        requestLock = unique_lock<mutex>(stop->mRequestMutex);
         if (stop->mStopped.load()) {
             return httpResponse;
         }
-        // Admission precedes Stop; the admitted request may finish after unregister.
+        // Registration must finish before Stop can unregister; heartbeats need not.
+        if (url != prometheus::REGISTER_COLLECTOR_PATH) {
+            requestLock.unlock();
+        }
     }
     if (!mHttpRequestSender(std::move(request), httpResponse)) {
         LOG_ERROR(sLogger, ("curl error", "")("method", method)("url", url)("query", query));
