@@ -16,14 +16,17 @@
 
 #include "monitor/SelfMonitorServer.h"
 
+#include <limits>
+#include <memory>
+
 #include "MetricConstants.h"
 #include "Monitor.h"
 #include "collection_pipeline/CollectionPipelineManager.h"
 #include "common/LogtailCommonFlags.h"
 #include "common/SafeThread.h"
 #include "go_pipeline/LogtailPlugin.h"
+#include "google/protobuf/io/coded_stream.h"
 #include "monitor/AlarmManager.h"
-#include "protobuf/models/ProtocolConversion.h"
 #include "protobuf/models/pipeline_event_group.pb.h"
 #include "runner/ProcessorRunner.h"
 
@@ -207,12 +210,9 @@ void SelfMonitorServer::SendAlarms() {
     // metadata:
     // INTERNAL_DATA_TARGET_REGION:${region}
     // INTERNAL_DATA_TYPE:__alarm__
-// Todo: windows 上的 cgo 内存有问题，调用 GetGoAlarms 函数时可能会 crash，需要修复
-#ifndef _MSC_VER
     if (LogtailPlugin::GetInstance()->IsPluginOpened()) {
-        LogtailPlugin::GetInstance()->GetGoAlarms();
+        LogtailPlugin::GetInstance()->SyncGoSelfMonitorAlarms();
     }
-#endif
     vector<PipelineEventGroup> pipelineEventGroupList;
     AlarmManager::GetInstance()->FlushAllRegionAlarm(pipelineEventGroupList);
 
@@ -229,49 +229,107 @@ void SelfMonitorServer::SendAlarms() {
     }
 }
 
-int32_t SelfMonitorServer::ReceiveGoAlarmsPB(const std::string& pbData) {
-    if (pbData.empty()) {
+int32_t SelfMonitorServer::ReceiveGoAlarmsPB(std::string_view pbData) {
+    if (pbData.empty() || pbData.size() > static_cast<size_t>(std::numeric_limits<int>::max())) {
         return 0;
     }
-    models::PipelineEventGroup pbGroup;
-    if (!pbGroup.ParseFromString(pbData)) {
+    // ParseFromArray clears the root oneof and deletes its entire log subtree.
+    // Preserve that subtree across small batches instead. Move it out of the
+    // thread-local cache while in use, so concurrent threads and nested calls
+    // cannot modify an active parse. Oversized or failed parses are not retained.
+    constexpr size_t kMaxCachedPayloadSize = 64 * 1024;
+    constexpr size_t kMaxCachedStorageSize = 256 * 1024;
+    static thread_local std::unique_ptr<models::PipelineEventGroup> cachedGroup;
+    const bool canCache = pbData.size() <= kMaxCachedPayloadSize;
+    auto group = canCache ? std::move(cachedGroup) : nullptr;
+    if (!group) {
+        group = std::make_unique<models::PipelineEventGroup>();
+    }
+    auto* pbGroup = group.get();
+    // Merge must start from logically empty state, including fields unused by
+    // this receiver. Clear the log child rather than the root to retain capacity.
+    pbGroup->clear_metadata();
+    pbGroup->clear_tags();
+    const auto* reflection = pbGroup->GetReflection();
+    if (!reflection->GetUnknownFields(*pbGroup).empty()) {
+        reflection->MutableUnknownFields(pbGroup)->Clear();
+    }
+    pbGroup->mutable_logs()->Clear();
+    // Coded streams support the Protobuf versions used on every platform.
+    // Merge may stop at an end-group tag, so require complete consumption too.
+    google::protobuf::io::CodedInputStream input(reinterpret_cast<const uint8_t*>(pbData.data()),
+                                                 static_cast<int>(pbData.size()));
+    if (!pbGroup->MergeFromCodedStream(&input) || !input.ConsumedEntireMessage()) {
         LOG_WARNING(sLogger, ("receive go alarms pb", "failed to parse protobuf")("size", pbData.size()));
-        return 0;
-    }
-    PipelineEventGroup eventGroup(std::make_shared<SourceBuffer>());
-    std::string errMsg;
-    if (!TransferPBToPipelineEventGroup(pbGroup, eventGroup, errMsg)) {
-        LOG_WARNING(sLogger, ("receive go alarms pb", "failed to transfer pb")("err", errMsg));
         return 0;
     }
 
     int32_t syncedAlarmCount = 0;
-    for (auto& eventPtr : eventGroup.GetEvents()) {
-        if (!eventPtr.Is<LogEvent>()) {
+    const std::string empty;
+    for (const auto& event : pbGroup->logs().events()) {
+        const std::string* alarmType = &empty;
+        const std::string* alarmLevel = &empty;
+        const std::string* alarmMessage = &empty;
+        const std::string* alarmCount = &empty;
+        const std::string* projectName = &empty;
+        const std::string* category = &empty;
+        const std::string* config = &empty;
+        // Borrow fields in one pass; duplicate keys retain the last value.
+        for (const auto& content : event.contents()) {
+            const auto& key = content.key();
+            // Length dispatch skips unrelated metadata without a chain of
+            // comparisons. Still check the full key; order and last-value-wins
+            // behavior for duplicate contents remain unchanged.
+            switch (key.size()) {
+                case 10:
+                    if (key == "alarm_type") {
+                        alarmType = &content.value();
+                    }
+                    break;
+                case 11:
+                    if (key == "alarm_level") {
+                        alarmLevel = &content.value();
+                    } else if (key == "alarm_count") {
+                        alarmCount = &content.value();
+                    }
+                    break;
+                case 13:
+                    if (key == "alarm_message") {
+                        alarmMessage = &content.value();
+                    }
+                    break;
+                case 12:
+                    if (key == "project_name") {
+                        projectName = &content.value();
+                    }
+                    break;
+                case 8:
+                    if (key == "category") {
+                        category = &content.value();
+                    }
+                    break;
+                case 6:
+                    if (key == "config") {
+                        config = &content.value();
+                    }
+                    break;
+                default:
+                    break;
+            }
+        }
+        if (alarmType->empty()) {
             continue;
         }
-        const LogEvent& logEvent = eventPtr.Cast<LogEvent>();
-        std::string alarmType = logEvent.GetContent("alarm_type").to_string();
-        if (alarmType.empty()) {
-            continue;
-        }
-        std::string alarmLevel = logEvent.GetContent("alarm_level").to_string();
-        std::string alarmMessage = logEvent.GetContent("alarm_message").to_string();
-        std::string alarmCount = logEvent.GetContent("alarm_count").to_string();
-        std::string projectName = logEvent.GetContent("project_name").to_string();
-        std::string category = logEvent.GetContent("category").to_string();
-        std::string config = logEvent.GetContent("config").to_string();
-
         AlarmLevel level = ALARM_LEVEL_WARNING;
-        if (alarmLevel == "2") {
+        if (*alarmLevel == "2") {
             level = ALARM_LEVEL_ERROR;
-        } else if (alarmLevel == "3") {
+        } else if (*alarmLevel == "3") {
             level = ALARM_LEVEL_CRITICAL;
         }
         int32_t count = 1;
-        if (!alarmCount.empty()) {
+        if (!alarmCount->empty()) {
             try {
-                count = std::stoi(alarmCount);
+                count = std::stoi(*alarmCount);
             } catch (...) {
                 count = 1;
             }
@@ -279,27 +337,27 @@ int32_t SelfMonitorServer::ReceiveGoAlarmsPB(const std::string& pbData) {
         if (count <= 0) {
             count = 1;
         }
-        // strip the "/1" or "/2" pipeline version suffix, matching GetGoAlarms
-        std::string pipelineConfig = config;
+        // Config lookup needs an owning string; trim the runner suffix in place.
+        std::string pipelineConfig = *config;
         if (pipelineConfig.size() > 2 && pipelineConfig[pipelineConfig.size() - 2] == '/'
             && (pipelineConfig.back() == '1' || pipelineConfig.back() == '2')) {
-            pipelineConfig = pipelineConfig.substr(0, pipelineConfig.size() - 2);
+            pipelineConfig.resize(pipelineConfig.size() - 2);
         }
-        std::string resolvedRegion = STRING_FLAG(default_region_name);
-        const std::shared_ptr<CollectionPipeline>& pipeline
-            = CollectionPipelineManager::GetInstance()->FindConfigByName(pipelineConfig);
-        if (pipeline) {
-            const std::string& region = pipeline->GetContext().GetRegion();
-            if (!region.empty()) {
-                resolvedRegion = region;
-            }
-        }
+        const auto& pipeline = CollectionPipelineManager::GetInstance()->FindConfigByName(pipelineConfig);
+        const std::string& region = pipeline && !pipeline->GetContext().GetRegion().empty()
+            ? pipeline->GetContext().GetRegion()
+            : STRING_FLAG(default_region_name);
         AlarmManager::GetInstance()->SendExternalAlarm(
-            alarmType, level, alarmMessage, count, resolvedRegion, projectName, pipelineConfig, category);
+            *alarmType, level, *alarmMessage, count, region, *projectName, pipelineConfig, *category);
         ++syncedAlarmCount;
     }
     if (syncedAlarmCount > 0) {
         LOG_DEBUG(sLogger, ("receive go alarms pb", "finished")("synced", syncedAlarmCount));
+    }
+    // Account for retained string/map capacities and cleared repeated elements,
+    // not just the wire length. A large batch must not pin its high-water memory.
+    if (canCache && pbGroup->SpaceUsedLong() <= kMaxCachedStorageSize) {
+        cachedGroup = std::move(group);
     }
     return syncedAlarmCount;
 }

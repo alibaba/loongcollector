@@ -15,7 +15,6 @@
 package helper
 
 import (
-	"runtime"
 	"strconv"
 	"testing"
 	"time"
@@ -23,24 +22,50 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
-	"github.com/alibaba/ilogtail/pkg/util"
 )
 
-// TestAlarmContractFieldNames verifies the field key constants match the C++
-// AlarmManager::FlushAllRegionAlarm log event content keys exactly.
-// C++ reference: core/monitor/AlarmManager.cpp lines 126-140.
+// Batch storage must preserve the wire contract without sharing mutable event
+// or pointer slices between alarms or between independently produced batches.
+func TestAlarmBatchStorageIsolation(t *testing.T) {
+	alarms := []selfmonitor.AlarmExportMessage{
+		{AlarmType: "FIRST", AlarmLevel: "2", AlarmMessage: "消息", Count: 1001, ProjectName: "project"},
+		{AlarmType: "SECOND", AlarmLevel: "3", AlarmMessage: "second", Count: -3, Category: "store", Config: "config/2"},
+		{AlarmType: "THIRD", AlarmLevel: "1", AlarmMessage: "third", Count: 0},
+	}
+	now := time.Unix(1700000000, 123)
+	group, err := TransferAlarmsToPipelineEventGroup(alarms, now)
+	require.NoError(t, err)
+	data, err := group.Marshal()
+	require.NoError(t, err)
+	var decoded protocol.PipelineEventGroup
+	require.NoError(t, decoded.Unmarshal(data))
+	assert.Equal(t, alarms, TransferPipelineEventGroupToAlarms(&decoded))
+	for _, event := range decoded.GetLogs().Events {
+		assert.Equal(t, uint64(now.UnixNano()), event.Timestamp)
+	}
+
+	// Appending to one event must not overwrite the next event's pointer slice.
+	first := group.GetLogs().Events[0]
+	first.Contents = append(first.Contents, &protocol.LogEvent_Content{
+		Key: []byte("extra"), Value: []byte("only-first"),
+	})
+	assert.Equal(t, alarms[1], transferLogEventToAlarm(group.GetLogs().Events[1]))
+	other, err := TransferAlarmsToPipelineEventGroup(alarms, now)
+	require.NoError(t, err)
+	first.Contents[0].Value = []byte("changed")
+	assert.Equal(t, "FIRST", transferLogEventToAlarm(other.GetLogs().Events[0]).AlarmType)
+}
+
+// Bridge fields match what C++ ReceiveGoAlarmsPB consumes. Output metadata is
+// intentionally absent: FlushAllRegionAlarm fills it at the final sender.
 func TestAlarmContractFieldNames(t *testing.T) {
 	cppFields := map[string]bool{
 		"alarm_type":    true,
 		"alarm_level":   true,
 		"alarm_message": true,
 		"alarm_count":   true,
-		"ip":            true,
-		"os":            true,
-		"ver":           true,
 		"project_name":  true,
 		"category":      true,
 		"config":        true,
@@ -94,9 +119,9 @@ func TestTransferAlarmsToPipelineEventGroup_AllFields(t *testing.T) {
 	assert.Equal(t, "3", contentMap[AlarmFieldLevel])
 	assert.Equal(t, "plugin crashed", contentMap[AlarmFieldMessage])
 	assert.Equal(t, "10", contentMap[AlarmFieldCount])
-	assert.Equal(t, util.GetIPAddress(), contentMap[AlarmFieldIP])
-	assert.Equal(t, runtime.GOOS, contentMap[AlarmFieldOS])
-	assert.Equal(t, config.BaseVersion, contentMap[AlarmFieldVersion])
+	assert.NotContains(t, contentMap, "ip")
+	assert.NotContains(t, contentMap, "os")
+	assert.NotContains(t, contentMap, "ver")
 	assert.Equal(t, "my-project", contentMap[AlarmFieldProject])
 	assert.Equal(t, "my-logstore", contentMap[AlarmFieldCategory])
 	assert.Equal(t, "my-config", contentMap[AlarmFieldConfig])

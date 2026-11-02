@@ -18,7 +18,6 @@
 
 #include <algorithm>
 #include <array>
-#include <functional>
 #include <utility>
 #include <vector>
 
@@ -50,30 +49,33 @@ namespace {
 /// Splits `host` / `port` out of either a full URL (`https://h:p/path?q`) or a bare authority
 /// (`h:p`, `[::1]:p`) — the scheme is optional, so raw HTTP events can pass the `Host` header
 /// value straight in. Handles IPv6 brackets and `user@` prefixes.
-bool ParseHostAndPortFromUrlOrAuthority(const std::string& url, std::string& host, std::string& port) {
-    host.clear();
-    port.clear();
+///
+/// Returns zero-copy slices of `url`; the caller must keep `url`'s backing alive for as long as
+/// the views are used (record arena, or a stack string consumed within the calling function).
+bool ParseHostAndPortFromUrlOrAuthority(StringView url, StringView& host, StringView& port) {
+    host = kEmptyStringView;
+    port = kEmptyStringView;
     const auto schemePos = url.find("://");
-    const size_t authorityStart = (schemePos == std::string::npos) ? 0 : schemePos + 3;
-    const size_t pathPos = url.find('/', authorityStart);
-    const size_t queryPos = url.find('?', authorityStart);
-    const size_t fragmentPos = url.find('#', authorityStart);
+    const size_t authorityStart = (schemePos == StringView::npos) ? 0 : schemePos + 3;
+    const auto pathPos = url.find('/', authorityStart);
+    const auto queryPos = url.find('?', authorityStart);
+    const auto fragmentPos = url.find('#', authorityStart);
     size_t authorityEnd = url.size();
-    if (pathPos != std::string::npos) {
-        authorityEnd = std::min(authorityEnd, pathPos);
+    if (pathPos != StringView::npos) {
+        authorityEnd = std::min(authorityEnd, static_cast<size_t>(pathPos));
     }
-    if (queryPos != std::string::npos) {
-        authorityEnd = std::min(authorityEnd, queryPos);
+    if (queryPos != StringView::npos) {
+        authorityEnd = std::min(authorityEnd, static_cast<size_t>(queryPos));
     }
-    if (fragmentPos != std::string::npos) {
-        authorityEnd = std::min(authorityEnd, fragmentPos);
+    if (fragmentPos != StringView::npos) {
+        authorityEnd = std::min(authorityEnd, static_cast<size_t>(fragmentPos));
     }
     if (authorityEnd <= authorityStart) {
         return false;
     }
-    std::string authority = url.substr(authorityStart, authorityEnd - authorityStart);
-    const size_t atPos = authority.rfind('@');
-    if (atPos != std::string::npos) {
+    StringView authority = url.substr(authorityStart, authorityEnd - authorityStart);
+    const auto atPos = authority.rfind('@');
+    if (atPos != StringView::npos) {
         if (atPos + 1 >= authority.size()) {
             return false;
         }
@@ -83,8 +85,8 @@ bool ParseHostAndPortFromUrlOrAuthority(const std::string& url, std::string& hos
         return false;
     }
     if (authority[0] == '[') {
-        const size_t closingBracket = authority.find(']');
-        if (closingBracket == std::string::npos || closingBracket <= 1) {
+        const auto closingBracket = authority.find(']');
+        if (closingBracket == StringView::npos || closingBracket <= 1) {
             return false;
         }
         host = authority.substr(1, closingBracket - 1);
@@ -100,8 +102,8 @@ bool ParseHostAndPortFromUrlOrAuthority(const std::string& url, std::string& hos
         port = authority.substr(closingBracket + 2);
         return !host.empty();
     }
-    const size_t colonPos = authority.rfind(':');
-    if (colonPos == std::string::npos) {
+    const auto colonPos = authority.rfind(':');
+    if (colonPos == StringView::npos) {
         host = authority;
         return !host.empty();
     }
@@ -164,13 +166,14 @@ struct RawRequestHeaderFields {
 /// (`parser/http/parser.rs` keys its HashMap by `h.name.to_lowercase()`) but the allowlist match is
 /// only sound *because* of this normalization, and a producer change must not silently turn a
 /// dropped header into an emitted one. `host` wins over `:authority` when both are present.
-RawRequestHeaderFields ExtractRequestHeaderFields(const std::string& headersJson) {
+RawRequestHeaderFields ExtractRequestHeaderFields(StringView headersJson) {
     RawRequestHeaderFields fields;
     if (headersJson.empty()) {
         return fields;
     }
     rapidjson::Document doc;
-    if (doc.Parse(headersJson.c_str(), headersJson.size()).HasParseError() || !doc.IsObject()) {
+    // Two-argument Parse: length-bounded, never the single-argument NUL-scanning form.
+    if (doc.Parse(headersJson.data(), headersJson.size()).HasParseError() || !doc.IsObject()) {
         return fields;
     }
 
@@ -212,7 +215,7 @@ RawRequestHeaderFields ExtractRequestHeaderFields(const std::string& headersJson
     return fields;
 }
 
-/// Emits one captured body under `<prefix>.content` / `<prefix>.size`.
+/// Emits one captured body under the given `.size` / `.content` keys.
 ///
 /// No binary handling here on purpose. AgentSight's analyzer stores bodies as Rust `String`
 /// (`analyzer/result.rs`: `request_body: Option<String>`) built with `String::from_utf8_lossy`
@@ -224,12 +227,16 @@ RawRequestHeaderFields ExtractRequestHeaderFields(const std::string& headersJson
 /// `content-length`), silently lossy for binary, and `.size` is the post-conversion length, so it
 /// overstates the wire size for binary payloads. Fixing this requires carrying `Vec<u8>` through
 /// the analyzer and FFI upstream.
-void EmitHttpBody(logtail::LogEvent* log, const std::string& prefix, const std::string& body) {
+///
+/// Keys are passed as whole literals by the caller (never `prefix + suffix` concatenations):
+/// `content` is emitted NoCopy as a slice of the record arena — the largest zero-copy win on the
+/// raw path — and a temporary concatenated key string would dangle by the time the log is flushed.
+void EmitHttpBody(logtail::LogEvent* log, StringView sizeKey, StringView contentKey, StringView body) {
     if (body.empty()) {
         return;
     }
-    log->SetContent(prefix + ".size", std::to_string(body.size()));
-    log->SetContent(prefix + ".content", body);
+    log->SetContent(sizeKey, StringView(std::to_string(body.size())));
+    log->SetContentNoCopy(contentKey, body);
 }
 
 /// Builtin cmdline allow rules used when the user does not configure any whitelist/blacklist.
@@ -381,7 +388,24 @@ void ApplyAgentsightRulesToConfig(AgentsightConfigHandle* cfg,
             "http_api", sym && sym->config_add_http));
 }
 
-using SetLogStrFn = std::function<void(StringView, const std::string&)>;
+/// Zero-copy emit for record fields: `val` must be a slice of the record's SourceBuffer arena
+/// (which the event group co-owns, so it outlives the log), and `key` must be a static literal or
+/// another arena slice — never a temporary. This is the NoCopy contract; anything computed goes
+/// through SetCopyIfNotEmpty instead.
+void SetNoCopyIfNotEmpty(logtail::LogEvent* log, StringView key, StringView val) {
+    if (!val.empty()) {
+        log->SetContentNoCopy(key, val);
+    }
+}
+
+/// Copying emit for computed values (emitPayload strings, UUIDs, std::to_string results, slices of
+/// stack-local documents): SetContent copies key and value into the group's main SourceBuffer.
+/// `val` may be any StringView/std::string whose bytes are valid during this call only.
+void SetCopyIfNotEmpty(logtail::LogEvent* log, StringView key, StringView val) {
+    if (!val.empty()) {
+        log->SetContent(key, val);
+    }
+}
 
 struct AgentsightLlmEmitPayload {
     std::string precomputedDelta;
@@ -408,82 +432,81 @@ void FillAgentsightOtlpTimeFields(logtail::LogEvent* log, uint64_t timestampNs) 
 }
 
 void FillAgentsightCommonCorrelation(const AgentsightLlmRecord& rec,
-                                     SetLogStrFn setStr,
                                      logtail::LogEvent* log,
                                      const std::string& eventId = {}) {
     if (!eventId.empty()) {
-        setStr(StringView("event.id"), eventId);
+        SetCopyIfNotEmpty(log, StringView("event.id"), eventId);
     }
-    setStr(StringView("gen_ai.session.id"), rec.mSessionId);
-    setStr(StringView("gen_ai.turn.id"), rec.mConversationId);
+    SetNoCopyIfNotEmpty(log, StringView("gen_ai.session.id"), rec.mSessionId);
+    SetNoCopyIfNotEmpty(log, StringView("gen_ai.turn.id"), rec.mConversationId);
     if (rec.mPid != 0) {
         log->SetContent("pid", std::to_string(rec.mPid));
     }
-    setStr(StringView("comm"), rec.mProcessName);
-    setStr(StringView("cmdline"), rec.mCmdline);
-    setStr(StringView("container.id"), rec.mContainerId);
-    setStr(StringView("gen_ai.agent.type"), rec.mAgentType);
+    SetNoCopyIfNotEmpty(log, StringView("comm"), rec.mProcessName);
+    SetNoCopyIfNotEmpty(log, StringView("cmdline"), rec.mCmdline);
+    SetNoCopyIfNotEmpty(log, StringView("container.id"), rec.mContainerId);
+    SetNoCopyIfNotEmpty(log, StringView("gen_ai.agent.type"), rec.mAgentType);
 }
 
-void FillAgentsightServerFromUrl(const AgentsightLlmRecord& rec, SetLogStrFn setStr) {
+void FillAgentsightServerFromUrl(const AgentsightLlmRecord& rec, logtail::LogEvent* log) {
     if (rec.mRequestUrl.empty()) {
         return;
     }
-    std::string host;
-    std::string port;
+    StringView host;
+    StringView port;
     if (ParseHostAndPortFromUrlOrAuthority(rec.mRequestUrl, host, port)) {
-        setStr(StringView("server.address"), host);
-        setStr(StringView("server.port"), port);
+        // Slices of rec.mRequestUrl, which lives in the record arena the group co-owns — NoCopy.
+        SetNoCopyIfNotEmpty(log, StringView("server.address"), host);
+        SetNoCopyIfNotEmpty(log, StringView("server.port"), port);
     }
 }
 
 void FillAgentsightRequestInputFields(const AgentsightLlmRecord& rec,
-                                      SetLogStrFn setStr,
+                                      logtail::LogEvent* log,
                                       bool messageDeltaOnly,
                                       const AgentsightLlmEmitPayload& payload) {
+    // mRequestMessagesJson / mToolDefinitionsJson are compute-only record fields (value-owned
+    // std::strings that die with the record at batch end, see AgentsightEvents.h): when they are
+    // emitted at all — full-fidelity mode, or the first/changed tools round — the bytes must be
+    // COPIED into the group arena. NoCopy here would dangle as soon as the record is released.
     if (!messageDeltaOnly) {
-        setStr(StringView("gen_ai.input.messages"), rec.mRequestMessagesJson);
+        SetCopyIfNotEmpty(log, StringView("gen_ai.input.messages"), rec.mRequestMessagesJson);
     }
     if (!payload.systemInstructionsHash.empty()) {
-        setStr(StringView("gen_ai.system_instructions_hash"), payload.systemInstructionsHash);
+        SetCopyIfNotEmpty(log, StringView("gen_ai.system_instructions_hash"), payload.systemInstructionsHash);
     }
     if (payload.emitSystemInstructions) {
-        setStr(StringView("gen_ai.system_instructions"), payload.systemInstructionsJson);
+        SetCopyIfNotEmpty(log, StringView("gen_ai.system_instructions"), payload.systemInstructionsJson);
     }
     if (!payload.toolDefinitionsHash.empty()) {
-        setStr(StringView("gen_ai.tool.definitions_hash"), payload.toolDefinitionsHash);
+        SetCopyIfNotEmpty(log, StringView("gen_ai.tool.definitions_hash"), payload.toolDefinitionsHash);
     }
     if (payload.emitToolDefinitions) {
-        setStr(StringView("gen_ai.tool.definitions"), rec.mToolDefinitionsJson);
+        SetCopyIfNotEmpty(log, StringView("gen_ai.tool.definitions"), rec.mToolDefinitionsJson);
     }
-    setStr(StringView("gen_ai.input.messages_delta"), payload.precomputedDelta);
+    SetCopyIfNotEmpty(log, StringView("gen_ai.input.messages_delta"), payload.precomputedDelta);
 }
 
 void FillAgentsightCombinedLlmLog(const AgentsightLlmRecord& rec,
                                   logtail::LogEvent* log,
                                   bool messageDeltaOnly,
                                   const AgentsightLlmEmitPayload& payload) {
-    auto setStr = [&](StringView k, const std::string& v) {
-        if (!v.empty()) {
-            log->SetContent(k, StringView(v.data(), v.size()));
-        }
-    };
-
     SetLogTimestampFromNs(log, rec.mTimestampNs);
     FillAgentsightOtlpTimeFields(log, rec.mTimestampNs);
-    FillAgentsightCommonCorrelation(rec, setStr, log);
-    setStr(StringView("gen_ai.response.id"), rec.mResponseId);
+    FillAgentsightCommonCorrelation(rec, log);
+    SetNoCopyIfNotEmpty(log, StringView("gen_ai.response.id"), rec.mResponseId);
 
     log->SetContent("gen_ai.response.duration", std::to_string(rec.mDurationNs / 1000000ULL));
 
-    FillAgentsightServerFromUrl(rec, setStr);
+    FillAgentsightServerFromUrl(rec, log);
 
-    log->SetContent("gen_ai.provider.name", rec.mProvider);
-    log->SetContent("gen_ai.request.model", rec.mModel);
+    log->SetContent(StringView("gen_ai.provider.name"), rec.mProvider);
+    log->SetContent(StringView("gen_ai.request.model"), rec.mModel);
     log->SetContent("status_code", std::to_string(rec.mStatusCode));
     log->SetContent(StringView("is_sse"), StringView(rec.mIsSse ? "1" : "0"));
-    setStr(StringView("gen_ai.response.finish_reasons"),
-           FormatFinishReasonsJson(rec.mResponseMessagesJson, rec.mFinishReason));
+    SetCopyIfNotEmpty(log,
+                      StringView("gen_ai.response.finish_reasons"),
+                      FormatFinishReasonsJson(rec.mResponseMessagesJson, rec.mFinishReason));
     log->SetContent(std::string("is_usage_from_api"), std::string(rec.mLlmUsage ? "true" : "false"));
 
     log->SetContent("gen_ai.usage.input_tokens", std::to_string(rec.mInputTokens));
@@ -492,8 +515,8 @@ void FillAgentsightCombinedLlmLog(const AgentsightLlmRecord& rec,
     log->SetContent("gen_ai.usage.cache_creation.input_tokens", std::to_string(rec.mCacheCreationInputTokens));
     log->SetContent("gen_ai.usage.cache_read.input_tokens", std::to_string(rec.mCacheReadInputTokens));
 
-    FillAgentsightRequestInputFields(rec, setStr, messageDeltaOnly, payload);
-    setStr(StringView("gen_ai.output.messages"), rec.mResponseMessagesJson);
+    FillAgentsightRequestInputFields(rec, log, messageDeltaOnly, payload);
+    SetNoCopyIfNotEmpty(log, StringView("gen_ai.output.messages"), rec.mResponseMessagesJson);
 }
 
 void FillAgentsightModelRequestLog(const AgentsightLlmRecord& rec,
@@ -501,58 +524,47 @@ void FillAgentsightModelRequestLog(const AgentsightLlmRecord& rec,
                                    bool messageDeltaOnly,
                                    const AgentsightLlmEmitPayload& payload,
                                    const std::string& eventId) {
-    auto setStr = [&](StringView k, const std::string& v) {
-        if (!v.empty()) {
-            log->SetContent(k, StringView(v.data(), v.size()));
-        }
-    };
-
     SetLogTimestampFromNs(log, rec.mTimestampNs);
     FillAgentsightOtlpTimeFields(log, rec.mTimestampNs);
     log->SetContent(StringView("event.name"), StringView("gen_ai.model.request"));
-    FillAgentsightCommonCorrelation(rec, setStr, log, eventId);
+    FillAgentsightCommonCorrelation(rec, log, eventId);
 
-    FillAgentsightServerFromUrl(rec, setStr);
+    FillAgentsightServerFromUrl(rec, log);
 
-    log->SetContent("gen_ai.provider.name", rec.mProvider);
-    log->SetContent("gen_ai.request.model", rec.mModel);
-    setStr(StringView("gen_ai.step.id"), payload.stepId);
+    log->SetContent(StringView("gen_ai.provider.name"), rec.mProvider);
+    log->SetContent(StringView("gen_ai.request.model"), rec.mModel);
+    SetCopyIfNotEmpty(log, StringView("gen_ai.step.id"), payload.stepId);
     if (payload.eventSequenceRequest > 0) {
         log->SetContent("gen_ai.event.sequence", std::to_string(payload.eventSequenceRequest));
     }
-    FillAgentsightRequestInputFields(rec, setStr, messageDeltaOnly, payload);
+    FillAgentsightRequestInputFields(rec, log, messageDeltaOnly, payload);
 }
 
 void FillAgentsightModelResponseLog(const AgentsightLlmRecord& rec,
                                     logtail::LogEvent* log,
                                     const AgentsightLlmEmitPayload& payload,
                                     const std::string& eventId) {
-    auto setStr = [&](StringView k, const std::string& v) {
-        if (!v.empty()) {
-            log->SetContent(k, StringView(v.data(), v.size()));
-        }
-    };
-
     const uint64_t responseEndNs = rec.mTimestampNs + rec.mDurationNs;
     SetLogTimestampFromNs(log, responseEndNs);
     FillAgentsightOtlpTimeFields(log, responseEndNs);
     log->SetContent(StringView("event.name"), StringView("gen_ai.model.response"));
-    FillAgentsightCommonCorrelation(rec, setStr, log, eventId);
-    setStr(StringView("gen_ai.response.id"), rec.mResponseId);
-    setStr(StringView("gen_ai.step.id"), payload.stepId);
+    FillAgentsightCommonCorrelation(rec, log, eventId);
+    SetNoCopyIfNotEmpty(log, StringView("gen_ai.response.id"), rec.mResponseId);
+    SetCopyIfNotEmpty(log, StringView("gen_ai.step.id"), payload.stepId);
     if (payload.eventSequenceResponse > 0) {
         log->SetContent("gen_ai.event.sequence", std::to_string(payload.eventSequenceResponse));
     }
 
     log->SetContent("gen_ai.response.duration", std::to_string(rec.mDurationNs / 1000000ULL));
-    log->SetContent("gen_ai.provider.name", rec.mProvider);
+    log->SetContent(StringView("gen_ai.provider.name"), rec.mProvider);
     if (!rec.mModel.empty()) {
-        log->SetContent("gen_ai.response.model", rec.mModel);
+        log->SetContent(StringView("gen_ai.response.model"), rec.mModel);
     }
     log->SetContent("status_code", std::to_string(rec.mStatusCode));
     log->SetContent(StringView("is_sse"), StringView(rec.mIsSse ? "1" : "0"));
-    setStr(StringView("gen_ai.response.finish_reasons"),
-           FormatFinishReasonsJson(rec.mResponseMessagesJson, rec.mFinishReason));
+    SetCopyIfNotEmpty(log,
+                      StringView("gen_ai.response.finish_reasons"),
+                      FormatFinishReasonsJson(rec.mResponseMessagesJson, rec.mFinishReason));
     log->SetContent(std::string("is_usage_from_api"), std::string(rec.mLlmUsage ? "true" : "false"));
 
     log->SetContent("gen_ai.usage.input_tokens", std::to_string(rec.mInputTokens));
@@ -561,7 +573,7 @@ void FillAgentsightModelResponseLog(const AgentsightLlmRecord& rec,
     log->SetContent("gen_ai.usage.cache_creation.input_tokens", std::to_string(rec.mCacheCreationInputTokens));
     log->SetContent("gen_ai.usage.cache_read.input_tokens", std::to_string(rec.mCacheReadInputTokens));
 
-    setStr(StringView("gen_ai.output.messages"), rec.mResponseMessagesJson);
+    SetNoCopyIfNotEmpty(log, StringView("gen_ai.output.messages"), rec.mResponseMessagesJson);
 }
 
 /// `event.sequence` values ordering the two halves of one raw HTTP exchange.
@@ -585,7 +597,6 @@ constexpr uint32_t kHttpResponseEventSequence = 2;
 /// — request-only records, or a response returned inside the same second — which makes the two
 /// timestamps identical and the order otherwise undecidable.
 void FillAgentsightHttpCommon(const AgentsightHttpsRecord& rec,
-                              SetLogStrFn setStr,
                               logtail::LogEvent* log,
                               const std::string& eventId,
                               const std::string& exchangeId,
@@ -599,10 +610,10 @@ void FillAgentsightHttpCommon(const AgentsightHttpsRecord& rec,
     if (rec.mPid != 0) {
         log->SetContent("pid", std::to_string(rec.mPid));
     }
-    setStr(StringView("comm"), rec.mProcessName);
-    setStr(StringView("cmdline"), rec.mCmdline);
-    setStr(StringView("container.id"), rec.mContainerId);
-    setStr(StringView("agent.type"), rec.mAgentType);
+    SetNoCopyIfNotEmpty(log, StringView("comm"), rec.mProcessName);
+    SetNoCopyIfNotEmpty(log, StringView("cmdline"), rec.mCmdline);
+    SetNoCopyIfNotEmpty(log, StringView("container.id"), rec.mContainerId);
+    SetNoCopyIfNotEmpty(log, StringView("agent.type"), rec.mAgentType);
     log->SetContent(StringView("url.scheme"), StringView("https"));
 }
 
@@ -618,30 +629,26 @@ void FillAgentsightHttpRequestLog(const AgentsightHttpsRecord& rec,
                                   logtail::LogEvent* log,
                                   const std::string& eventId,
                                   const std::string& exchangeId) {
-    auto setStr = [&](StringView k, const std::string& v) {
-        if (!v.empty()) {
-            log->SetContent(k, StringView(v.data(), v.size()));
-        }
-    };
-
-    FillAgentsightHttpCommon(rec, setStr, log, eventId, exchangeId, kHttpRequestEventSequence, rec.mTimestampNs);
+    FillAgentsightHttpCommon(rec, log, eventId, exchangeId, kHttpRequestEventSequence, rec.mTimestampNs);
     log->SetContent(StringView("event.name"), StringView("http.request"));
-    setStr(StringView("http.request.method"), rec.mMethod);
-    setStr(StringView("url.path"), rec.mPath);
+    SetNoCopyIfNotEmpty(log, StringView("http.request.method"), rec.mMethod);
+    SetNoCopyIfNotEmpty(log, StringView("url.path"), rec.mPath);
 
     const RawRequestHeaderFields headerFields = ExtractRequestHeaderFields(rec.mRequestHeaders);
-    std::string host;
-    std::string port;
+    StringView host;
+    StringView port;
     if (ParseHostAndPortFromUrlOrAuthority(headerFields.host, host, port)) {
-        setStr(StringView("server.address"), host);
-        setStr(StringView("server.port"), port);
+        // host/port slice the stack-local headerFields.host, NOT the record arena — SetContent
+        // copies them into the arena before this function returns.
+        SetCopyIfNotEmpty(log, StringView("server.address"), host);
+        SetCopyIfNotEmpty(log, StringView("server.port"), port);
     }
-    setStr(StringView("user_agent.original"), headerFields.userAgent);
+    SetCopyIfNotEmpty(log, StringView("user_agent.original"), headerFields.userAgent);
     for (const auto& header : headerFields.allowed) {
         log->SetContent("http.request.header." + header.first, header.second);
     }
 
-    EmitHttpBody(log, "http.request.body", rec.mRequestBody);
+    EmitHttpBody(log, "http.request.body.size", "http.request.body.content", rec.mRequestBody);
 }
 
 /// Response headers that carry credentials or credential challenges. Never emitted.
@@ -750,12 +757,13 @@ constexpr size_t kMaxEmittedResponseHeaders = 64;
 /// (`parser/http/parser.rs` collects into a HashMap keyed by `h.name.to_lowercase()`, and HPACK
 /// header names are lowercase by spec) — the normalization is what makes the denylist match sound,
 /// so it must not depend on the producer getting it right.
-void EmitHttpResponseHeaders(logtail::LogEvent* log, const std::string& headersJson) {
+void EmitHttpResponseHeaders(logtail::LogEvent* log, StringView headersJson) {
     if (headersJson.empty()) {
         return;
     }
     rapidjson::Document doc;
-    if (doc.Parse(headersJson.c_str(), headersJson.size()).HasParseError() || !doc.IsObject()) {
+    // Two-argument Parse: length-bounded, never the single-argument NUL-scanning form.
+    if (doc.Parse(headersJson.data(), headersJson.size()).HasParseError() || !doc.IsObject()) {
         return;
     }
     size_t emitted = 0;
@@ -802,20 +810,14 @@ void FillAgentsightHttpResponseLog(const AgentsightHttpsRecord& rec,
                                    logtail::LogEvent* log,
                                    const std::string& eventId,
                                    const std::string& exchangeId) {
-    auto setStr = [&](StringView k, const std::string& v) {
-        if (!v.empty()) {
-            log->SetContent(k, StringView(v.data(), v.size()));
-        }
-    };
-
     FillAgentsightHttpCommon(
-        rec, setStr, log, eventId, exchangeId, kHttpResponseEventSequence, rec.mTimestampNs + rec.mDurationNs);
+        rec, log, eventId, exchangeId, kHttpResponseEventSequence, rec.mTimestampNs + rec.mDurationNs);
     log->SetContent(StringView("event.name"), StringView("http.response"));
     log->SetContent("http.response.status_code", std::to_string(rec.mStatusCode));
     log->SetContent(StringView("is_sse"), StringView(rec.mIsSse ? "1" : "0"));
 
     EmitHttpResponseHeaders(log, rec.mResponseHeaders);
-    EmitHttpBody(log, "http.response.body", rec.mResponseBody);
+    EmitHttpBody(log, "http.response.body.size", "http.response.body.content", rec.mResponseBody);
 }
 
 /// Resolves @containerId against the process-wide container inventory maintained by
@@ -829,13 +831,14 @@ void FillAgentsightHttpResponseLog(const AgentsightHttpsRecord& rec,
 /// `container.id` content field and nothing else changes. Deliberately no IsPurageContainerMode
 /// gate here — the inventory is simply empty when the manager was never started, and the mode flag
 /// is fixed at AppConfig construction, which would keep this path out of unit tests.
-void AttachAgentsightContainerTags(PipelineEventGroup& group, const std::string& containerId) {
+void AttachAgentsightContainerTags(PipelineEventGroup& group, StringView containerId) {
     if (containerId.empty()) {
         return;
     }
-    const auto info = ContainerManager::GetInstance()->GetContainerInfoById(containerId);
+    // ContainerManager only takes std::string; one small owned copy per containerized record.
+    const auto info = ContainerManager::GetInstance()->GetContainerInfoById(containerId.to_string());
     if (!info) {
-        LOG_DEBUG(sLogger, ("Agentsight container meta not found", "")("containerId", containerId));
+        LOG_DEBUG(sLogger, ("Agentsight container meta not found", "")("containerId", containerId.to_string()));
         return;
     }
     AttachAgentsightContainerTagsFromInfo(group, *info);
@@ -1272,8 +1275,12 @@ int AgentsightManager::HandleHttpsEvent(const AgentsightHttpsRecord* rec) {
         pluginIndex = mPluginIndex;
     }
 
-    auto sourceBuffer = std::make_shared<SourceBuffer>();
-    PipelineEventGroup eventGroup(sourceBuffer);
+    // The record's EMIT arena becomes the group's main SourceBuffer: emitted views alias it with
+    // no second copy (SetContentNoCopy), and computed values are appended into it by SetContent.
+    // The group co-owns the arena, so these views stay valid until flush. Compute-only record
+    // fields (value-owned std::strings, see AgentsightEvents.h) are NOT in this arena — they are
+    // released with the record at batch end and must be copied when emitted.
+    PipelineEventGroup eventGroup(rec->GetSourceBuffer());
     // Correlation mirrors the gen_ai.* path's split of responsibilities (see FillAgentsightHttpCommon):
     // one shared http.exchange.id pairs the two halves, each log gets its own event.id, and
     // event.sequence fixes their order. event.id must stay unique per log — downstream treats it as the
@@ -1368,7 +1375,9 @@ int AgentsightManager::HandleLlmEvent(AgentsightLlmRecord* rec) {
     if (!sessionKey.empty()) {
         AgentsightSessionInputState sessionState = previous ? previousCopy : AgentsightSessionInputState{};
         if (rec->mConversationId != sessionState.lastTurnId) {
-            sessionState.lastTurnId = rec->mConversationId;
+            // The LRU value must own its bytes: the view aliases the record arena, which dies with
+            // the event group — long before this cache entry expires.
+            sessionState.lastTurnId = rec->mConversationId.to_string();
             sessionState.nextStepNumber = 1;
             sessionState.nextEventSequence = 1;
         }
@@ -1384,8 +1393,12 @@ int AgentsightManager::HandleLlmEvent(AgentsightLlmRecord* rec) {
         mSessionInputCache.insert(sessionKey, std::move(sessionState));
     }
 
-    auto sourceBuffer = std::make_shared<SourceBuffer>();
-    PipelineEventGroup eventGroup(sourceBuffer);
+    // The record's EMIT arena becomes the group's main SourceBuffer: emitted views alias it with
+    // no second copy (SetContentNoCopy), and computed values are appended into it by SetContent.
+    // The group co-owns the arena, so these views stay valid until flush. Compute-only record
+    // fields (value-owned std::strings, see AgentsightEvents.h) are NOT in this arena — they are
+    // released with the record at batch end and must be copied when emitted.
+    PipelineEventGroup eventGroup(rec->GetSourceBuffer());
     const size_t logCount = eventStreamFormat ? 2U : 1U;
     for (size_t i = 0; i < logCount; ++i) {
         auto* log = eventGroup.AddLogEvent(true, mEventPool);

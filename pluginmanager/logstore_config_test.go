@@ -19,6 +19,7 @@ package pluginmanager
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"testing"
 	"time"
@@ -621,5 +622,14 @@ func Test_genPluginMeta(t *testing.T) {
 		assert.Equal(t, "testPlugin", result.PluginType)
 		assert.Equal(t, "testPlugin/customID", result.PluginTypeWithID)
 		assert.Equal(t, "customID", result.PluginID)
+	}
+}
+
+func TestUnknownInputFailsConfiguration(t *testing.T) {
+	for _, name := range []string{"input_not_registered", "input_cpu_profiling/1"} {
+		_, err := createLogstoreConfig("project", "store", "unknown-input", 0,
+			fmt.Sprintf(`{"inputs":[{"type":%q}],"flushers":[{"type":"flusher_stdout"}]}`, name))
+		require.Error(t, err)
+		require.Contains(t, err.Error(), getPluginType(name))
 	}
 }

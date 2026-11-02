@@ -20,11 +20,11 @@ package sls
 import (
 	"fmt"
 
+	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logtail"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
-	converter "github.com/alibaba/ilogtail/pkg/protocol/converter"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
 
@@ -45,8 +45,9 @@ type SlsFlusher struct { // nolint:revive
 	// sendPb / sendPbV2 abstract the cgo calls into Logtail so the send path can
 	// be exercised in unit tests without a live Logtail adaptor. They default to
 	// the real logtail symbols in Init.
-	sendPb   func(configName, logstore string, pbBuffer []byte, lines int) int
-	sendPbV2 func(configName, logstore string, pbBuffer []byte, lines int, hash string) int
+	sendPb                 func(configName, logstore string, pbBuffer []byte, lines int) int
+	sendPbV2               func(configName, logstore string, pbBuffer []byte, lines int, hash string) int
+	sendPipelineEventGroup func(configName, logstore string, pbBuffer []byte, eventCount int, hash string) int
 }
 
 // Init ...
@@ -57,6 +58,9 @@ func (p *SlsFlusher) Init(context pipeline.Context) error {
 	}
 	if p.sendPbV2 == nil {
 		p.sendPbV2 = logtail.SendPbV2
+	}
+	if p.sendPipelineEventGroup == nil {
+		p.sendPipelineEventGroup = logtail.SendPipelineEventGroup
 	}
 	return nil
 }
@@ -87,37 +91,109 @@ func (p *SlsFlusher) Flush(projectName string, logstoreName string, configName s
 	return nil
 }
 
-// Export makes flusher_sls loadable in the v2 Runner as a transitional bridge:
-// each v2 PipelineGroupEvents is converted to a legacy LogGroup (via B3's
-// PipelineGroupEventsToLogGroup, which handles Log/Metric/Span structurally)
-// and then pushed through the same SendPb cgo path used by Flush. This keeps a
-// single wire format toward the C++ Logtail queue while the v2 pipeline rolls
-// out; a native v2 send path can replace it later.
+// Export sends typed PipelineEventGroup protobufs to C++. The protobuf uses a
+// oneof, so mixed groups are split into consecutive runs of the same event kind
+// without dropping events or changing their order. Flush retains the v1 ABI.
 func (p *SlsFlusher) Export(groupEventsList []*models.PipelineGroupEvents, _ pipeline.PipelineContext) error {
-	configName := p.context.GetConfigName()
 	for _, groupEvents := range groupEventsList {
-		logGroup, err := converter.PipelineGroupEventsToLogGroup(groupEvents)
-		if err != nil {
-			return fmt.Errorf("convert pipeline group events to loggroup err %v", err)
-		}
-		if logGroup == nil {
+		if groupEvents == nil || len(groupEvents.Events) == 0 {
 			continue
 		}
-		// The converter does not carry a category; for SLS the category is the
-		// logstore, mirroring v1 where LogGroup.Category == logstore.
-		if logGroup.Category == "" {
-			logGroup.Category = p.context.GetLogstore()
-		}
-		if err := p.sendLogGroup(configName, logGroup); err != nil {
-			return err
+		for start := 0; start < len(groupEvents.Events); {
+			if groupEvents.Events[start] == nil {
+				return fmt.Errorf("nil pipeline event at index %d", start)
+			}
+			kind := groupEvents.Events[start].GetType()
+			end := start + 1
+			for end < len(groupEvents.Events) && groupEvents.Events[end] != nil && groupEvents.Events[end].GetType() == kind {
+				end++
+			}
+			if err := p.sendPipelineEvents(groupEvents.Group, groupEvents.Events[start:end]); err != nil {
+				return err
+			}
+			start = end
 		}
 	}
 	return nil
 }
 
+func (p *SlsFlusher) sendPipelineEvents(group *models.GroupInfo, events []models.PipelineEvent) error {
+	pb := &protocol.PipelineEventGroup{
+		Tags: make(map[string][]byte), Metadata: make(map[string][]byte),
+	}
+	for k, v := range group.GetTags().Iterator() {
+		pb.Tags[k] = []byte(v)
+	}
+	for k, v := range group.GetMetadata().Iterator() {
+		pb.Metadata[k] = []byte(v)
+	}
+	// Check conversion errors explicitly: the generic group helper ignores
+	// event conversion failures, which would turn malformed data into data loss.
+	switch events[0].GetType() {
+	case models.EventTypeLogging:
+		logs := &protocol.PipelineEventGroup_LogEvents{}
+		for _, event := range events {
+			log, ok := event.(*models.Log)
+			if !ok || log == nil {
+				return fmt.Errorf("invalid log event %T", event)
+			}
+			converted, err := helper.TransferLogEventToPB(log)
+			if err != nil {
+				return fmt.Errorf("convert log event: %w", err)
+			}
+			logs.Events = append(logs.Events, converted)
+		}
+		pb.PipelineEvents = &protocol.PipelineEventGroup_Logs{Logs: logs}
+	case models.EventTypeMetric:
+		metrics := &protocol.PipelineEventGroup_MetricEvents{}
+		for _, event := range events {
+			metric, ok := event.(*models.Metric)
+			if !ok || metric == nil {
+				return fmt.Errorf("invalid metric event %T", event)
+			}
+			converted, err := helper.TransferMetricEventToPB(metric)
+			if err != nil {
+				return fmt.Errorf("convert metric event: %w", err)
+			}
+			metrics.Events = append(metrics.Events, converted)
+		}
+		pb.PipelineEvents = &protocol.PipelineEventGroup_Metrics{Metrics: metrics}
+	case models.EventTypeSpan:
+		spans := &protocol.PipelineEventGroup_SpanEvents{}
+		for _, event := range events {
+			span, ok := event.(*models.Span)
+			if !ok || span == nil {
+				return fmt.Errorf("invalid span event %T", event)
+			}
+			converted, err := helper.TransferSpanEventToPB(span)
+			if err != nil {
+				return fmt.Errorf("convert span event: %w", err)
+			}
+			spans.Events = append(spans.Events, converted)
+		}
+		pb.PipelineEvents = &protocol.PipelineEventGroup_Spans{Spans: spans}
+	default:
+		return fmt.Errorf("unsupported pipeline event type %v", events[0].GetType())
+	}
+	var shardHash string
+	if p.EnableShardHash {
+		shardHash = string(pb.Tags[util.ShardHashTagKey])
+		if !p.KeepShardHash {
+			delete(pb.Tags, util.ShardHashTagKey)
+		}
+	}
+	buf, err := pb.Marshal()
+	if err != nil {
+		return fmt.Errorf("marshal pipeline event group: %w", err)
+	}
+	if result := p.sendPipelineEventGroup(p.context.GetConfigName(), p.context.GetLogstore(), buf, len(events), shardHash); result < 0 {
+		return fmt.Errorf("send pipeline event group: error %d", result)
+	}
+	return nil
+}
+
 // sendLogGroup marshals a single LogGroup and pushes it into Logtail's sending
-// queue via cgo. Shared by the v1 Flush and v2 Export paths so both apply the
-// same shard-hash handling and SendPb/SendPbV2 selection.
+// queue via the legacy v1 SendPb/SendPbV2 ABI.
 func (p *SlsFlusher) sendLogGroup(configName string, logGroup *protocol.LogGroup) error {
 	if len(logGroup.Logs) == 0 {
 		return nil

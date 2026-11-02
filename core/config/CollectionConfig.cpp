@@ -259,14 +259,14 @@ bool CollectionConfig::Parse() {
             }
         }
         mInputs.push_back(&plugin);
+        // TODO: remove file-input special handling once FileServer uses per-input keys (#2644).
 #ifndef APSARA_UNIT_TEST_MAIN
-        // TODO: remove these special restrictions
         if (pluginType == "input_file" || pluginType == "input_container_stdio"
             || pluginType == "input_static_file_onetime") {
             hasFileInput = true;
         }
 #else
-        // TODO: remove these special restrictions after all C++ inputs support Go processors
+        // Test plugin aliases follow the same file-input restriction.
         if (pluginType.find("input_file") != string::npos || pluginType.find("input_container_stdio") != string::npos
             || pluginType.find("input_static_file_onetime") != string::npos) {
             hasFileInput = true;
@@ -497,13 +497,12 @@ bool CollectionConfig::Parse() {
         }
         mFlushers.push_back(&plugin);
     }
-    // TODO: remove this restriction once extended flushers implement FlusherV2.Export end to end.
+    // TODO: relax this restriction once the Go-to-native bridge can address additional native flusher instances.
     // Native + Go flusher coexistence rule (intentional, not part of the removed input whitelist):
     // when a Go (extended) flusher is present the native flushers are fed by the Go pipeline
     // (see ShouldNativeFlusherConnectedByGoPipeline), and flusher_sls is currently the only native
     // flusher able to consume that output. Therefore at most one native flusher may coexist with Go
-    // flushers, and it must be flusher_sls. This rule is lifted once extended flushers implement
-    // FlusherV2.Export end to end.
+    // flushers, and it must be flusher_sls.
     if (mHasGoFlusher && nativeFlusherCnt > 1) {
         PARAM_ERROR_RETURN(sLogger,
                            alarm,

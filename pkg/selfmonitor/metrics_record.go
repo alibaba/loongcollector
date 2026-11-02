@@ -96,23 +96,54 @@ type MetricsRecord struct {
 	MetricCollectors []MetricCollector
 }
 
-func (m *MetricsRecord) insertLabels(record map[string]string) {
-	labels := map[string]string{}
-	for _, label := range m.Labels {
-		labels[label.Key] = label.Value
-	}
-	labelsStr, _ := json.Marshal(labels)
-	record[MetricLabelPrefix] = string(labelsStr)
-}
-
 func (m *MetricsRecord) RegisterMetricCollector(collector MetricCollector) {
 	m.Lock()
 	defer m.Unlock()
 	m.MetricCollectors = append(m.MetricCollectors, collector)
 }
 
+// CloneLabelsWithCategory copies labels and sets metric_category to category.
+// Used to derive a plugin_source MetricsRecord from plugin-level labels.
+func CloneLabelsWithCategory(labels []LabelPair, category string) []LabelPair {
+	out := make([]LabelPair, 0, len(labels)+1)
+	replaced := false
+	for _, label := range labels {
+		if label.Key == MetricLabelKeyMetricCategory {
+			out = append(out, LabelPair{Key: label.Key, Value: category})
+			replaced = true
+			continue
+		}
+		out = append(out, label)
+	}
+	if !replaced {
+		out = append([]LabelPair{{Key: MetricLabelKeyMetricCategory, Value: category}}, out...)
+	}
+	return out
+}
+
+// exportKind maps a Go self-monitor metric type onto the C++ SelfMonitorMetricEvent
+// buckets (counters / gauges) or equivalent aggregation (string -> labels).
+func exportKind(metricType SelfMetricType) string {
+	switch metricType {
+	case CounterType, CumulativeCounterType:
+		return MetricCounterPrefix
+	case GaugeType, AverageType, MaxType, LatencyType:
+		return MetricGaugePrefix
+	case StringType:
+		return MetricLabelPrefix
+	default:
+		// RateType / SummaryType / HistogramType are not implemented; treat as gauge.
+		return MetricGaugePrefix
+	}
+}
+
 // ExportMetricRecords is used for exporting metrics records.
 // It will replace Serialize in the future.
+//
+// Type mapping (equivalent aggregation onto C++ Counter/Gauge):
+//   - CounterType, CumulativeCounterType -> counters
+//   - GaugeType, AverageType, MaxType, LatencyType -> gauges
+//   - StringType -> labels (C++ has no string metric; source identity lives in labels)
 func (m *MetricsRecord) ExportMetricRecords() map[string]string {
 	m.RLock()
 	defer m.RUnlock()
@@ -120,7 +151,10 @@ func (m *MetricsRecord) ExportMetricRecords() map[string]string {
 	record := map[string]string{}
 	counters := map[string]string{}
 	gauges := map[string]string{}
-	m.insertLabels(record)
+	labels := map[string]string{}
+	for _, label := range m.Labels {
+		labels[label.Key] = label.Value
+	}
 	for _, metricCollector := range m.MetricCollectors {
 		metrics := metricCollector.Collect()
 		for _, metric := range metrics {
@@ -130,14 +164,18 @@ func (m *MetricsRecord) ExportMetricRecords() map[string]string {
 			}
 			valueName := singleMetric[SelfMetricNameKey]
 			valueValue := singleMetric[valueName]
-			if metric.Type() == CounterType {
+			switch exportKind(metric.Type()) {
+			case MetricCounterPrefix:
 				counters[valueName] = valueValue
-			}
-			if metric.Type() == GaugeType {
+			case MetricGaugePrefix:
 				gauges[valueName] = valueValue
+			case MetricLabelPrefix:
+				labels[valueName] = valueValue
 			}
 		}
 	}
+	labelsStr, _ := json.Marshal(labels)
+	record[MetricLabelPrefix] = string(labelsStr)
 	countersStr, _ := json.Marshal(counters)
 	record[MetricCounterPrefix] = string(countersStr)
 	gaugesStr, _ := json.Marshal(gauges)

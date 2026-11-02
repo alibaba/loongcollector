@@ -159,7 +159,7 @@ func (p *pluginv2Runner) addMetricInput(pluginMeta *pipeline.PluginMeta, input p
 	p.TimerRunner = append(p.TimerRunner, &timerRunner{
 		initialMaxDelay: time.Duration(p.LogstoreConfig.GlobalConfig.InputMaxFirstCollectDelayMs) * time.Millisecond,
 		interval:        wrapper.Interval,
-		state:           input,
+		state:           &wrapper,
 		context:         p.LogstoreConfig.Context,
 	})
 	return err
@@ -233,7 +233,8 @@ func (p *pluginv2Runner) runInput() {
 
 func (p *pluginv2Runner) runMetricInput(control *pipeline.AsyncControl) {
 	for _, t := range p.TimerRunner {
-		if plugin, ok := t.state.(pipeline.MetricInputV2); ok {
+		// Aggregator timers share this list and are handled by runAggregator.
+		if plugin, ok := t.state.(*MetricWrapperV2); ok {
 			metric := plugin
 			timer := t
 			control.Run(func(cc *pipeline.AsyncControl) {
@@ -241,8 +242,6 @@ func (p *pluginv2Runner) runMetricInput(control *pipeline.AsyncControl) {
 					return metric.Read(p.InputPipeContext)
 				}, cc)
 			})
-		} else {
-			logger.Error(p.LogstoreConfig.Context.GetRuntimeContext(), selfmonitor.MetricInputV2StartFailureAlarm, "type assertion", "failure")
 		}
 	}
 }

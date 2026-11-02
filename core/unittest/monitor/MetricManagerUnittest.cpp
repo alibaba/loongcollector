@@ -45,6 +45,7 @@ public:
     void TestCreateAndDeleteMetric();
     void TestParseGoMetricsPB();
     void TestParseGoMetricsPBInvalid();
+    void TestParseGoMetricsPBRepeatedBatch();
 };
 
 APSARA_UNIT_TEST_CASE(MetricManagerUnittest, TestCreateMetricAutoDelete, 0);
@@ -52,6 +53,31 @@ APSARA_UNIT_TEST_CASE(MetricManagerUnittest, TestCreateMetricAutoDeleteMultiThre
 APSARA_UNIT_TEST_CASE(MetricManagerUnittest, TestCreateAndDeleteMetric, 2);
 APSARA_UNIT_TEST_CASE(MetricManagerUnittest, TestParseGoMetricsPB, 3);
 APSARA_UNIT_TEST_CASE(MetricManagerUnittest, TestParseGoMetricsPBInvalid, 4);
+APSARA_UNIT_TEST_CASE(MetricManagerUnittest, TestParseGoMetricsPBRepeatedBatch, 5);
+
+void MetricManagerUnittest::TestParseGoMetricsPBRepeatedBatch() {
+    models::PipelineEventGroup pb;
+    for (int i = 0; i < 100; ++i) {
+        auto* metric = pb.mutable_metrics()->add_events();
+        metric->set_name("plugin");
+        (*metric->mutable_tags())["plugin_type"] = "flusher_stdout";
+        (*metric->mutable_tags())["pipeline_name"] = "config-" + std::to_string(i);
+        auto* values = metric->mutable_untypedmultidoublevalues()->mutable_values();
+        (*values)["events"].set_value(100);
+        (*values)["events"].set_metrictype(models::METRIC_TYPE_COUNTER);
+        (*values)["queue_size"].set_value(12.25);
+        (*values)["queue_size"].set_metrictype(models::METRIC_TYPE_GAUGE);
+    }
+    std::string bytes;
+    ASSERT_TRUE(pb.SerializeToString(&bytes));
+    for (int iteration = 0; iteration < 500; ++iteration) {
+        std::vector<SelfMonitorMetricEvent> records;
+        ASSERT_TRUE(ReadMetrics::ParseGoMetricsPB(bytes, records));
+        ASSERT_EQ(100U, records.size());
+        EXPECT_EQ(100U, records[0].GetCounter("events"));
+        EXPECT_EQ(12.25, records[0].GetGauge("queue_size"));
+    }
+}
 
 
 void MetricManagerUnittest::TestCreateMetricAutoDelete() {
@@ -341,9 +367,7 @@ void MetricManagerUnittest::TestCreateAndDeleteMetric() {
     delete fileMetric1;
 }
 
-// Build a serialized PipelineEventGroup PB carrying one MetricEvent, mirroring the
-// D3 Go pull payload, and verify ParseGoMetricsPB reconstructs the GetGoMetrics map
-// form that SelfMonitorMetricEvent(const std::map&) consumes.
+// PB fields should reach the final snapshot without JSON or native event intermediates.
 void MetricManagerUnittest::TestParseGoMetricsPB() {
     PipelineEventGroup group(std::make_shared<SourceBuffer>());
     MetricEvent* e = group.AddMetricEvent();
@@ -365,18 +389,13 @@ void MetricManagerUnittest::TestParseGoMetricsPB() {
     std::string bytes;
     APSARA_TEST_TRUE(pb.SerializeToString(&bytes));
 
-    std::vector<std::map<std::string, std::string>> metricsList;
+    std::vector<SelfMonitorMetricEvent> metricsList;
     APSARA_TEST_TRUE(ReadMetrics::ParseGoMetricsPB(bytes, metricsList));
     APSARA_TEST_EQUAL(metricsList.size(), 1UL);
 
-    // The reconstructed string form must match the legacy GetGoMetrics map shape:
-    // counters are integral strings, gauges use fixed 4-fractional-digit notation
-    // (Go: strconv.FormatFloat(v, 'f', 4, 64)), not std::to_string's 6 digits.
-    APSARA_TEST_EQUAL(metricsList[0]["counters"], std::string(R"({"proc_in_records_total":"100"})"));
-    APSARA_TEST_EQUAL(metricsList[0]["gauges"], std::string(R"({"avg_delay_ms":"50.5000","cache_size":"12.0000"})"));
-
-    // feed through the same ctor GetGoMetrics uses, verifying end-to-end coexistence
-    SelfMonitorMetricEvent event(metricsList[0]);
+    const auto& gauges = metricsList[0].GetGauges();
+    APSARA_TEST_EQUAL(gauges.size(), 2UL);
+    SelfMonitorMetricEvent& event = metricsList[0];
     APSARA_TEST_EQUAL(event.mCategory, std::string("plugin"));
     APSARA_TEST_EQUAL(event.GetLabel("plugin_type"), std::string("flusher_stdout"));
     APSARA_TEST_EQUAL(event.GetCounter("proc_in_records_total"), 100UL);
@@ -387,11 +406,18 @@ void MetricManagerUnittest::TestParseGoMetricsPB() {
 // Empty input is a no-op success; malformed protobuf returns false without touching
 // the output list.
 void MetricManagerUnittest::TestParseGoMetricsPBInvalid() {
-    std::vector<std::map<std::string, std::string>> metricsList;
+    std::vector<SelfMonitorMetricEvent> metricsList;
     APSARA_TEST_TRUE(ReadMetrics::ParseGoMetricsPB("", metricsList));
     APSARA_TEST_EQUAL(metricsList.size(), 0UL);
 
     APSARA_TEST_FALSE(ReadMetrics::ParseGoMetricsPB("not-a-valid-protobuf-payload", metricsList));
+    APSARA_TEST_EQUAL(metricsList.size(), 0UL);
+    models::PipelineEventGroup malformed;
+    malformed.mutable_metrics()->add_events()->mutable_untypedmultidoublevalues();
+    malformed.mutable_metrics()->add_events()->set_name("missing_value");
+    std::string bytes;
+    APSARA_TEST_TRUE(malformed.SerializeToString(&bytes));
+    APSARA_TEST_FALSE(ReadMetrics::ParseGoMetricsPB(bytes, metricsList));
     APSARA_TEST_EQUAL(metricsList.size(), 0UL);
 }
 

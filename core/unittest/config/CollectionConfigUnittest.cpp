@@ -2425,8 +2425,8 @@ void CollectionConfigUnittest::NativeInputWithGoPlugin() const {
     string errorMsg;
 
     // The input-type whitelist/blacklist gate is removed. Any registered native input
-    // may now coexist with Go processors and/or Go flushers, so these configs must Parse.
-    // (These inputs were previously rejected by the legacy-parity blacklist.)
+    // may coexist with Go processors and/or Go flushers. Disabled native names must fail.
+    // Both classification and Parse are checked; accepting a name as Go is insufficient.
     const vector<string> nativeInputs = {
         "input_agentsight",
         "input_cpu_profiling",
@@ -2462,7 +2462,10 @@ void CollectionConfigUnittest::NativeInputWithGoPlugin() const {
         configJson.reset(new Json::Value());
         APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
         config.reset(new CollectionConfig(configName, std::move(configJson), filepath));
-        APSARA_TEST_TRUE_DESC(config->Parse(), inputType);
+        const bool available = PluginRegistry::GetInstance()->IsValidNativeInputPlugin(inputType, false);
+        APSARA_TEST_EQUAL_DESC(available, config->Parse(), inputType);
+        APSARA_TEST_FALSE_DESC(config->mHasGoInput, inputType);
+        APSARA_TEST_EQUAL_DESC(available, config->mHasNativeInput, inputType);
 
         // native input + Go flusher only
         configStr = R"(
@@ -2483,7 +2486,10 @@ void CollectionConfigUnittest::NativeInputWithGoPlugin() const {
         configJson.reset(new Json::Value());
         APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
         config.reset(new CollectionConfig(configName, std::move(configJson), filepath));
-        APSARA_TEST_TRUE_DESC(config->Parse(), inputType);
+
+        APSARA_TEST_EQUAL_DESC(available, config->Parse(), inputType);
+        APSARA_TEST_FALSE_DESC(config->mHasGoInput, inputType);
+        APSARA_TEST_EQUAL_DESC(available, config->mHasNativeInput, inputType);
     }
 }
 
@@ -2517,7 +2523,7 @@ void CollectionConfigUnittest::MultiInputAndFlusherCoexistence() const {
     config.reset(new CollectionConfig(configName, std::move(configJson), filepath));
     APSARA_TEST_FALSE(config->Parse());
 
-    // native input coexists with Go flusher (multi-input path).
+    // A single native file input coexists with a Go flusher.
     configStr = R"(
         {
             "inputs": [

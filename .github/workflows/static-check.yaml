@@ -95,6 +95,11 @@ jobs:
           exclude-regex: 'common/xxhash|labels/Relabel\.cpp|ProcessorParseContainerLogNative\.cpp|FlusherSLS\.cpp|_thirdparty|core/common/LRUCache\.h|core/common/queue/.*|core/common/magic_enum\.hpp|core/host_monitor/common/FieldEntry\.h'
           include-regex: '.*\.(cpp|h)$'
 
+      - name: Lint Processor Process Events[0]
+        run: |
+          python3 -m unittest -v scripts/lint_process_events0_test.py
+          python3 scripts/lint_process_events0.py
+
       - name: Go Plugin Lint
         run: make lint
   

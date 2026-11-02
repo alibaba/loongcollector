@@ -311,6 +311,24 @@ bool CollectionPipeline::Init(CollectionConfig&& config) {
         }
     }
 
+    // Validate input queue compatibility before LoadGoPipelines: a failed Init
+    // must not leave a newly loaded Go configuration pending for the next start.
+    // TODO: support queue-type selection for Go inputs; they currently use count-bounded queues.
+    // Determine process queue type based on input plugins
+    QueueType queueType = mInputs.empty() ? QueueType::COUNT_BOUNDED : mInputs[0]->GetProcessQueueType();
+    for (auto& input : mInputs) {
+        if (input->GetProcessQueueType() != queueType) {
+            PARAM_ERROR_RETURN(mContext.GetLogger(),
+                               mContext.GetAlarm(),
+                               "not all inputs' queue type are the same",
+                               noModule,
+                               mName,
+                               mContext.GetProjectName(),
+                               mContext.GetLogstoreName(),
+                               mContext.GetRegion());
+        }
+    }
+
 #ifndef APSARA_UNIT_TEST_MAIN
     if (!LoadGoPipelines()) {
         return false;
@@ -323,21 +341,6 @@ bool CollectionPipeline::Init(CollectionConfig&& config) {
             mContext.SetProcessQueueKey(QueueKeyManager::GetInstance()->GetKey(mName));
         }
 
-        // TODO: for go input, we currently assume count bounded process queue
-        // Determine process queue type based on input plugins
-        QueueType queueType = mInputs.empty() ? QueueType::COUNT_BOUNDED : mInputs[0]->GetProcessQueueType();
-        for (auto& input : mInputs) {
-            if (input->GetProcessQueueType() != queueType) {
-                PARAM_ERROR_RETURN(mContext.GetLogger(),
-                                   mContext.GetAlarm(),
-                                   "not all inputs' queue type are the same",
-                                   noModule,
-                                   mName,
-                                   mContext.GetProjectName(),
-                                   mContext.GetLogstoreName(),
-                                   mContext.GetRegion());
-            }
-        }
         switch (queueType) {
             case QueueType::COUNT_BOUNDED:
                 ProcessQueueManager::GetInstance()->CreateOrUpdateCountBoundedQueue(

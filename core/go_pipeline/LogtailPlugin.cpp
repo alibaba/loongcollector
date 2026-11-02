@@ -14,6 +14,8 @@
 
 #include "go_pipeline/LogtailPlugin.h"
 
+#include <memory>
+
 #include "json/json.h"
 
 #include "StringView.h"
@@ -29,8 +31,13 @@
 #include "common/compression/CompressorFactory.h"
 #include "file_server/ConfigManager.h"
 #include "logger/Logger.h"
+#include "models/PipelineEventGroup.h"
 #include "monitor/AlarmManager.h"
+#include "monitor/MetricManager.h"
 #include "monitor/Monitor.h"
+#include "monitor/SelfMonitorServer.h"
+#include "protobuf/models/ProtocolConversion.h"
+#include "protobuf/models/pipeline_event_group.pb.h"
 #include "provider/Provider.h"
 #ifdef APSARA_UNIT_TEST_MAIN
 #include "unittest/pipeline/LogtailPluginMock.h"
@@ -56,8 +63,8 @@ LogtailPlugin::LogtailPlugin() {
     mStartFun = NULL;
     mLoadGlobalConfigFun = NULL;
     mPluginValid = false;
-    mGetGoAlarmsFun = NULL;
     mPluginContainerConfig.mLogstore = "logtail_containers";
+    mPluginContainerContext.SetConfigName("logtail_containers");
     mPluginContainerConfig.mAliuid = STRING_FLAG(logtail_profile_aliuid);
     mPluginContainerConfig.mCompressor = CompressorFactory::GetInstance()->Create(CompressType::ZSTD);
 
@@ -243,12 +250,22 @@ int LogtailPlugin::SendPbV2(const char* configName,
     // LOG_DEBUG(sLogger, ("send pb", configNameStr)("pb size", pbSize)("lines", lines));
     FlusherSLS* pConfig = NULL;
     if (configNameStr == containerConfig->mLogstore) {
+        auto* plugin = LogtailPlugin::GetInstance();
+        lock_guard<mutex> lock(plugin->mPluginContainerMutex);
         pConfig = containerConfig;
         pConfig->mProject = GetProfileSender()->GetDefaultProfileProjectName();
         pConfig->mRegion = GetProfileSender()->GetDefaultProfileRegion();
         if (pConfig->mProject.empty()) {
             return 0;
         }
+        if (!pConfig->InitForProfile(plugin->mPluginContainerContext)) {
+            return -1;
+        }
+        string hash;
+        if (shardHashSize > 0 && shardHash != nullptr) {
+            hash.assign(shardHash, static_cast<size_t>(shardHashSize));
+        }
+        return pConfig->Send(string(pbBuffer, pbSize), hash, logstore) ? 0 : -1;
     } else {
         shared_ptr<CollectionPipeline> p = CollectionPipelineManager::GetInstance()->FindConfigByName(configNameStr);
         if (!p) {
@@ -265,6 +282,80 @@ int LogtailPlugin::SendPbV2(const char* configName,
         shardHashStr.assign(shardHash, static_cast<size_t>(shardHashSize));
     }
     return pConfig->Send(std::string(pbBuffer, pbSize), shardHashStr, logstore) ? 0 : -1;
+}
+
+int LogtailPlugin::SendPipelineEventGroup(const char* configName,
+                                          int32_t configNameSize,
+                                          const char* logstoreName,
+                                          int logstoreSize,
+                                          char* pbBuffer,
+                                          int32_t pbSize,
+                                          int32_t /*eventCount*/,
+                                          const char* shardHash,
+                                          int shardHashSize) {
+    if (configName == NULL || configNameSize <= 0 || pbBuffer == NULL || pbSize <= 0) {
+        return -1;
+    }
+
+    models::PipelineEventGroup pbGroup;
+    if (!pbGroup.ParseFromArray(pbBuffer, pbSize)) {
+        LOG_WARNING(sLogger,
+                    ("error", "SendPipelineEventGroup invalid PipelineEventGroup PB")("pb size", pbSize)(
+                        "config", std::string(configName, configNameSize)));
+        return -1;
+    }
+
+    static FlusherSLS* containerConfig = &(LogtailPlugin::GetInstance()->mPluginContainerConfig);
+
+    string configNameStr = string(configName, configNameSize);
+
+    string logstore;
+    if (logstoreSize > 0 && logstoreName != NULL) {
+        logstore.assign(logstoreName, (size_t)logstoreSize);
+    }
+
+    if (configNameStr == containerConfig->mLogstore) {
+        auto* plugin = LogtailPlugin::GetInstance();
+        lock_guard<mutex> lock(plugin->mPluginContainerMutex);
+        containerConfig->mProject = GetProfileSender()->GetDefaultProfileProjectName();
+        containerConfig->mRegion = GetProfileSender()->GetDefaultProfileRegion();
+        if (containerConfig->mProject.empty()) {
+            // An empty profile project explicitly disables container reporting.
+            return 0;
+        }
+        string hash;
+        if (shardHashSize > 0 && shardHash != nullptr) {
+            hash.assign(shardHash, static_cast<size_t>(shardHashSize));
+        }
+        if (!containerConfig->InitForProfile(plugin->mPluginContainerContext)) {
+            return -1;
+        }
+        return containerConfig->Send(pbGroup, hash, logstore) ? 0 : -1;
+    }
+
+    shared_ptr<CollectionPipeline> p = CollectionPipelineManager::GetInstance()->FindConfigByName(configNameStr);
+    if (!p) {
+        LOG_INFO(sLogger,
+                 ("error", "SendPipelineEventGroup can not find config, maybe config updated")("config", configNameStr)(
+                     "logstore", logstore));
+        return -2;
+    }
+    if (p->GetFlushers().empty() || p->GetFlushers()[0] == nullptr) {
+        LOG_WARNING(sLogger, ("error", "SendPipelineEventGroup config has no flusher")("config", configNameStr));
+        return -2;
+    }
+    const Flusher* plugin = p->GetFlushers()[0]->GetPlugin();
+    if (plugin == NULL || plugin->Name() != FlusherSLS::sName) {
+        LOG_WARNING(sLogger, ("error", "SendPipelineEventGroup flusher is not flusher_sls")("config", configNameStr));
+        return -2;
+    }
+    FlusherSLS* pConfig = const_cast<FlusherSLS*>(static_cast<const FlusherSLS*>(plugin));
+
+    string hash;
+    if (shardHashSize > 0 && shardHash != nullptr) {
+        hash.assign(shardHash, static_cast<size_t>(shardHashSize));
+    }
+    return pConfig->Send(pbGroup, hash, logstore) ? 0 : -1;
 }
 
 bool LogtailPlugin::LoadPluginBase() {
@@ -288,7 +379,7 @@ bool LogtailPlugin::LoadPluginBase() {
             return mPluginValid;
         }
         int version = versionFun();
-        if (!(version / 100 == 2 || version / 100 == 3)) {
+        if (!(version / 100 == 2 || version / 100 == 3 || version / 100 == 4)) {
             LOG_ERROR(sLogger, ("invalid plugin adapter version, version", version));
             return mPluginValid;
         }
@@ -307,6 +398,17 @@ bool LogtailPlugin::LoadPluginBase() {
                 return mPluginValid;
             }
             registerFun(LogtailPlugin::IsValidToSend, LogtailPlugin::SendPb);
+        }
+
+        // Additive: SendPipelineEventGroup coexists with SendPb. Old adapters
+        // without this symbol keep working; Go calls then return -1.
+        auto registerPegFun
+            = (RegisterSendPipelineEventGroupFun)loader.LoadMethod("RegisterSendPipelineEventGroup", error);
+        if (error.empty()) {
+            registerPegFun(LogtailPlugin::SendPipelineEventGroup);
+        } else {
+            LOG_WARNING(sLogger,
+                        ("load RegisterSendPipelineEventGroup failed", error)("SendPipelineEventGroup", "unavailable"));
         }
 
         mPluginAdapterPtr = loader.Release();
@@ -402,16 +504,21 @@ bool LogtailPlugin::LoadPluginBase() {
             LOG_ERROR(sLogger, ("load ProcessPipelineEventGroup error, Message", error));
             return mPluginValid;
         }
-        // 获取golang部分指标信息
-        mGetGoMetricsFun = (GetGoMetricsFun)loader.LoadMethod("GetGoMetrics", error);
+        mGetGoSelfMonitorMetricsPBFun
+            = (GetGoSelfMonitorMetricsPBFun)loader.LoadMethod("GetGoSelfMonitorMetricsPB", error);
         if (!error.empty()) {
-            LOG_ERROR(sLogger, ("load GetGoMetrics error, Message", error));
+            LOG_ERROR(sLogger, ("load GetGoSelfMonitorMetricsPB error", error));
             return mPluginValid;
         }
-        // 获取golang部分告警信息
-        mGetGoAlarmsFun = (GetGoAlarmsFun)loader.LoadMethod("GetGoAlarms", error);
+        mGetGoSelfMonitorAlarmsPBFun
+            = (GetGoSelfMonitorAlarmsPBFun)loader.LoadMethod("GetGoSelfMonitorAlarmsPB", error);
         if (!error.empty()) {
-            LOG_ERROR(sLogger, ("load GetGoAlarms error, Message", error));
+            LOG_ERROR(sLogger, ("load GetGoSelfMonitorAlarmsPB error", error));
+            return mPluginValid;
+        }
+        mFreeSelfMonitorPBFun = (FreeSelfMonitorPBFun)loader.LoadMethod("FreeSelfMonitorPB", error);
+        if (!error.empty()) {
+            LOG_ERROR(sLogger, ("load FreeSelfMonitorPB error", error));
             return mPluginValid;
         }
 
@@ -472,110 +579,29 @@ void LogtailPlugin::ProcessPipelineEventGroup(const std::string& configName,
 #endif
 }
 
-void LogtailPlugin::GetGoMetrics(std::vector<std::map<std::string, std::string>>& metircsList,
-                                 const string& metricType) {
-    if (mGetGoMetricsFun != nullptr) {
-        GoString type;
-        type.n = metricType.size();
-        type.p = metricType.c_str();
-        auto* metrics = mGetGoMetricsFun(type);
-        if (metrics != nullptr) {
-            for (int i = 0; i < metrics->count; ++i) {
-                std::map<std::string, std::string> item;
-                InnerPluginMetric* innerpm = metrics->metrics[i];
-                if (innerpm != nullptr) {
-                    for (int j = 0; j < innerpm->count; ++j) {
-                        InnerKeyValue* innerkv = innerpm->keyValues[j];
-                        if (innerkv != nullptr) {
-                            item.insert(std::make_pair(std::string(innerkv->key), std::string(innerkv->value)));
-                            free(innerkv->key);
-                            free(innerkv->value);
-                            free(innerkv);
-                        }
-                    }
-                    free(innerpm->keyValues);
-                    free(innerpm);
-                }
-                metircsList.emplace_back(item);
-            }
-            free(metrics->metrics);
-            free(metrics);
-        }
+bool LogtailPlugin::GetGoSelfMonitorMetrics(std::vector<SelfMonitorMetricEvent>& metricsList,
+                                            const std::string& metricType) {
+    if (!mPluginValid || mGetGoSelfMonitorMetricsPBFun == nullptr || mFreeSelfMonitorPBFun == nullptr) {
+        return false;
     }
+    GoString type{metricType.data(), static_cast<GoInt>(metricType.size())};
+    SelfMonitorPBBuffer buffer = mGetGoSelfMonitorMetricsPBFun(type);
+    // Parse borrowed C bytes while the Go-owned allocation is guarded by RAII.
+    std::unique_ptr<char, FreeSelfMonitorPBFun> data(buffer.data, mFreeSelfMonitorPBFun);
+    if (buffer.data == nullptr) {
+        return buffer.size == 0;
+    }
+    return ReadMetrics::ParseGoMetricsPB(std::string_view(buffer.data, buffer.size), metricsList);
 }
 
-void LogtailPlugin::GetGoAlarms() {
-    if (mGetGoAlarmsFun == nullptr) {
+void LogtailPlugin::SyncGoSelfMonitorAlarms() {
+    if (!mPluginValid || mGetGoSelfMonitorAlarmsPBFun == nullptr || mFreeSelfMonitorPBFun == nullptr) {
         return;
     }
-    auto* alarms = mGetGoAlarmsFun();
-    if (alarms == nullptr) {
-        return;
-    }
-    int32_t syncedAlarmCount = 0;
-    int32_t droppedAlarmCount = 0;
-    for (int i = 0; i < alarms->count; ++i) {
-        InnerGoAlarm* innerAlarm = alarms->alarms[i];
-        if (innerAlarm == nullptr) {
-            continue;
-        }
-        std::string alarmType = innerAlarm->alarmType ? std::string(innerAlarm->alarmType) : "";
-        std::string alarmLevel = innerAlarm->alarmLevel ? std::string(innerAlarm->alarmLevel) : "";
-        std::string alarmMessage = innerAlarm->alarmMessage ? std::string(innerAlarm->alarmMessage) : "";
-        std::string projectName = innerAlarm->projectName ? std::string(innerAlarm->projectName) : "";
-        std::string category = innerAlarm->category ? std::string(innerAlarm->category) : "";
-        std::string config = innerAlarm->config ? std::string(innerAlarm->config) : "";
-        if (alarmType.empty()) {
-            ++droppedAlarmCount;
-            free(innerAlarm->alarmType);
-            free(innerAlarm->alarmLevel);
-            free(innerAlarm->alarmMessage);
-            free(innerAlarm->projectName);
-            free(innerAlarm->category);
-            free(innerAlarm->config);
-            free(innerAlarm);
-            continue;
-        }
-
-        AlarmLevel level = ALARM_LEVEL_WARNING;
-        if (alarmLevel == "2") {
-            level = ALARM_LEVEL_ERROR;
-        } else if (alarmLevel == "3") {
-            level = ALARM_LEVEL_CRITICAL;
-        }
-        int32_t count = innerAlarm->count > 0 ? innerAlarm->count : 1;
-        std::string pipelineConfig = config;
-        if (pipelineConfig.size() > 2 && pipelineConfig[pipelineConfig.size() - 2] == '/'
-            && (pipelineConfig.back() == '1' || pipelineConfig.back() == '2')) {
-            pipelineConfig = pipelineConfig.substr(0, pipelineConfig.size() - 2);
-        }
-        std::string resolvedRegion = STRING_FLAG(default_region_name);
-        const shared_ptr<CollectionPipeline>& pipeline
-            = CollectionPipelineManager::GetInstance()->FindConfigByName(pipelineConfig);
-        if (pipeline) {
-            const std::string& region = pipeline->GetContext().GetRegion();
-            if (!region.empty()) {
-                resolvedRegion = region;
-            }
-        }
-        AlarmManager::GetInstance()->SendExternalAlarm(
-            alarmType, level, alarmMessage, count, resolvedRegion, projectName, pipelineConfig, category);
-        ++syncedAlarmCount;
-
-        free(innerAlarm->alarmType);
-        free(innerAlarm->alarmLevel);
-        free(innerAlarm->alarmMessage);
-        free(innerAlarm->projectName);
-        free(innerAlarm->category);
-        free(innerAlarm->config);
-        free(innerAlarm);
-    }
-    free(alarms->alarms);
-    free(alarms);
-    if (syncedAlarmCount > 0 || droppedAlarmCount > 0) {
-        LOG_DEBUG(sLogger,
-                  ("sync go alarms to cpp pipeline", "finished")("synced", syncedAlarmCount)("dropped_empty_type",
-                                                                                             droppedAlarmCount));
+    SelfMonitorPBBuffer buffer = mGetGoSelfMonitorAlarmsPBFun();
+    std::unique_ptr<char, FreeSelfMonitorPBFun> data(buffer.data, mFreeSelfMonitorPBFun);
+    if (buffer.data != nullptr && buffer.size != 0) {
+        SelfMonitorServer::GetInstance()->ReceiveGoAlarmsPB(std::string_view(buffer.data, buffer.size));
     }
 }
 

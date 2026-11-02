@@ -31,6 +31,12 @@ extern "C" {
         int lines,
         const char *shardHash, int shardHashSize);
 
+    typedef int(*SendPipelineEventGroupFun)(const char *configName, int configNameSize,
+        const char *logstore, int logstoreSize,
+        char *pbBuffer, int pbSize,
+        int eventCount,
+        const char *shardHash, int shardHashSize);
+
     typedef int(*PluginCtlCmdFun)(const char * configName, int configNameSize, int optId, const char * params, int paramsLen);
 
     void RegisterLogtailCallBack(IsValidToSendFun checkFun, SendPbFun sendFun, PluginCtlCmdFun cmdFun);
@@ -40,6 +46,8 @@ extern "C" {
         SendPbV2Fun sendV2Fun,
         PluginCtlCmdFun cmdFun);
 
+    void RegisterSendPipelineEventGroup(SendPipelineEventGroupFun sendFun);
+
     int LogtailIsValidToSend(long long logstoreKey);
 
     int LogtailSendPb(const char * configName, int configNameSize, const char * logstore, int logstoreSize, char * pbBuffer, int pbSize, int lines);
@@ -48,6 +56,12 @@ extern "C" {
         const char *logstore, int logstoreSize,
         char *pbBuffer, int pbSize,
         int lines,
+        const char *shardHash, int shardHashSize);
+
+    int LogtailSendPipelineEventGroup(const char *configName, int configNameSize,
+        const char *logstore, int logstoreSize,
+        char *pbBuffer, int pbSize,
+        int eventCount,
         const char *shardHash, int shardHashSize);
 
     // version for logtail plugin adapter, used for check plugin adapter version

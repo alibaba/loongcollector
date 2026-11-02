@@ -28,6 +28,8 @@ public:
     void TestLlmRecordCopiesProcessNameAndCmdline();
     void TestHttpsRecordCopiesProcessMetadata();
     void TestHttpsRecordCopiesPayloadsAndIdentity();
+    void TestRecordsOwnCopiedBytesInArena();
+    void TestZeroInitializedDataYieldsEmptyViews();
 };
 
 void AgentsightEventsUnittest::TestLlmRecordCopiesNonNullSizedBuffers() {
@@ -160,11 +162,80 @@ void AgentsightEventsUnittest::TestHttpsRecordCopiesPayloadsAndIdentity() {
     APSARA_TEST_EQUAL(std::string(kReqBody, sizeof(kReqBody)), r.mRequestBody);
     APSARA_TEST_EQUAL(kResHeaders, r.mResponseHeaders);
     APSARA_TEST_EQUAL(std::string(kResBody, sizeof(kResBody)), r.mResponseBody);
+    // Embedded NULs survive the arena copy explicitly (length-bounded, not NUL-scanned).
+    APSARA_TEST_EQUAL(3UL, r.mRequestBody.size());
+    APSARA_TEST_EQUAL('\0', r.mRequestBody[1]);
+    APSARA_TEST_EQUAL(4UL, r.mResponseBody.size());
+    APSARA_TEST_EQUAL('\0', r.mResponseBody[1]);
+}
+
+void AgentsightEventsUnittest::TestRecordsOwnCopiedBytesInArena() {
+    // The FFI pointers die when the callback returns; every non-empty view must point into the
+    // record's own SourceBuffer arena, never at the caller-provided buffers.
+    static const std::string kSession = "session-1";
+    static const std::string kReq = "{a";
+
+    AgentsightLLMData d{};
+    d.session_id = kSession.c_str();
+    d.request_messages = kReq.data();
+    d.request_messages_len = 2;
+
+    AgentsightLlmRecord r("pipe-a", d);
+    APSARA_TEST_TRUE(r.GetSourceBuffer() != nullptr);
+    APSARA_TEST_TRUE(r.mSessionId.data() != kSession.c_str());
+    APSARA_TEST_TRUE(r.mRequestMessagesJson.data() != kReq.data());
+    APSARA_TEST_EQUAL("session-1", r.mSessionId);
+    APSARA_TEST_EQUAL("{a", r.mRequestMessagesJson);
+
+    static const std::string kBody = "xy";
+    AgentsightHttpsData hd{};
+    hd.request_body = kBody.data();
+    hd.request_body_len = 2;
+    AgentsightHttpsRecord hr("pipe-raw", hd);
+    APSARA_TEST_TRUE(hr.GetSourceBuffer() != nullptr);
+    APSARA_TEST_TRUE(hr.mRequestBody.data() != kBody.data());
+    APSARA_TEST_EQUAL(kBody, hr.mRequestBody);
+}
+
+void AgentsightEventsUnittest::TestZeroInitializedDataYieldsEmptyViews() {
+    // Null pointers / zero lengths / all-zero fixed buffers must yield empty views without
+    // dereferencing null or calling CopyString(nullptr, 0).
+    AgentsightLLMData ld{};
+    AgentsightLlmRecord lr("pipe-a", ld);
+    APSARA_TEST_TRUE(lr.mSessionId.empty());
+    APSARA_TEST_TRUE(lr.mConversationId.empty());
+    APSARA_TEST_TRUE(lr.mResponseId.empty());
+    APSARA_TEST_TRUE(lr.mProcessName.empty());
+    APSARA_TEST_TRUE(lr.mCmdline.empty());
+    APSARA_TEST_TRUE(lr.mAgentType.empty());
+    APSARA_TEST_TRUE(lr.mContainerId.empty());
+    APSARA_TEST_TRUE(lr.mRequestUrl.empty());
+    APSARA_TEST_TRUE(lr.mProvider.empty());
+    APSARA_TEST_TRUE(lr.mModel.empty());
+    APSARA_TEST_TRUE(lr.mFinishReason.empty());
+    APSARA_TEST_TRUE(lr.mRequestMessagesJson.empty());
+    APSARA_TEST_TRUE(lr.mResponseMessagesJson.empty());
+    APSARA_TEST_TRUE(lr.mToolDefinitionsJson.empty());
+
+    AgentsightHttpsData hd{};
+    AgentsightHttpsRecord hr("pipe-raw", hd);
+    APSARA_TEST_TRUE(hr.mProcessName.empty());
+    APSARA_TEST_TRUE(hr.mCmdline.empty());
+    APSARA_TEST_TRUE(hr.mAgentType.empty());
+    APSARA_TEST_TRUE(hr.mContainerId.empty());
+    APSARA_TEST_TRUE(hr.mMethod.empty());
+    APSARA_TEST_TRUE(hr.mPath.empty());
+    APSARA_TEST_TRUE(hr.mRequestHeaders.empty());
+    APSARA_TEST_TRUE(hr.mRequestBody.empty());
+    APSARA_TEST_TRUE(hr.mResponseHeaders.empty());
+    APSARA_TEST_TRUE(hr.mResponseBody.empty());
 }
 
 UNIT_TEST_CASE(AgentsightEventsUnittest, TestLlmRecordCopiesNonNullSizedBuffers)
 UNIT_TEST_CASE(AgentsightEventsUnittest, TestLlmRecordCopiesProcessNameAndCmdline)
 UNIT_TEST_CASE(AgentsightEventsUnittest, TestHttpsRecordCopiesProcessMetadata)
 UNIT_TEST_CASE(AgentsightEventsUnittest, TestHttpsRecordCopiesPayloadsAndIdentity)
+UNIT_TEST_CASE(AgentsightEventsUnittest, TestRecordsOwnCopiedBytesInArena)
+UNIT_TEST_CASE(AgentsightEventsUnittest, TestZeroInitializedDataYieldsEmptyViews)
 
 UNIT_TEST_MAIN

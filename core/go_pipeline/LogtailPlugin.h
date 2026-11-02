@@ -20,6 +20,7 @@
 #include <stddef.h>
 #endif
 
+#include <cstddef>
 #include <cstdint>
 
 #include <numeric>
@@ -79,35 +80,12 @@ struct innerContainerMeta {
     char** envsVal;
 };
 
+// Matches PBBuffer in libGoPluginBase. Release data only through the allocating
+// module's FreeSelfMonitorPB callback, including when Windows uses a static CRT.
 typedef struct {
-    char* key;
-    char* value;
-} InnerKeyValue;
-
-typedef struct {
-    InnerKeyValue** keyValues;
-    int count;
-} InnerPluginMetric;
-
-typedef struct {
-    InnerPluginMetric** metrics;
-    int count;
-} InnerPluginMetrics;
-
-typedef struct {
-    char* alarmType;
-    char* alarmLevel;
-    char* alarmMessage;
-    char* projectName;
-    char* category;
-    char* config;
-    int count;
-} InnerGoAlarm;
-
-typedef struct {
-    InnerGoAlarm** alarms;
-    int count;
-} InnerGoAlarms;
+    char* data;
+    size_t size;
+} SelfMonitorPBBuffer;
 
 struct K8sContainerMeta {
     std::string PodName;
@@ -160,8 +138,9 @@ typedef GoInt (*ProcessPipelineEventGroupFun)(GoString c, GoSlice l, GoString p)
 typedef struct innerContainerMeta* (*GetContainerMetaFun)(GoString containerID);
 typedef char* (*GetAllContainerMetaFun)();
 typedef char* (*GetDiffContainerMetaFun)();
-typedef InnerPluginMetrics* (*GetGoMetricsFun)(GoString metricType);
-typedef InnerGoAlarms* (*GetGoAlarmsFun)();
+typedef SelfMonitorPBBuffer (*GetGoSelfMonitorMetricsPBFun)(GoString metricType);
+typedef SelfMonitorPBBuffer (*GetGoSelfMonitorAlarmsPBFun)();
+typedef void (*FreeSelfMonitorPBFun)(char* data);
 
 // Methods export by adapter.
 typedef int (*IsValidToSendFun)(long long logstoreKey);
@@ -182,13 +161,28 @@ typedef int (*SendPbV2Fun)(const char* configName,
                            int lines,
                            const char* shardHash,
                            int shardHashSize);
+typedef int (*SendPipelineEventGroupFun)(const char* configName,
+                                         int configNameSize,
+                                         const char* logstore,
+                                         int logstoreSize,
+                                         char* pbBuffer,
+                                         int pbSize,
+                                         int eventCount,
+                                         const char* shardHash,
+                                         int shardHashSize);
 
 
 typedef void (*RegisterLogtailCallBack)(IsValidToSendFun checkFun, SendPbFun sendFun);
 typedef void (*RegisterLogtailCallBackV2)(IsValidToSendFun checkFun, SendPbFun sendFun, SendPbV2Fun sendV2Fun);
+typedef void (*RegisterSendPipelineEventGroupFun)(SendPipelineEventGroupFun sendFun);
 
 typedef int (*PluginAdapterVersion)();
 }
+
+namespace logtail {
+class GoPipelineBridgeUnittest;
+class SelfMonitorMetricEvent;
+} // namespace logtail
 
 // Create by david zhang. 2017/09/02 22:22:12
 class LogtailPlugin {
@@ -251,14 +245,30 @@ public:
                         const char* shardHash,
                         int shardHashSize);
 
+    // SendPipelineEventGroup is the PipelineEventGroup-PB counterpart of SendPbV2.
+    // It coexists with legacy SendPb/SendPbV2 and forwards each call's routing
+    // overrides to the typed FlusherSLS path. Return codes match SendPbV2:
+    // 0 accepted (including disabled profile reporting), -1 parse/send failure,
+    // -2 config missing or without an SLS flusher.
+    static int SendPipelineEventGroup(const char* configName,
+                                      int32_t configNameSize,
+                                      const char* logstore,
+                                      int logstoreSize,
+                                      char* pbBuffer,
+                                      int32_t pbSize,
+                                      int32_t eventCount,
+                                      const char* shardHash,
+                                      int shardHashSize);
+
     K8sContainerMeta GetContainerMeta(logtail::StringView containerID);
     K8sContainerMeta GetContainerMeta(const std::string& containerID);
 
     std::string GetAllContainersMeta();
     std::string GetDiffContainersMeta();
 
-    void GetGoMetrics(std::vector<std::map<std::string, std::string>>& metircsList, const std::string& metricType);
-    void GetGoAlarms();
+    bool GetGoSelfMonitorMetrics(std::vector<logtail::SelfMonitorMetricEvent>& metricsList,
+                                 const std::string& metricType);
+    void SyncGoSelfMonitorAlarms();
 
 private:
     void* mPluginBasePtr;
@@ -272,13 +282,21 @@ private:
     StopBuiltInModulesFun mStopBuiltInModulesFun;
     StartFun mStartFun;
     volatile bool mPluginValid;
+    // The fixed container reporting path owns its context for the flusher lifetime.
+    logtail::CollectionPipelineContext mPluginContainerContext;
     logtail::FlusherSLS mPluginContainerConfig;
+    std::mutex mPluginContainerMutex;
     ProcessPipelineEventGroupFun mProcessPipelineEventGroupFun;
     GetContainerMetaFun mGetContainerMetaFun;
     GetAllContainerMetaFun mGetAllContainerMetaFun;
     GetDiffContainerMetaFun mGetDiffContainerMetaFun;
-    GetGoMetricsFun mGetGoMetricsFun;
-    GetGoAlarmsFun mGetGoAlarmsFun;
+    GetGoSelfMonitorMetricsPBFun mGetGoSelfMonitorMetricsPBFun = nullptr;
+    GetGoSelfMonitorAlarmsPBFun mGetGoSelfMonitorAlarmsPBFun = nullptr;
+    FreeSelfMonitorPBFun mFreeSelfMonitorPBFun = nullptr;
+
+#ifdef APSARA_UNIT_TEST_MAIN
+    friend class logtail::GoPipelineBridgeUnittest;
+#endif
 
     // Configuration for plugin system in JSON format.
     Json::Value mPluginCfg;

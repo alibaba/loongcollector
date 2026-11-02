@@ -22,6 +22,10 @@
 
 namespace logtail {
 
+namespace models {
+class MetricEvent;
+}
+
 struct SelfMonitorMetricRule {
     bool mEnable;
     size_t mInterval;
@@ -41,9 +45,16 @@ class SelfMonitorMetricEvent {
 public:
     SelfMonitorMetricEvent() = default;
     SelfMonitorMetricEvent(const SelfMonitorMetricEvent& event) = default;
+    SelfMonitorMetricEvent& operator=(const SelfMonitorMetricEvent& event) = default;
+    SelfMonitorMetricEvent(SelfMonitorMetricEvent&& event) noexcept = default;
+    SelfMonitorMetricEvent& operator=(SelfMonitorMetricEvent&& event) noexcept = default;
 
     explicit SelfMonitorMetricEvent(MetricsRecord* metricRecord);
     explicit SelfMonitorMetricEvent(const std::map<std::string, std::string>& metricRecord);
+
+    // Own only the final labels/values; protobuf storage may be released immediately.
+    explicit SelfMonitorMetricEvent(const models::MetricEvent& metricRecord);
+    const std::unordered_map<std::string, double>& GetGauges() const;
 
     void SetInterval(size_t interval);
     void Merge(const SelfMonitorMetricEvent& event);

@@ -18,6 +18,8 @@
 
 #include <string>
 
+#include "common/StringView.h"
+
 namespace logtail::ebpf {
 
 /// Cached per `gen_ai.session.id` (see `ResolveSessionStateKey`): last completed LLM round for delta/dedup
@@ -35,24 +37,29 @@ struct AgentsightSessionInputState {
     size_t nextEventSequence = 1;
 };
 
+// All JSON inputs below are StringView: they may point into a record's SourceBuffer arena (no NUL
+// termination guaranteed by the view contract) and must be consumed with length-bounded APIs only
+// (rapidjson two-argument Parse, CalcSHA256Hex(data, len)). Returned std::strings are freshly
+// computed values owned by the caller.
+
 /// Delta/dedup LRU key: `session_id`, or `turn.id` when session is absent.
-std::string ResolveSessionStateKey(const std::string& sessionId, const std::string& turnId);
+std::string ResolveSessionStateKey(StringView sessionId, StringView turnId);
 
 /// `{turn.id}:s{N}` (e.g. `278a5a71…:s2`); empty when `turnId` is empty.
-std::string FormatGenAiStepId(const std::string& turnId, size_t stepNumber);
+std::string FormatGenAiStepId(StringView turnId, size_t stepNumber);
 
-std::string ExtractSystemInstructionsJson(const std::string& requestMessagesJson);
+std::string ExtractSystemInstructionsJson(StringView requestMessagesJson);
 
 /// SHA-256 (hex) of `ExtractSystemInstructionsJson` output.
-std::string ComputeSystemInstructionsHash(const std::string& requestMessagesJson);
+std::string ComputeSystemInstructionsHash(StringView requestMessagesJson);
 
 /// SHA-256 (hex) of the raw tool-definitions JSON string.
-std::string ComputeToolDefinitionsHash(const std::string& toolDefinitionsJson);
+std::string ComputeToolDefinitionsHash(StringView toolDefinitionsJson);
 
 /// Builds `gen_ai.response.finish_reasons` as a JSON string array, e.g. `["stop"]`.
 /// Collects `finish_reason` from each object in `responseMessagesJson`; uses
 /// `fallbackFinishReason` when the array is empty or unparsable.
-std::string FormatFinishReasonsJson(const std::string& responseMessagesJson, const std::string& fallbackFinishReason);
+std::string FormatFinishReasonsJson(StringView responseMessagesJson, StringView fallbackFinishReason);
 
 /// Derives `gen_ai.input.messages_delta` locally (does not use AgentSight FFI delta).
 /// `previousState` stores the last round's **request** (`messageCount` / `messagesHash`) and
@@ -61,14 +68,13 @@ std::string FormatFinishReasonsJson(const std::string& responseMessagesJson, con
 /// (H_in: role+parts-only per message), skip `outputMessageCount` messages only if
 /// `hash(cur[idxAfterIn:idxAfterIn+N_out]) == outputMessagesHash`; otherwise delta starts at `idxAfterIn`.
 /// H_in uses role+parts normalization; H_out uses role-only normalization. System messages are omitted from delta.
-std::string ComputeInputMessagesDelta(const std::string& fullMessagesJson,
-                                      const AgentsightSessionInputState* previousState);
+std::string ComputeInputMessagesDelta(StringView fullMessagesJson, const AgentsightSessionInputState* previousState);
 
 /// After each emit: `messageCount` / `messagesHash` cover **non-system request** messages only;
 /// response replay state is stored in `outputMessageCount` / `outputMessagesHash`.
-void CommitSessionStateAfterEmit(const std::string& requestMessagesJson,
-                                 const std::string& responseMessagesJson,
-                                 const std::string& toolDefinitionsJson,
+void CommitSessionStateAfterEmit(StringView requestMessagesJson,
+                                 StringView responseMessagesJson,
+                                 StringView toolDefinitionsJson,
                                  AgentsightSessionInputState& state);
 
 } // namespace logtail::ebpf

@@ -108,7 +108,7 @@ func (c *cumulativeCounterImp) Export() map[string]string {
 }
 
 func (c *cumulativeCounterImp) Type() SelfMetricType {
-	return CounterType
+	return CumulativeCounterType
 }
 
 // delta is a counter metric that can be incremented or decremented.
@@ -245,7 +245,7 @@ func (a *averageImp) Export() map[string]string {
 }
 
 func (a *averageImp) Type() SelfMetricType {
-	return GaugeType
+	return AverageType
 }
 
 // maxImp is a metric to compute the max value of a series of values in the last window.
@@ -285,7 +285,7 @@ func (m *maxImp) Export() map[string]string {
 }
 
 func (m *maxImp) Type() SelfMetricType {
-	return GaugeType
+	return MaxType
 }
 
 // latencyImp is a metric to compute the average latency of a series of values in the last window.
@@ -343,7 +343,7 @@ func (l *latencyImp) Export() map[string]string {
 }
 
 func (l *latencyImp) Type() SelfMetricType {
-	return GaugeType
+	return LatencyType
 }
 
 // strMetricImp is a metric that represents a single string value.
@@ -389,7 +389,7 @@ func (s *strMetricImp) Export() map[string]string {
 }
 
 func (s *strMetricImp) Type() SelfMetricType {
-	return GaugeType
+	return StringType
 }
 
 type Series struct {

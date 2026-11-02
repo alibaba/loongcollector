@@ -28,6 +28,10 @@ void DoMd5(const uint8_t* poolIn, const uint64_t inputBytesNum, uint8_t md5[16])
 std::string CalcMD5(const std::string& message);
 /// Lowercase hex SHA-256 digest of `message`.
 std::string CalcSHA256Hex(const std::string& message);
+/// Lowercase hex SHA-256 digest of the `len` bytes at `data` (no NUL termination required;
+/// embedded NULs are hashed as ordinary bytes). Lets callers hash borrowed buffers (e.g.
+/// StringView) without materializing a std::string copy.
+std::string CalcSHA256Hex(const char* data, size_t len);
 
 bool SignatureToHash(const std::string& signature, uint64_t& sigHash, uint32_t& sigSize);
 bool CheckAndUpdateSignature(const std::string& signature, uint64_t& sigHash, uint32_t& sigSize);

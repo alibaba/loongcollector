@@ -491,6 +491,8 @@ func createLogstoreConfig(project string, logstore string, configName string, lo
 							} else if _, isServiceInput := pipeline.ServiceInputs[pluginType]; isServiceInput {
 								// Load ServiceInput plugin defined in pipeline.ServiceInputs
 								err = loadService(logstoreC.genPluginMeta(pluginTypeWithIDStr), logstoreC, input["detail"])
+							} else {
+								return nil, fmt.Errorf("can't find input plugin %s", pluginType)
 							}
 							if err != nil {
 								return nil, err

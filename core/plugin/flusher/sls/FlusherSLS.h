@@ -36,11 +36,16 @@
 #include "models/PipelineEventGroup.h"
 #include "plugin/flusher/sls/SLSClientManager.h"
 #include "protobuf/sls/sls_logs.pb.h"
+
 #ifdef __ENTERPRISE__
 #include "plugin/flusher/sls/EnterpriseSLSClientManager.h"
 #endif
 
 namespace logtail {
+
+namespace models {
+class PipelineEventGroup;
+}
 
 class FlusherSLS : public HttpFlusher {
 public:
@@ -77,7 +82,14 @@ public:
 
     CompressType GetCompressType() const { return mCompressor ? mCompressor->GetCompressType() : CompressType::NONE; }
 
-    // for use of Go pipeline and shennong
+    // Initialize the fixed container reporting endpoint without a native batcher.
+    bool InitForProfile(CollectionPipelineContext& context);
+
+    // Go v2 batches are already formed. Preserve each call's routing overrides.
+    bool
+    Send(const models::PipelineEventGroup& group, const std::string& shardHashKey, const std::string& logstore = "");
+
+    // Legacy LogGroup wire data, for Go v1 and profile callers.
     bool Send(std::string&& data, const std::string& shardHashKey, const std::string& logstore = "");
 
     const std::string& GetSubpath() const { return mSubpath; }
