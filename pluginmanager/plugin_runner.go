@@ -16,6 +16,7 @@ package pluginmanager
 
 import (
 	"github.com/alibaba/ilogtail/pkg/pipeline"
+	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
 type pluginCategory string
@@ -40,13 +41,11 @@ const (
 type PluginRunner interface {
 	Init(inputQueueSize int, aggrQueueSize int) error
 
-	AddDefaultAggregatorIfEmpty() error
-
 	AddDefaultFlusherIfEmpty() error
 
 	ReceiveRawLog(log *pipeline.LogWithContext)
 
-	ReceiveLogGroup(logGroup pipeline.LogGroupWithContext)
+	ReceivePipelineEventGroup(group *protocol.PipelineEventGroup, context map[string]interface{})
 
 	AddPlugin(pluginMeta *pipeline.PluginMeta, category pluginCategory, plugin interface{}, config map[string]interface{}) error
 

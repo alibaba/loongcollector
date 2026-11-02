@@ -17,7 +17,6 @@ Feature: processor v2 pipeline
     """
     enable: true
     global:
-      StructureType: v2
       InputIntervalMs: 1000
     inputs:
       - Type: metric_debug_file
@@ -60,7 +59,6 @@ Feature: processor v2 pipeline
     """
     enable: true
     global:
-      StructureType: v2
       InputIntervalMs: 1000
     inputs:
       - Type: metric_debug_file
@@ -105,7 +103,6 @@ Feature: processor v2 pipeline
     """
     enable: true
     global:
-      StructureType: v2
       InputIntervalMs: 1000
     inputs:
       - Type: metric_debug_file
@@ -146,7 +143,6 @@ Feature: processor v2 pipeline
     """
     enable: true
     global:
-      StructureType: v2
       InputIntervalMs: 1000
     inputs:
       - Type: metric_debug_file
@@ -179,7 +175,6 @@ Feature: processor v2 pipeline
     """
     enable: true
     global:
-      StructureType: v2
       InputIntervalMs: 1000
     inputs:
       - Type: metric_debug_file

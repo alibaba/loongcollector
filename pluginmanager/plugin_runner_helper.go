@@ -17,7 +17,6 @@ package pluginmanager
 import (
 	"fmt"
 	"math/rand"
-	"strings"
 	"time"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
@@ -95,20 +94,14 @@ func flushOutStore[T FlushData, F FlusherWrapperInterface](lc *LogstoreConfig, s
 }
 
 func GetFlushStoreLen(runner PluginRunner) int {
-	if r, ok := runner.(*pluginv1Runner); ok {
-		return r.FlushOutStore.Len()
-	}
-	if r, ok := runner.(*pluginv2Runner); ok {
+	if r, ok := runner.(*pluginRunner); ok {
 		return r.FlushOutStore.Len()
 	}
 	return 0
 }
 
 func GetFlushCancelToken(runner PluginRunner) <-chan struct{} {
-	if r, ok := runner.(*pluginv1Runner); ok {
-		return r.FlushControl.CancelToken()
-	}
-	if r, ok := runner.(*pluginv2Runner); ok {
+	if r, ok := runner.(*pluginRunner); ok {
 		return r.FlushControl.CancelToken()
 	}
 	return make(<-chan struct{})
@@ -116,13 +109,9 @@ func GetFlushCancelToken(runner PluginRunner) <-chan struct{} {
 
 func GetConfigInputs(runner PluginRunner) []pipeline.ServiceInput {
 	inputs := make([]pipeline.ServiceInput, 0)
-	if r, ok := runner.(*pluginv1Runner); ok {
-		for _, i := range r.ServicePlugins {
-			inputs = append(inputs, i.Input)
-		}
-	} else if r, ok := runner.(*pluginv2Runner); ok {
-		for _, i := range r.ServicePlugins {
-			inputs = append(inputs, i.Input)
+	if r, ok := runner.(*pluginRunner); ok {
+		for _, input := range r.ServicePlugins {
+			inputs = append(inputs, input.Input)
 		}
 	}
 	return inputs
@@ -130,11 +119,7 @@ func GetConfigInputs(runner PluginRunner) []pipeline.ServiceInput {
 
 func GetConfigFlushers(runner PluginRunner) []pipeline.Flusher {
 	flushers := make([]pipeline.Flusher, 0)
-	if r, ok := runner.(*pluginv1Runner); ok {
-		for _, f := range r.FlusherPlugins {
-			flushers = append(flushers, f.Flusher)
-		}
-	} else if r, ok := runner.(*pluginv2Runner); ok {
+	if r, ok := runner.(*pluginRunner); ok {
 		for _, f := range r.FlusherPlugins {
 			flushers = append(flushers, f.Flusher)
 		}
@@ -142,8 +127,8 @@ func GetConfigFlushers(runner PluginRunner) []pipeline.Flusher {
 	return flushers
 }
 
-func pluginUnImplementError(category pluginCategory, version ConfigVersion, pluginType string) error {
-	return fmt.Errorf("plugin does not implement %s%s. pluginType: %s", category, strings.ToUpper(string(version)), pluginType)
+func pluginUnImplementError(category pluginCategory, pluginType string) error {
+	return fmt.Errorf("plugin does not implement %s event interface. pluginType: %s", category, pluginType)
 }
 
 func pluginCategoryUndefinedError(category pluginCategory) error {

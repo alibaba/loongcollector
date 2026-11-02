@@ -251,7 +251,8 @@ func marshalSingleProtocolEntry(entry map[string]interface{}) ([]byte, error) {
 	return marshalWithoutHTMLEscaped(entry)
 }
 
-// PipelineGroupEventsToLogGroup converts v2 pipeline events into a legacy LogGroup for v1-only flush paths.
+// PipelineGroupEventsToLogGroup builds the LogGroup wire message required by
+// existing output protocols. Pipeline processing and queues retain native events.
 func PipelineGroupEventsToLogGroup(groupEvents *models.PipelineGroupEvents) (*protocol.LogGroup, error) {
 	if groupEvents == nil || len(groupEvents.Events) == 0 {
 		return nil, nil

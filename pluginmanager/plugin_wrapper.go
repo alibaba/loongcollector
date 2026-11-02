@@ -57,7 +57,7 @@ func (wrapper *InputWrapper) InitMetricRecord(pluginMeta *pipeline.PluginMeta) {
 	sourceOutEventGroupsTotal := selfmonitor.NewCounterMetricAndRegister(wrapper.SourceMetricRecord, selfmonitor.MetricPluginOutEventGroupsTotal)
 	sourceOutSizeBytes := selfmonitor.NewCounterMetricAndRegister(wrapper.SourceMetricRecord, selfmonitor.MetricPluginOutSizeBytes)
 
-	// Fan-out so v1 AddData* and v2 PipelineCollectorWrapper increment both categories.
+	// Fan out input collection counters to both metric record categories.
 	wrapper.outEventsTotal = selfmonitor.NewFanoutCounter(pluginOutEventsTotal, sourceOutEventsTotal)
 	wrapper.outEventGroupsTotal = selfmonitor.NewFanoutCounter(pluginOutEventGroupsTotal, sourceOutEventGroupsTotal)
 	wrapper.outSizeBytes = selfmonitor.NewFanoutCounter(pluginOutSizeBytes, sourceOutSizeBytes)

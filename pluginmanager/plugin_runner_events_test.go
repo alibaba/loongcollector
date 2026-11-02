@@ -29,7 +29,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
-func TestPluginV2Runner_ReceiveRawLog(t *testing.T) {
+func TestEventRunner_ReceiveRawLog(t *testing.T) {
 	timeSec := uint32(time.Now().UnixMilli() / 1e3)
 	logCtx := &pipeline.LogWithContext{
 		Log: &protocol.Log{
@@ -44,7 +44,7 @@ func TestPluginV2Runner_ReceiveRawLog(t *testing.T) {
 
 	ctx := &mockContect{}
 
-	p := &pluginv2Runner{
+	p := &pluginRunner{
 		InputPipeContext: ctx,
 	}
 
@@ -83,9 +83,9 @@ func (m *mockPipelineCollector) Collect(groupInfo *models.GroupInfo, eventList .
 	m.ctx.logs = append(m.ctx.logs, models.PipelineGroupEvents{Group: groupInfo, Events: eventList})
 }
 
-func TestPluginV2Runner_ReceivePipelineEventGroup_MetricMultiValue(t *testing.T) {
+func TestEventRunner_ReceivePipelineEventGroup_MetricMultiValue(t *testing.T) {
 	ctx := &mockContect{}
-	p := &pluginv2Runner{InputPipeContext: ctx}
+	p := &pluginRunner{InputPipeContext: ctx}
 
 	multiValue := models.NewMetricMultiValueWithMap(map[string]float64{"cpu": 0.5, "mem": 10})
 	metric := models.NewMultiValuesMetric("agent", models.MetricTypeUntyped, models.NewTags(), 123, multiValue.Values)
@@ -102,9 +102,9 @@ func TestPluginV2Runner_ReceivePipelineEventGroup_MetricMultiValue(t *testing.T)
 	assert.Equal(t, "pack-1", ctx.logs[0].Group.Metadata.Get("source"))
 }
 
-func TestPluginV2Runner_ReceivePipelineEventGroup_Span(t *testing.T) {
+func TestEventRunner_ReceivePipelineEventGroup_Span(t *testing.T) {
 	ctx := &mockContect{}
-	p := &pluginv2Runner{InputPipeContext: ctx}
+	p := &pluginRunner{InputPipeContext: ctx}
 
 	span := models.NewSpan("op", "trace", "span", models.SpanKindServer, 1, 2, models.NewTagsWithKeyValues("k", "v"), nil, nil)
 	pbGroup, err := helper.TransferPipelineEventGroupToPB(models.NewGroup(models.NewMetadata(), models.NewTags()), []models.PipelineEvent{span})
@@ -117,9 +117,9 @@ func TestPluginV2Runner_ReceivePipelineEventGroup_Span(t *testing.T) {
 	assert.Equal(t, "op", s.GetName())
 }
 
-func TestPluginV2Runner_ReceivePipelineEventGroup_Log(t *testing.T) {
+func TestEventRunner_ReceivePipelineEventGroup_Log(t *testing.T) {
 	ctx := &mockContect{}
-	p := &pluginv2Runner{InputPipeContext: ctx}
+	p := &pluginRunner{InputPipeContext: ctx}
 
 	log := models.NewLog("", []byte("alarm"), "", "", "", models.NewTags(), 200)
 	pbGroup, err := helper.TransferPipelineEventGroupToPB(models.NewGroup(models.NewMetadata(), models.NewTags()), []models.PipelineEvent{log})
@@ -141,11 +141,11 @@ func (*timerMetricInput) Read(ctx pipeline.PipelineContext) error {
 	return nil
 }
 
-func TestPluginV2Runner_MetricTimerRecordsSourceCounters(t *testing.T) {
+func TestEventRunner_MetricTimerRecordsSourceCounters(t *testing.T) {
 	ctx := &ContextImp{}
 	ctx.InitContext("project", "store", "timer-pipeline")
 	output := helper.NewObservePipelineContext(4)
-	runner := &pluginv2Runner{
+	runner := &pluginRunner{
 		LogstoreConfig:   &LogstoreConfig{Context: ctx, GlobalConfig: &config.GlobalConfig{}},
 		InputPipeContext: output,
 	}

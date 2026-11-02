@@ -15,18 +15,24 @@
 package pluginmanager
 
 import (
-	"github.com/alibaba/ilogtail/pkg/pipeline"
-
 	"time"
+
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 )
 
-type MetricWrapperV2 struct {
+type MetricInputWrapper struct {
 	MetricWrapper
 	pipelineCtxWrapper *PipelineContextWrapper // keep the pointer to avoid alloc and GC
-	Input              pipeline.MetricInputV2
+	Input              pipeline.MetricInput
+	collector          *inputCollector
 }
 
-func (wrapper *MetricWrapperV2) Init(pluginMeta *pipeline.PluginMeta, inputInterval int) error {
+func (wrapper *MetricInputWrapper) Init(pluginMeta *pipeline.PluginMeta, inputInterval int) error {
+	if _, ok := wrapper.Input.(pipeline.MetricInputV2); !ok {
+		if _, ok := wrapper.Input.(pipeline.MetricInputV1); !ok {
+			return pluginUnImplementError(pluginMetricInput, pluginMeta.PluginType)
+		}
+	}
 	wrapper.InitMetricRecord(pluginMeta)
 
 	interval, err := wrapper.Input.Init(wrapper.Config.Context)
@@ -38,10 +44,14 @@ func (wrapper *MetricWrapperV2) Init(pluginMeta *pipeline.PluginMeta, inputInter
 	}
 	wrapper.Interval = time.Duration(interval) * time.Millisecond
 	wrapper.pipelineCtxWrapper = newPipelineContextWrapper(nil, wrapper.outEventsTotal, wrapper.outEventGroupsTotal, wrapper.outSizeBytes)
+	wrapper.collector = &inputCollector{context: wrapper.pipelineCtxWrapper}
 	return nil
 }
 
-func (wrapper *MetricWrapperV2) Read(pipelineContext pipeline.PipelineContext) error {
+func (wrapper *MetricInputWrapper) Read(pipelineContext pipeline.PipelineContext) error {
 	wrapper.pipelineCtxWrapper.PipelineCollectorWrapper.inner = pipelineContext.Collector()
-	return wrapper.Input.Read(wrapper.pipelineCtxWrapper)
+	if input, ok := wrapper.Input.(pipeline.MetricInputV2); ok {
+		return input.Read(wrapper.pipelineCtxWrapper)
+	}
+	return wrapper.Input.(pipeline.MetricInputV1).Collect(wrapper.collector)
 }

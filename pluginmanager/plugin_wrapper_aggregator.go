@@ -24,19 +24,19 @@ import (
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
-// AggregatorWrapperV2 wrappers Aggregator.
+// AggregatorPluginWrapper wrappers Aggregator.
 // It implements LogGroupQueue interface, and is passed to associated Aggregator.
 // Aggregator uses Add function to pass log groups to wrapper, and then wrapper
-// passes log groups to associated LogstoreConfig through channel LogGroupsChan.
-// In fact, LogGroupsChan == (associated) LogstoreConfig.LogGroupsChan.
-type AggregatorWrapperV2 struct {
+// passes log groups to associated LogstoreConfig through channel the output queue.
+// In fact, the output queue == (associated) LogstoreConfig.the output queue.
+type AggregatorPluginWrapper struct {
 	AggregatorWrapper
 	Aggregator pipeline.AggregatorV2
 
 	totalDelayTimeMs selfmonitor.CounterMetric
 }
 
-func (wrapper *AggregatorWrapperV2) Init(pluginMeta *pipeline.PluginMeta) error {
+func (wrapper *AggregatorPluginWrapper) Init(pluginMeta *pipeline.PluginMeta) error {
 	wrapper.InitMetricRecord(pluginMeta)
 	wrapper.totalDelayTimeMs = selfmonitor.NewCounterMetricAndRegister(wrapper.MetricRecord, selfmonitor.MetricPluginTotalDelayMs)
 
@@ -52,7 +52,7 @@ func (wrapper *AggregatorWrapperV2) Init(pluginMeta *pipeline.PluginMeta) error 
 	return nil
 }
 
-func (wrapper *AggregatorWrapperV2) Record(events *models.PipelineGroupEvents, context pipeline.PipelineContext) error {
+func (wrapper *AggregatorPluginWrapper) Record(events *models.PipelineGroupEvents, context pipeline.PipelineContext) error {
 	startTime := time.Now()
 
 	err := wrapper.Aggregator.Record(events, context)
@@ -65,14 +65,14 @@ func (wrapper *AggregatorWrapperV2) Record(events *models.PipelineGroupEvents, c
 	return err
 }
 
-func (wrapper *AggregatorWrapperV2) GetResult(context pipeline.PipelineContext) error {
+func (wrapper *AggregatorPluginWrapper) GetResult(context pipeline.PipelineContext) error {
 	return wrapper.Aggregator.GetResult(context)
 }
 
-func (wrapper *AggregatorWrapperV2) Add(loggroup *protocol.LogGroup) error {
+func (wrapper *AggregatorPluginWrapper) Add(loggroup *protocol.LogGroup) error {
 	return nil
 }
 
-func (wrapper *AggregatorWrapperV2) AddWithWait(loggroup *protocol.LogGroup, duration time.Duration) error {
+func (wrapper *AggregatorPluginWrapper) AddWithWait(loggroup *protocol.LogGroup, duration time.Duration) error {
 	return nil
 }

@@ -105,12 +105,9 @@ test/e2e/test_cases/my_feature/
 - 持续采集插件不要用 `global.ExcutionTimeout`（见 §6.1）
 - `flusher_prometheus` 的 `Retry.*Delay` 等为 **duration 类型**，YAML 里勿写 `"1s"` 字符串（会 JSON 反序列化失败）
 
-### 3.4 v1 / v2 与 flusher
+### 3.4 事件模型与 flusher
 
-| 配置 | 说明 |
-|------|------|
-| 默认 v1 + `flusher_grpc` / `flusher_http` | C++ `ProcessPipelineEventGroup` → Go 转 `LogGroup` → `ReceiveLogGroup` |
-| `StructureType: v2` + `flusher_prometheus` | Metric 走 `ReceivePipelineEventGroup`；**不能** v2 + `flusher_grpc`（未实现 FlusherV2） |
+Go 默认使用统一事件 Pipeline；Native 输入经 ProcessPipelineEventGroup PB 直接传入，不再转换为 LogGroup。配置可省略 StructureType；显式配置时使用 v2。flusher_grpc、flusher_http 和 flusher_prometheus 均通过事件 Export 接口发送。
 
 ---
 
