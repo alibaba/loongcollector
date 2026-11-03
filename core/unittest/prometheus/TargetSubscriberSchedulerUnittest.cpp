@@ -20,6 +20,7 @@
 #include <chrono>
 #include <iostream>
 #include <memory>
+#include <set>
 #include <string>
 #include <thread>
 #include <utility>
@@ -28,6 +29,7 @@
 #include "common/JsonUtil.h"
 #include "common/MachineInfoUtil.h"
 #include "common/http/HttpResponse.h"
+#include "common/timer/HttpRequestTimerEvent.h"
 #include "monitor/Monitor.h"
 #include "prometheus/Constants.h"
 #include "prometheus/async/PromFuture.h"
@@ -48,6 +50,7 @@ public:
     void TestBuildHostOnlyScrapeSchedulerGroupHostIPFallback();
     void TestBuildScrapeSchedulerSet();
     void TestTargetLabels();
+    void TestUnixSocketLabel();
     void TestTargetsInfoToString();
     void TestRaceConditionBetweenCancelAndCallback();
 
@@ -681,6 +684,110 @@ void TargetSubscriberSchedulerUnittest::TestTargetLabels() {
               80);
 }
 
+void TargetSubscriberSchedulerUnittest::TestUnixSocketLabel() {
+    auto buildSchedulers = [](const Json::Value& scrapeConfig, const string& targetResponse) {
+        TargetSubscriberScheduler subscriber;
+        APSARA_TEST_TRUE(subscriber.Init(scrapeConfig));
+        std::vector<PromTargetInfo> targetGroup;
+        APSARA_TEST_TRUE(subscriber.ParseScrapeSchedulerGroup(targetResponse, targetGroup));
+        return subscriber.BuildScrapeSchedulerSet(targetGroup);
+    };
+
+    auto socketPathFor = [](const std::shared_ptr<ScrapeScheduler>& scheduler) {
+        auto event = scheduler->BuildScrapeTimerEvent(chrono::steady_clock::now());
+        return static_cast<HttpRequestTimerEvent*>(event.get())->mRequest->mUnixSocketPath;
+    };
+
+    {
+        string targets = R"JSON([
+            {
+                "targets": ["localhost:9100"],
+                "labels": {
+                    "__address__": "localhost:9100",
+                    "__unix_socket__": "/var/run/exporter.sock"
+                }
+            }
+        ])JSON";
+        auto schedulers = buildSchedulers(mConfig["ScrapeConfig"], targets);
+        APSARA_TEST_EQUAL_FATAL(1UL, schedulers.size());
+        auto scheduler = schedulers.begin()->second;
+        APSARA_TEST_EQUAL("/var/run/exporter.sock", socketPathFor(scheduler));
+        APSARA_TEST_EQUAL("localhost", scheduler->mHost);
+        APSARA_TEST_EQUAL(9100, scheduler->mPort);
+        APSARA_TEST_EQUAL("http", scheduler->mScheme);
+        APSARA_TEST_EQUAL("localhost:9100", scheduler->mTargetInfo.mLabels.Get(prometheus::INSTANCE));
+    }
+    {
+        Json::Value config = mConfig["ScrapeConfig"];
+        string relabelStr = R"JSON([
+            {
+                "action": "replace",
+                "source_labels": ["__meta_socket_path"],
+                "target_label": "__unix_socket__"
+            }
+        ])JSON";
+        string errMsg;
+        APSARA_TEST_TRUE(ParseJsonTable(relabelStr, config[prometheus::RELABEL_CONFIGS], errMsg));
+        string targets = R"JSON([
+            {
+                "targets": ["exporter:443"],
+                "labels": {
+                    "__address__": "exporter:443",
+                    "__scheme__": "https",
+                    "__meta_socket_path": "/run/exporter/metrics.sock"
+                }
+            }
+        ])JSON";
+        auto schedulers = buildSchedulers(config, targets);
+        APSARA_TEST_EQUAL_FATAL(1UL, schedulers.size());
+        auto scheduler = schedulers.begin()->second;
+        APSARA_TEST_EQUAL("/run/exporter/metrics.sock", socketPathFor(scheduler));
+        APSARA_TEST_EQUAL("exporter", scheduler->mHost);
+        APSARA_TEST_EQUAL(443, scheduler->mPort);
+        APSARA_TEST_EQUAL("https", scheduler->mScheme);
+    }
+    {
+        string targets = R"JSON([
+            {
+                "targets": ["192.168.22.7:8080"],
+                "labels": {
+                    "__address__": "192.168.22.7:8080"
+                }
+            }
+        ])JSON";
+        auto schedulers = buildSchedulers(mConfig["ScrapeConfig"], targets);
+        APSARA_TEST_EQUAL_FATAL(1UL, schedulers.size());
+        auto scheduler = schedulers.begin()->second;
+        APSARA_TEST_TRUE(socketPathFor(scheduler).empty());
+    }
+    {
+        Json::Value config;
+        string errMsg;
+        string configStr = R"JSON({
+            "job_name": "uds-exporter",
+            "host_only_mode": true,
+            "static_configs": [
+                {"targets": ["localhost:9100"], "labels": {"__unix_socket__": "/run/first.sock"}},
+                {"targets": ["localhost:9100"], "labels": {"__unix_socket__": "/run/second.sock"}}
+            ]
+        })JSON";
+        APSARA_TEST_TRUE(ParseJsonTable(configStr, config, errMsg));
+        TargetSubscriberScheduler subscriber;
+        APSARA_TEST_TRUE(subscriber.Init(config));
+        std::vector<PromTargetInfo> targetGroup;
+        subscriber.BuildHostOnlyScrapeSchedulerGroup(targetGroup);
+        APSARA_TEST_EQUAL_FATAL(2UL, targetGroup.size());
+        auto schedulers = subscriber.BuildScrapeSchedulerSet(targetGroup);
+        APSARA_TEST_EQUAL(2UL, schedulers.size());
+        APSARA_TEST_NOT_EQUAL(targetGroup[0].mHash, targetGroup[1].mHash);
+        std::set<string> socketPaths;
+        for (const auto& entry : schedulers) {
+            socketPaths.insert(socketPathFor(entry.second));
+        }
+        APSARA_TEST_TRUE(socketPaths == std::set<string>({"/run/first.sock", "/run/second.sock"}));
+    }
+}
+
 void TargetSubscriberSchedulerUnittest::TestTargetsInfoToString() {
     std::shared_ptr<TargetSubscriberScheduler> targetSubscriber = std::make_shared<TargetSubscriberScheduler>();
     auto metricLabels = MetricLabels();
@@ -815,6 +922,7 @@ UNIT_TEST_CASE(TargetSubscriberSchedulerUnittest, TestBuildScrapeSchedulerSet)
 UNIT_TEST_CASE(TargetSubscriberSchedulerUnittest, TestBuildHostOnlyScrapeSchedulerGroup)
 UNIT_TEST_CASE(TargetSubscriberSchedulerUnittest, TestBuildHostOnlyScrapeSchedulerGroupHostIPFallback)
 UNIT_TEST_CASE(TargetSubscriberSchedulerUnittest, TestTargetLabels)
+UNIT_TEST_CASE(TargetSubscriberSchedulerUnittest, TestUnixSocketLabel)
 UNIT_TEST_CASE(TargetSubscriberSchedulerUnittest, TestTargetsInfoToString)
 UNIT_TEST_CASE(TargetSubscriberSchedulerUnittest, TestRaceConditionBetweenCancelAndCallback)
 

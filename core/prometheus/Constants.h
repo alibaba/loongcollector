@@ -102,6 +102,7 @@ const char* const SCRAPE_TIMEOUT_LABEL_NAME = "__scrape_timeout__";
 const char* const SCHEME_LABEL_NAME = "__scheme__";
 const char* const METRICS_PATH_LABEL_NAME = "__metrics_path__";
 const char* const PARAM_LABEL_NAME = "__param_";
+const char* const UNIX_SOCKET_LABEL_NAME = "__unix_socket__";
 const char* const LABELS = "labels";
 const char* const TARGET_HASH = "hash";
 const char* const REBALANCE_MS = "rebalance_ms";
