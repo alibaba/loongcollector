@@ -33,6 +33,10 @@ public:
 
 private:
     std::unique_ptr<AsynHttpRequest> mRequest;
+
+#ifdef APSARA_UNIT_TEST_MAIN
+    friend class TargetSubscriberSchedulerUnittest;
+#endif
 };
 
 } // namespace logtail

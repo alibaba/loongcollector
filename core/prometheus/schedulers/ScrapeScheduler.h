@@ -96,6 +96,7 @@ private:
     CounterPtr mPluginTotalDelayMs;
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class ProcessorParsePrometheusMetricUnittest;
+    friend class PrometheusInputRunnerUnittest;
     friend class TargetSubscriberSchedulerUnittest;
     friend class ScrapeSchedulerUnittest;
 #endif

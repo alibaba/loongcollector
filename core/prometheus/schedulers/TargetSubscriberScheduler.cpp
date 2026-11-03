@@ -23,7 +23,6 @@
 #include <string>
 
 #include "AppConfig.h"
-#include "SelfMonitorMetricEvent.h"
 #include "common/JsonUtil.h"
 #include "common/MachineInfoUtil.h"
 #include "common/StringTools.h"
@@ -34,6 +33,7 @@
 #include "monitor/Monitor.h"
 #include "monitor/metric_constants/MetricConstants.h"
 #include "prometheus/Constants.h"
+#include "prometheus/PrometheusInputRunner.h"
 #include "prometheus/Utils.h"
 #include "prometheus/async/PromFuture.h"
 #include "prometheus/async/PromHttpRequest.h"
@@ -43,8 +43,6 @@ using namespace std;
 
 namespace logtail {
 
-std::chrono::steady_clock::time_point TargetSubscriberScheduler::mLastUpdateTime = std::chrono::steady_clock::now();
-uint64_t TargetSubscriberScheduler::sDelaySeconds = 0;
 TargetSubscriberScheduler::TargetSubscriberScheduler()
     : mQueueKey(0), mInputIndex(0), mServicePort(0), mUnRegisterMs(0) {
 }
@@ -406,6 +404,23 @@ string TargetSubscriberScheduler::GetId() const {
     return mJobName;
 }
 
+TargetSubscriberStatistics TargetSubscriberScheduler::CollectLoadAndDrainScrapeDelay() {
+    TargetSubscriberStatistics statistics;
+    ReadLock lock(mRWLock);
+    for (const auto& item : mScrapeSchedulerMap) {
+        const auto& scheduler = item.second;
+        auto size = scheduler->GetLastScrapeSize();
+        if (size >= 0) {
+            statistics.mLoad += static_cast<uint64_t>(size) / mScrapeConfigPtr->mScrapeIntervalSeconds;
+        }
+        auto delaySeconds = scheduler->mExecDelayCount.exchange(0);
+        if (delaySeconds > 0) {
+            statistics.mScrapeDelaySeconds += static_cast<uint64_t>(delaySeconds);
+        }
+    }
+    return statistics;
+}
+
 bool TargetSubscriberScheduler::ScheduleNext() {
     auto future = std::make_shared<PromFuture<HttpResponse&, uint64_t>>();
     future->AddDoneCallback([this](HttpResponse& response, uint64_t timestampMilliSec) {
@@ -457,6 +472,8 @@ TargetSubscriberScheduler::BuildSubscriberTimerEvent(std::chrono::steady_clock::
     httpHeader[prometheus::ACCEPT] = prometheus::APPLICATION_JSON;
     httpHeader[prometheus::X_PROMETHEUS_REFRESH_INTERVAL_SECONDS] = ToString(prometheus::RefeshIntervalSeconds);
     httpHeader[prometheus::USER_AGENT] = prometheus::PROMETHEUS_PREFIX + mPodName;
+    httpHeader[prometheus::PROMETHEUS_COLLECTOR_PROTOCOL_VERSION]
+        = prometheus::PROMETHEUS_COLLECTOR_PROTOCOL_VERSION_V1;
     if (!mETag.empty()) {
         httpHeader[prometheus::IF_NONE_MATCH] = mETag;
     }
@@ -480,37 +497,15 @@ TargetSubscriberScheduler::BuildSubscriberTimerEvent(std::chrono::steady_clock::
 
 string TargetSubscriberScheduler::TargetsInfoToString() const {
     Json::Value root;
-
-    SelfMonitorMetricEvent wantAgentEvent;
-    LoongCollectorMonitor::GetInstance()->GetAgentMetric(wantAgentEvent);
-    SelfMonitorMetricEvent wantRunnerEvent;
-    LoongCollectorMonitor::GetInstance()->GetRunnerMetric(METRIC_LABEL_VALUE_RUNNER_NAME_HTTP_SINK, wantRunnerEvent);
-
-    root[prometheus::AGENT_INFO][prometheus::CPU_USAGE] = wantAgentEvent.GetGauge(METRIC_AGENT_CPU); // double
-    root[prometheus::AGENT_INFO][prometheus::CPU_LIMIT] = AppConfig::GetInstance()->GetCpuUsageUpLimit(); // float
-    root[prometheus::AGENT_INFO][prometheus::MEM_USAGE] = wantAgentEvent.GetGauge(METRIC_AGENT_MEMORY); // double
-    root[prometheus::AGENT_INFO][prometheus::MEM_LIMIT] = AppConfig::GetInstance()->GetMemUsageUpLimit(); // int64_t
-    root[prometheus::AGENT_INFO][prometheus::HTTP_SINK_IN_ITEMS_TOTAL]
-        = wantRunnerEvent.GetCounter(METRIC_RUNNER_IN_ITEMS_TOTAL); // uint64_t
-    root[prometheus::AGENT_INFO][prometheus::HTTP_SINK_OUT_FAILED]
-        = wantRunnerEvent.GetCounter(METRIC_RUNNER_SINK_OUT_FAILED_ITEMS_TOTAL); // uint64_t
+    root[prometheus::AGENT_INFO] = PrometheusInputRunner::GetInstance()->GetAgentInfoSnapshot().ToJson();
     {
         ReadLock lock(mRWLock);
         for (const auto& [k, v] : mScrapeSchedulerMap) {
             Json::Value targetInfo;
             targetInfo[prometheus::HASH] = v->GetId();
             targetInfo[prometheus::SIZE] = v->GetLastScrapeSize();
-            sDelaySeconds += v->mExecDelayCount;
-            v->mExecDelayCount = 0;
             root[prometheus::TARGETS_INFO].append(targetInfo);
         }
-    }
-    auto curTime = std::chrono::steady_clock::now();
-    auto needToClear = curTime - mLastUpdateTime >= std::chrono::seconds(prometheus::RefeshIntervalSeconds);
-    root[prometheus::AGENT_INFO][prometheus::SCRAPE_DELAY_SECONDS] = sDelaySeconds;
-    if (needToClear) {
-        sDelaySeconds = 0;
-        mLastUpdateTime = curTime;
     }
     return root.toStyledString();
 }
