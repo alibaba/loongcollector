@@ -462,6 +462,88 @@ func TestLogstoreConfig_ProcessPipelineEventGroup_V1Logs(t *testing.T) {
 	assert.Equal(t, "pack-1", logCtx.Context["source"])
 }
 
+func TestLogstoreConfig_ProcessPipelineEventGroup_V1Topic(t *testing.T) {
+	for _, usingOldContentTag := range []bool{false, true} {
+		t.Run("UsingOldContentTag="+strconv.FormatBool(usingOldContentTag), func(t *testing.T) {
+			groupInfo := models.NewGroup(models.NewMetadata(), models.NewTagsWithKeyValues("__topic__", "access", "host", "h1"))
+			log := models.NewLog("", []byte("hello"), "", "", "", models.NewTags(), 1_000_000_000)
+			pbGroup, err := helper.TransferPipelineEventGroupToPB(groupInfo, []models.PipelineEvent{log})
+			require.NoError(t, err)
+			pbBytes, err := pbGroup.Marshal()
+			require.NoError(t, err)
+
+			l := &LogstoreConfig{
+				ConfigName: "test-v1-topic",
+				Version:    v1,
+				Context:    &ContextImp{},
+				GlobalConfig: &global_config.GlobalConfig{
+					UsingOldContentTag: usingOldContentTag,
+				},
+			}
+			l.Context.InitContext("", "", l.ConfigName)
+			runner := &pluginv1Runner{
+				LogstoreConfig: l,
+				LogsChan:       make(chan *pipeline.LogWithContext, 1),
+			}
+			l.PluginRunner = runner
+			require.Equal(t, 0, l.ProcessPipelineEventGroup(pbBytes, "pack-1"))
+			require.Len(t, runner.LogsChan, 1)
+			logCtx := <-runner.LogsChan
+			assert.Equal(t, "access", logCtx.Context[ctxKeyTopic])
+			assert.Equal(t, "pack-1", logCtx.Context[ctxKeySource])
+			contents := make(map[string]string)
+			for _, content := range logCtx.Log.Contents {
+				contents[content.Key] = content.Value
+			}
+			assert.Equal(t, "hello", contents["content"])
+			assert.Equal(t, "access", contents[tagKeyLogTopic])
+			assert.NotContains(t, contents, "__tag__:__topic__")
+			if usingOldContentTag {
+				assert.Equal(t, "h1", contents["__tag__:host"])
+			} else {
+				assert.Equal(t, []*protocol.LogTag{{Key: "host", Value: "h1"}}, logCtx.Context[ctxKeyTags])
+			}
+		})
+	}
+}
+
+func TestLogstoreConfig_ProcessPipelineEventGroup_V2Topic(t *testing.T) {
+	tests := []struct {
+		name string
+		tags map[string]string
+	}{
+		{name: "absent topic", tags: map[string]string{"host": "h1"}},
+		{name: "empty topic", tags: map[string]string{"__topic__": "", "host": "h1"}},
+		{name: "nonempty topic", tags: map[string]string{"__topic__": "access", "host": "h1"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			groupInfo := models.NewGroup(models.NewMetadata(), models.NewTagsWithMap(tt.tags))
+			log := models.NewLog("", []byte("hello"), "", "", "", models.NewTags(), 1_000_000_000)
+			pbGroup, err := helper.TransferPipelineEventGroupToPB(groupInfo, []models.PipelineEvent{log})
+			require.NoError(t, err)
+			pbBytes, err := pbGroup.Marshal()
+			require.NoError(t, err)
+
+			ctx := &mockContect{}
+			l := &LogstoreConfig{ConfigName: "test-v2-topic", Version: v2, Context: &ContextImp{}}
+			l.Context.InitContext("", "", l.ConfigName)
+			l.PluginRunner = &pluginv2Runner{LogstoreConfig: l, InputPipeContext: ctx}
+			require.Equal(t, 0, l.ProcessPipelineEventGroup(pbBytes, "pack-1"))
+			require.Len(t, ctx.logs, 1)
+			// The v2 typed protocol retains the reserved topic for native SLS serialization.
+			tags := make(map[string]string)
+			for k, v := range ctx.logs[0].Group.Tags.Iterator() {
+				tags[k] = v
+			}
+			assert.Equal(t, tt.tags, tags)
+			assert.Equal(t, "pack-1", ctx.logs[0].Group.Metadata.Get(ctxKeySource))
+			require.Len(t, ctx.logs[0].Events, 1)
+			assert.IsType(t, &models.Log{}, ctx.logs[0].Events[0])
+		})
+	}
+}
+
 func TestLogstoreConfig_ProcessPipelineEventGroup_V1DiscardMetric(t *testing.T) {
 	groupInfo := models.NewGroup(models.NewMetadata(), models.NewTags())
 	metric := models.NewSingleValueMetric("cpu", models.MetricTypeGauge, models.NewTags(), 0, 1.0)
