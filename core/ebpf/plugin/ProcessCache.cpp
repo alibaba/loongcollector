@@ -145,7 +145,12 @@ void ProcessCache::ForceShrink() {
         return;
     }
 
-    auto validProcs = mProcParser.GetAllPids();
+    auto snapshot = mProcParser.GetAllPids();
+    if (!snapshot) {
+        LOG_WARNING(sLogger, ("process cache shrink", "skip incomplete process snapshot"));
+        return;
+    }
+    const auto& validProcs = *snapshot;
     auto minKtime = TimeKeeper::GetInstance()->KtimeNs()
         - std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::minutes(2)).count();
 

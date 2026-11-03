@@ -26,6 +26,7 @@
 #include <sys/statvfs.h>
 #endif
 #include <fstream>
+#include <mutex>
 
 #include "boost/filesystem.hpp"
 
@@ -471,7 +472,35 @@ bool IsValidSuffix(const std::string& filename) {
 
 namespace fsutil {
 
-Dir::Dir(const std::string& dirPath) : mDirPath(dirPath) {
+#ifdef APSARA_UNIT_TEST_MAIN
+namespace {
+std::mutex sDirErrorInjectorMutex;
+Dir::ErrorInjector sDirErrorInjector;
+} // namespace
+
+Dir::ErrorInjector Dir::SetErrorInjectorForTesting(ErrorInjector injector) {
+    std::lock_guard<std::mutex> lock(sDirErrorInjectorMutex);
+    sDirErrorInjector.swap(injector);
+    return injector;
+}
+
+int Dir::getInjectedError(const char* operation) const {
+    std::lock_guard<std::mutex> lock(sDirErrorInjectorMutex);
+    const int error = sDirErrorInjector ? sDirErrorInjector(mDirPath, operation) : 0;
+#if defined(__linux__)
+    if (error != 0) {
+        errno = error;
+    }
+#elif defined(_MSC_VER)
+    if (error != 0) {
+        SetLastError(error);
+    }
+#endif
+    return error;
+}
+#endif
+
+Dir::Dir(const std::string& dirPath, bool includeHidden) : mDirPath(dirPath), mIncludeHidden(includeHidden) {
 #if defined(__linux__)
     mDir = nullptr;
 #elif defined(_MSC_VER)
@@ -484,10 +513,9 @@ Dir::~Dir() {
 }
 
 #if defined(_MSC_VER)
-// Invalid entry is returned if fileName starts with ., such as ., .., hidden files.
-static Entry ConstructEntry(const WIN32_FIND_DATA& findData) {
+static Entry ConstructEntry(const WIN32_FIND_DATA& findData, bool includeHidden) {
     std::string fileName(findData.cFileName);
-    if (0 == fileName.find("."))
+    if (fileName == "." || fileName == ".." || (!includeHidden && fileName.front() == '.'))
         return Entry();
 
     // NOTE: We assume there are only two types: DIR and REG_FILE, ignore symbolic.
@@ -511,6 +539,11 @@ bool Dir::Open() {
     if (IsOpened())
         return true;
     mLastErrorCode = 0;
+#ifdef APSARA_UNIT_TEST_MAIN
+    if ((mLastErrorCode = getInjectedError("open")) != 0) {
+        return false;
+    }
+#endif
     if (mDirPath.empty()) {
         // Log it but don't return, let following call to generate errno.
         LOG_WARNING(sLogger, ("Empty dir path", mDirPath));
@@ -534,7 +567,7 @@ bool Dir::Open() {
         return false;
     }
     // Cache first entry.
-    mCachedEntry = ConstructEntry(ffd);
+    mCachedEntry = ConstructEntry(ffd, mIncludeHidden);
     return true;
 #endif
 }
@@ -551,6 +584,12 @@ Entry Dir::ReadNext(bool resolveWithStat) {
         return Entry();
     }
 
+#ifdef APSARA_UNIT_TEST_MAIN
+    if ((mLastErrorCode = getInjectedError("read")) != 0) {
+        return Entry();
+    }
+#endif
+
 #if defined(__linux__)
     // Call readdir until it returns nullptr or non-dot entry.
     while (true) {
@@ -566,7 +605,7 @@ Entry Dir::ReadNext(bool resolveWithStat) {
         }
 
         std::string fileName(ent->d_name);
-        if (0 == fileName.find('.')) {
+        if (fileName == "." || fileName == ".." || (!mIncludeHidden && fileName.front() == '.')) {
             continue;
         }
 
@@ -640,7 +679,7 @@ Entry Dir::ReadNext(bool resolveWithStat) {
             }
             return Entry();
         }
-        auto entry = ConstructEntry(ffd);
+        auto entry = ConstructEntry(ffd, mIncludeHidden);
         if (entry)
             return entry;
     }
@@ -655,22 +694,42 @@ bool Dir::Close() {
     auto dir = mDir;
     // closedir may free the directory stream even when closing its fd fails.
     mDir = nullptr;
-    if (closedir(dir) != 0) {
-        mLastErrorCode = errno;
-        LOG_WARNING(sLogger, ("Close dir failed", mDirPath)("errno", mLastErrorCode));
-        return false;
-    }
+    int closeError = closedir(dir) == 0 ? 0 : errno;
 #elif defined(_MSC_VER)
     auto find = mFind;
     mFind = INVALID_HANDLE_VALUE;
     mCachedEntry = Entry();
-    if (!FindClose(find)) {
-        mLastErrorCode = GetLastError();
+    int closeError = FindClose(find) ? 0 : GetLastError();
+#endif
+#ifdef APSARA_UNIT_TEST_MAIN
+    if (closeError == 0) {
+        closeError = getInjectedError("close");
+    }
+#endif
+    if (closeError != 0) {
+        mLastErrorCode = closeError;
         LOG_WARNING(sLogger, ("Close dir failed", mDirPath)("errno", mLastErrorCode));
         return false;
     }
-#endif
     return true;
+}
+
+DirectoryScanResult ScanDirectory(const std::string& dirPath, bool includeHidden) {
+    DirectoryScanResult result;
+    Dir dir(dirPath, includeHidden);
+    if (!dir.Open()) {
+        result.errorCode = dir.GetLastErrorCode();
+        return result;
+    }
+    while (auto entry = dir.ReadNext(false)) {
+        result.entries.emplace_back(std::move(entry));
+    }
+    dir.Close();
+    result.errorCode = dir.GetLastErrorCode();
+    if (!result.IsComplete()) {
+        result.entries.clear();
+    }
+    return result;
 }
 
 PathStat::PathStat() {

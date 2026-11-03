@@ -20,6 +20,7 @@
 #include "ebpf/plugin/ProcessCache.h"
 #include "type/table/BaseElements.h"
 #include "unittest/Unittest.h"
+#include "unittest/common/DirErrorInjector.h"
 
 using namespace logtail;
 using namespace logtail::ebpf;
@@ -308,5 +309,26 @@ UNIT_TEST_CASE(ProcessCacheUnittest, TestPrintDebugInfo);
 UNIT_TEST_CASE(ProcessCacheUnittest, TestCacheSize);
 UNIT_TEST_CASE(ProcessCacheUnittest, TestCacheContains);
 UNIT_TEST_CASE(ProcessCacheUnittest, TestClearCache);
+
+#if defined(__linux__)
+TEST_F(ProcessCacheUnittest, ScanFailureCannotEvictOldLiveProcess) {
+    const auto root = std::filesystem::path(logtail::GetProcessExecutionDir()) / "p1_process_cache";
+    std::filesystem::create_directories(root / "12345");
+    mProcessCache.mProcParser.mProcPath = root;
+    const data_event_id key{12345, 1};
+    auto value = std::make_shared<logtail::ProcessCacheValue>();
+    mProcessCache.AddCache(key, value);
+    for (const auto& operation : {"open", "read", "close"}) {
+        logtail::ScopedDirErrorInjector fault(root.string(), operation, EIO, 1);
+        mProcessCache.ForceShrink();
+        EXPECT_TRUE(mProcessCache.Contains(key)) << operation;
+        EXPECT_EQ(0, mProcessCache.mLastForceShrinkTimeSec);
+    }
+    std::filesystem::remove_all(root / "12345");
+    mProcessCache.ForceShrink();
+    EXPECT_FALSE(mProcessCache.Contains(key));
+    std::filesystem::remove_all(root);
+}
+#endif
 
 UNIT_TEST_MAIN

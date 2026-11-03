@@ -23,3 +23,9 @@ target_link_libraries(polling_preserved_dir_depth_unittest ${UT_BASE_TARGET})
 
 include(GoogleTest)
 gtest_discover_tests(polling_preserved_dir_depth_unittest)
+
+if (LINUX)
+    add_executable(polling_scan_error_unittest PollingScanErrorUnittest.cpp)
+    target_link_libraries(polling_scan_error_unittest ${UT_BASE_TARGET})
+    gtest_discover_tests(polling_scan_error_unittest)
+endif ()

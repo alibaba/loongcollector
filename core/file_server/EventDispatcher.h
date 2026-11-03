@@ -246,6 +246,7 @@ protected:
         kSigChanged,
         kLogDirChanged,
         kCacheFull,
+        kSearchIncomplete,
         kDevInodeNotFound
     };
     ValidateCheckpointResult validateCheckpoint(CheckPointPtr& checkpoint,

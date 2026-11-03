@@ -21,9 +21,11 @@
 
 #include "collection_pipeline/CollectionPipelineManager.h"
 #include "config/ConfigDiff.h"
+#include "config/InstanceConfigManager.h"
 #include "config/watcher/InstanceConfigWatcher.h"
 #include "config/watcher/PipelineConfigWatcher.h"
 #include "unittest/Unittest.h"
+#include "unittest/common/DirErrorInjector.h"
 #include "unittest/plugin/PluginMock.h"
 #ifdef __ENTERPRISE__
 #include "config/provider/EnterpriseConfigProvider.h"
@@ -64,7 +66,13 @@ protected:
         auto* watcher = PipelineConfigWatcher::GetInstance();
         watcher->SetForceIterateError(false);
         watcher->SetForceStatusError(false);
+        watcher->SetForceEntryStatusError(false);
         watcher->ClearEnvironment();
+        InstanceConfigWatcher::GetInstance()->SetForceEntryStatusError(false);
+        InstanceConfigWatcher::GetInstance()->ClearEnvironment();
+#if defined(__linux__)
+        InstanceConfigManager::GetInstance()->mInstanceConfigMap.clear();
+#endif
         CollectionPipelineManager::GetInstance()->ClearAllPipelines();
         filesystem::remove_all(configDir);
         filesystem::remove_all(instanceConfigDir);
@@ -613,6 +621,96 @@ UNIT_TEST_CASE(ConfigWatcherUnittest, IterateErrorOnRunningPipelinesYieldsEmptyD
 UNIT_TEST_CASE(ConfigWatcherUnittest, StatusErrorOnRunningPipelinesYieldsEmptyDiff)
 UNIT_TEST_CASE(ConfigWatcherUnittest, RealDeletedConfigStillRemoved)
 UNIT_TEST_CASE(ConfigWatcherUnittest, MissingOptionalConfigDirDoesNotAbort)
+
+#if defined(__linux__)
+TEST_F(ConfigWatcherUnittest, DirectoryIoErrorsKeepRunningPipelinesAndRetryNewConfigs) {
+    startTwoRunningPipelines();
+    auto* watcher = PipelineConfigWatcher::GetInstance();
+    const auto snapshot = watcher->GetFileInfoMap();
+    writeMockPipeline(configDir / "c.json");
+    for (const auto& operation : {"open", "read", "close"}) {
+        ScopedDirErrorInjector fault(configDir.string(), operation, EIO, 1);
+        const auto diff = watcher->CheckConfigDiff();
+        EXPECT_FALSE(diff.first.HasDiff()) << operation;
+        EXPECT_FALSE(diff.second.HasDiff()) << operation;
+        EXPECT_EQ(snapshot, watcher->GetFileInfoMap()) << operation;
+        EXPECT_TRUE(CollectionPipelineManager::GetInstance()->FindConfigByName("a"));
+        EXPECT_TRUE(CollectionPipelineManager::GetInstance()->FindConfigByName("b"));
+    }
+    const auto recovered = watcher->CheckConfigDiff();
+    EXPECT_EQ(1U, recovered.first.mAdded.size());
+    EXPECT_TRUE(recovered.first.mRemoved.empty());
+}
+
+TEST_F(ConfigWatcherUnittest, EntryStatusErrorKeepsPipelineDiffAndMetadataUnchanged) {
+    startTwoRunningPipelines();
+    auto* watcher = PipelineConfigWatcher::GetInstance();
+    const auto snapshot = watcher->GetFileInfoMap();
+    watcher->SetForceEntryStatusError(true);
+    const auto failed = watcher->CheckConfigDiff();
+    EXPECT_FALSE(failed.first.HasDiff());
+    EXPECT_FALSE(failed.second.HasDiff());
+    EXPECT_EQ(snapshot, watcher->GetFileInfoMap());
+    watcher->SetForceEntryStatusError(false);
+    filesystem::remove(configDir / "b.json");
+    const auto recovered = watcher->CheckConfigDiff();
+    EXPECT_EQ((vector<string>{"b"}), recovered.first.mRemoved);
+}
+
+TEST_F(ConfigWatcherUnittest, FailureInSecondSourceDiscardsFirstSourceChanges) {
+    startTwoRunningPipelines();
+    auto* watcher = PipelineConfigWatcher::GetInstance();
+    const auto snapshot = watcher->GetFileInfoMap();
+    const auto otherDir = configDir / "other";
+    filesystem::create_directories(otherDir);
+    writeMockPipeline(otherDir / "d.json");
+    writeMockPipeline(configDir / "c.json");
+    watcher->AddSource(otherDir.string());
+    {
+        ScopedDirErrorInjector fault(otherDir.string(), "close", EIO);
+        const auto diff = watcher->CheckConfigDiff();
+        EXPECT_FALSE(diff.first.HasDiff());
+        EXPECT_FALSE(diff.second.HasDiff());
+        EXPECT_EQ(snapshot, watcher->GetFileInfoMap());
+    }
+    const auto recovered = watcher->CheckConfigDiff();
+    EXPECT_EQ(2U, recovered.first.mAdded.size());
+    EXPECT_TRUE(recovered.first.mRemoved.empty());
+}
+
+TEST_F(ConfigWatcherUnittest, InstanceScanFailuresPreserveDiffAndRetry) {
+    filesystem::create_directories(instanceConfigDir);
+    const auto write = [](const filesystem::path& path) { ofstream(path) << R"({"enable":true})"; };
+    write(instanceConfigDir / "a.json");
+    write(instanceConfigDir / "b.json");
+    auto* watcher = InstanceConfigWatcher::GetInstance();
+    auto* manager = InstanceConfigManager::GetInstance();
+    Json::Value config;
+    config["enable"] = true;
+    for (const auto& name : {"a", "b"}) {
+        manager->mInstanceConfigMap[name] = make_shared<InstanceConfig>(name, config, instanceConfigDir.string());
+    }
+    (void)watcher->CheckConfigDiff();
+    const auto snapshot = watcher->mFileInfoMap;
+    write(instanceConfigDir / "c.json");
+    for (const auto& operation : {"open", "read", "close"}) {
+        ScopedDirErrorInjector fault(instanceConfigDir.string(), operation, EIO, 1);
+        EXPECT_FALSE(watcher->CheckConfigDiff().HasDiff()) << operation;
+        EXPECT_EQ(snapshot, watcher->mFileInfoMap) << operation;
+        EXPECT_EQ(2U, manager->GetAllConfigNames().size());
+    }
+    watcher->SetForceEntryStatusError(true);
+    EXPECT_FALSE(watcher->CheckConfigDiff().HasDiff());
+    EXPECT_EQ(snapshot, watcher->mFileInfoMap);
+    watcher->SetForceEntryStatusError(false);
+    const auto recovered = watcher->CheckConfigDiff();
+    ASSERT_EQ(1U, recovered.mAdded.size());
+    EXPECT_TRUE(recovered.mRemoved.empty());
+    filesystem::remove(instanceConfigDir / "b.json");
+    const auto deleted = watcher->CheckConfigDiff();
+    EXPECT_EQ((vector<string>{"b"}), deleted.mRemoved);
+}
+#endif
 
 } // namespace logtail
 

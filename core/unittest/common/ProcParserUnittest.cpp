@@ -22,6 +22,7 @@
 
 #include "common/ProcParser.h"
 #include "unittest/Unittest.h"
+#include "unittest/common/DirErrorInjector.h"
 
 namespace logtail {
 
@@ -451,5 +452,29 @@ UNIT_TEST_CASE(ProcParserUnittest, TestReadStat);
 UNIT_TEST_CASE(ProcParserUnittest, TestReadStatus);
 
 } // namespace logtail
+
+#if defined(__linux__)
+namespace logtail {
+TEST_F(ProcParserUnittest, PidSnapshotSeparatesScanFailureFromEmptySuccess) {
+    std::filesystem::create_directories(mProcDir / "10");
+    std::filesystem::create_directories(mProcDir / "20");
+    { std::ofstream file(mProcDir / "30"); }
+    auto healthy = mParser->GetAllPids();
+    ASSERT_TRUE(healthy.has_value());
+    EXPECT_EQ((std::unordered_set<int>{10, 20}), *healthy);
+    for (const auto& operation : {"open", "read", "close"}) {
+        logtail::ScopedDirErrorInjector fault(mProcDir.string(), operation, EIO, 1);
+        EXPECT_FALSE(mParser->GetAllPids().has_value()) << operation;
+    }
+    std::filesystem::remove_all(mProcDir / "10");
+    std::filesystem::remove_all(mProcDir / "20");
+    healthy = mParser->GetAllPids();
+    ASSERT_TRUE(healthy.has_value());
+    EXPECT_TRUE(healthy->empty());
+    std::filesystem::remove_all(mProcDir);
+    EXPECT_FALSE(mParser->GetAllPids().has_value());
+}
+} // namespace logtail
+#endif
 
 UNIT_TEST_MAIN

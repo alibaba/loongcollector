@@ -16,6 +16,7 @@
 
 #pragma once
 #include <map>
+#include <set>
 
 #include "common/Lock.h"
 #include "common/LogRunnable.h"
@@ -51,6 +52,8 @@ public:
         mStatCount = 0;
         mNewFileVec.clear();
         mCurrentRound = 0;
+        mIncompleteDirs.clear();
+        mScanInterrupted = false;
     }
 
 private:
@@ -59,6 +62,9 @@ private:
 
     void Polling();
     void PollingIteration();
+    void MarkScanIncomplete(const std::string& dir);
+    bool IsScanIncomplete(const std::string& path) const;
+    void ProtectUnscannedCache();
 
     // PollingNormalConfigPath polls config with normal base path recursively.
     // @config: config to poll.
@@ -142,6 +148,9 @@ private:
     std::vector<SplitedFilePath> mNewFileVec;
     // The sequence number of current round, uint64_t is used to avoid overflow.
     uint64_t mCurrentRound;
+    // A failed subtree cannot provide negative evidence for cache eviction.
+    std::set<std::string> mIncompleteDirs;
+    bool mScanInterrupted = false;
 
     IntGaugePtr mPollingDirCacheSize;
     IntGaugePtr mPollingFileCacheSize;

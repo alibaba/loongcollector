@@ -589,15 +589,14 @@ EventDispatcher::ValidateCheckpointResult EventDispatcher::validateCheckpoint(
     }
 
     if (cachePathDevInodeMap.size() >= (size_t)INT32_FLAG(checkpoint_find_max_cache_size)) {
-        LOG_WARNING(
-            sLogger,
-            ("delete checkpoint", "cannot find the file because of full find cache")("config", checkpoint->mConfigName)(
-                "log reader queue name", checkpoint->mFileName)("real file path", checkpoint->mRealFileName)(
-                "file device", checkpoint->mDevInode.inode)("file inode", checkpoint->mDevInode.inode));
+        LOG_WARNING(sLogger,
+                    ("defer checkpoint validation", "find cache is full")("config", checkpoint->mConfigName)(
+                        "log reader queue name", checkpoint->mFileName)("real file path", checkpoint->mRealFileName)(
+                        "file device", checkpoint->mDevInode.inode)("file inode", checkpoint->mDevInode.inode));
         AlarmManager::GetInstance()->SendAlarmWarning(
             CHECKPOINT_ALARM,
-            string("cannot find the file because of full find cache, delete the checkpoint, log reader queue name: ")
-                + filePath + ", real file path: " + realFilePath,
+            string("find cache is full, keep checkpoint and retry, log reader queue name: ") + filePath
+                + ", real file path: " + realFilePath,
             config->GetContext().GetRegion(),
             config->GetContext().GetProjectName(),
             config->GetContext().GetConfigName(),
@@ -608,10 +607,14 @@ EventDispatcher::ValidateCheckpointResult EventDispatcher::validateCheckpoint(
     if (inputFile) {
         searchDepth = inputFile->mMaxCheckpointDirSearchDepth;
     }
-    auto const searchResult
-        = SearchFilePathByDevInodeInDirectory(path, searchDepth, checkpoint->mDevInode, &cachePathDevInodeMap);
-    if (searchResult) {
-        const auto& newRealPath = searchResult.value();
+    const auto search
+        = SearchFilePathByDevInodeInDirectoryChecked(path, searchDepth, checkpoint->mDevInode, &cachePathDevInodeMap);
+    if (search.status != DirectorySearchStatus::kComplete) {
+        LOG_WARNING(sLogger, ("checkpoint search incomplete", "keep checkpoint")("path", path));
+        return ValidateCheckpointResult::kSearchIncomplete;
+    }
+    if (search.path) {
+        const auto& newRealPath = *search.path;
         if (CheckFileSignature(newRealPath, checkpoint->mSignatureHash, checkpoint->mSignatureSize)) {
             checkpoint->mRealFileName = newRealPath;
             LOG_INFO(sLogger,
@@ -655,6 +658,9 @@ void EventDispatcher::AddExistedCheckPointFileEvents() {
     vector<Event*> eventVec;
     for (auto iter = checkPointMap.begin(); iter != checkPointMap.end(); ++iter) {
         auto const result = validateCheckpoint(iter->second, cachePathDevInodeMap, eventVec);
+        if (result == ValidateCheckpointResult::kSearchIncomplete || result == ValidateCheckpointResult::kCacheFull) {
+            continue;
+        }
         if (!(result == ValidateCheckpointResult::kNormal || result == ValidateCheckpointResult::kRotate)) {
             deleteKeyVec.push_back(iter->first);
         } else {
@@ -700,6 +706,9 @@ void EventDispatcher::AddExistedCheckPointFileEvents() {
                                                  0);
             const auto result = validateCheckpoint(v1Cpt, cachePathDevInodeMap, eventVec);
             switch (result) {
+                case ValidateCheckpointResult::kSearchIncomplete:
+                case ValidateCheckpointResult::kCacheFull:
+                    break;
                 case ValidateCheckpointResult::kNormal:
                     break;
 

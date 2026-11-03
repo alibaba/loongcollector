@@ -184,7 +184,7 @@ class Dir {
     Dir& operator=(const Dir&) = delete;
 
 public:
-    Dir(const std::string& dirPath);
+    explicit Dir(const std::string& dirPath, bool includeHidden = false);
     ~Dir();
 
     bool Open();
@@ -235,9 +235,15 @@ public:
     // closed directory resets the error before trying to open it.
     int GetLastErrorCode() const { return mLastErrorCode; }
 
+#ifdef APSARA_UNIT_TEST_MAIN
+    using ErrorInjector = std::function<int(const std::string&, const char*)>;
+    static ErrorInjector SetErrorInjectorForTesting(ErrorInjector injector);
+#endif
+
 private:
     std::string mDirPath;
     int mLastErrorCode = 0;
+    bool mIncludeHidden = false;
 #if defined(__linux__)
     DIR* mDir;
 #elif defined(_MSC_VER)
@@ -247,7 +253,22 @@ private:
 #endif
 
     bool IsOpened() const;
+#ifdef APSARA_UNIT_TEST_MAIN
+    int getInjectedError(const char* operation) const;
+#endif
 };
+
+// A failed scan never publishes partial entries. IsComplete() includes explicit
+// close success; callers must check it before replacing or removing old state.
+struct [[nodiscard]] DirectoryScanResult {
+    std::vector<Entry> entries;
+    int errorCode = 0;
+
+    bool IsComplete() const { return errorCode == 0; }
+};
+
+[[nodiscard]] DirectoryScanResult ScanDirectory(const std::string& dirPath, bool includeHidden = false);
+
 #if defined(__linux__)
 typedef struct stat RawStatType;
 #elif defined(_MSC_VER)

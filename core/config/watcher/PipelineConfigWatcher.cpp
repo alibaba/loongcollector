@@ -199,6 +199,12 @@ bool PipelineConfigWatcher::InsertPipelines(CollectionConfigDiff& pDiff,
                                             unordered_set<string>& configSet,
                                             SingletonConfigCache& singletonCache,
                                             ConfigFileInfoMap& nextFileInfo) {
+    const auto incomplete = [](const filesystem::path& path, const error_code& ec) {
+        LOG_WARNING(sLogger,
+                    ("pipeline config scan incomplete", "keep previous snapshot")("path", path.string())(
+                        "error code", ec.value())("error msg", ec.message()));
+        return false;
+    };
     for (const auto& dir : mSourceDir) {
         error_code ec;
         filesystem::file_status s = filesystem::status(dir, ec);
@@ -234,14 +240,24 @@ bool PipelineConfigWatcher::InsertPipelines(CollectionConfigDiff& pDiff,
             lock = unique_lock<mutex>(*muxItr->second);
         }
 
-        error_code itEc;
-        for (auto it = filesystem::directory_iterator(dir, itEc); !itEc && it != filesystem::directory_iterator();
-             it.increment(itEc)) {
-            const auto& entry = *it;
-            const filesystem::path& path = entry.path();
+        const auto scan = fsutil::ScanDirectory(dir.string(), true);
+        if (!scan.IsComplete()) {
+            return incomplete(dir, error_code(scan.errorCode, system_category()));
+        }
+        for (const auto& entry : scan.entries) {
+            const filesystem::path path = dir / entry.Name();
             const string& configName = path.stem().string();
             const string& filepath = path.string();
-            if (!filesystem::is_regular_file(entry.status(ec))) {
+            auto status = filesystem::status(path, ec);
+#ifdef APSARA_UNIT_TEST_MAIN
+            if (mForceEntryStatusError) {
+                ec = make_error_code(errc::io_error);
+            }
+#endif
+            if (ec) {
+                return incomplete(path, ec);
+            }
+            if (!filesystem::is_regular_file(status)) {
                 LOG_DEBUG(sLogger, ("config file is not a regular file", "skip current object")("filepath", filepath));
                 continue;
             }
@@ -255,7 +271,13 @@ bool PipelineConfigWatcher::InsertPipelines(CollectionConfigDiff& pDiff,
 
             auto iter = mFileInfoMap.find(filepath);
             uintmax_t size = filesystem::file_size(path, ec);
+            if (ec) {
+                return incomplete(path, ec);
+            }
             filesystem::file_time_type mTime = filesystem::last_write_time(path, ec);
+            if (ec) {
+                return incomplete(path, ec);
+            }
             if (iter == mFileInfoMap.end()) {
                 nextFileInfo[filepath] = make_pair(size, mTime);
                 unique_ptr<Json::Value> detail = make_unique<Json::Value>();
@@ -315,16 +337,9 @@ bool PipelineConfigWatcher::InsertPipelines(CollectionConfigDiff& pDiff,
             }
 #ifdef APSARA_UNIT_TEST_MAIN
             if (mForceIterateError) {
-                itEc = make_error_code(errc::bad_file_descriptor);
-                break;
+                return incomplete(dir, make_error_code(errc::bad_file_descriptor));
             }
 #endif
-        }
-        if (itEc) {
-            LOG_WARNING(sLogger,
-                        ("action", "iterate config dir")("status", "failed")("dir path", dir.string())(
-                            "error code", itEc.value())("error msg", itEc.message()));
-            return false;
         }
     }
     return true;

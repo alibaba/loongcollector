@@ -306,16 +306,17 @@ bool DiskBufferWriter::LoadFileToSend(time_t timeLine, std::vector<std::string>&
             LOG_INFO(sLogger, ("rebuild buffer file path success", bufferFilePath));
     }
 
-    fsutil::Dir dir(bufferFilePath);
-    if (!dir.Open()) {
-        string errorStr = ErrnoToString(GetErrno());
-        LOG_ERROR(sLogger, ("open dir error", bufferFilePath)("reason", errorStr));
-        AlarmManager::GetInstance()->SendAlarmCritical(
-            SECONDARY_READ_WRITE_ALARM, string("open dir error,dir:") + bufferFilePath + ",error:" + errorStr);
+    const auto scan = fsutil::ScanDirectory(bufferFilePath);
+    if (!scan.IsComplete()) {
+        string errorStr = ErrnoToString(scan.errorCode);
+        LOG_ERROR(sLogger, ("buffer directory scan incomplete", bufferFilePath)("reason", errorStr));
+        AlarmManager::GetInstance()->SendAlarmCritical(SECONDARY_READ_WRITE_ALARM,
+                                                       string("buffer directory scan incomplete,dir:") + bufferFilePath
+                                                           + ",error:" + errorStr);
         return false;
     }
-    fsutil::Entry ent;
-    while ((ent = dir.ReadNext())) {
+    vector<string> candidates;
+    for (const auto& ent : scan.entries) {
         string filename = ent.Name();
         if (filename.find(GetSendBufferFileNamePrefix()) == 0) {
             int32_t filetime{};
@@ -324,11 +325,12 @@ bool DiskBufferWriter::LoadFileToSend(time_t timeLine, std::vector<std::string>&
                 continue;
             }
             if (filetime < timeLine) {
-                filesToSend.push_back(filename);
+                candidates.push_back(filename);
             }
         }
     }
-    sort(filesToSend.begin(), filesToSend.end());
+    sort(candidates.begin(), candidates.end());
+    filesToSend = std::move(candidates);
     return true;
 }
 

@@ -53,12 +53,13 @@ enum class CheckPointFileStatus {
     kFound,
     kNotFound,
     kSearchIncomplete,
+    kSearchFailed,
     kSignatureChanged,
 };
 
 struct DirectoryScanCache {
     std::map<DevInode, SplitedFilePath> mInodePaths;
-    bool mSearchTruncated = false;
+    DirectorySearchStatus mStatus = DirectorySearchStatus::kComplete;
 };
 
 using DirectoryInodeCache = std::map<std::pair<std::string, uint16_t>, DirectoryScanCache>;
@@ -94,14 +95,18 @@ resolveCheckPointFile(CheckPoint& checkPoint, uint16_t searchDepth, DirectoryIno
     if (cacheIter == directoryInodeCache.end()) {
         DirectoryScanCache scanCache;
         // An invalid target forces one bounded scan that populates the directory cache.
-        SearchFilePathByDevInodeInDirectory(
-            parentDir, searchDepth, DevInode(), &scanCache.mInodePaths, &scanCache.mSearchTruncated);
+        const auto scan
+            = SearchFilePathByDevInodeInDirectoryChecked(parentDir, searchDepth, DevInode(), &scanCache.mInodePaths);
+        scanCache.mStatus = scan.status;
         cacheIter = directoryInodeCache.emplace(cacheKey, std::move(scanCache)).first;
+    }
+    if (cacheIter->second.mStatus == DirectorySearchStatus::kFailed) {
+        return CheckPointFileStatus::kSearchFailed;
     }
     const auto found = cacheIter->second.mInodePaths.find(checkPoint.mDevInode);
     if (found == cacheIter->second.mInodePaths.end()) {
-        return cacheIter->second.mSearchTruncated ? CheckPointFileStatus::kSearchIncomplete
-                                                  : CheckPointFileStatus::kNotFound;
+        return cacheIter->second.mStatus == DirectorySearchStatus::kTruncated ? CheckPointFileStatus::kSearchIncomplete
+                                                                              : CheckPointFileStatus::kNotFound;
     }
     const std::string realFilePath = PathJoin(found->second.mFileDir, found->second.mFileName);
     if (checkPoint.mSignatureSize > 0
@@ -615,7 +620,12 @@ void CheckPointManager::CheckTimeoutCheckPoint() {
             ++configNotMatchedCount;
         } else {
             const auto fileStatus = resolveCheckPointFile(checkPoint, searchDepth, directoryInodeCache);
-            if (fileStatus == CheckPointFileStatus::kNotFound) {
+            if (fileStatus == CheckPointFileStatus::kSearchFailed) {
+                // I/O failure is not evidence of file disappearance, regardless
+                // of the checkpoint's age. Retry when the directory recovers.
+                ++searchIncompleteCount;
+                continue;
+            } else if (fileStatus == CheckPointFileStatus::kNotFound) {
                 ++fileGoneCount;
             } else if (fileStatus == CheckPointFileStatus::kSearchIncomplete) {
                 ++searchIncompleteCount;
@@ -681,15 +691,23 @@ boost::optional<std::string> SearchFilePathByDevInodeInDirectory(const std::stri
                                                                  const DevInode& devInode,
                                                                  std::map<DevInode, SplitedFilePath>* cache,
                                                                  bool* searchTruncated) {
-#define METHOD_LOG_PATTERN ("method", "SearchFilePathByDevInodeInDirectory")("inode", devInode.inode)
+    const auto result = SearchFilePathByDevInodeInDirectoryChecked(baseDirPath, searchDepth, devInode, cache);
     if (searchTruncated) {
-        *searchTruncated = false;
+        *searchTruncated = result.status != DirectorySearchStatus::kComplete;
     }
+    return result.path;
+}
+
+DirectorySearchResult SearchFilePathByDevInodeInDirectoryChecked(const std::string& baseDirPath,
+                                                                 uint16_t searchDepth,
+                                                                 const DevInode& devInode,
+                                                                 std::map<DevInode, SplitedFilePath>* cache) {
+#define METHOD_LOG_PATTERN ("method", "SearchFilePathByDevInodeInDirectory")("inode", devInode.inode)
     std::deque<std::pair<std::string /* path */, uint16_t /* depth */>> dirs;
     dirs.emplace_back(std::make_pair(baseDirPath, 0));
 
     int32_t findCount = 0;
-    boost::optional<std::string> result;
+    DirectorySearchResult result;
     while (!dirs.empty()) {
         const auto dirPath = dirs.front().first;
         const auto depth = dirs.front().second;
@@ -697,10 +715,15 @@ boost::optional<std::string> SearchFilePathByDevInodeInDirectory(const std::stri
 
         fsutil::Dir dir(dirPath);
         if (!dir.Open()) {
+            const auto error = dir.GetLastErrorCode();
+            if (fsutil::Dir::IsENOENT(error) || fsutil::Dir::IsENOTDIR(error)) {
+                continue;
+            }
             AlarmManager::GetInstance()->SendAlarmWarning(
-                CHECKPOINT_ALARM, string("Failed to open dir : ") + dirPath + ";\terrno : " + ToString(GetErrno()));
+                CHECKPOINT_ALARM, string("Failed to open dir : ") + dirPath + ";\terrno : " + ToString(error));
             LOG_ERROR(sLogger, METHOD_LOG_PATTERN("message", "open dir error")("dir", dirPath));
-            continue;
+            result.status = DirectorySearchStatus::kFailed;
+            return result;
         }
         LOG_DEBUG(sLogger, METHOD_LOG_PATTERN("dir", dirPath));
 
@@ -709,15 +732,14 @@ boost::optional<std::string> SearchFilePathByDevInodeInDirectory(const std::stri
         std::string entName;
         const std::string entPathPrefix = PathJoin(dirPath, "");
         std::string entPath = entPathPrefix;
+        std::map<DevInode, SplitedFilePath> scannedPaths;
         while ((ent = dir.ReadNext(false))) {
             if (findCount++ > INT32_FLAG(checkpoint_find_max_file_count)) {
-                if (searchTruncated) {
-                    *searchTruncated = true;
-                }
+                result.status = DirectorySearchStatus::kTruncated;
                 LOG_WARNING(sLogger,
                             METHOD_LOG_PATTERN("exceed max search count", INT32_FLAG(checkpoint_find_max_file_count))(
                                 "base dir", baseDirPath)("search depth", searchDepth));
-                return result;
+                break;
             }
 
             entName = ent.Name();
@@ -725,8 +747,13 @@ boost::optional<std::string> SearchFilePathByDevInodeInDirectory(const std::stri
             entPath.append(entName);
             fsutil::PathStat buf;
             if (!fsutil::PathStat::stat(entPath, buf)) {
+                const auto error = GetErrno();
                 LOG_ERROR(sLogger, METHOD_LOG_PATTERN("get file info error: ", entPath));
-                continue;
+                if (fsutil::Dir::IsENOENT(error)) {
+                    continue;
+                }
+                result.status = DirectorySearchStatus::kFailed;
+                break;
             }
             if (!buf.IsRegFile()) {
                 if (buf.IsDir() && depth < searchDepth) {
@@ -736,12 +763,24 @@ boost::optional<std::string> SearchFilePathByDevInodeInDirectory(const std::stri
             }
             entDevInode = buf.GetDevInode();
             if (cache) {
-                cache->insert(std::make_pair(entDevInode, SplitedFilePath(dirPath, entName)));
+                scannedPaths.emplace(entDevInode, SplitedFilePath(dirPath, entName));
             }
             if (devInode == entDevInode) {
-                result = entPath;
-                return result;
+                result.path = entPath;
+                break;
             }
+        }
+        const bool closed = dir.Close();
+        if (!closed || dir.GetLastErrorCode() != 0 || result.status == DirectorySearchStatus::kFailed) {
+            result.path = boost::none;
+            result.status = DirectorySearchStatus::kFailed;
+            return result;
+        }
+        if (cache) {
+            cache->insert(scannedPaths.begin(), scannedPaths.end());
+        }
+        if (result.path || result.status != DirectorySearchStatus::kComplete) {
+            return result;
         }
     }
     return result;

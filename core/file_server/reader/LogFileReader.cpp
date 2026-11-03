@@ -498,8 +498,16 @@ void LogFileReader::initExactlyOnce(uint32_t concurrency) {
     PrimaryCheckpointPB primaryCpt;
     static auto* sCptM = CheckpointManagerV2::GetInstance();
     bool hasCheckpoint = sCptM->GetPB(primaryCptKey, primaryCpt);
+    mPrimaryCheckpointValidationPending = false;
     if (hasCheckpoint) {
-        hasCheckpoint = validatePrimaryCheckpoint(primaryCpt);
+        bool searchComplete = true;
+        hasCheckpoint = validatePrimaryCheckpoint(primaryCpt, &searchComplete);
+        if (!searchComplete) {
+            // Load existing state without changing persistent checkpoints. Opening
+            // the reader is blocked until validation can make a definite decision.
+            mPrimaryCheckpointValidationPending = true;
+            hasCheckpoint = true;
+        }
         if (!hasCheckpoint) {
             LOG_WARNING(sLogger,
                         COMMON_READER_INFO("ignore primary checkpoint and delete range checkpoints", primaryCptKey));
@@ -574,8 +582,11 @@ void LogFileReader::initExactlyOnce(uint32_t concurrency) {
     adjustParametersByRangeCheckpoints();
 }
 
-bool LogFileReader::validatePrimaryCheckpoint(const PrimaryCheckpointPB& cpt) {
+bool LogFileReader::validatePrimaryCheckpoint(const PrimaryCheckpointPB& cpt, bool* searchComplete) {
 #define METHOD_LOG_PATTERN ("method", "validatePrimaryCheckpoint")("checkpoint", cpt.DebugString())
+    if (searchComplete) {
+        *searchComplete = true;
+    }
     auto const sigSize = cpt.sig_size();
     auto const sigHash = cpt.sig_hash();
     if (sigSize > 0) {
@@ -587,12 +598,19 @@ bool LogFileReader::validatePrimaryCheckpoint(const PrimaryCheckpointPB& cpt) {
             }
 
             auto dirPath = boost::filesystem::path(filePath).parent_path();
-            const auto searchResult = SearchFilePathByDevInodeInDirectory(dirPath.string(), 0, mDevInode, nullptr);
-            if (!searchResult) {
+            const auto searchResult
+                = SearchFilePathByDevInodeInDirectoryChecked(dirPath.string(), 0, mDevInode, nullptr);
+            if (searchResult.status != DirectorySearchStatus::kComplete) {
+                if (searchComplete) {
+                    *searchComplete = false;
+                }
+                return false;
+            }
+            if (!searchResult.path) {
                 LOG_WARNING(sLogger, METHOD_LOG_PATTERN("can not find file with dev inode", mDevInode.inode));
                 return false;
             }
-            const auto& newFilePath = searchResult.value();
+            const auto& newFilePath = *searchResult.path;
             LOG_INFO(sLogger,
                      METHOD_LOG_PATTERN("file has been rotated from", "")("from", filePath)("to", newFilePath));
             filePath = newFilePath;
@@ -1034,6 +1052,9 @@ void LogFileReader::skipCheckpointRelayHole() {
 }
 
 bool LogFileReader::ReadLog(LogBuffer& logBuffer, const Event* event, bool isStaticFile) {
+    if (mPrimaryCheckpointValidationPending) {
+        return false;
+    }
     // when event is read timeout and the file cannot be opened, simply flush the cache.
     if (!mLogFileOp.IsOpen() && (event == nullptr || !event->IsReaderFlushTimeout())) {
         if (!ShouldForceReleaseDeletedFileFd()) {
@@ -1161,6 +1182,24 @@ void LogFileReader::OnOpenFileError() {
 }
 
 bool LogFileReader::UpdateFilePtr() {
+    if (mPrimaryCheckpointValidationPending) {
+        bool searchComplete = true;
+        const bool valid = validatePrimaryCheckpoint(mEOOption->primaryCheckpoint, &searchComplete);
+        if (!searchComplete) {
+            return false;
+        }
+        mPrimaryCheckpointValidationPending = false;
+        if (!valid) {
+            mLastFilePos = 0;
+            mCache.clear();
+            const auto concurrency = mEOOption->concurrency;
+            ExactlyOnceQueueManager::GetInstance()->DeleteQueue(mEOOption->fbKey);
+            initExactlyOnce(concurrency);
+            if (mPrimaryCheckpointValidationPending) {
+                return false;
+            }
+        }
+    }
     // move last update time before check IsValidToPush
     mLastUpdateTime = time(nullptr);
     if (mLogFileOp.IsOpen() == false) {
@@ -2454,8 +2493,10 @@ LogFileReader::~LogFileReader() {
     if (mEOOption) {
         ExactlyOnceQueueManager::GetInstance()->DeleteQueue(mEOOption->fbKey);
 
-        static auto sCptM = CheckpointManagerV2::GetInstance();
-        sCptM->MarkGC(mEOOption->primaryCheckpointKey);
+        if (!mPrimaryCheckpointValidationPending) {
+            static auto sCptM = CheckpointManagerV2::GetInstance();
+            sCptM->MarkGC(mEOOption->primaryCheckpointKey);
+        }
     }
 }
 

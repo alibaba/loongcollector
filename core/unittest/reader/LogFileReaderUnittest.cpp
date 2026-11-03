@@ -24,11 +24,13 @@
 #include "constants/TagConstants.h"
 #include "file_server/FileServer.h"
 #include "file_server/checkpoint/CheckPointManager.h"
+#include "file_server/checkpoint/CheckpointManagerV2.h"
 #include "file_server/reader/JsonLogFileReader.h"
 #include "file_server/reader/LogFileReader.h"
 #include "monitor/metric_constants/MetricConstants.h"
 #include "monitor/metric_models/ReentrantMetricsRecord.h"
 #include "unittest/Unittest.h"
+#include "unittest/common/DirErrorInjector.h"
 
 DECLARE_FLAG_INT32(force_release_deleted_file_fd_timeout);
 
@@ -2331,6 +2333,100 @@ UNIT_TEST_CASE(WholeFileOverwriteLargeUnittest, TestOverwriteDuringAccumulation)
 UNIT_TEST_CASE(WholeFileOverwriteLargeUnittest, TestChunkLineAlignment);
 UNIT_TEST_CASE(WholeFileOverwriteLargeUnittest, TestChunkCharAlignment);
 UNIT_TEST_CASE(WholeFileOverwriteLargeUnittest, TestAppendModeNoReset);
+
+#if defined(__linux__)
+TEST_F(LogFileReaderUnittest, IncompleteRotationSearchCannotResetExactlyOnceCheckpoints) {
+    const auto root = std::filesystem::path(GetProcessExecutionDir()) / "p1_exactly_once_reader";
+    std::filesystem::create_directories(root);
+    const std::string content = "checkpoint content\n";
+    const auto file = root / "test.log";
+    const auto rotated = root / "test.log.1";
+    std::ofstream(file) << content;
+    const auto inode = GetFileDevInode(file.string());
+    const auto key = ctx.GetConfigName() + "-" + file.string() + "-" + std::to_string(inode.dev) + "-"
+        + std::to_string(inode.inode);
+    const auto rangeKey = CheckpointManagerV2::MakeRangeKey(key, 0);
+    auto* checkpoints = CheckpointManagerV2::GetInstance();
+    PrimaryCheckpointPB primary;
+    primary.set_concurrency(1);
+    primary.set_sig_size(content.size());
+    primary.set_sig_hash(HashSignatureString(content.data(), content.size()));
+    primary.set_log_path(file.string());
+    primary.set_real_path(file.string());
+    primary.set_dev(inode.dev);
+    primary.set_inode(inode.inode);
+    primary.set_config_name(ctx.GetConfigName());
+    RangeCheckpointPB range;
+    range.set_hash_key("0123456789abcdef0123456789abcdef");
+    range.set_sequence_id(11);
+    range.set_read_offset(2);
+    range.set_read_length(3);
+    range.set_update_time(time(nullptr));
+    range.set_committed(false);
+    ASSERT_TRUE(checkpoints->SetPB(key, primary));
+    ASSERT_TRUE(checkpoints->SetPB(rangeKey, range));
+    std::filesystem::rename(file, rotated);
+    MultilineOptions multiline;
+    for (const auto& operation : {"open", "read", "close"}) {
+        {
+            ScopedDirErrorInjector fault(root.string(), operation, EIO);
+            LogFileReader reader(
+                root.string(), "test.log", inode, {&readerOpts, &ctx}, {&multiline, &ctx}, {&fileTagOpts, &ctx});
+            reader.SetMetrics();
+            reader.initExactlyOnce(1);
+            EXPECT_TRUE(reader.mPrimaryCheckpointValidationPending) << operation;
+            EXPECT_FALSE(reader.UpdateFilePtr());
+            LogBuffer logBuffer;
+            EXPECT_FALSE(reader.ReadLog(logBuffer, nullptr));
+            PrimaryCheckpointPB savedPrimary;
+            RangeCheckpointPB savedRange;
+            ASSERT_TRUE(checkpoints->GetPB(key, savedPrimary));
+            ASSERT_TRUE(checkpoints->GetPB(rangeKey, savedRange));
+            EXPECT_EQ(primary.SerializeAsString(), savedPrimary.SerializeAsString());
+            EXPECT_EQ(range.SerializeAsString(), savedRange.SerializeAsString());
+        }
+        std::lock_guard<std::mutex> lock(checkpoints->mMutex);
+        EXPECT_EQ(0U, checkpoints->mGCItems.count(key));
+    }
+    {
+        LogFileReader reader(
+            root.string(), "test.log", inode, {&readerOpts, &ctx}, {&multiline, &ctx}, {&fileTagOpts, &ctx});
+        reader.SetMetrics();
+        {
+            ScopedDirErrorInjector fault(root.string(), "read", EIO);
+            reader.initExactlyOnce(1);
+            EXPECT_TRUE(reader.mPrimaryCheckpointValidationPending);
+        }
+        EXPECT_TRUE(reader.UpdateFilePtr());
+        EXPECT_FALSE(reader.mPrimaryCheckpointValidationPending);
+        EXPECT_EQ(2, reader.mLastFilePos);
+        EXPECT_EQ(rotated.string(), reader.mRealLogPath);
+        EXPECT_EQ(11U, reader.mEOOption->toReplayCheckpoints.front()->data.sequence_id());
+    }
+    ASSERT_TRUE(checkpoints->SetPB(key, primary));
+    {
+        LogFileReader reader(
+            root.string(), "test.log", inode, {&readerOpts, &ctx}, {&multiline, &ctx}, {&fileTagOpts, &ctx});
+        reader.SetMetrics();
+        {
+            ScopedDirErrorInjector fault(root.string(), "read", EIO);
+            reader.initExactlyOnce(1);
+            EXPECT_TRUE(reader.mPrimaryCheckpointValidationPending);
+        }
+        std::filesystem::remove(rotated);
+        EXPECT_FALSE(reader.UpdateFilePtr());
+        EXPECT_FALSE(reader.mPrimaryCheckpointValidationPending);
+        RangeCheckpointPB removed;
+        EXPECT_FALSE(checkpoints->GetPB(rangeKey, removed));
+    }
+    checkpoints->DeleteCheckpoints({key, rangeKey});
+    {
+        std::lock_guard<std::mutex> lock(checkpoints->mMutex);
+        checkpoints->mGCItems.erase(key);
+    }
+    std::filesystem::remove_all(root);
+}
+#endif
 
 } // namespace logtail
 

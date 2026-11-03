@@ -60,6 +60,7 @@ public:
     void SetPipelineManager(const CollectionPipelineManager* pm) { mCollectionPipelineManager = pm; }
     void SetForceIterateError(bool enabled) { mForceIterateError = enabled; }
     void SetForceStatusError(bool enabled) { mForceStatusError = enabled; }
+    void SetForceEntryStatusError(bool enabled) { mForceEntryStatusError = enabled; }
     const std::map<std::string, std::pair<uintmax_t, std::filesystem::file_time_type>>& GetFileInfoMap() const {
         return mFileInfoMap;
     }
@@ -109,6 +110,7 @@ private:
 #ifdef APSARA_UNIT_TEST_MAIN
     bool mForceIterateError = false;
     bool mForceStatusError = false;
+    bool mForceEntryStatusError = false;
     friend class SingletonInputCollectionConfigUpdateUnittest;
 #endif
 };

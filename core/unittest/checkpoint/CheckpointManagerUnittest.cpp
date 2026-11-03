@@ -17,17 +17,23 @@
 
 #include "app_config/AppConfig.h"
 #include "collection_pipeline/CollectionPipelineContext.h"
+#include "collection_pipeline/CollectionPipelineManager.h"
 #include "common/DevInode.h"
 #include "common/FileSystemUtil.h"
 #include "common/Flags.h"
 #include "common/HashUtil.h"
+#include "file_server/EventDispatcher.h"
 #include "file_server/FileServer.h"
 #include "file_server/checkpoint/CheckPointManager.h"
+#include "file_server/event/Event.h"
 #include "unittest/Unittest.h"
+#include "unittest/common/DirErrorInjector.h"
+#include "unittest/plugin/PluginMock.h"
 
 DECLARE_FLAG_INT32(checkpoint_find_max_file_count);
 DECLARE_FLAG_INT32(check_point_check_interval);
 DECLARE_FLAG_INT32(mem_check_point_time_out);
+DECLARE_FLAG_INT32(checkpoint_find_max_cache_size);
 
 namespace logtail {
 
@@ -37,6 +43,8 @@ const std::string kMatchedConfig = "checkpoint_gc_matched_config";
 class CheckpointManagerUnittest : public ::testing::Test {
 public:
     static void SetUpTestCase() {
+        PluginRegistry::GetInstance()->LoadPlugins();
+        LoadPluginMock();
         kTestRootDir = (bfs::path(GetProcessExecutionDir()) / "CheckpointManagerUnittest").string();
         bfs::remove_all(kTestRootDir);
         bfs::create_directories(kTestRootDir);
@@ -56,6 +64,7 @@ public:
     static void TearDownTestCase() {
         FileServer::GetInstance()->RemoveFileDiscoveryConfig(kMatchedConfig);
         bfs::remove_all(kTestRootDir);
+        PluginRegistry::GetInstance()->UnloadPlugins();
     }
 
     void SetUp() override {
@@ -706,6 +715,122 @@ void CheckpointManagerUnittest::TestGcRespectsCheckInterval() {
     CheckPointPtr cpt;
     EXPECT_TRUE(manager->GetCheckPoint(devInode, "cfg_unregistered", cpt));
 }
+
+#if defined(__linux__)
+TEST_F(CheckpointManagerUnittest, SearchIoFailureIsNotNotFoundAndDoesNotPublishPartialCache) {
+    const auto root = bfs::path(kTestRootDir) / "p1_search";
+    bfs::create_directories(root);
+    const auto file = (root / "file.log").string();
+    std::ofstream(file) << "file";
+    std::ofstream((root / "second.log").string()) << "second";
+    const auto inode = GetFileDevInode(file);
+    for (const auto& operation : {"open", "read", "close"}) {
+        std::map<DevInode, SplitedFilePath> cache;
+        cache.emplace(DevInode(9, 9), SplitedFilePath("old", "entry"));
+        ScopedDirErrorInjector fault(root.string(), operation, EIO, 1);
+        const auto result = SearchFilePathByDevInodeInDirectoryChecked(root.string(), 0, DevInode(), &cache);
+        EXPECT_EQ(DirectorySearchStatus::kFailed, result.status) << operation;
+        EXPECT_FALSE(result.path) << operation;
+        EXPECT_EQ(1U, cache.size()) << operation;
+        EXPECT_EQ(1U, cache.count(DevInode(9, 9))) << operation;
+    }
+    const auto found = SearchFilePathByDevInodeInDirectoryChecked(root.string(), 0, inode, nullptr);
+    EXPECT_EQ(DirectorySearchStatus::kComplete, found.status);
+    ASSERT_TRUE(found.path);
+    EXPECT_EQ(file, *found.path);
+    bfs::remove(file);
+    const auto gone = SearchFilePathByDevInodeInDirectoryChecked(root.string(), 0, inode, nullptr);
+    EXPECT_EQ(DirectorySearchStatus::kComplete, gone.status);
+    EXPECT_FALSE(gone.path);
+    bfs::remove_all(root);
+}
+
+TEST_F(CheckpointManagerUnittest, GcKeepsCheckpointAcrossIoFailureEvenPastResidencyTimeout) {
+    const auto name = std::string("p1_gc_scan.log");
+    const auto file = CreateFile(name);
+    const auto rotated = file + ".1";
+    const auto inode = GetFileDevInode(file);
+    auto checkpoint = MakeCheckPoint(file, inode, 123, kMatchedConfig);
+    checkpoint->mSignatureSize = name.size();
+    checkpoint->mSignatureHash = HashSignatureString(name.data(), name.size());
+    auto* manager = CheckPointManager::Instance();
+    manager->AddCheckPoint(checkpoint.release());
+    bfs::rename(file, rotated);
+    CheckPointPtr current;
+    ASSERT_TRUE(manager->GetCheckPoint(inode, kMatchedConfig, current));
+    current->mMemInsertTime = static_cast<int32_t>(time(nullptr)) - 100000;
+    const auto oldInterval = INT32_FLAG(check_point_check_interval);
+    INT32_FLAG(check_point_check_interval) = -1;
+    for (const auto& operation : {"open", "read", "close"}) {
+        ScopedDirErrorInjector fault(kTestRootDir, operation, EIO, 1);
+        manager->CheckTimeoutCheckPoint();
+        EXPECT_TRUE(manager->GetCheckPoint(inode, kMatchedConfig, current)) << operation;
+        EXPECT_EQ(123, current->mOffset);
+        EXPECT_TRUE(current->mRealFileName.empty());
+    }
+    current->mMemInsertTime = static_cast<int32_t>(time(nullptr));
+    manager->CheckTimeoutCheckPoint();
+    EXPECT_TRUE(manager->GetCheckPoint(inode, kMatchedConfig, current));
+    EXPECT_EQ(rotated, current->mRealFileName);
+    bfs::remove(rotated);
+    manager->CheckTimeoutCheckPoint();
+    EXPECT_FALSE(manager->GetCheckPoint(inode, kMatchedConfig, current));
+    INT32_FLAG(check_point_check_interval) = oldInterval;
+}
+
+TEST_F(CheckpointManagerUnittest, RecoveryDefersIncompleteSearchAndCacheLimitWithoutDeletingCheckpoint) {
+    auto detail = std::make_unique<Json::Value>();
+    (*detail)["inputs"][0]["Type"] = "input_mock";
+    (*detail)["flushers"][0]["Type"] = "flusher_mock";
+    CollectionConfig config(kMatchedConfig, std::move(detail), "/fake/path");
+    ASSERT_TRUE(config.Parse());
+    auto pipeline = CollectionPipelineManager::GetInstance()->BuildPipeline(std::move(config));
+    ASSERT_NE(nullptr, pipeline);
+    CollectionPipelineManager::GetInstance()->mPipelineNameEntityMap[kMatchedConfig] = pipeline;
+    auto* dispatcher = EventDispatcher::GetInstance();
+    dispatcher->mPathWdMap[kTestRootDir] = 1;
+    const std::string name = "p1_recovery.log";
+    const auto file = CreateFile(name);
+    const auto inode = GetFileDevInode(file);
+    auto checkpoint = MakeCheckPoint(file, inode, 456, kMatchedConfig);
+    checkpoint->mSignatureSize = name.size();
+    checkpoint->mSignatureHash = HashSignatureString(name.data(), name.size());
+    auto* manager = CheckPointManager::Instance();
+    manager->AddCheckPoint(checkpoint.release());
+    bfs::rename(file, file + ".1");
+    CheckPointPtr current;
+    for (const auto& operation : {"open", "read", "close"}) {
+        ScopedDirErrorInjector fault(kTestRootDir, operation, EIO);
+        dispatcher->AddExistedCheckPointFileEvents();
+        EXPECT_TRUE(manager->GetCheckPoint(inode, kMatchedConfig, current)) << operation;
+        EXPECT_EQ(456, current->mOffset);
+    }
+    const auto oldCacheLimit = INT32_FLAG(checkpoint_find_max_cache_size);
+    INT32_FLAG(checkpoint_find_max_cache_size) = 0;
+    dispatcher->AddExistedCheckPointFileEvents();
+    EXPECT_TRUE(manager->GetCheckPoint(inode, kMatchedConfig, current));
+    INT32_FLAG(checkpoint_find_max_cache_size) = oldCacheLimit;
+    const auto oldScanLimit = INT32_FLAG(checkpoint_find_max_file_count);
+    INT32_FLAG(checkpoint_find_max_file_count) = -1;
+    dispatcher->AddExistedCheckPointFileEvents();
+    EXPECT_TRUE(manager->GetCheckPoint(inode, kMatchedConfig, current));
+    INT32_FLAG(checkpoint_find_max_file_count) = oldScanLimit;
+    std::map<DevInode, SplitedFilePath> cache;
+    std::vector<Event*> events;
+    EXPECT_EQ(EventDispatcher::ValidateCheckpointResult::kRotate,
+              dispatcher->validateCheckpoint(current, cache, events));
+    EXPECT_EQ(file + ".1", current->mRealFileName);
+    EXPECT_EQ(1U, events.size());
+    for (auto* event : events) {
+        delete event;
+    }
+    bfs::remove(file + ".1");
+    dispatcher->AddExistedCheckPointFileEvents();
+    EXPECT_FALSE(manager->GetCheckPoint(inode, kMatchedConfig, current));
+    dispatcher->mPathWdMap.erase(kTestRootDir);
+    CollectionPipelineManager::GetInstance()->mPipelineNameEntityMap.erase(kMatchedConfig);
+}
+#endif
 
 } // namespace logtail
 
