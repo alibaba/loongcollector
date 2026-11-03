@@ -141,12 +141,15 @@ private:
     )";
 
     const string newInvalidPipelineConfigWithInvalidFormat = R"({"flushers":{}})";
+    // Change file-input options to exercise config updates on every platform;
+    // container stdio is unavailable on Windows.
     const string newInvalidPipelineConfigWithInvalidDetail = R"(
 {
     "valid": false,
     "inputs": [
         {
-            "Type": "input_container_stdio"
+            "Type": "input_file",
+            "FilePaths": ["updated.log"]
         }
     ],
     "flushers": [
@@ -161,7 +164,8 @@ private:
     "valid": true,
     "inputs": [
         {
-            "Type": "input_container_stdio"
+            "Type": "input_file",
+            "FilePaths": ["updated.log"]
         }
     ],
     "flushers": [
@@ -177,7 +181,8 @@ private:
     "enable": false,
     "inputs": [
         {
-            "Type": "input_container_stdio"
+            "Type": "input_file",
+            "FilePaths": ["updated.log"]
         }
     ],
     "flushers": [

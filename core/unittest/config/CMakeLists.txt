@@ -55,12 +55,14 @@ endif ()
 
 include(GoogleTest)
 gtest_discover_tests(collection_config_unittest)
-gtest_discover_tests(common_config_provider_unittest)
-gtest_discover_tests(config_feedback_receiver_unittest)
+# These config binaries can exceed the default 5 s startup limit when ASAN
+# discovery runs alongside parallel compilation. This only bounds enumeration.
+gtest_discover_tests(common_config_provider_unittest DISCOVERY_TIMEOUT 30)
+gtest_discover_tests(config_feedback_receiver_unittest DISCOVERY_TIMEOUT 30)
 gtest_discover_tests(config_manager_unittest)
 gtest_discover_tests(config_update_unittest)
 gtest_discover_tests(config_watcher_unittest)
-gtest_discover_tests(onetime_config_manager_unittest)
+gtest_discover_tests(onetime_config_manager_unittest DISCOVERY_TIMEOUT 30)
 gtest_discover_tests(onetime_config_update_unittest)
 gtest_discover_tests(pipeline_config_unittest)
 gtest_discover_tests(singleton_input_collection_config_update_unittest)

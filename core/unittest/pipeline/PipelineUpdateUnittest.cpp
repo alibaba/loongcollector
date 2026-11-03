@@ -127,7 +127,9 @@ public:
     void TestPipelineTopoUpdateCase10() const;
     void TestPipelineTopoUpdateCase11() const;
     void TestPipelineTopoUpdateCase12() const;
+#ifdef __linux__
     void TestPipelineTopoUpdateCase13() const;
+#endif
     void TestPipelineInputBlock() const;
     void TestPipelineGoInputBlockCase1() const;
     void TestPipelineGoInputBlockCase2() const;
@@ -1421,6 +1423,8 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase12() const {
     VerifyData("test_logstore_3", 8, 10);
 }
 
+// Container stdio is a Linux-only native input; exercise its lifecycle there.
+#ifdef __linux__
 void PipelineUpdateUnittest::TestPipelineTopoUpdateCase13() const {
     // input_container_stdio -> Go -> C++ => Go -> Go -> C++
     const std::string configName = "test13";
@@ -1431,7 +1435,7 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase13() const {
     CollectionConfigDiff diff;
     CollectionConfig pipelineConfigObj
         = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson), filepath);
-    pipelineConfigObj.Parse();
+    APSARA_TEST_TRUE_FATAL(pipelineConfigObj.Parse());
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     AppConfig::GetInstance()->mPurageContainerMode = true;
     pipelineManager->UpdatePipelines(diff);
@@ -1446,12 +1450,14 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase13() const {
     CollectionConfigDiff diffUpdate;
     CollectionConfig pipelineConfigObjUpdate
         = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate), filepath);
-    pipelineConfigObjUpdate.Parse();
+    APSARA_TEST_TRUE_FATAL(pipelineConfigObjUpdate.Parse());
     diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
     pipelineManager->UpdatePipelines(diffUpdate);
     APSARA_TEST_EQUAL_FATAL(1U, pipelineManager->GetAllPipelines().size());
     APSARA_TEST_EQUAL_FATAL(true, LogtailPluginMock::GetInstance()->IsStarted());
 }
+
+#endif
 
 void PipelineUpdateUnittest::TestPipelineInputBlock() const {
     // C++ -> C++ -> C++
@@ -2528,7 +2534,9 @@ UNIT_TEST_CASE(PipelineUpdateUnittest, TestPipelineTopoUpdateCase9)
 UNIT_TEST_CASE(PipelineUpdateUnittest, TestPipelineTopoUpdateCase10)
 UNIT_TEST_CASE(PipelineUpdateUnittest, TestPipelineTopoUpdateCase11)
 UNIT_TEST_CASE(PipelineUpdateUnittest, TestPipelineTopoUpdateCase12)
+#ifdef __linux__
 UNIT_TEST_CASE(PipelineUpdateUnittest, TestPipelineTopoUpdateCase13)
+#endif
 UNIT_TEST_CASE(PipelineUpdateUnittest, TestPipelineInputBlock)
 UNIT_TEST_CASE(PipelineUpdateUnittest, TestPipelineGoInputBlockCase1)
 UNIT_TEST_CASE(PipelineUpdateUnittest, TestPipelineGoInputBlockCase2)
