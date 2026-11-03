@@ -29,7 +29,6 @@
 | global.InputIntervalMs           | int        | 否        | 1000    | **扩展（Go）Input** 侧默认调度间隔，单位毫秒（不限于 MetricInput；与 `pkg/config.GlobalConfig.InputIntervalMs` 默认一致）。               |
 | global.InputMaxFirstCollectDelayMs| int       | 否        | 10000   | 扩展 Input 首次采集前随机等待上限（毫秒）；若大于 `InputIntervalMs` 则实际按间隔封顶（见 Go `GlobalConfig` 注释）。               |
 | global.EnableTimestampNanosecond | bool       | 否        | false   | 是否在序列化等路径中启用纳秒时间戳（C++ `GlobalConfig` 与传给 Go 的全局字段一致）。               |
-| global.UsingOldContentTag        | bool       | 否        | false   | 是否使用旧版 `content` Tag 行为（C++ `GlobalConfig`）。 |
 | global.PipelineMetaTagKey        | object     | 否        | 空       | 重命名或删除采集配置级 Tag。map 中 key 为原 tag 逻辑名（如 `HOST_NAME`），value 为新物理 tag 名；空串表示删除，`__default__` 表示默认值。可配置项见下文表 1。 |
 | global.AgentEnvMetaTagKey        | object     | 否        | 空       | 环境变量元数据 Tag 映射（`ProcessorTagNative` 等读取此键名）。C++ `GlobalConfig::sNativeParam` 中还包含 **`AgentMetaTagKey`**，用于与 Go 管线 JSON 交互；若与文档/示例不一致，以当前版本源码及单测为准。 |
 | global.ExcutionTimeout           | uint       | 条件      | —       | **仅一次性采集配置**：运行超时（秒），键名为源码中的 `ExcutionTimeout`（拼写与实现对齐）；范围在代码中裁剪为约 600～604800。 |

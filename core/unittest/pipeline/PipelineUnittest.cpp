@@ -203,7 +203,6 @@ void PipelineUnittest::OnSuccessfulInit() const {
         {
             "global" : {
                 "EnableTimestampNanosecond": false,
-                "UsingOldContentTag": false,
                 "DefaultLogQueueSize" : 5,
                 "DefaultLogGroupQueueSize": 3
             },
@@ -231,7 +230,6 @@ void PipelineUnittest::OnSuccessfulInit() const {
         {
             "global" : {
                 "EnableTimestampNanosecond": false,
-                "UsingOldContentTag": false,
                 "DefaultLogQueueSize" : 5,
                 "DefaultLogGroupQueueSize": 3
             },
@@ -259,7 +257,6 @@ void PipelineUnittest::OnSuccessfulInit() const {
         {
             "global" : {
                 "EnableTimestampNanosecond": false,
-                "UsingOldContentTag": false,
                 "DefaultLogQueueSize" : 10,
                 "DefaultLogGroupQueueSize": 3
             },
@@ -652,7 +649,6 @@ void PipelineUnittest::OnInitVariousTopology() const {
         {
             "global" : {
                 "EnableTimestampNanosecond": false,
-                "UsingOldContentTag": false,
                 "DefaultLogQueueSize": 10,
                 "EnableProcessorTag": true
             },
@@ -723,7 +719,6 @@ void PipelineUnittest::OnInitVariousTopology() const {
         {
             "global" : {
                 "EnableTimestampNanosecond": false,
-                "UsingOldContentTag": false,
                 "EnableProcessorTag": true
             },
             "inputs": [
@@ -844,7 +839,6 @@ void PipelineUnittest::OnInitVariousTopology() const {
         {
             "global" : {
                 "EnableTimestampNanosecond": false,
-                "UsingOldContentTag": false,
                 "DefaultLogQueueSize" : 10
             },
             "processors": [
@@ -1023,7 +1017,6 @@ void PipelineUnittest::OnInitVariousTopology() const {
         {
             "global" : {
                 "EnableTimestampNanosecond": false,
-                "UsingOldContentTag": false,
                 "EnableProcessorTag": true
             },
             "inputs": [
@@ -1125,7 +1118,6 @@ void PipelineUnittest::OnInitVariousTopology() const {
         {
             "global" : {
                 "EnableTimestampNanosecond": false,
-                "UsingOldContentTag": false,
                 "DefaultLogQueueSize" : 10
             },
             "aggregators": [
@@ -1247,7 +1239,6 @@ void PipelineUnittest::OnInitVariousTopology() const {
         {
             "global" : {
                 "EnableTimestampNanosecond": false,
-                "UsingOldContentTag": false,
                 "DefaultLogQueueSize" : 10,
                 "EnableProcessorTag": true
             },
@@ -1311,7 +1302,6 @@ void PipelineUnittest::OnInitVariousTopology() const {
         {
             "global" : {
                 "EnableTimestampNanosecond": false,
-                "UsingOldContentTag": false,
                 "EnableProcessorTag": true
             },
             "inputs": [
@@ -1420,7 +1410,6 @@ void PipelineUnittest::OnInitVariousTopology() const {
         {
             "global" : {
                 "EnableTimestampNanosecond": false,
-                "UsingOldContentTag": false,
                 "DefaultLogQueueSize" : 10
             },
             "processors": [
@@ -1549,7 +1538,6 @@ void PipelineUnittest::OnInitVariousTopology() const {
         {
             "global" : {
                 "EnableTimestampNanosecond": false,
-                "UsingOldContentTag": false,
                 "DefaultLogQueueSize" : 10
             },
             "aggregators": [
@@ -1601,7 +1589,6 @@ void PipelineUnittest::OnInitVariousTopology() const {
         {
             "global" : {
                 "EnableTimestampNanosecond": false,
-                "UsingOldContentTag": false,
                 "EnableProcessorTag": true
             },
             "inputs": [
@@ -1704,7 +1691,6 @@ void PipelineUnittest::OnInitVariousTopology() const {
         {
             "global" : {
                 "EnableTimestampNanosecond": false,
-                "UsingOldContentTag": false,
                 "DefaultLogQueueSize" : 10
             },
             "aggregators": [
@@ -1856,7 +1842,6 @@ void PipelineUnittest::OnInitVariousTopology() const {
         {
             "global" : {
                 "EnableTimestampNanosecond": false,
-                "UsingOldContentTag": false,
                 "DefaultLogQueueSize" : 10,
                 "EnableProcessorTag": true
             },
@@ -1934,7 +1919,6 @@ void PipelineUnittest::OnInitVariousTopology() const {
         {
             "global" : {
                 "EnableTimestampNanosecond": false,
-                "UsingOldContentTag": false,
                 "EnableProcessorTag": true
             },
             "inputs": [
@@ -2065,7 +2049,6 @@ void PipelineUnittest::OnInitVariousTopology() const {
         {
             "global" : {
                 "EnableTimestampNanosecond": false,
-                "UsingOldContentTag": false,
                 "DefaultLogQueueSize" : 10
             },
             "processors": [
@@ -2224,7 +2207,6 @@ void PipelineUnittest::OnInitVariousTopology() const {
         {
             "global" : {
                 "EnableTimestampNanosecond": false,
-                "UsingOldContentTag": false,
                 "DefaultLogQueueSize" : 10
             },
             "aggregators": [
@@ -2290,7 +2272,6 @@ void PipelineUnittest::OnInitVariousTopology() const {
         {
             "global" : {
                 "EnableTimestampNanosecond": false,
-                "UsingOldContentTag": false,
                 "EnableProcessorTag": true
             },
             "inputs": [
@@ -2644,7 +2625,6 @@ void PipelineUnittest::OnInputFileWithContainerDiscovery() const {
         {
             "global" : {
                 "EnableTimestampNanosecond": false,
-                "UsingOldContentTag": false,
                 "DefaultLogQueueSize" : 10
             },
             "inputs": [
@@ -2665,7 +2645,6 @@ void PipelineUnittest::OnInputFileWithContainerDiscovery() const {
         {
             "global" : {
                 "EnableTimestampNanosecond": false,
-                "UsingOldContentTag": false,
                 "DefaultLogQueueSize" : 10
             },
             "inputs": [
@@ -2728,7 +2707,6 @@ void PipelineUnittest::OnInputFileWithContainerDiscovery() const {
         {
             "global" : {
                 "EnableTimestampNanosecond": false,
-                "UsingOldContentTag": false,
                 "DefaultLogQueueSize" : 10,
                 "EnableProcessorTag": true
             },
@@ -2750,7 +2728,6 @@ void PipelineUnittest::OnInputFileWithContainerDiscovery() const {
         {
             "global" : {
                 "EnableTimestampNanosecond": false,
-                "UsingOldContentTag": false,
                 "DefaultLogQueueSize" : 10,
                 "EnableProcessorTag": true
             },
@@ -2772,7 +2749,6 @@ void PipelineUnittest::OnInputFileWithContainerDiscovery() const {
         {
             "global" : {
                 "EnableTimestampNanosecond": false,
-                "UsingOldContentTag": false,
                 "DefaultLogQueueSize" : 10,
                 "EnableProcessorTag": true
             },

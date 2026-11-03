@@ -61,14 +61,12 @@ func (c *inputCollector) AddDataWithContext(tags, fields map[string]string, ctx 
 		ts = t[0]
 	}
 	log := &models.Log{Timestamp: uint64(ts.UnixNano()), Tags: models.NewTags(), Contents: models.NewLogContents()}
-	// Collector tags have always been per-log fields (CreateLog semantics).
-	// Keep them in Contents so processors and wire outputs retain these fields;
-	// native event tags and group tags keep their separate meanings.
+	// Tags and log contents stay separate in the unified event pipeline.
 	for key, value := range c.configTags {
-		log.Contents.Add(key, value)
+		log.Tags.Add(key, value)
 	}
 	for key, value := range tags {
-		log.Contents.Add(key, value)
+		log.Tags.Add(key, value)
 	}
 	for key, value := range fields {
 		if key == contentKey {

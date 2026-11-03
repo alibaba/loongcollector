@@ -74,7 +74,7 @@ func TestCollectorInputEmitsNamedContents(t *testing.T) {
 	group := <-ctx.Collector().Observe()
 	log := group.Events[0].(*models.Log)
 	require.Equal(t, "named", log.Contents.Get("field"))
-	require.Equal(t, "value", log.Contents.Get("tag"))
+	require.Equal(t, "value", log.Tags.Get("tag"))
 	require.Equal(t, []byte("body"), log.GetBody())
 	require.Equal(t, uint64(10000000020), log.Timestamp)
 }
@@ -155,10 +155,10 @@ func TestCollectorStaleMetricPreservesNaNPayload(t *testing.T) {
 	require.Equal(t, helper.StaleNaN, math.Float64bits(metric.Value.GetSingleValue()))
 }
 
-func TestNativeInputPreservesNamedFieldsAndContentTags(t *testing.T) {
+func TestNativeInputPreservesFieldsAndGroupTags(t *testing.T) {
 	ctx := &ContextImp{}
 	ctx.InitContext("project", "store", "native")
-	runner := &pluginRunner{LogstoreConfig: &LogstoreConfig{Context: ctx, GlobalConfig: &config.GlobalConfig{UsingOldContentTag: true}}, FlushOutStore: NewFlushOutStore[models.PipelineGroupEvents]()}
+	runner := &pluginRunner{LogstoreConfig: &LogstoreConfig{Context: ctx, GlobalConfig: &config.GlobalConfig{}}, FlushOutStore: NewFlushOutStore[models.PipelineGroupEvents]()}
 	require.NoError(t, runner.Init(1, 1))
 	runner.ReceivePipelineEventGroup(&protocol.PipelineEventGroup{
 		Tags: map[string][]byte{"path": []byte("/logs/app.log")},
@@ -170,13 +170,13 @@ func TestNativeInputPreservesNamedFieldsAndContentTags(t *testing.T) {
 	log := group.Events[0].(*models.Log)
 	require.Equal(t, "first", log.Contents.Get("named"))
 	require.Equal(t, []byte("body"), log.GetBody())
-	require.Equal(t, "/logs/app.log", log.Contents.Get("__tag__:path"))
+	require.Equal(t, "/logs/app.log", group.Group.Tags.Get("path"))
+	require.False(t, log.Contents.Contains("__tag__:path"))
 	require.Equal(t, "pack", group.Group.Metadata.Get("source"))
 }
 
-// Both Collector entry points must preserve fields before processors run and
-// after conversion to the LogGroup wire protocol used by existing flushers.
-func TestCollectorTagsRemainLogFields(t *testing.T) {
+// Collector tags stay separate from contents in memory and on the output wire.
+func TestCollectorTagsStaySeparate(t *testing.T) {
 	for _, array := range []bool{false, true} {
 		t.Run(fmt.Sprintf("array=%t", array), func(t *testing.T) {
 			output := helper.NewObservePipelineContext(1)
@@ -190,20 +190,28 @@ func TestCollectorTagsRemainLogFields(t *testing.T) {
 			}
 			group := <-output.Collector().Observe()
 			log := group.Events[0].(*models.Log)
-			require.Equal(t, "GET", log.Contents.Get("_method_"))
-			require.Equal(t, "example-container:latest", log.Contents.Get("_image_name_"))
-			require.Equal(t, "value", log.Contents.Get("configured"))
-			require.Zero(t, log.Tags.Len())
+			require.Equal(t, "GET", log.Tags.Get("_method_"))
+			require.False(t, log.Contents.Contains("_method_"))
+			require.Equal(t, "example-container:latest", log.Tags.Get("_image_name_"))
+			require.Equal(t, "value", log.Tags.Get("configured"))
+			require.Equal(t, 3, log.Tags.Len())
 			require.Equal(t, "tag", group.Group.Tags.Get("group"))
-			wire, err := converter.PipelineGroupEventsToLogGroup(group)
+			wires, err := converter.PipelineGroupEventsToLogGroups(group)
 			require.NoError(t, err)
+			require.Len(t, wires, 1)
+			wire := wires[0]
+			wireTags := make(map[string]string)
+			for _, tag := range wire.LogTags {
+				wireTags[tag.Key] = tag.Value
+			}
 			fields := make(map[string]string)
 			for _, field := range wire.Logs[0].Contents {
 				fields[field.Key] = field.Value
 			}
-			require.Equal(t, "GET", fields["_method_"])
-			require.Equal(t, "example-container:latest", fields["_image_name_"])
-			require.Equal(t, "value", fields["configured"])
+			require.Equal(t, "GET", wireTags["_method_"])
+			require.NotContains(t, fields, "_method_")
+			require.Equal(t, "example-container:latest", wireTags["_image_name_"])
+			require.Equal(t, "value", wireTags["configured"])
 			require.Equal(t, "body", fields["content"])
 		})
 	}

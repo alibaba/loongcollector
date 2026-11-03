@@ -30,8 +30,6 @@ import (
 	global_config "github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
-	"github.com/alibaba/ilogtail/pkg/util"
 	"github.com/alibaba/ilogtail/plugins/extension/basicauth"
 	"github.com/alibaba/ilogtail/plugins/input"
 	"github.com/alibaba/ilogtail/plugins/processor/regex"
@@ -397,25 +395,6 @@ func Test_hasDockerStdoutInput(t *testing.T) {
 	}
 }
 
-func Test_extractTags(t *testing.T) {
-	l := &protocol.Log{}
-	extractTags([]byte("k1~=~v1^^^k2~=~v2"), l)
-	assert.Equal(t, l.Contents[0].Key, "k1")
-	assert.Equal(t, l.Contents[0].Value, "v1")
-	assert.Equal(t, l.Contents[1].Key, "k2")
-	assert.Equal(t, l.Contents[1].Value, "v2")
-
-	l = &protocol.Log{}
-	extractTags([]byte("^^^k2~=~v2"), l)
-	assert.Equal(t, l.Contents[0].Key, "k2")
-	assert.Equal(t, l.Contents[0].Value, "v2")
-
-	l = &protocol.Log{}
-	extractTags([]byte("^^^k2"), l)
-	assert.Equal(t, l.Contents[0].Key, "__tag__:__prefix__0")
-	assert.Equal(t, l.Contents[0].Value, "k2")
-}
-
 func Test_extractTagsToLogTags(t *testing.T) {
 	logTag := extractTagsToLogTags([]byte("k1~=~v1^^^k2~=~v2"))
 	assert.Equal(t, logTag[0].Key, "k1")
@@ -433,95 +412,19 @@ func Test_extractTagsToLogTags(t *testing.T) {
 }
 
 func TestLogstoreConfig_ProcessRawLogV2(t *testing.T) {
-	rawLogs := []byte("12345")
-	topic := "topic"
-	tags := []byte("")
-	str := util.ZeroCopyBytesToString(rawLogs)
-	l := new(LogstoreConfig)
-	l.PluginRunner = &rawLogCaptureRunner{
-		LogsChan: make(chan *pipeline.LogWithContext, 10),
-	}
-	l.GlobalConfig = &global_config.LoongcollectorGlobalConfig
-	l.GlobalConfig.UsingOldContentTag = true
-	{
-		assert.Equal(t, 0, l.ProcessRawLogV2(rawLogs, "", topic, tags))
-		assert.Equal(t, 1, len(l.PluginRunner.(*rawLogCaptureRunner).LogsChan))
-		log := <-l.PluginRunner.(*rawLogCaptureRunner).LogsChan
-		assert.Equal(t, log.Log.Contents[0].GetValue(), str)
-		assert.Equal(t, log.Log.Contents[1].GetValue(), topic)
-		assert.True(t, util.IsSafeString(log.Log.Contents[0].GetValue(), str))
-		assert.False(t, util.IsSafeString(log.Log.Contents[1].GetValue(), topic))
-	}
-
-	{
-		tags = []byte("k1~=~v1^^^k2~=~v2")
-		tagsStr := util.ZeroCopyBytesToString(tags)
-		assert.Equal(t, 0, l.ProcessRawLogV2(rawLogs, "", topic, tags))
-		assert.Equal(t, 1, len(l.PluginRunner.(*rawLogCaptureRunner).LogsChan))
-		log := <-l.PluginRunner.(*rawLogCaptureRunner).LogsChan
-		assert.Equal(t, log.Log.Contents[0].GetValue(), str)
-		assert.Equal(t, log.Log.Contents[1].GetValue(), topic)
-		assert.Equal(t, 4, len(log.Log.Contents))
-
-		assert.Equal(t, log.Log.Contents[0].GetValue(), str)
-		assert.Equal(t, log.Log.Contents[1].GetValue(), topic)
-		assert.Equal(t, log.Log.Contents[2].GetKey(), "k1")
-		assert.Equal(t, log.Log.Contents[2].GetValue(), "v1")
-		assert.Equal(t, log.Log.Contents[3].GetKey(), "k2")
-		assert.Equal(t, log.Log.Contents[3].GetValue(), "v2")
-
-		assert.True(t, util.IsSafeString(log.Log.Contents[0].GetValue(), str))
-		assert.False(t, util.IsSafeString(log.Log.Contents[1].GetValue(), topic))
-		assert.True(t, util.IsSafeString(log.Log.Contents[2].GetKey(), tagsStr))
-		assert.True(t, util.IsSafeString(log.Log.Contents[2].GetValue(), tagsStr))
-		assert.True(t, util.IsSafeString(log.Log.Contents[3].GetKey(), tagsStr))
-		assert.True(t, util.IsSafeString(log.Log.Contents[3].GetValue(), tagsStr))
-	}
-
-	{
-		tags = []byte("^^^k2~=~v2")
-		tagsStr := util.ZeroCopyBytesToString(tags)
-		assert.Equal(t, 0, l.ProcessRawLogV2(rawLogs, "", topic, tags))
-		assert.Equal(t, 1, len(l.PluginRunner.(*rawLogCaptureRunner).LogsChan))
-		log := <-l.PluginRunner.(*rawLogCaptureRunner).LogsChan
-		assert.Equal(t, log.Log.Contents[0].GetValue(), str)
-		assert.Equal(t, log.Log.Contents[1].GetValue(), topic)
-		assert.Equal(t, 3, len(log.Log.Contents))
-
-		assert.Equal(t, log.Log.Contents[0].GetValue(), str)
-		assert.Equal(t, log.Log.Contents[1].GetValue(), topic)
-		assert.Equal(t, log.Log.Contents[2].GetKey(), "k2")
-		assert.Equal(t, log.Log.Contents[2].GetValue(), "v2")
-
-		assert.True(t, util.IsSafeString(log.Log.Contents[0].GetValue(), str))
-		assert.False(t, util.IsSafeString(log.Log.Contents[1].GetValue(), topic))
-		assert.True(t, util.IsSafeString(log.Log.Contents[2].GetKey(), tagsStr))
-		assert.True(t, util.IsSafeString(log.Log.Contents[2].GetValue(), tagsStr))
-	}
-
-	{
-		tags = []byte("^^^k2^^^k3")
-		tagsStr := util.ZeroCopyBytesToString(tags)
-		assert.Equal(t, 0, l.ProcessRawLogV2(rawLogs, "", topic, tags))
-		assert.Equal(t, 1, len(l.PluginRunner.(*rawLogCaptureRunner).LogsChan))
-		log := <-l.PluginRunner.(*rawLogCaptureRunner).LogsChan
-		assert.Equal(t, log.Log.Contents[0].GetValue(), str)
-		assert.Equal(t, log.Log.Contents[1].GetValue(), topic)
-		assert.Equal(t, 4, len(log.Log.Contents))
-
-		assert.Equal(t, log.Log.Contents[0].GetValue(), str)
-		assert.Equal(t, log.Log.Contents[1].GetValue(), topic)
-		assert.Equal(t, log.Log.Contents[2].GetKey(), "__tag__:__prefix__0")
-		assert.Equal(t, log.Log.Contents[2].GetValue(), "k2")
-		assert.Equal(t, log.Log.Contents[3].GetKey(), "__tag__:__prefix__1")
-		assert.Equal(t, log.Log.Contents[3].GetValue(), "k3")
-
-		assert.True(t, util.IsSafeString(log.Log.Contents[0].GetValue(), str))
-		assert.False(t, util.IsSafeString(log.Log.Contents[1].GetValue(), topic))
-		assert.True(t, util.IsSafeString(log.Log.Contents[2].GetKey(), tagsStr))
-		assert.True(t, util.IsSafeString(log.Log.Contents[2].GetValue(), tagsStr))
-		assert.True(t, util.IsSafeString(log.Log.Contents[3].GetKey(), tagsStr))
-		assert.True(t, util.IsSafeString(log.Log.Contents[3].GetValue(), tagsStr))
+	for _, rawTags := range []string{"", "k1~=~v1^^^k2~=~v2", "^^^k2~=~v2", "^^^k2^^^k3"} {
+		t.Run(rawTags, func(t *testing.T) {
+			runner := &rawLogCaptureRunner{LogsChan: make(chan *pipeline.LogWithContext, 1)}
+			config := &LogstoreConfig{PluginRunner: runner}
+			assert.Equal(t, 0, config.ProcessRawLogV2([]byte("12345"), "pack", "topic", []byte(rawTags)))
+			in := <-runner.LogsChan
+			require.Len(t, in.Log.Contents, 2)
+			assert.Equal(t, "12345", in.Log.Contents[0].Value)
+			assert.Equal(t, "topic", in.Log.Contents[1].Value)
+			assert.Equal(t, "pack", in.Context["source"])
+			assert.Equal(t, "topic", in.Context["topic"])
+			assert.Equal(t, extractTagsToLogTags([]byte(rawTags)), in.Context["tags"])
+		})
 	}
 }
 

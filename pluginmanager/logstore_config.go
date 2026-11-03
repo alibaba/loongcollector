@@ -138,39 +138,6 @@ var (
 	tagSeparator = []byte("~=~")
 )
 
-// extractTags extracts tags from rawTags and append them into log.
-// Rule: k1~=~v1^^^k2~=~v2
-// rawTags
-func extractTags(rawTags []byte, log *protocol.Log) {
-	defaultPrefixIndex := 0
-	for len(rawTags) != 0 {
-		idx := bytes.Index(rawTags, tagDelimiter)
-		var part []byte
-		if idx < 0 {
-			part = rawTags
-			rawTags = rawTags[len(rawTags):]
-		} else {
-			part = rawTags[:idx]
-			rawTags = rawTags[idx+len(tagDelimiter):]
-		}
-		if len(part) > 0 {
-			pos := bytes.Index(part, tagSeparator)
-			if pos > 0 {
-				log.Contents = append(log.Contents, &protocol.Log_Content{
-					Key:   string(part[:pos]),
-					Value: string(part[pos+len(tagSeparator):]),
-				})
-			} else {
-				log.Contents = append(log.Contents, &protocol.Log_Content{
-					Key:   defaultTagPrefix + strconv.Itoa(defaultPrefixIndex),
-					Value: string(part),
-				})
-			}
-			defaultPrefixIndex++
-		}
-	}
-}
-
 // extractTagsToLogTags extracts tags from rawTags and append them into []*protocol.LogTag.
 // Rule: k1~=~v1^^^k2~=~v2
 // rawTags
@@ -207,7 +174,7 @@ func extractTagsToLogTags(rawTags []byte) []*protocol.LogTag {
 }
 
 // ProcessRawLogV2 ...
-// V1 -> V2: enable topic field, and use tags field to pass more tags.
+// The versioned raw-log ABI carries topic metadata and separate group tags.
 // unsafe parameter: rawLog,packID and tags
 // safe parameter:  topic
 func (lc *LogstoreConfig) ProcessRawLogV2(rawLog []byte, packID string, topic string, tags []byte) int {
@@ -218,14 +185,10 @@ func (lc *LogstoreConfig) ProcessRawLogV2(rawLog []byte, packID string, topic st
 	if len(topic) > 0 {
 		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "__log_topic__", Value: topic})
 	}
-	// When UsingOldContentTag is set to false, the tag is now put into the context during cgo.
-	if !lc.GlobalConfig.UsingOldContentTag {
-		logTags := extractTagsToLogTags(tags)
-		lc.PluginRunner.ReceiveRawLog(&pipeline.LogWithContext{Log: log, Context: map[string]interface{}{"source": packID, "topic": topic, "tags": logTags}})
-	} else {
-		extractTags(tags, log)
-		lc.PluginRunner.ReceiveRawLog(&pipeline.LogWithContext{Log: log, Context: map[string]interface{}{"source": packID, "topic": topic}})
-	}
+	// The raw-log entry point follows the event model: tags are group
+	// attributes, never additional log contents.
+	logTags := extractTagsToLogTags(tags)
+	lc.PluginRunner.ReceiveRawLog(&pipeline.LogWithContext{Log: log, Context: map[string]interface{}{"source": packID, "topic": topic, "tags": logTags}})
 	return 0
 }
 

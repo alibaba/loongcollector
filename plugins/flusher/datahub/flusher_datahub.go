@@ -103,24 +103,23 @@ func (d *FlusherDatahub) Description() string {
 
 func (d *FlusherDatahub) Export(groupEventsList []*models.PipelineGroupEvents, _ pipeline.PipelineContext) error {
 	for _, groupEvents := range groupEventsList {
-		logGroup, err := converter.PipelineGroupEventsToLogGroup(groupEvents)
+		logGroups, err := converter.PipelineGroupEventsToLogGroups(groupEvents)
 		if err != nil {
 			return fmt.Errorf("convert pipeline group events to loggroup: %w", err)
 		}
-		if logGroup == nil || len(logGroup.Logs) == 0 {
-			continue
-		}
-		records := make([]datahub.IRecord, len(logGroup.Logs))
-		for id, log := range logGroup.Logs {
-			record, buildErr := d.recordBuilder.Log2Record(logGroup, log)
-			if buildErr != nil {
-				return buildErr
+		for _, logGroup := range logGroups {
+			records := make([]datahub.IRecord, len(logGroup.Logs))
+			for id, log := range logGroup.Logs {
+				record, buildErr := d.recordBuilder.Log2Record(logGroup, log)
+				if buildErr != nil {
+					return buildErr
+				}
+				records[id] = record
 			}
-			records[id] = record
-		}
-		err = d.producer.Send(records)
-		if err != nil {
-			return err
+			err = d.producer.Send(records)
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return nil

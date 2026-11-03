@@ -251,9 +251,23 @@ func marshalSingleProtocolEntry(entry map[string]interface{}) ([]byte, error) {
 	return marshalWithoutHTMLEscaped(entry)
 }
 
-// PipelineGroupEventsToLogGroup builds the LogGroup wire message required by
-// existing output protocols. Pipeline processing and queues retain native events.
-func PipelineGroupEventsToLogGroup(groupEvents *models.PipelineGroupEvents) (*protocol.LogGroup, error) {
+// PipelineGroupEventsToLogGroups serializes native events using the existing
+// LogGroup wire schema. Per-log tags stay in LogTags; distinct tag sets are
+// emitted in separate groups rather than flattened into log contents.
+func PipelineGroupEventsToLogGroups(events *models.PipelineGroupEvents) ([]*protocol.LogGroup, error) {
+	var groups []*protocol.LogGroup
+	err := helper.ForEachLogTagGroup(events, func(group *models.PipelineGroupEvents) error {
+		converted, err := pipelineGroupEventsToLogGroup(group)
+		if err != nil {
+			return err
+		}
+		groups = append(groups, converted)
+		return nil
+	})
+	return groups, err
+}
+
+func pipelineGroupEventsToLogGroup(groupEvents *models.PipelineGroupEvents) (*protocol.LogGroup, error) {
 	if groupEvents == nil || len(groupEvents.Events) == 0 {
 		return nil, nil
 	}

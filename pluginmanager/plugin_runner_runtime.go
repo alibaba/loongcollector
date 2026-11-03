@@ -447,16 +447,7 @@ func (p *pluginRunner) ReceivePipelineEventGroup(pbGroup *protocol.PipelineEvent
 		}
 		groupEvents.Group.Metadata.Add(k, value)
 	}
-	if p.LogstoreConfig != nil && p.LogstoreConfig.GlobalConfig != nil && p.LogstoreConfig.GlobalConfig.UsingOldContentTag {
-		// Preserve the explicit legacy tag-content option in the event model.
-		for _, event := range groupEvents.Events {
-			if log, ok := event.(*models.Log); ok {
-				for key, value := range groupEvents.Group.Tags.Iterator() {
-					log.Contents.Add(tagPrefix+key, value)
-				}
-			}
-		}
-	}
+
 	p.InputPipeContext.Collector().Collect(groupEvents.Group, groupEvents.Events...)
 }
 

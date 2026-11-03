@@ -580,7 +580,6 @@ void CollectionPipeline::CopyNativeGlobalParamToGoPipeline(Json::Value& pipeline
     if (!pipeline.isNull()) {
         Json::Value& global = pipeline["global"];
         global["EnableTimestampNanosecond"] = mContext.GetGlobalConfig().mEnableTimestampNanosecond;
-        global["UsingOldContentTag"] = mContext.GetGlobalConfig().mUsingOldContentTag;
     }
 }
 

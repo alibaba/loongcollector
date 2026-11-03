@@ -109,6 +109,11 @@ test/e2e/test_cases/my_feature/
 
 Go 默认使用统一事件 Pipeline；Native 输入经 ProcessPipelineEventGroup PB 直接传入，不再转换为 LogGroup。配置可省略 StructureType；显式配置时使用 v2。flusher_grpc、flusher_http 和 flusher_prometheus 均通过事件 Export 接口发送。
 
+- Log.Contents 是日志字段，用 the log fields match kv 验证。
+- Log.Tags 是日志标签；gRPC/SLS 的日志 wire schema 使用组级标签，出口按标签分组传输，用 the log tags match kv 验证。
+- 文件路径等组标签直接断言 __path__，不再断言复制到 Contents 的 __tag__:__path__。
+- E2E 不再设置旧版 tag 内容兼容开关。
+
 ---
 
 ## 4 本地运行

@@ -50,7 +50,6 @@ void GlobalConfigUnittest::OnSuccessfulInit() const {
     APSARA_TEST_EQUAL("", config->mTopicFormat);
     APSARA_TEST_EQUAL(1U, config->mPriority);
     APSARA_TEST_FALSE(config->mEnableTimestampNanosecond);
-    APSARA_TEST_FALSE(config->mUsingOldContentTag);
 
     // valid optional param
     configStr = R"(
@@ -58,8 +57,7 @@ void GlobalConfigUnittest::OnSuccessfulInit() const {
             "TopicType": "custom",
             "TopicFormat": "test_topic",
             "Priority": 1,
-            "EnableTimestampNanosecond": true,
-            "UsingOldContentTag": true
+            "EnableTimestampNanosecond": true
         }
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
@@ -70,7 +68,6 @@ void GlobalConfigUnittest::OnSuccessfulInit() const {
     APSARA_TEST_EQUAL("test_topic", config->mTopicFormat);
     APSARA_TEST_EQUAL(1U, config->mPriority);
     APSARA_TEST_TRUE(config->mEnableTimestampNanosecond);
-    APSARA_TEST_TRUE(config->mUsingOldContentTag);
 
     // invalid optional param
     configStr = R"(
@@ -78,8 +75,7 @@ void GlobalConfigUnittest::OnSuccessfulInit() const {
             "TopicType": true,
             "TopicFormat": true,
             "Priority": "1",
-            "EnableTimestampNanosecond": "true",
-            "UsingOldContentTag": "true"
+            "EnableTimestampNanosecond": "true"
         }
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
@@ -90,7 +86,6 @@ void GlobalConfigUnittest::OnSuccessfulInit() const {
     APSARA_TEST_EQUAL("", config->mTopicFormat);
     APSARA_TEST_EQUAL(1U, config->mPriority);
     APSARA_TEST_FALSE(config->mEnableTimestampNanosecond);
-    APSARA_TEST_FALSE(config->mUsingOldContentTag);
 
     // topicFormat
     configStr = R"(

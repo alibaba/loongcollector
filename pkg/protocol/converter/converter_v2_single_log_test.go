@@ -59,8 +59,10 @@ func TestPipelineGroupEventsToLogGroupConvertsMetricStructurally(t *testing.T) {
 		Events: []models.PipelineEvent{log, metric},
 	}
 
-	logGroup, err := PipelineGroupEventsToLogGroup(groupEvents)
+	logGroups, err := PipelineGroupEventsToLogGroups(groupEvents)
 	require.NoError(t, err)
+	require.Len(t, logGroups, 1)
+	logGroup := logGroups[0]
 	require.Len(t, logGroup.Logs, 2)
 
 	metricContents := make(map[string]string, len(logGroup.Logs[1].Contents))
@@ -70,4 +72,29 @@ func TestPipelineGroupEventsToLogGroupConvertsMetricStructurally(t *testing.T) {
 	assert.Equal(t, "m", metricContents[metricNameKey])
 	assert.Equal(t, "1", metricContents[metricValueKey])
 	assert.NotContains(t, metricContents, "__pipeline_passthrough__")
+}
+
+func TestPipelineGroupEventsToLogGroupsPreservesSeparateTags(t *testing.T) {
+	group := &models.PipelineGroupEvents{Group: models.NewGroup(models.NewMetadata(), models.NewTagsWithKeyValues("shared", "group"))}
+	for _, value := range []string{"a", "a", "b", "a"} {
+		group.Events = append(group.Events, models.NewSimpleLog([]byte(value), models.NewTagsWithKeyValues("container", value), 1))
+	}
+	wires, err := PipelineGroupEventsToLogGroups(group)
+	require.NoError(t, err)
+	require.Len(t, wires, 3)
+	for i, wire := range wires {
+		tags := map[string]string{}
+		for _, tag := range wire.LogTags {
+			tags[tag.Key] = tag.Value
+		}
+		require.Equal(t, []string{"a", "b", "a"}[i], tags["container"])
+		require.Equal(t, "group", tags["shared"])
+		require.Len(t, wire.Logs, []int{2, 1, 1}[i])
+		for _, log := range wire.Logs {
+			for _, field := range log.Contents {
+				require.NotEqual(t, "container", field.Key)
+			}
+		}
+	}
+	require.False(t, group.Group.Tags.Contains("container"))
 }
