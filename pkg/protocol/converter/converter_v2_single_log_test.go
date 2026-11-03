@@ -21,6 +21,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/alibaba/ilogtail/pkg/config"
+	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/models"
 )
 
@@ -97,4 +98,64 @@ func TestPipelineGroupEventsToLogGroupsPreservesSeparateTags(t *testing.T) {
 		}
 	}
 	require.False(t, group.Group.Tags.Contains("container"))
+}
+
+func TestPipelineGroupEventsToLogGroupsPreservesReservedTopic(t *testing.T) {
+	tests := []struct {
+		name     string
+		tags     map[string]string
+		topic    string
+		wantTags map[string]string
+	}{
+		{name: "no tags"},
+		{
+			name:     "ordinary tags without topic",
+			tags:     map[string]string{"host": "h1", "topic": "ordinary"},
+			wantTags: map[string]string{"host": "h1", "topic": "ordinary"},
+		},
+		{
+			name:  "topic only",
+			tags:  map[string]string{"__topic__": "access"},
+			topic: "access",
+		},
+		{
+			name:     "topic with ordinary tags",
+			tags:     map[string]string{"__topic__": "access", "host": "h1"},
+			topic:    "access",
+			wantTags: map[string]string{"host": "h1"},
+		},
+		{
+			name:     "empty topic",
+			tags:     map[string]string{"__topic__": "", "host": "h1"},
+			wantTags: map[string]string{"host": "h1"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			groupInfo := models.NewGroup(models.NewMetadata(), models.NewTagsWithMap(tt.tags))
+			log := models.NewLog("", []byte("body"), "", "", "", models.NewTags(), 1_000_000_000)
+			pbGroup, err := helper.TransferPipelineEventGroupToPB(groupInfo, []models.PipelineEvent{log})
+			require.NoError(t, err)
+
+			incoming, err := helper.TransferPBToPipelineGroupEvents(pbGroup)
+			require.NoError(t, err)
+			groups, err := PipelineGroupEventsToLogGroups(incoming)
+			require.NoError(t, err)
+			require.Len(t, groups, 1)
+			lg := groups[0]
+			require.Equal(t, len(tt.tags), incoming.Group.Tags.Len())
+			for k, v := range tt.tags {
+				assert.Equal(t, v, incoming.Group.Tags.Get(k))
+			}
+			assert.Equal(t, tt.topic, lg.Topic)
+			require.Len(t, lg.Logs, 1)
+			assert.Equal(t, "body", lg.Logs[0].Contents[0].Value)
+			require.Len(t, lg.LogTags, len(tt.wantTags))
+			for _, tag := range lg.LogTags {
+				value, ok := tt.wantTags[tag.Key]
+				assert.True(t, ok, "unexpected tag %q", tag.Key)
+				assert.Equal(t, value, tag.Value)
+			}
+		})
+	}
 }

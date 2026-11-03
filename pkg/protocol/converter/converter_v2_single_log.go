@@ -278,6 +278,11 @@ func pipelineGroupEventsToLogGroup(groupEvents *models.PipelineGroupEvents) (*pr
 	if groupEvents.Group != nil {
 		logGroup.LogTags = make([]*protocol.LogTag, 0, groupEvents.Group.GetTags().Len())
 		for k, v := range groupEvents.Group.GetTags().Iterator() {
+			if k == "__topic__" {
+				// Reserved pipeline topic maps to the LogGroup wire field.
+				logGroup.Topic = v
+				continue
+			}
 			logGroup.LogTags = append(logGroup.LogTags, &protocol.LogTag{Key: k, Value: v})
 		}
 	}

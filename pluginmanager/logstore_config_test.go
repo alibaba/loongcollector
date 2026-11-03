@@ -28,7 +28,9 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	global_config "github.com/alibaba/ilogtail/pkg/config"
+	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/plugins/extension/basicauth"
 	"github.com/alibaba/ilogtail/plugins/input"
@@ -482,3 +484,40 @@ type rawLogCaptureRunner struct {
 }
 
 func (r *rawLogCaptureRunner) ReceiveRawLog(log *pipeline.LogWithContext) { r.LogsChan <- log }
+
+func TestLogstoreConfig_ProcessPipelineEventGroup_Topic(t *testing.T) {
+	tests := []struct {
+		name string
+		tags map[string]string
+	}{
+		{name: "absent topic", tags: map[string]string{"host": "h1"}},
+		{name: "empty topic", tags: map[string]string{"__topic__": "", "host": "h1"}},
+		{name: "nonempty topic", tags: map[string]string{"__topic__": "access", "host": "h1"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			groupInfo := models.NewGroup(models.NewMetadata(), models.NewTagsWithMap(tt.tags))
+			log := models.NewLog("", []byte("hello"), "", "", "", models.NewTags(), 1_000_000_000)
+			pbGroup, err := helper.TransferPipelineEventGroupToPB(groupInfo, []models.PipelineEvent{log})
+			require.NoError(t, err)
+			pbBytes, err := pbGroup.Marshal()
+			require.NoError(t, err)
+
+			ctx := &mockContect{}
+			l := &LogstoreConfig{ConfigName: "test-topic", Context: &ContextImp{}}
+			l.Context.InitContext("", "", l.ConfigName)
+			l.PluginRunner = &pluginRunner{LogstoreConfig: l, InputPipeContext: ctx}
+			require.Equal(t, 0, l.ProcessPipelineEventGroup(pbBytes, "pack-1"))
+			require.Len(t, ctx.logs, 1)
+			// The typed protocol retains the reserved topic for native SLS serialization.
+			tags := make(map[string]string)
+			for k, v := range ctx.logs[0].Group.Tags.Iterator() {
+				tags[k] = v
+			}
+			assert.Equal(t, tt.tags, tags)
+			assert.Equal(t, "pack-1", ctx.logs[0].Group.Metadata.Get(ctxKeySource))
+			require.Len(t, ctx.logs[0].Events, 1)
+			assert.IsType(t, &models.Log{}, ctx.logs[0].Events[0])
+		})
+	}
+}
