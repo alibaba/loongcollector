@@ -19,7 +19,6 @@
 #include <cstdint>
 
 #include <filesystem>
-#include <optional>
 #include <set>
 #include <vector>
 
@@ -55,12 +54,12 @@ private:
     PluginMetricManagerPtr mPluginMetricManager;
     IntGaugePtr mMonitorFileTotal;
 
-    bool GetValidBaseDirs(const BasePathInfo& pathInfo,
+    void GetValidBaseDirs(const BasePathInfo& pathInfo,
                           const std::filesystem::path& dir,
                           uint32_t depth,
                           std::vector<std::filesystem::path>& filepaths) const;
-    std::optional<std::vector<std::filesystem::path>> GetFiles() const;
-    bool GetFiles(const std::filesystem::path& dir,
+    std::vector<std::filesystem::path> GetFiles() const;
+    void GetFiles(const std::filesystem::path& dir,
                   uint32_t depth,
                   const BasePathInfo* pathInfo,
                   const std::string* containerBaseDir,

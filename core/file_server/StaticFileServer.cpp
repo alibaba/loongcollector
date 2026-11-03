@@ -72,10 +72,6 @@ bool StaticFileServer::HasRegisteredPlugins() const {
 }
 
 void StaticFileServer::ClearUnusedCheckpoints() {
-    lock_guard<mutex> lock(mUpdateMux);
-    if (!mPendingDiscoveries.empty()) {
-        return;
-    }
     if (mIsUnusedCheckpointsCleared || time(nullptr) - mStartTime < INT32_FLAG(unused_checkpoints_clear_interval_sec)) {
         return;
     }
@@ -90,7 +86,6 @@ void StaticFileServer::RemoveInput(const string& configName, size_t idx, bool ke
         mInputFileReaderConfigsMap.erase(make_pair(configName, idx));
         mInputMultilineConfigsMap.erase(make_pair(configName, idx));
         mInputFileTagConfigsMap.erase(make_pair(configName, idx));
-        mPendingDiscoveries.erase(make_pair(configName, idx));
         mDeletedInputs.emplace(configName, idx);
     }
     if (!keepingCheckpoint) {
@@ -105,8 +100,7 @@ void StaticFileServer::AddInput(const string& configName,
                                 const FileReaderOptions* fileReaderOpts,
                                 const MultilineOptions* multilineOpts,
                                 const FileTagOptions* fileTagOpts,
-                                const CollectionPipelineContext* ctx,
-                                std::function<optional<vector<filesystem::path>>()> discoverFiles) {
+                                const CollectionPipelineContext* ctx) {
     // check if the server is started, if not, start it
     {
         lock_guard<mutex> lock(mThreadRunningMux);
@@ -125,21 +119,14 @@ void StaticFileServer::AddInput(const string& configName,
         expireTime = pipeline.GetOnetimeExpireTime().value_or(0);
     }
 
-    if (!discoverFiles) {
-        InputStaticFileCheckpointManager::GetInstance()->CreateCheckpoint(
-            configName, idx, files, startTime, expireTime);
-    }
+    InputStaticFileCheckpointManager::GetInstance()->CreateCheckpoint(configName, idx, files, startTime, expireTime);
     {
         lock_guard<mutex> lock(mUpdateMux);
         mInputFileDiscoveryConfigsMap.try_emplace(make_pair(configName, idx), make_pair(fileDiscoveryOpts, ctx));
         mInputFileReaderConfigsMap.try_emplace(make_pair(configName, idx), make_pair(fileReaderOpts, ctx));
         mInputMultilineConfigsMap.try_emplace(make_pair(configName, idx), make_pair(multilineOpts, ctx));
         mInputFileTagConfigsMap.try_emplace(make_pair(configName, idx), make_pair(fileTagOpts, ctx));
-        if (discoverFiles) {
-            mPendingDiscoveries.insert_or_assign(make_pair(configName, idx), std::move(discoverFiles));
-        } else {
-            mAddedInputs.emplace(configName, idx);
-        }
+        mAddedInputs.emplace(configName, idx);
     }
 }
 
@@ -236,13 +223,9 @@ LogFileReaderPtr StaticFileServer::GetNextAvailableReader(const string& configNa
             // 文件不存在或 devinode 不匹配，尝试在目录中查找轮转后的文件
             auto dirPath = filePath.parent_path();
             const auto searchResult
-                = SearchFilePathByDevInodeInDirectoryChecked(dirPath.string(), 0, fingerprint.mDevInode, nullptr);
-            if (searchResult.status != DirectorySearchStatus::kComplete) {
-                // Keep this fingerprint and retry on the next reader iteration.
-                return LogFileReaderPtr();
-            }
-            if (searchResult.path) {
-                filePath = filesystem::path(ConvertAndNormalizeNativePath(*searchResult.path)).lexically_normal();
+                = SearchFilePathByDevInodeInDirectory(dirPath.string(), 0, fingerprint.mDevInode, nullptr);
+            if (searchResult) {
+                filePath = filesystem::path(ConvertAndNormalizeNativePath(searchResult.value())).lexically_normal();
                 LOG_INFO(sLogger,
                          ("file rotated, found new path", "")("config", configName)("input idx", idx)(
                              "old path", fingerprint.mFilePath.string())("new path", filePath.string()));
@@ -305,29 +288,6 @@ LogFileReaderPtr StaticFileServer::GetNextAvailableReader(const string& configNa
 
 void StaticFileServer::UpdateInputs() {
     unique_lock<mutex> lock(mUpdateMux);
-    const auto now = time(nullptr);
-    if (now != mLastDiscoveryRetryTime) {
-        mLastDiscoveryRetryTime = now;
-        for (auto iter = mPendingDiscoveries.begin(); iter != mPendingDiscoveries.end();) {
-            const auto files = iter->second();
-            if (!files) {
-                ++iter;
-                continue;
-            }
-            const auto& key = iter->first;
-            const auto* ctx = mInputFileDiscoveryConfigsMap.at(key).second;
-            uint32_t startTime = 0;
-            uint32_t expireTime = 0;
-            if (ctx && ctx->HasValidPipeline()) {
-                startTime = ctx->GetPipeline().GetOnetimeStartTime().value_or(0);
-                expireTime = ctx->GetPipeline().GetOnetimeExpireTime().value_or(0);
-            }
-            InputStaticFileCheckpointManager::GetInstance()->CreateCheckpoint(
-                key.first, key.second, files, startTime, expireTime);
-            mAddedInputs.emplace(key);
-            iter = mPendingDiscoveries.erase(iter);
-        }
-    }
     for (const auto& item : mDeletedInputs) {
         mPipelineNameReadersMap.erase(item.first);
     }
@@ -388,8 +348,6 @@ void StaticFileServer::Clear() {
     mPipelineNameReadersMap.clear();
     mAddedInputs.clear();
     mDeletedInputs.clear();
-    mPendingDiscoveries.clear();
-    mLastDiscoveryRetryTime = 0;
 }
 
 LogFileReaderPtr StaticFileServer::TestGetNextAvailableReader(const string& configName, size_t idx) {

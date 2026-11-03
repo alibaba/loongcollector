@@ -19,7 +19,6 @@
 #include "file_server/checkpoint/InputStaticFileCheckpointManager.h"
 #include "plugin/input/InputStaticFile.h"
 #include "unittest/Unittest.h"
-#include "unittest/common/DirErrorInjector.h"
 
 using namespace std;
 
@@ -269,7 +268,6 @@ void StaticFileServerUnittest::TestFileRotationDetection() const {
     sServer->UpdateInputs();
 
     // Rotate file: move original to rotated (this preserves devinode), create new file
-    sServer->Stop();
     filesystem::rename(originalFile, rotatedFile);
     // Verify rotated file has the same devinode
     auto rotatedDevInode = GetFileDevInode(rotatedFile.string());
@@ -283,17 +281,6 @@ void StaticFileServerUnittest::TestFileRotationDetection() const {
     auto newFileDevInode = GetFileDevInode(originalFile.string());
     APSARA_TEST_NOT_EQUAL(originalDevInode, newFileDevInode);
 
-#if defined(__linux__)
-    for (const auto& operation : {"open", "read", "close"}) {
-        ScopedDirErrorInjector fault(originalFile.parent_path().string(), operation, EIO);
-        EXPECT_EQ(nullptr, sServer->TestGetNextAvailableReader("test_config", 0));
-        FileFingerprint current;
-        ASSERT_TRUE(sManager->GetCurrentFileFingerprint("test_config", 0, &current));
-        EXPECT_EQ(originalDevInode, current.mDevInode);
-        EXPECT_EQ(originalFile, current.mFilePath);
-        EXPECT_TRUE(sServer->mDeletedInputs.empty());
-    }
-#endif
     // Get reader - should find rotated file by devinode
     auto reader = sServer->TestGetNextAvailableReader("test_config", 0);
     APSARA_TEST_NOT_EQUAL(nullptr, reader);

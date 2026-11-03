@@ -103,7 +103,6 @@ public:
 
 private:
     void run();
-    void discover();
 
     struct InnerState {
         ProcessDiscoveryConfig mConfig;

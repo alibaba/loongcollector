@@ -29,7 +29,6 @@
 #include "common/LogtailCommonFlags.h"
 #include "common/RuntimeUtil.h"
 #include "unittest/Unittest.h"
-#include "unittest/common/DirErrorInjector.h"
 
 namespace logtail {
 
@@ -216,40 +215,6 @@ TEST_F(FileSystemUtilUnittest, TestDirCloseAndReopen) {
     EXPECT_TRUE(dir.Close());
     EXPECT_EQ(0, dir.GetLastErrorCode());
 }
-
-TEST_F(FileSystemUtilUnittest, TestScanDirectoryPreservesHiddenEntriesAndEmptySuccess) {
-    const auto empty = fsutil::ScanDirectory(mTestRoot.string(), true);
-    ASSERT_TRUE(empty.IsComplete());
-    EXPECT_TRUE(empty.entries.empty());
-    { std::ofstream file((mTestRoot / ".hidden").string()); }
-    { std::ofstream file((mTestRoot / "visible").string()); }
-    const auto scan = fsutil::ScanDirectory(mTestRoot.string(), true);
-    ASSERT_TRUE(scan.IsComplete());
-    std::set<std::string> names;
-    for (const auto& entry : scan.entries) {
-        names.insert(entry.Name());
-    }
-    EXPECT_EQ((std::set<std::string>{".hidden", "visible"}), names);
-    const auto legacyScan = fsutil::ScanDirectory(mTestRoot.string());
-    ASSERT_TRUE(legacyScan.IsComplete());
-    ASSERT_EQ(1U, legacyScan.entries.size());
-    EXPECT_EQ("visible", legacyScan.entries.front().Name());
-}
-
-#if defined(__linux__)
-TEST_F(FileSystemUtilUnittest, TestScanDirectoryNeverPublishesFailedSnapshots) {
-    { std::ofstream file((mTestRoot / "one").string()); }
-    { std::ofstream file((mTestRoot / "two").string()); }
-    for (const auto& operation : {"open", "read", "close"}) {
-        ScopedDirErrorInjector fault(mTestRoot.string(), operation, EIO, 1);
-        const auto scan = fsutil::ScanDirectory(mTestRoot.string());
-        EXPECT_FALSE(scan.IsComplete()) << operation;
-        EXPECT_EQ(EIO, scan.errorCode) << operation;
-        EXPECT_TRUE(scan.entries.empty()) << operation;
-    }
-    EXPECT_TRUE(fsutil::ScanDirectory(mTestRoot.string()).IsComplete());
-}
-#endif
 
 #if defined(__linux__)
 TEST_F(FileSystemUtilUnittest, TestDirDanglingSymbolicDoesNotFailScan) {

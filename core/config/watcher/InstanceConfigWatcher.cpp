@@ -35,20 +35,10 @@ InstanceConfigWatcher::InstanceConfigWatcher()
 InstanceConfigDiff InstanceConfigWatcher::CheckConfigDiff() {
     InstanceConfigDiff diff;
     unordered_set<string> configSet;
-    decltype(mFileInfoMap) nextFileInfo;
-    const auto incomplete = [](const filesystem::path& path, const error_code& ec) {
-        LOG_WARNING(sLogger,
-                    ("instance config scan incomplete", "keep previous snapshot")("path", path.string())(
-                        "error code", ec.value())("error msg", ec.message()));
-        return InstanceConfigDiff{};
-    };
     for (const auto& dir : mSourceDir) {
         error_code ec;
         filesystem::file_status s = filesystem::status(dir, ec);
         if (ec) {
-            if (ec != errc::no_such_file_or_directory) {
-                return incomplete(dir, ec);
-            }
             LOG_WARNING(sLogger,
                         ("failed to get config dir path info", "skip current object")("dir path", dir.string())(
                             "error code", ec.value())("error msg", ec.message()));
@@ -69,27 +59,17 @@ InstanceConfigDiff InstanceConfigWatcher::CheckConfigDiff() {
             lock = unique_lock<mutex>(*muxItr->second);
         }
 
-        const auto scan = fsutil::ScanDirectory(dir.string(), true);
-        if (!scan.IsComplete()) {
-            return incomplete(dir, error_code(scan.errorCode, system_category()));
-        }
-        for (const auto& entry : scan.entries) {
-            const filesystem::path path = dir / entry.Name();
+        error_code itEc;
+        for (auto it = filesystem::directory_iterator(dir, itEc); !itEc && it != filesystem::directory_iterator();
+             it.increment(itEc)) {
+            const auto& entry = *it;
+            const filesystem::path& path = entry.path();
             const string& configName = path.stem().string();
             if (configName == REGION_CONFIG || configName == READABLE_REGION_CONFIG) {
                 continue;
             }
             const string& filepath = path.string();
-            auto status = filesystem::status(path, ec);
-#ifdef APSARA_UNIT_TEST_MAIN
-            if (mForceEntryStatusError) {
-                ec = make_error_code(errc::io_error);
-            }
-#endif
-            if (ec) {
-                return incomplete(path, ec);
-            }
-            if (!filesystem::is_regular_file(status)) {
+            if (!filesystem::is_regular_file(entry.status(ec))) {
                 LOG_DEBUG(sLogger, ("config file is not a regular file", "skip current object")("filepath", filepath));
                 continue;
             }
@@ -103,15 +83,9 @@ InstanceConfigDiff InstanceConfigWatcher::CheckConfigDiff() {
 
             auto iter = mFileInfoMap.find(filepath);
             uintmax_t size = filesystem::file_size(path, ec);
-            if (ec) {
-                return incomplete(path, ec);
-            }
             filesystem::file_time_type mTime = filesystem::last_write_time(path, ec);
-            if (ec) {
-                return incomplete(path, ec);
-            }
-            nextFileInfo[filepath] = make_pair(size, mTime);
             if (iter == mFileInfoMap.end()) {
+                mFileInfoMap[filepath] = make_pair(size, mTime);
                 Json::Value detail;
                 if (!LoadConfigDetailFromFile(path, detail)) {
                     continue;
@@ -127,6 +101,7 @@ InstanceConfigDiff InstanceConfigWatcher::CheckConfigDiff() {
                                                                                                           configName));
             } else if (iter->second.first != size || iter->second.second != mTime) {
                 // for config currently running, we leave it untouched if new config is invalid
+                mFileInfoMap[filepath] = make_pair(size, mTime);
                 Json::Value detail;
                 if (!LoadConfigDetailFromFile(path, detail)) {
                     continue;
@@ -165,6 +140,11 @@ InstanceConfigDiff InstanceConfigWatcher::CheckConfigDiff() {
                 LOG_DEBUG(sLogger, ("existing config file unchanged", "skip current object"));
             }
         }
+        if (itEc) {
+            LOG_WARNING(sLogger,
+                        ("action", "iterate config dir")("status", "failed")("dir path", dir.string())(
+                            "error code", itEc.value())("error msg", itEc.message()));
+        }
     }
     for (const auto& name : mInstanceConfigManager->GetAllConfigNames()) {
         if (configSet.find(name) == configSet.end()) {
@@ -174,7 +154,16 @@ InstanceConfigDiff InstanceConfigWatcher::CheckConfigDiff() {
                 ("existing valid config is removed", "prepare to stop current running instanceConfig")("config", name));
         }
     }
-    mFileInfoMap = std::move(nextFileInfo);
+    std::vector<std::string> keysToRemove;
+    for (const auto& item : mFileInfoMap) {
+        string configName = filesystem::path(item.first).stem().string();
+        if (configSet.find(configName) == configSet.end()) {
+            keysToRemove.push_back(item.first);
+        }
+    }
+    for (const auto& key : keysToRemove) {
+        mFileInfoMap.erase(key);
+    }
 
     if (diff.HasDiff()) {
         LOG_INFO(sLogger,

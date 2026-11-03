@@ -155,8 +155,6 @@ void PollingDirFile::PollingIteration() {
     PTScopedLock threadLock(mPollingThreadLock);
     mStatCount = 0;
     mNewFileVec.clear();
-    mIncompleteDirs.clear();
-    mScanInterrupted = false;
     ++mCurrentRound;
 
     // Get a copy of config list from ConfigManager and build sorted path items.
@@ -175,14 +173,10 @@ void PollingDirFile::PollingIteration() {
 
     // 处理所有精确路径（已按 basePath 深度排序）
     for (auto& pathItem : sortedPaths) {
-        if (!mRuningFlag || mHoldOnFlag) {
-            mScanInterrupted = true;
+        if (!mRuningFlag || mHoldOnFlag)
             break;
-        }
-        if (mStatCount > INT32_FLAG(polling_max_stat_count)) {
-            mScanInterrupted = true;
+        if (mStatCount > INT32_FLAG(polling_max_stat_count))
             break;
-        }
 
         const CollectionPipelineContext* ctx = pathItem.config.second;
         const FileDiscoveryOptions* config = pathItem.config.first;
@@ -191,10 +185,6 @@ void PollingDirFile::PollingIteration() {
             // 非容器：直接使用 basePath
             fsutil::PathStat baseDirStat;
             if (!fsutil::PathStat::stat(pathItem.path, baseDirStat)) {
-                const auto error = GetErrno();
-                if (!fsutil::Dir::IsENOENT(error) && !fsutil::Dir::IsENOTDIR(error)) {
-                    MarkScanIncomplete(pathItem.path);
-                }
                 LOG_DEBUG(sLogger,
                           ("get base dir info error: ", pathItem.path)(ctx->GetProjectName(), ctx->GetLogstoreName()));
                 continue;
@@ -224,10 +214,6 @@ void PollingDirFile::PollingIteration() {
 
                     fsutil::PathStat baseDirStat;
                     if (!fsutil::PathStat::stat(realBaseDir, baseDirStat)) {
-                        const auto error = GetErrno();
-                        if (!fsutil::Dir::IsENOENT(error) && !fsutil::Dir::IsENOTDIR(error)) {
-                            MarkScanIncomplete(realBaseDir);
-                        }
                         LOG_DEBUG(sLogger,
                                   ("get docker base dir info error: ", realBaseDir)(ctx->GetProjectName(),
                                                                                     ctx->GetLogstoreName()));
@@ -247,14 +233,10 @@ void PollingDirFile::PollingIteration() {
 
     // 处理所有通配符路径（不排序）
     for (auto& pathItem : wildcardPaths) {
-        if (!mRuningFlag || mHoldOnFlag) {
-            mScanInterrupted = true;
+        if (!mRuningFlag || mHoldOnFlag)
             break;
-        }
-        if (mStatCount > INT32_FLAG(polling_max_stat_count)) {
-            mScanInterrupted = true;
+        if (mStatCount > INT32_FLAG(polling_max_stat_count))
             break;
-        }
 
         const CollectionPipelineContext* ctx = pathItem.config.second;
         const FileDiscoveryOptions* config = pathItem.config.first;
@@ -300,55 +282,10 @@ void PollingDirFile::PollingIteration() {
     PollingModify::GetInstance()->AddNewFile(mNewFileVec);
 
     // Check cache, clear unavailable and overtime items.
-    ProtectUnscannedCache();
     if (mCurrentRound % INT32_FLAG(check_not_exist_file_dir_round) == 0) {
         ClearUnavailableFileAndDir();
     }
     ClearTimeoutFileAndDir();
-}
-
-void PollingDirFile::MarkScanIncomplete(const string& dir) {
-    string prefix = dir;
-    if (prefix.empty()) {
-        mScanInterrupted = true;
-        return;
-    }
-    while (prefix.size() > 1 && prefix.back() == PATH_SEPARATOR[0]) {
-        prefix.pop_back();
-    }
-    if (mIncompleteDirs.insert(prefix).second) {
-        LOG_WARNING(sLogger, ("polling scan incomplete", "preserve subtree cache")("dir", dir));
-    }
-}
-
-bool PollingDirFile::IsScanIncomplete(const string& path) const {
-    if (mScanInterrupted) {
-        return true;
-    }
-    for (const auto& dir : mIncompleteDirs) {
-        if (path == dir
-            || (path.size() > dir.size() && path.compare(0, dir.size(), dir) == 0
-                && (dir.back() == PATH_SEPARATOR[0] || path[dir.size()] == PATH_SEPARATOR[0]))) {
-            return true;
-        }
-    }
-    return false;
-}
-
-void PollingDirFile::ProtectUnscannedCache() {
-    ScopedSpinLock lock(mCacheLock);
-    const auto pauseMissingRound = [this](auto& cache) {
-        for (auto& item : cache) {
-            const auto lastRound = item.second.GetLastCheckRound();
-            if (lastRound < mCurrentRound && IsScanIncomplete(item.first)) {
-                // Pause rather than reset the age, so old confirmed-missing
-                // rounds still count after a successful retry.
-                item.second.SetCheckRound(lastRound + 1);
-            }
-        }
-    };
-    pauseMissingRound(mDirCacheMap);
-    pauseMissingRound(mFileCacheMap);
 }
 
 // Last Modified Time (LMD) of directory changes when a file or a subdirectory is added,
@@ -490,7 +427,6 @@ bool PollingDirFile::PollingNormalConfigPath(const FileDiscoveryConfig& pConfig,
             LOG_DEBUG(sLogger, ("Open dir error, ENOENT, dir", dirPath.c_str()));
             return false;
         } else {
-            MarkScanIncomplete(dirPath);
             AlarmManager::GetInstance()->SendAlarmWarning(LOGDIR_PERMISSION_ALARM,
                                                           string("Failed to open dir : ") + dirPath
                                                               + ";\terrno : " + ToString(err),
@@ -505,17 +441,14 @@ bool PollingDirFile::PollingNormalConfigPath(const FileDiscoveryConfig& pConfig,
     int32_t nowStatCount = 0;
     fsutil::Entry ent;
     while ((ent = dir.ReadNext(false))) {
-        if (!mRuningFlag || mHoldOnFlag) {
-            mScanInterrupted = true;
+        if (!mRuningFlag || mHoldOnFlag)
             break;
-        }
 
         if (++mStatCount % INT32_FLAG(dirfile_stat_count) == 0) {
             usleep(INT32_FLAG(dirfile_stat_sleep) * 1000);
         }
 
         if (mStatCount > INT32_FLAG(polling_max_stat_count)) {
-            mScanInterrupted = true;
             LOG_WARNING(sLogger,
                         ("total dir's polling stat count is exceeded", nowStatCount)(dirPath, mStatCount)(
                             pConfig.second->GetProjectName(), pConfig.second->GetLogstoreName()));
@@ -532,7 +465,6 @@ bool PollingDirFile::PollingNormalConfigPath(const FileDiscoveryConfig& pConfig,
         }
 
         if (++nowStatCount > INT32_FLAG(polling_max_stat_count_per_dir)) {
-            MarkScanIncomplete(dirPath);
             LOG_WARNING(sLogger,
                         ("this dir's polling stat count is exceeded", nowStatCount)(dirPath, mStatCount)(
                             pConfig.second->GetProjectName(), pConfig.second->GetLogstoreName()));
@@ -581,9 +513,6 @@ bool PollingDirFile::PollingNormalConfigPath(const FileDiscoveryConfig& pConfig,
         // Mainly for symbolic (Linux), we need to use stat to dig out the real type.
         fsutil::PathStat buf;
         if (!fsutil::PathStat::stat(item, buf)) {
-            if (!fsutil::Dir::IsENOENT(GetErrno())) {
-                MarkScanIncomplete(item);
-            }
             LOG_DEBUG(sLogger, ("get file info error", item.c_str())("errno", errno));
             continue;
         }
@@ -607,10 +536,6 @@ bool PollingDirFile::PollingNormalConfigPath(const FileDiscoveryConfig& pConfig,
         }
     }
 
-    const bool closed = dir.Close();
-    if (!closed || dir.GetLastErrorCode() != 0) {
-        MarkScanIncomplete(dirPath);
-    }
     return true;
 }
 
@@ -650,9 +575,6 @@ bool PollingDirFile::PollingWildcardConfigPath(const FileDiscoveryConfig& pConfi
         string item = PathJoin(dirPath, pathInfo.constWildcardPaths[depth]);
         fsutil::PathStat baseDirStat;
         if (!fsutil::PathStat::stat(item, baseDirStat)) {
-            if (!fsutil::Dir::IsENOENT(GetErrno()) && !fsutil::Dir::IsENOTDIR(GetErrno())) {
-                MarkScanIncomplete(item);
-            }
             LOG_DEBUG(sLogger,
                       ("get wildcard dir info error: ", pathInfo.basePath)("stat path", item)(
                           pConfig.second->GetProjectName(),
@@ -682,7 +604,6 @@ bool PollingDirFile::PollingWildcardConfigPath(const FileDiscoveryConfig& pConfi
             LOG_DEBUG(sLogger, ("Open dir fail, ENOENT, dir", dirPath.c_str()));
             return false;
         } else {
-            MarkScanIncomplete(dirPath);
             AlarmManager::GetInstance()->SendAlarmWarning(LOGDIR_PERMISSION_ALARM,
                                                           string("Failed to open dir : ") + dirPath
                                                               + ";\terrno : " + ToString(err),
@@ -697,13 +618,10 @@ bool PollingDirFile::PollingWildcardConfigPath(const FileDiscoveryConfig& pConfi
     fsutil::Entry ent;
     int32_t dirCount = 0;
     while ((ent = dir.ReadNext(false))) {
-        if (!mRuningFlag || mHoldOnFlag) {
-            mScanInterrupted = true;
+        if (!mRuningFlag || mHoldOnFlag)
             break;
-        }
 
         if (dirCount >= INT32_FLAG(wildcard_max_sub_dir_count)) {
-            MarkScanIncomplete(dirPath);
             LOG_WARNING(
                 sLogger,
                 ("too many sub directoried for path", dirPath)("dirCount", dirCount)("basePath", pathInfo.basePath));
@@ -722,7 +640,6 @@ bool PollingDirFile::PollingWildcardConfigPath(const FileDiscoveryConfig& pConfi
             usleep(INT32_FLAG(dirfile_stat_sleep) * 1000);
 
         if (mStatCount > INT32_FLAG(polling_max_stat_count)) {
-            mScanInterrupted = true;
             LOG_WARNING(sLogger,
                         ("total dir's polling stat count is exceeded",
                          "")(dirPath, mStatCount)(pConfig.second->GetProjectName(), pConfig.second->GetLogstoreName()));
@@ -742,9 +659,6 @@ bool PollingDirFile::PollingWildcardConfigPath(const FileDiscoveryConfig& pConfi
         string item = PathJoin(dirPath, entName);
         fsutil::PathStat buf;
         if (!fsutil::PathStat::stat(item, buf)) {
-            if (!fsutil::Dir::IsENOENT(GetErrno())) {
-                MarkScanIncomplete(item);
-            }
             LOG_WARNING(sLogger, ("get file info fail", item.c_str())("errno", GetErrno()));
             continue;
         }
@@ -776,10 +690,6 @@ bool PollingDirFile::PollingWildcardConfigPath(const FileDiscoveryConfig& pConfi
                 }
             }
         }
-    }
-    const bool closed = dir.Close();
-    if (!closed || dir.GetLastErrorCode() != 0) {
-        MarkScanIncomplete(dirPath);
     }
     return hasMatchFlag;
 }
@@ -874,10 +784,6 @@ void PollingDirFile::ClearUnavailableFileAndDir() {
         ScopedSpinLock lock(mCacheLock);
         for (auto iter = mDirCacheMap.begin(); iter != mDirCacheMap.end();) {
             auto& cacheItem = iter->second;
-            if (IsScanIncomplete(iter->first)) {
-                ++iter;
-                continue;
-            }
             if (mCurrentRound - cacheItem.GetLastCheckRound() > (uint64_t)INT32_FLAG(delete_dir_file_round)) {
                 if (cacheItem.HasMatchedConfig()) {
                     eventVec.push_back(new Event(iter->first, string(), EVENT_TIMEOUT | EVENT_ISDIR, 0, 0));
@@ -889,10 +795,6 @@ void PollingDirFile::ClearUnavailableFileAndDir() {
 
         // Files need not to generate delete event, it is PollingModify's responsibility.
         for (auto iter = mFileCacheMap.begin(); iter != mFileCacheMap.end();) {
-            if (IsScanIncomplete(iter->first)) {
-                ++iter;
-                continue;
-            }
             if (mCurrentRound - iter->second.GetLastCheckRound() > (uint64_t)INT32_FLAG(delete_dir_file_round)) {
                 iter = mFileCacheMap.erase(iter);
             } else

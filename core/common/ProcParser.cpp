@@ -420,26 +420,19 @@ std::string ProcParser::GetUserNameByUid(uid_t uid) {
 #endif
 }
 
-std::optional<std::unordered_set<int>> ProcParser::GetAllPids() {
+std::unordered_set<int> ProcParser::GetAllPids() {
     std::unordered_set<int> pids;
-    const auto scan = fsutil::ScanDirectory(mProcPath.string(), true);
-    if (!scan.IsComplete()) {
-        LOG_WARNING(sLogger, ("process directory scan incomplete", mProcPath.string())("errno", scan.errorCode));
-        return std::nullopt;
-    }
-    for (const auto& entry : scan.entries) {
-        const auto& dirName = entry.Name();
-        int32_t pid = 0;
-        if (!StringTo(dirName, pid)) {
+    std::error_code ec;
+    for (const auto& entry : std::filesystem::directory_iterator(mProcPath, ec)) {
+        if (ec) {
             continue;
         }
-        std::error_code ec;
-        const bool isDir = entry.IsDir() || std::filesystem::is_directory(mProcPath / dirName, ec);
-        if (ec && ec != std::errc::no_such_file_or_directory) {
-            LOG_WARNING(sLogger, ("process entry status failed", dirName)("error", ec.message()));
-            return std::nullopt;
+        if (!entry.is_directory()) {
+            continue;
         }
-        if (!isDir) {
+        const std::string& dirName = entry.path().filename().string();
+        int32_t pid = 0;
+        if (!StringTo(dirName, pid)) {
             continue;
         }
         pids.insert(pid);

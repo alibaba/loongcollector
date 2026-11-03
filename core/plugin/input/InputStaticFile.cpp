@@ -34,13 +34,10 @@ using namespace std;
 
 namespace logtail {
 
-static bool IsValidDir(const filesystem::path& dir, bool& complete) {
+static bool IsValidDir(const filesystem::path& dir) {
     error_code ec;
     filesystem::file_status s = filesystem::status(dir, ec);
     if (ec) {
-        if (ec != errc::no_such_file_or_directory && ec != errc::not_a_directory) {
-            complete = false;
-        }
         LOG_WARNING(sLogger,
                     ("failed to get base dir path info",
                      "skip")("dir path", dir.string())("error code", ec.value())("error msg", ec.message()));
@@ -151,27 +148,15 @@ bool InputStaticFile::Start() {
         // mFileDiscovery.SetContainerInfo();
     }
 
+    // Add plugin metric manager
+    FileServer::GetInstance()->AddPluginMetricManager(mContext->GetConfigName(), mPluginMetricManager);
+
     optional<vector<filesystem::path>> files;
-    std::function<optional<vector<filesystem::path>>()> discoverFiles;
     if (!mContext->IsOnetimePipelineRunningBeforeStart()) {
         files = GetFiles();
-        if (!files) {
-            LOG_WARNING(
-                sLogger,
-                ("static file scan incomplete", "defer task discovery and retry")("config", mContext->GetConfigName()));
-            discoverFiles = [this]() { return GetFiles(); };
-        }
     }
-    FileServer::GetInstance()->AddPluginMetricManager(mContext->GetConfigName(), mPluginMetricManager);
-    StaticFileServer::GetInstance()->AddInput(mContext->GetConfigName(),
-                                              mIndex,
-                                              files,
-                                              &mFileDiscovery,
-                                              &mFileReader,
-                                              &mMultiline,
-                                              &mFileTag,
-                                              mContext,
-                                              std::move(discoverFiles));
+    StaticFileServer::GetInstance()->AddInput(
+        mContext->GetConfigName(), mIndex, files, &mFileDiscovery, &mFileReader, &mMultiline, &mFileTag, mContext);
     return true;
 }
 
@@ -185,9 +170,8 @@ bool InputStaticFile::Stop(bool isPipelineRemoving) {
     return true;
 }
 
-optional<vector<filesystem::path>> InputStaticFile::GetFiles() const {
+vector<filesystem::path> InputStaticFile::GetFiles() const {
     vector<filesystem::path> res;
-    bool complete = true;
     const auto& pathInfos = mFileDiscovery.GetBasePathInfos();
 
     if (!mEnableContainerDiscovery) {
@@ -196,9 +180,7 @@ optional<vector<filesystem::path>> InputStaticFile::GetFiles() const {
         for (const auto& pathInfo : pathInfos) {
             vector<filesystem::path> baseDirs;
             if (pathInfo.hasWildcard()) {
-                if (!GetValidBaseDirs(pathInfo, pathInfo.wildcardPaths[0], 0, baseDirs)) {
-                    return nullopt;
-                }
+                GetValidBaseDirs(pathInfo, pathInfo.wildcardPaths[0], 0, baseDirs);
                 if (baseDirs.empty()) {
                     LOG_WARNING(sLogger,
                                 ("no files found", "base dir path invalid")("base dir", pathInfo.basePath)(
@@ -210,12 +192,8 @@ optional<vector<filesystem::path>> InputStaticFile::GetFiles() const {
             }
 
             for (const auto& dir : baseDirs) {
-                if (IsValidDir(dir, complete)) {
-                    if (!GetFiles(dir, mFileDiscovery.mMaxDirSearchDepth, &pathInfo, nullptr, visitedDirs, res)) {
-                        return nullopt;
-                    }
-                } else if (!complete) {
-                    return nullopt;
+                if (IsValidDir(dir)) {
+                    GetFiles(dir, mFileDiscovery.mMaxDirSearchDepth, &pathInfo, nullptr, visitedDirs, res);
                 }
             }
         }
@@ -237,9 +215,7 @@ optional<vector<filesystem::path>> InputStaticFile::GetFiles() const {
 
                 vector<filesystem::path> baseDirs;
                 if (pathInfo.hasWildcard()) {
-                    if (!GetValidBaseDirs(pathInfo, realBaseDir, 0, baseDirs)) {
-                        return nullopt;
-                    }
+                    GetValidBaseDirs(pathInfo, realBaseDir, 0, baseDirs);
                     if (baseDirs.empty()) {
                         LOG_DEBUG(
                             sLogger,
@@ -253,13 +229,8 @@ optional<vector<filesystem::path>> InputStaticFile::GetFiles() const {
 
                 auto prevCnt = res.size();
                 for (const auto& dir : baseDirs) {
-                    if (IsValidDir(dir, complete)) {
-                        if (!GetFiles(
-                                dir, mFileDiscovery.mMaxDirSearchDepth, &pathInfo, &realBaseDir, visitedDirs, res)) {
-                            return nullopt;
-                        }
-                    } else if (!complete) {
-                        return nullopt;
+                    if (IsValidDir(dir)) {
+                        GetFiles(dir, mFileDiscovery.mMaxDirSearchDepth, &pathInfo, &realBaseDir, visitedDirs, res);
                     }
                 }
                 if (res.size() > prevCnt) {
@@ -279,7 +250,7 @@ optional<vector<filesystem::path>> InputStaticFile::GetFiles() const {
     return res;
 }
 
-bool InputStaticFile::GetValidBaseDirs(const BasePathInfo& pathInfo,
+void InputStaticFile::GetValidBaseDirs(const BasePathInfo& pathInfo,
                                        const filesystem::path& dir,
                                        uint32_t depth,
                                        vector<filesystem::path>& filepaths) const {
@@ -289,9 +260,8 @@ bool InputStaticFile::GetValidBaseDirs(const BasePathInfo& pathInfo,
         finish = true;
     }
 
-    bool complete = true;
-    if (depth == 0 && !IsValidDir(wildcardPaths[depth], complete)) {
-        return complete;
+    if (depth == 0 && !IsValidDir(wildcardPaths[depth])) {
+        return;
     }
 
     const auto& subdir = pathInfo.constWildcardPaths[depth];
@@ -300,65 +270,46 @@ bool InputStaticFile::GetValidBaseDirs(const BasePathInfo& pathInfo,
         error_code ec;
         filesystem::file_status s = filesystem::status(path, ec);
         if (ec || !filesystem::exists(s) || !filesystem::is_directory(s)) {
-            return !ec || ec == errc::no_such_file_or_directory || ec == errc::not_a_directory;
+            return;
         }
         if (finish) {
             filepaths.emplace_back(path);
         } else {
-            return GetValidBaseDirs(pathInfo, path, depth + 1, filepaths);
+            GetValidBaseDirs(pathInfo, path, depth + 1, filepaths);
         }
     } else {
         auto pattern = filesystem::path(wildcardPaths[depth + 1]).filename();
-        const auto scan = fsutil::ScanDirectory(dir.string(), true);
-        if (!scan.IsComplete()) {
-            LOG_WARNING(sLogger, ("static file directory scan failed", dir.string())("errno", scan.errorCode));
-            return false;
-        }
-        for (const auto& entry : scan.entries) {
-            const auto path = dir / entry.Name();
-            error_code ec;
-            const auto status = filesystem::status(path, ec);
-            if (ec) {
-                return false;
-            }
+        error_code ec;
+        for (auto const& entry : filesystem::directory_iterator(dir, ec)) {
+            const auto& path = entry.path();
+            const auto& status = entry.status();
             if (filesystem::is_directory(status)
                 && (fnmatch(pattern.string().c_str(), path.filename().string().c_str(), FNM_PATHNAME) == 0)) {
                 if (finish) {
                     filepaths.emplace_back(path);
                 } else {
-                    if (!GetValidBaseDirs(pathInfo, path, depth + 1, filepaths)) {
-                        return false;
-                    }
+                    GetValidBaseDirs(pathInfo, path, depth + 1, filepaths);
                 }
             }
         }
     }
-    return true;
 }
 
-bool InputStaticFile::GetFiles(const filesystem::path& dir,
+void InputStaticFile::GetFiles(const filesystem::path& dir,
                                uint32_t depth,
                                const BasePathInfo* pathInfo,
                                const string* containerBaseDir,
                                set<DevInode>& visitedDir,
                                vector<filesystem::path>& files) const {
-    const auto scan = fsutil::ScanDirectory(dir.string(), true);
-    if (!scan.IsComplete()) {
-        LOG_WARNING(sLogger, ("static file directory scan failed", dir.string())("errno", scan.errorCode));
-        return false;
-    }
-    for (const auto& entry : scan.entries) {
-        const auto path = dir / entry.Name();
+    error_code ec;
+    for (auto const& entry : filesystem::directory_iterator(dir, ec)) {
+        const auto& path = entry.path();
         auto pathStr = path.string();
         if (containerBaseDir && pathInfo) {
             // Map container path to config path
             pathStr = pathInfo->basePath + pathStr.substr(containerBaseDir->size());
         }
-        error_code ec;
-        const auto status = filesystem::status(path, ec);
-        if (ec) {
-            return false;
-        }
+        const auto& status = entry.status();
         if (filesystem::is_regular_file(status)) {
             const auto& filename = path.filename().string();
             if (pathInfo) {
@@ -372,23 +323,17 @@ bool InputStaticFile::GetFiles(const filesystem::path& dir,
             }
         } else if (filesystem::is_directory(status)) {
             auto devInode = GetFileDevInode(path.string());
-            if (!devInode.IsValid()) {
-                return false;
-            }
-            if (visitedDir.find(devInode) != visitedDir.end()) {
+            if (!devInode.IsValid() || visitedDir.find(devInode) != visitedDir.end()) {
                 // avoid loop
                 continue;
             }
             visitedDir.emplace(devInode);
             if (depth > 0 && !AppConfig::GetInstance()->IsHostPathMatchBlacklist(path.string())
                 && !mFileDiscovery.IsDirectoryInBlacklist(pathStr)) {
-                if (!GetFiles(path, depth - 1, pathInfo, containerBaseDir, visitedDir, files)) {
-                    return false;
-                }
+                GetFiles(path, depth - 1, pathInfo, containerBaseDir, visitedDir, files);
             }
         }
     }
-    return true;
 }
 
 bool InputStaticFile::CreateInnerProcessors() {

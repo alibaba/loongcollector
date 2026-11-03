@@ -18,7 +18,6 @@
 
 #include <condition_variable>
 #include <filesystem>
-#include <functional>
 #include <future>
 #include <map>
 #include <mutex>
@@ -62,8 +61,7 @@ public:
                   const FileReaderOptions* fileReaderOpts,
                   const MultilineOptions* multilineOpts,
                   const FileTagOptions* fileTagOpts,
-                  const CollectionPipelineContext* ctx,
-                  std::function<std::optional<std::vector<std::filesystem::path>>()> discoverFiles = {});
+                  const CollectionPipelineContext* ctx);
     void RemoveInput(const std::string& configName, size_t idx, bool keepingCheckpoint = false);
 
 #ifdef APSARA_UNIT_TEST_MAIN
@@ -109,10 +107,6 @@ private:
     std::map<std::pair<std::string, size_t>, FileTagConfig> mInputFileTagConfigsMap;
     std::multimap<std::string, size_t> mAddedInputs;
     std::set<std::pair<std::string, size_t>> mDeletedInputs;
-    // Callbacks run under mUpdateMux, so RemoveInput waits for discovery to finish.
-    std::map<std::pair<std::string, size_t>, std::function<std::optional<std::vector<std::filesystem::path>>()>>
-        mPendingDiscoveries;
-    time_t mLastDiscoveryRetryTime = 0;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class StaticFileServerUnittest;

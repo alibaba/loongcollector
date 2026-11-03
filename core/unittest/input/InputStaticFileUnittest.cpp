@@ -24,7 +24,6 @@
 #include "plugin/processor/inner/ProcessorSplitLogStringNative.h"
 #include "plugin/processor/inner/ProcessorSplitMultilineLogStringNative.h"
 #include "unittest/Unittest.h"
-#include "unittest/common/DirErrorInjector.h"
 
 using namespace std;
 
@@ -527,7 +526,7 @@ void InputStaticFileUnittest::TestGetFiles() {
         input.CreateMetricsRecordRef(InputStaticFile::sName, "1");
         APSARA_TEST_TRUE(input.Init(configJson, optionalGoPipeline));
         input.CommitMetricsRecordRef();
-        APSARA_TEST_TRUE(input.GetFiles().value().empty());
+        APSARA_TEST_TRUE(input.GetFiles().empty());
 
         filesystem::remove_all("invalid_dir");
     }
@@ -544,7 +543,7 @@ void InputStaticFileUnittest::TestGetFiles() {
         input.CreateMetricsRecordRef(InputStaticFile::sName, "1");
         APSARA_TEST_TRUE(input.Init(configJson, optionalGoPipeline));
         input.CommitMetricsRecordRef();
-        APSARA_TEST_TRUE(input.GetFiles().value().empty());
+        APSARA_TEST_TRUE(input.GetFiles().empty());
 
         filesystem::remove_all("test_logs");
     }
@@ -562,7 +561,7 @@ void InputStaticFileUnittest::TestGetFiles() {
         input.CreateMetricsRecordRef(InputStaticFile::sName, "1");
         APSARA_TEST_TRUE(input.Init(configJson, optionalGoPipeline));
         input.CommitMetricsRecordRef();
-        APSARA_TEST_TRUE(input.GetFiles().value().empty());
+        APSARA_TEST_TRUE(input.GetFiles().empty());
 
         filesystem::remove_all("test_logs");
     }
@@ -584,7 +583,7 @@ void InputStaticFileUnittest::TestGetFiles() {
         input.CreateMetricsRecordRef(InputStaticFile::sName, "1");
         APSARA_TEST_TRUE(input.Init(configJson, optionalGoPipeline));
         input.CommitMetricsRecordRef();
-        APSARA_TEST_EQUAL(2U, input.GetFiles().value().size());
+        APSARA_TEST_EQUAL(2U, input.GetFiles().size());
 
         filesystem::remove_all("test_logs");
     }
@@ -606,7 +605,7 @@ void InputStaticFileUnittest::TestGetFiles() {
         input.CreateMetricsRecordRef(InputStaticFile::sName, "1");
         APSARA_TEST_TRUE(input.Init(configJson, optionalGoPipeline));
         input.CommitMetricsRecordRef();
-        APSARA_TEST_EQUAL(2U, input.GetFiles().value().size());
+        APSARA_TEST_EQUAL(2U, input.GetFiles().size());
 
         filesystem::remove_all("test_logs");
     }
@@ -624,7 +623,7 @@ void InputStaticFileUnittest::TestGetFiles() {
         input.CreateMetricsRecordRef(InputStaticFile::sName, "1");
         APSARA_TEST_TRUE(input.Init(configJson, optionalGoPipeline));
         input.CommitMetricsRecordRef();
-        APSARA_TEST_TRUE(input.GetFiles().value().empty());
+        APSARA_TEST_TRUE(input.GetFiles().empty());
 
         filesystem::remove_all("invalid_dir");
     }
@@ -641,7 +640,7 @@ void InputStaticFileUnittest::TestGetFiles() {
         input.CreateMetricsRecordRef(InputStaticFile::sName, "1");
         APSARA_TEST_TRUE(input.Init(configJson, optionalGoPipeline));
         input.CommitMetricsRecordRef();
-        APSARA_TEST_TRUE(input.GetFiles().value().empty());
+        APSARA_TEST_TRUE(input.GetFiles().empty());
 
         filesystem::remove("test_logs");
     }
@@ -673,7 +672,7 @@ void InputStaticFileUnittest::TestGetFiles() {
         input.CreateMetricsRecordRef(InputStaticFile::sName, "1");
         APSARA_TEST_TRUE(input.Init(configJson, optionalGoPipeline));
         input.CommitMetricsRecordRef();
-        APSARA_TEST_EQUAL(2U, input.GetFiles().value().size());
+        APSARA_TEST_EQUAL(2U, input.GetFiles().size());
 
         filesystem::remove_all("test_logs");
     }
@@ -695,7 +694,7 @@ void InputStaticFileUnittest::TestGetFiles() {
         input.CreateMetricsRecordRef(InputStaticFile::sName, "1");
         APSARA_TEST_TRUE(input.Init(configJson, optionalGoPipeline));
         input.CommitMetricsRecordRef();
-        APSARA_TEST_EQUAL(1U, input.GetFiles().value().size());
+        APSARA_TEST_EQUAL(1U, input.GetFiles().size());
 
         filesystem::remove_all("test_logs");
     }
@@ -734,8 +733,7 @@ void InputStaticFileUnittest::TestDirectoryNameWithDot() {
         // Expected: Should find 2 files from app.v1 and app.v2 directories
         // If stem() was used, it would match "app" only and fail to match "app.v1" and "app.v2"
         auto files = input->GetFiles();
-        ASSERT_TRUE(files.has_value());
-        APSARA_TEST_EQUAL(2U, files->size());
+        APSARA_TEST_EQUAL(2U, files.size());
 
         filesystem::remove_all("test_logs");
     }
@@ -764,8 +762,7 @@ void InputStaticFileUnittest::TestDirectoryNameWithDot() {
         input->CommitMetricsRecordRef();
         // Expected: Should find 2 files from both release directories
         auto files = input->GetFiles();
-        ASSERT_TRUE(files.has_value());
-        APSARA_TEST_EQUAL(2U, files->size());
+        APSARA_TEST_EQUAL(2U, files.size());
 
         filesystem::remove_all("test_logs");
     }
@@ -791,8 +788,7 @@ void InputStaticFileUnittest::TestDirectoryNameWithDot() {
         input->CommitMetricsRecordRef();
         // Expected: Should find 1 file
         auto files = input->GetFiles();
-        ASSERT_TRUE(files.has_value());
-        APSARA_TEST_EQUAL(1U, files->size());
+        APSARA_TEST_EQUAL(1U, files.size());
 
         filesystem::remove_all("test_logs");
     }
@@ -808,88 +804,6 @@ UNIT_TEST_CASE(InputStaticFileUnittest, OnPipelineUpdate)
 UNIT_TEST_CASE(InputStaticFileUnittest, TestGetFiles)
 UNIT_TEST_CASE(InputStaticFileUnittest, TestDirectoryNameWithDot)
 UNIT_TEST_CASE(InputStaticFileUnittest, OnEnableContainerDiscovery)
-
-#if defined(__linux__)
-TEST_F(InputStaticFileUnittest, FailedScanDoesNotCreateOrReplaceTaskCheckpoint) {
-    const auto root = filesystem::absolute("p1_static_scan");
-    filesystem::create_directories(root / "child");
-    ofstream(root / "a.log") << "a";
-    ofstream(root / "b.log") << "b";
-    ofstream(root / ".hidden.log") << "hidden";
-    ofstream(root / "child/c.log") << "c";
-    Json::Value config;
-    config["FilePaths"].append((root / "**" / "*.log").string());
-    config["MaxDirSearchDepth"] = 2;
-    InputStaticFile input;
-    input.SetContext(ctx);
-    input.mIndex = 0;
-    input.CreateMetricsRecordRef(InputStaticFile::sName, "1");
-    Json::Value optionalGoPipeline;
-    ASSERT_TRUE(input.Init(config, optionalGoPipeline));
-    input.CommitMetricsRecordRef();
-    auto healthy = input.GetFiles();
-    ASSERT_TRUE(healthy.has_value());
-    ASSERT_EQ(4U, healthy->size());
-
-    const auto checkpoint = sManager->mCheckpointRootPath / "test_config@0.json";
-    ofstream(checkpoint) << "previous checkpoint";
-    for (const auto& failedDir : {root, root / "child"}) {
-        for (const auto& operation : {"open", "read", "close"}) {
-            ScopedDirErrorInjector fault(failedDir.string(), operation, EIO, 1);
-            EXPECT_FALSE(input.GetFiles().has_value()) << failedDir << operation;
-            EXPECT_TRUE(input.Start()) << failedDir << operation;
-            sServer->Stop();
-            EXPECT_TRUE(sManager->mInputCheckpointMap.empty());
-            EXPECT_TRUE(sServer->HasRegisteredPlugins());
-            EXPECT_EQ(1U, sServer->mPendingDiscoveries.size());
-            sServer->ClearUnusedCheckpoints();
-            string previous;
-            EXPECT_EQ(FileReadResult::kOK, ReadFileContent(checkpoint.string(), previous));
-            EXPECT_EQ("previous checkpoint", previous);
-        }
-    }
-    healthy = input.GetFiles();
-    ASSERT_TRUE(healthy.has_value());
-    EXPECT_EQ(4U, healthy->size());
-    sServer->mLastDiscoveryRetryTime = 0;
-    sServer->UpdateInputs();
-    EXPECT_TRUE(sServer->mPendingDiscoveries.empty());
-    ASSERT_EQ(1U, sManager->mInputCheckpointMap.size());
-    EXPECT_EQ(4U, sManager->mInputCheckpointMap.begin()->second.mFileCheckpoints.size());
-    input.Stop(true);
-    filesystem::remove_all(root);
-}
-
-TEST_F(InputStaticFileUnittest, WildcardScanFailureIsNotAnEmptyTask) {
-    const auto root = filesystem::absolute("p1_static_wildcard_scan");
-    filesystem::create_directories(root / "child");
-    ofstream(root / "child/a.log") << "a";
-    Json::Value config;
-    config["FilePaths"].append((root / "*" / "*.log").string());
-    InputStaticFile input;
-    input.SetContext(ctx);
-    input.CreateMetricsRecordRef(InputStaticFile::sName, "1");
-    Json::Value optionalGoPipeline;
-    ASSERT_TRUE(input.Init(config, optionalGoPipeline));
-    input.CommitMetricsRecordRef();
-    {
-        ScopedDirErrorInjector fault(root.string(), "close", EIO);
-        EXPECT_FALSE(input.GetFiles().has_value());
-        EXPECT_TRUE(input.Start());
-        sServer->Stop();
-        EXPECT_EQ(1U, sServer->mPendingDiscoveries.size());
-        input.Stop(true);
-    }
-    sServer->mLastDiscoveryRetryTime = 0;
-    sServer->UpdateInputs();
-    EXPECT_TRUE(sServer->mPendingDiscoveries.empty());
-    EXPECT_TRUE(sManager->mInputCheckpointMap.empty());
-    const auto healthy = input.GetFiles();
-    ASSERT_TRUE(healthy.has_value());
-    EXPECT_EQ(1U, healthy->size());
-    filesystem::remove_all(root);
-}
-#endif
 
 } // namespace logtail
 

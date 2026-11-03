@@ -631,7 +631,6 @@ private:
         uint32_t concurrency = 8;
     };
     std::shared_ptr<ExactlyOnceOption> mEOOption;
-    bool mPrimaryCheckpointValidationPending = false;
 
     // Select next checkpoint to recover from toReplayCheckpoints.
     // Called before read.
@@ -698,7 +697,7 @@ private:
     //  will be written before first read.
     //
     // By the way, if the v2 checkpoint is valid, set mLastFileSignatureSize/Hash.
-    bool validatePrimaryCheckpoint(const PrimaryCheckpointPB& cpt, bool* searchComplete = nullptr);
+    bool validatePrimaryCheckpoint(const PrimaryCheckpointPB& cpt);
 
     // Adjust parameters for first read by range checkpoints.
     //

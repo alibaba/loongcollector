@@ -17,7 +17,6 @@
 #include <cstdint>
 
 #include <filesystem>
-#include <optional>
 #include <string>
 #include <unordered_set>
 #include <vector>
@@ -235,9 +234,7 @@ public:
 
     std::string GetUserNameByUid(uid_t uid);
 
-    // nullopt means the process snapshot is incomplete; an empty set is a
-    // successful scan and may be used to remove processes that really exited.
-    std::optional<std::unordered_set<int>> GetAllPids();
+    std::unordered_set<int> GetAllPids();
 
 private:
     std::filesystem::path procPidPath(uint32_t pid, const std::string& subpath) const;

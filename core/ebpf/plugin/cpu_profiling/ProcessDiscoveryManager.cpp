@@ -95,40 +95,32 @@ void ProcessDiscoveryManager::run() {
         return;
     }
     while (mRunning) {
-        discover();
+        auto pidsUnorder = mProcParser->GetAllPids();
+        std::vector<uint32_t> pids(pidsUnorder.begin(), pidsUnorder.end());
+        std::sort(pids.begin(), pids.end());
+
+        std::vector<DiscoverEntry> result;
+        size_t pidMatchCacheSize = 0;
+
+        {
+            std::lock_guard<std::mutex> guard(mLock);
+
+            for (auto& [_, state] : mStates) {
+                state.FindAllMatch(pids, *mProcParser, result, mIsContainerMode);
+                pidMatchCacheSize += state.mPidMatchCache.size();
+            }
+        }
+
+        if (mStatsCallback) {
+            mStatsCallback(pidMatchCacheSize);
+        }
+
+        if (!result.empty()) {
+            mCallback(std::move(result));
+        }
 
         std::unique_lock<std::mutex> cvLock(mSleepCvMutex);
         mSleepCv.wait_for(cvLock, std::chrono::milliseconds(mSleepMilliseconds), [this]() { return !mRunning.load(); });
-    }
-}
-
-void ProcessDiscoveryManager::discover() {
-    auto snapshot = mProcParser->GetAllPids();
-    if (!snapshot) {
-        return;
-    }
-    const auto& pidsUnorder = *snapshot;
-    std::vector<uint32_t> pids(pidsUnorder.begin(), pidsUnorder.end());
-    std::sort(pids.begin(), pids.end());
-
-    std::vector<DiscoverEntry> result;
-    size_t pidMatchCacheSize = 0;
-
-    {
-        std::lock_guard<std::mutex> guard(mLock);
-
-        for (auto& [_, state] : mStates) {
-            state.FindAllMatch(pids, *mProcParser, result, mIsContainerMode);
-            pidMatchCacheSize += state.mPidMatchCache.size();
-        }
-    }
-
-    if (mStatsCallback) {
-        mStatsCallback(pidMatchCacheSize);
-    }
-
-    if (!result.empty()) {
-        mCallback(std::move(result));
     }
 }
 

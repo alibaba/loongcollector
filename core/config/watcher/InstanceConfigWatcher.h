@@ -37,7 +37,6 @@ public:
 
 #ifdef APSARA_UNIT_TEST_MAIN
     void SetInstanceConfigManager(const InstanceConfigManager* m) { mInstanceConfigManager = m; }
-    void SetForceEntryStatusError(bool enabled) { mForceEntryStatusError = enabled; }
 #endif
 
 private:
@@ -45,9 +44,6 @@ private:
     ~InstanceConfigWatcher() = default;
 
     const InstanceConfigManager* mInstanceConfigManager = nullptr;
-#ifdef APSARA_UNIT_TEST_MAIN
-    bool mForceEntryStatusError = false;
-#endif
 };
 
 } // namespace logtail

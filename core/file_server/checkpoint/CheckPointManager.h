@@ -190,7 +190,7 @@ public:
 //  checkpoint_find_max_file_count.
 //
 // @cache [out]: cache iterated files if not nullptr.
-// @searchTruncated [out]: true when a limit or I/O error makes the search incomplete.
+// @searchTruncated [out]: set to true if the file-count limit stops the scan.
 //
 // @return the path of the file with devInode if find.
 boost::optional<std::string> SearchFilePathByDevInodeInDirectory(const std::string& dirPath,
@@ -202,20 +202,5 @@ boost::optional<std::string> SearchFilePathByDevInodeInDirectory(const std::stri
                                                                  const DevInode& devInode,
                                                                  std::map<DevInode, SplitedFilePath>* cache,
                                                                  bool* searchTruncated);
-
-enum class DirectorySearchStatus { kComplete, kTruncated, kFailed };
-
-struct [[nodiscard]] DirectorySearchResult {
-    boost::optional<std::string> path;
-    DirectorySearchStatus status = DirectorySearchStatus::kComplete;
-};
-
-// kComplete means the target was found or the configured search was exhausted.
-// A missing target can be used for deletion only when status is kComplete.
-[[nodiscard]] DirectorySearchResult
-SearchFilePathByDevInodeInDirectoryChecked(const std::string& dirPath,
-                                           uint16_t searchDepth,
-                                           const DevInode& devInode,
-                                           std::map<DevInode, SplitedFilePath>* cache);
 
 } // namespace logtail
