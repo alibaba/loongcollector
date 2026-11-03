@@ -23,6 +23,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
@@ -124,6 +125,44 @@ func TestSlsFlusher_ExportConvertsLogEvent(t *testing.T) {
 		}
 	}
 	assert.True(t, found, "converted log should preserve the index key/value")
+}
+
+func TestSlsFlusher_ExportPreservesReservedTopic(t *testing.T) {
+	tests := []struct {
+		name string
+		tags map[string]string
+	}{
+		{name: "absent topic", tags: map[string]string{"host": "h1"}},
+		{name: "empty topic", tags: map[string]string{"__topic__": "", "host": "h1"}},
+		{name: "nonempty topic", tags: map[string]string{"__topic__": "access", "host": "h1"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			log := models.NewLog("", []byte("body"), "", "", "", models.NewTags(), 100)
+			group := models.NewGroup(models.NewMetadata(), models.NewTagsWithMap(tt.tags))
+			incoming, err := helper.TransferPipelineEventGroupToPB(group, []models.PipelineEvent{log})
+			require.NoError(t, err)
+			// Use the same conversion as the v2 runner before exporting back to C++.
+			converted, err := helper.TransferPBToPipelineGroupEvents(incoming)
+			require.NoError(t, err)
+			flusher, captured := newTestFlusher(false)
+			require.NoError(t, flusher.Export([]*models.PipelineGroupEvents{converted}, nil))
+			require.Equal(t, 1, captured.pegCalls)
+			assert.Zero(t, captured.legacyCalls)
+
+			var outgoing protocol.PipelineEventGroup
+			require.NoError(t, outgoing.Unmarshal(captured.pbBuffer))
+			tags := make(map[string]string)
+			for k, v := range outgoing.Tags {
+				tags[k] = string(v)
+			}
+			assert.Equal(t, tt.tags, tags)
+			assert.NotContains(t, outgoing.Tags, "__tag__:__topic__")
+			require.NotNil(t, outgoing.GetLogs())
+			require.Len(t, outgoing.GetLogs().Events, 1)
+			assert.Equal(t, incoming.GetLogs(), outgoing.GetLogs())
+		})
+	}
 }
 
 // TestSlsFlusher_ExportPassesThroughMetric verifies Metric events are not dropped
