@@ -14,8 +14,14 @@
  * limitations under the License.
  */
 
+#include <cerrno>
+
 #include <fstream>
 #include <string>
+
+#if defined(__linux__)
+#include <unistd.h>
+#endif
 
 #include "boost/format.hpp"
 
@@ -127,7 +133,185 @@ TEST_F(FileSystemUtilUnittest, TestDirNormal) {
     }
     EXPECT_EQ(subFiles, filesFind);
     EXPECT_EQ(subDirs, dirsFind);
+    EXPECT_EQ(0, rootDir.GetLastErrorCode());
+    EXPECT_TRUE(rootDir.Close());
+    EXPECT_EQ(0, rootDir.GetLastErrorCode());
 }
+
+TEST_F(FileSystemUtilUnittest, TestDirEmptyWithStaleError) {
+    fsutil::Dir dir(mTestRoot.string());
+    ASSERT_TRUE(dir.Open());
+#if defined(__linux__)
+    errno = EIO;
+#elif defined(_MSC_VER)
+    SetLastError(ERROR_ACCESS_DENIED);
+#endif
+    EXPECT_FALSE(dir.ReadNext(false));
+    EXPECT_EQ(0, dir.GetLastErrorCode());
+    EXPECT_TRUE(dir.Close());
+    EXPECT_EQ(0, dir.GetLastErrorCode());
+}
+
+TEST_F(FileSystemUtilUnittest, TestDirReadBeforeOpen) {
+    fsutil::Dir dir(mTestRoot.string());
+    EXPECT_FALSE(dir.ReadNext());
+#if defined(__linux__)
+    EXPECT_EQ(EBADF, dir.GetLastErrorCode());
+#elif defined(_MSC_VER)
+    EXPECT_EQ(ERROR_INVALID_HANDLE, dir.GetLastErrorCode());
+#endif
+    EXPECT_TRUE(dir.Close());
+    EXPECT_NE(0, dir.GetLastErrorCode());
+    ASSERT_TRUE(dir.Open());
+    EXPECT_FALSE(dir.ReadNext());
+    EXPECT_EQ(0, dir.GetLastErrorCode());
+    EXPECT_TRUE(dir.Close());
+}
+
+TEST_F(FileSystemUtilUnittest, TestDirOpenFailureAndRecovery) {
+    auto path = mTestRoot / "missing";
+    fsutil::Dir dir(path.string());
+    EXPECT_FALSE(dir.Open());
+    auto error = dir.GetLastErrorCode();
+    EXPECT_TRUE(fsutil::Dir::IsENOENT(error));
+    EXPECT_FALSE(dir.ReadNext());
+    EXPECT_TRUE(dir.Close());
+    EXPECT_EQ(error, dir.GetLastErrorCode());
+
+    ASSERT_TRUE(bfs::create_directory(path));
+    ASSERT_TRUE(dir.Open());
+    EXPECT_EQ(0, dir.GetLastErrorCode());
+    EXPECT_FALSE(dir.ReadNext());
+    EXPECT_EQ(0, dir.GetLastErrorCode());
+    EXPECT_TRUE(dir.Close());
+}
+
+TEST_F(FileSystemUtilUnittest, TestDirOpenRegularFile) {
+    auto path = mTestRoot / "file";
+    { std::ofstream file(path.string()); }
+    fsutil::Dir dir(path.string());
+    EXPECT_FALSE(dir.Open());
+    EXPECT_NE(0, dir.GetLastErrorCode());
+    auto error = dir.GetLastErrorCode();
+    EXPECT_TRUE(dir.Close());
+    EXPECT_EQ(error, dir.GetLastErrorCode());
+}
+
+TEST_F(FileSystemUtilUnittest, TestDirCloseAndReopen) {
+    { std::ofstream file((mTestRoot / "file").string()); }
+    fsutil::Dir dir(mTestRoot.string());
+    EXPECT_TRUE(dir.Close());
+    ASSERT_TRUE(dir.Open());
+    EXPECT_TRUE(dir.Close());
+    EXPECT_TRUE(dir.Close());
+
+    ASSERT_TRUE(dir.Open());
+    auto entry = dir.ReadNext(false);
+    ASSERT_TRUE(entry);
+    EXPECT_EQ("file", entry.Name());
+    EXPECT_FALSE(dir.ReadNext(false));
+    EXPECT_EQ(0, dir.GetLastErrorCode());
+    EXPECT_TRUE(dir.Close());
+    EXPECT_TRUE(dir.Close());
+    EXPECT_EQ(0, dir.GetLastErrorCode());
+}
+
+#if defined(__linux__)
+TEST_F(FileSystemUtilUnittest, TestDirDanglingSymbolicDoesNotFailScan) {
+    bfs::create_symlink(mTestRoot / "missing", mTestRoot / "link");
+    fsutil::Dir dir(mTestRoot.string());
+    ASSERT_TRUE(dir.Open());
+    auto entry = dir.ReadNext();
+    ASSERT_TRUE(entry);
+    EXPECT_TRUE(entry.IsSymbolic());
+    EXPECT_FALSE(entry.IsDir());
+    EXPECT_FALSE(entry.IsRegFile());
+    // stat fails for the dangling link, but the directory scan itself is clean.
+    EXPECT_FALSE(dir.ReadNext());
+    EXPECT_EQ(0, dir.GetLastErrorCode());
+    EXPECT_TRUE(dir.Close());
+}
+
+TEST_F(FileSystemUtilUnittest, TestDirReadFailure) {
+    fsutil::Dir dir(mTestRoot.string());
+    ASSERT_TRUE(dir.Open());
+    // Force a real readdir failure before its first buffer is filled.
+    ASSERT_EQ(0, close(dirfd(dir.mDir)));
+    EXPECT_FALSE(dir.ReadNext(false));
+    EXPECT_EQ(EBADF, dir.GetLastErrorCode());
+    EXPECT_FALSE(dir.ReadNext(false));
+    EXPECT_EQ(EBADF, dir.GetLastErrorCode());
+    EXPECT_FALSE(dir.Close());
+    EXPECT_EQ(EBADF, dir.GetLastErrorCode());
+    EXPECT_TRUE(dir.Close());
+    EXPECT_EQ(EBADF, dir.GetLastErrorCode());
+}
+
+TEST_F(FileSystemUtilUnittest, TestDirPartialReadFailure) {
+    { std::ofstream file((mTestRoot / "file1").string()); }
+    { std::ofstream file((mTestRoot / "file2").string()); }
+    fsutil::Dir dir(mTestRoot.string());
+    ASSERT_TRUE(dir.Open());
+    ASSERT_TRUE(dir.ReadNext(false));
+    EXPECT_EQ(0, dir.GetLastErrorCode());
+
+    ASSERT_EQ(0, close(dirfd(dir.mDir)));
+    // Drain any entries already buffered by libc, then fail on the next refill.
+    while (dir.ReadNext(false)) {
+    }
+    EXPECT_EQ(EBADF, dir.GetLastErrorCode());
+    EXPECT_FALSE(dir.Close());
+    EXPECT_EQ(EBADF, dir.GetLastErrorCode());
+
+    ASSERT_TRUE(dir.Open());
+    EXPECT_EQ(0, dir.GetLastErrorCode());
+    size_t count = 0;
+    while (dir.ReadNext(false)) {
+        ++count;
+    }
+    EXPECT_EQ(2U, count);
+    EXPECT_EQ(0, dir.GetLastErrorCode());
+    EXPECT_TRUE(dir.Close());
+}
+
+TEST_F(FileSystemUtilUnittest, TestDirReadErrorSurvivesSuccessfulClose) {
+    fsutil::Dir dir(mTestRoot.string());
+    ASSERT_TRUE(dir.Open());
+    auto fd = dirfd(dir.mDir);
+    auto backupFd = dup(fd);
+    ASSERT_GE(backupFd, 0);
+    ASSERT_EQ(0, close(fd));
+    EXPECT_FALSE(dir.ReadNext(false));
+    EXPECT_EQ(EBADF, dir.GetLastErrorCode());
+    // Restore the descriptor so Close succeeds without erasing the scan error.
+    EXPECT_EQ(fd, dup2(backupFd, fd));
+    EXPECT_EQ(0, close(backupFd));
+    EXPECT_TRUE(dir.Open());
+    EXPECT_FALSE(dir.ReadNext(false));
+    EXPECT_EQ(EBADF, dir.GetLastErrorCode());
+    EXPECT_TRUE(dir.Close());
+    EXPECT_EQ(EBADF, dir.GetLastErrorCode());
+}
+
+TEST_F(FileSystemUtilUnittest, TestDirCloseFailure) {
+    fsutil::Dir dir(mTestRoot.string());
+    ASSERT_TRUE(dir.Open());
+    EXPECT_FALSE(dir.ReadNext(false));
+    EXPECT_EQ(0, dir.GetLastErrorCode());
+    ASSERT_EQ(0, close(dirfd(dir.mDir)));
+    EXPECT_FALSE(dir.Close());
+    EXPECT_EQ(EBADF, dir.GetLastErrorCode());
+    // closedir has consumed the stream; neither Close nor destruction may retry.
+    EXPECT_EQ(nullptr, dir.mDir);
+    EXPECT_TRUE(dir.Close());
+    EXPECT_EQ(EBADF, dir.GetLastErrorCode());
+
+    ASSERT_TRUE(dir.Open());
+    EXPECT_FALSE(dir.ReadNext(false));
+    EXPECT_EQ(0, dir.GetLastErrorCode());
+    EXPECT_TRUE(dir.Close());
+}
+#endif
 
 #ifndef _MSC_VER
 TEST_F(FileSystemUtilUnittest, TestDirSymbolic) {
