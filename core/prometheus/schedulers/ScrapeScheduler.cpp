@@ -204,6 +204,7 @@ std::unique_ptr<TimerEvent> ScrapeScheduler::BuildScrapeTimerEvent(std::chrono::
         this->mIsContextValidFuture,
         mScrapeConfigPtr->mFollowRedirects,
         mScrapeConfigPtr->mEnableTLS ? std::optional<CurlTLS>(mScrapeConfigPtr->mTLS) : std::nullopt);
+    request->mUnixSocketPath = mTargetInfo.mLabels.Get(prometheus::UNIX_SOCKET_LABEL_NAME);
 
     auto timerEvent = std::make_unique<HttpRequestTimerEvent>(execTime, std::move(request));
     return timerEvent;

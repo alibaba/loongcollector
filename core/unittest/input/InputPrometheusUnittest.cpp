@@ -49,6 +49,18 @@ protected:
         p.mName = "test_config";
         ctx.SetConfigName("test_config");
         ctx.SetPipeline(p);
+        PrometheusInputRunner::GetInstance()->mHttpRequestSender
+            = [](unique_ptr<HttpRequest>&&, HttpResponse& response) {
+                  response.SetStatusCode(200);
+                  return true;
+              };
+    }
+    void TearDown() override {
+        auto runner = PrometheusInputRunner::GetInstance();
+        runner->Stop();
+        if (runner->mThreadRes.valid()) {
+            runner->mThreadRes.wait();
+        }
     }
     static void TearDownTestCase() { PluginRegistry::GetInstance()->UnloadPlugins(); }
 

@@ -226,6 +226,11 @@ func TransferPBToLogGroupForV1(src *protocol.PipelineEventGroup) (logGroup *prot
 		LogTags: make([]*protocol.LogTag, 0, len(src.Tags)),
 	}
 	for k, v := range src.Tags {
+		if k == "__topic__" {
+			// Match the native pipeline's reserved topic handling.
+			logGroup.Topic = string(v)
+			continue
+		}
 		logGroup.LogTags = append(logGroup.LogTags, &protocol.LogTag{
 			Key:   k,
 			Value: string(v),

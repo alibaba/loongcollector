@@ -17,11 +17,18 @@
 #pragma once
 
 #include <cstdint>
+#include <json/json.h>
 
+#include <atomic>
+#include <chrono>
+#include <functional>
+#include <map>
 #include <memory>
+#include <mutex>
 #include <string>
 
 #include "common/Lock.h"
+#include "common/http/HttpRequest.h"
 #include "common/http/HttpResponse.h"
 #include "common/timer/Timer.h"
 #include "monitor/metric_models/MetricTypes.h"
@@ -30,13 +37,26 @@
 
 namespace logtail {
 
+struct PrometheusAgentInfo {
+    float mCpuLimit = 0;
+    double mCpuUsage = 0;
+    int64_t mMemLimit = 0;
+    double mMemUsage = 0;
+    uint64_t mLoad = 0;
+    uint64_t mScrapeDelaySeconds = 0;
+    uint64_t mHttpSinkInItemsTotal = 0;
+    uint64_t mHttpSinkOutFailed = 0;
+
+    Json::Value ToJson() const;
+};
+
 class PrometheusInputRunner : public InputRunner {
 public:
     PrometheusInputRunner(const PrometheusInputRunner&) = delete;
     PrometheusInputRunner(PrometheusInputRunner&&) = delete;
     PrometheusInputRunner& operator=(const PrometheusInputRunner&) = delete;
     PrometheusInputRunner& operator=(PrometheusInputRunner&&) = delete;
-    ~PrometheusInputRunner() override = default;
+    ~PrometheusInputRunner() override;
     static PrometheusInputRunner* GetInstance() {
         static PrometheusInputRunner sInstance;
         return &sInstance;
@@ -54,9 +74,35 @@ public:
     bool HasRegisteredPlugins() const override;
     void EventGC() override;
 
+    PrometheusAgentInfo GetAgentInfoSnapshot() const;
+
 private:
+    enum class HeartbeatResult { Success, NotRegistered, Failed };
+
+    struct StopToken {
+        std::atomic_bool mStopped = false;
+        std::mutex mRequestMutex;
+    };
+
+    using HttpRequestSender = std::function<bool(std::unique_ptr<HttpRequest>&&, HttpResponse&)>;
+
     PrometheusInputRunner();
-    HttpResponse SendRegisterMessage(const std::string& url) const;
+    void RunRegistrationAndHeartbeat(const std::shared_ptr<StopToken>& stop);
+    void OnInitialRegistration(const HttpResponse& response);
+    std::chrono::steady_clock::time_point SteadyNow() const;
+    void SleepFor(std::chrono::steady_clock::duration interval) const;
+    HttpResponse SendOperatorRequest(const std::string& method,
+                                     const std::string& url,
+                                     const std::string& query,
+                                     const std::map<std::string, std::string>& headers,
+                                     const std::string& body,
+                                     uint32_t timeout,
+                                     uint32_t maxTryCnt
+                                     = static_cast<uint32_t>(INT32_FLAG(default_http_request_max_try_cnt)),
+                                     const std::shared_ptr<StopToken>& stop = nullptr) const;
+    HttpResponse SendRegisterMessage(const std::string& url, const std::shared_ptr<StopToken>& stop = nullptr) const;
+    HeartbeatResult SendHeartbeat(const std::shared_ptr<StopToken>& stop = nullptr);
+    PrometheusAgentInfo RefreshAgentInfoSnapshot();
 
     void CancelAllTargetSubscriber();
     void SubscribeOnce();
@@ -66,10 +112,10 @@ private:
     bool mIsStarted = false;
     std::mutex mStartMutex;
 
-    std::mutex mRegisterMutex;
-    std::atomic<bool> mIsThreadRunning = true;
+    std::shared_ptr<StopToken> mStopToken;
     std::future<void> mThreadRes;
 
+    HttpRequestSender mHttpRequestSender;
     std::string mServiceHost;
     int32_t mServicePort;
     std::string mPodName;
@@ -78,6 +124,9 @@ private:
 
     mutable ReadWriteLock mSubscriberMapRWLock;
     std::map<std::string, std::shared_ptr<TargetSubscriberScheduler>> mTargetSubscriberSchedulerMap;
+
+    mutable ReadWriteLock mAgentInfoRWLock;
+    PrometheusAgentInfo mAgentInfoSnapshot;
 
     std::atomic<uint64_t> mUnRegisterMs;
 
@@ -90,7 +139,10 @@ private:
     IntGaugePtr mPromJobNum;
 
 #ifdef APSARA_UNIT_TEST_MAIN
+    std::function<std::chrono::steady_clock::time_point()> mSteadyNow;
+    std::function<void(std::chrono::steady_clock::duration)> mSleepFor;
     friend class PrometheusInputRunnerUnittest;
+    friend class TargetSubscriberSchedulerUnittest;
     friend class InputPrometheusUnittest;
 
 #endif
