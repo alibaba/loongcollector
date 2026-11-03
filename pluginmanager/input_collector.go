@@ -29,7 +29,10 @@ import (
 
 // inputCollector adapts the public Collector API at the input boundary. It emits
 // native events directly; no LogGroup or second runner is constructed.
-type inputCollector struct{ context pipeline.PipelineContext }
+type inputCollector struct {
+	context    pipeline.PipelineContext
+	configTags map[string]string
+}
 
 func (c *inputCollector) group(ctx map[string]interface{}) *models.GroupInfo {
 	group := models.NewGroup(models.NewMetadata(), models.NewTags())
@@ -58,8 +61,14 @@ func (c *inputCollector) AddDataWithContext(tags, fields map[string]string, ctx 
 		ts = t[0]
 	}
 	log := &models.Log{Timestamp: uint64(ts.UnixNano()), Tags: models.NewTags(), Contents: models.NewLogContents()}
+	// Collector tags have always been per-log fields (CreateLog semantics).
+	// Keep them in Contents so processors and wire outputs retain these fields;
+	// native event tags and group tags keep their separate meanings.
+	for key, value := range c.configTags {
+		log.Contents.Add(key, value)
+	}
 	for key, value := range tags {
-		log.Tags.Add(key, value)
+		log.Contents.Add(key, value)
 	}
 	for key, value := range fields {
 		if key == contentKey {

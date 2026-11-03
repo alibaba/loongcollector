@@ -27,6 +27,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
+	converter "github.com/alibaba/ilogtail/pkg/protocol/converter"
 )
 
 func TestDefaultEventPipeline(t *testing.T) {
@@ -73,7 +74,7 @@ func TestCollectorInputEmitsNamedContents(t *testing.T) {
 	group := <-ctx.Collector().Observe()
 	log := group.Events[0].(*models.Log)
 	require.Equal(t, "named", log.Contents.Get("field"))
-	require.Equal(t, "value", log.Tags.Get("tag"))
+	require.Equal(t, "value", log.Contents.Get("tag"))
 	require.Equal(t, []byte("body"), log.GetBody())
 	require.Equal(t, uint64(10000000020), log.Timestamp)
 }
@@ -171,4 +172,39 @@ func TestNativeInputPreservesNamedFieldsAndContentTags(t *testing.T) {
 	require.Equal(t, []byte("body"), log.GetBody())
 	require.Equal(t, "/logs/app.log", log.Contents.Get("__tag__:path"))
 	require.Equal(t, "pack", group.Group.Metadata.Get("source"))
+}
+
+// Both Collector entry points must preserve fields before processors run and
+// after conversion to the LogGroup wire protocol used by existing flushers.
+func TestCollectorTagsRemainLogFields(t *testing.T) {
+	for _, array := range []bool{false, true} {
+		t.Run(fmt.Sprintf("array=%t", array), func(t *testing.T) {
+			output := helper.NewObservePipelineContext(1)
+			collector := &inputCollector{context: output, configTags: map[string]string{"configured": "value"}}
+			tags := map[string]string{"_method_": "GET", "_image_name_": "example-container:latest"}
+			ctx := map[string]interface{}{"source": "container", "tags": []*protocol.LogTag{{Key: "group", Value: "tag"}}}
+			if array {
+				collector.AddDataArrayWithContext(tags, []string{"content", "field"}, []string{"body", "value"}, ctx, time.Unix(10, 20))
+			} else {
+				collector.AddDataWithContext(tags, map[string]string{"content": "body", "field": "value"}, ctx, time.Unix(10, 20))
+			}
+			group := <-output.Collector().Observe()
+			log := group.Events[0].(*models.Log)
+			require.Equal(t, "GET", log.Contents.Get("_method_"))
+			require.Equal(t, "example-container:latest", log.Contents.Get("_image_name_"))
+			require.Equal(t, "value", log.Contents.Get("configured"))
+			require.Zero(t, log.Tags.Len())
+			require.Equal(t, "tag", group.Group.Tags.Get("group"))
+			wire, err := converter.PipelineGroupEventsToLogGroup(group)
+			require.NoError(t, err)
+			fields := make(map[string]string)
+			for _, field := range wire.Logs[0].Contents {
+				fields[field.Key] = field.Value
+			}
+			require.Equal(t, "GET", fields["_method_"])
+			require.Equal(t, "example-container:latest", fields["_image_name_"])
+			require.Equal(t, "value", fields["configured"])
+			require.Equal(t, "body", fields["content"])
+		})
+	}
 }
