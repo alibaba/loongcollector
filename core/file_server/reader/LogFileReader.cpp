@@ -52,6 +52,7 @@
 #include "file_server/FileServer.h"
 #include "file_server/checkpoint/CheckPointManager.h"
 #include "file_server/checkpoint/CheckpointManagerV2.h"
+#include "file_server/checkpoint/FileSystemUuid.h"
 #include "file_server/event/BlockEventManager.h"
 #include "file_server/event_handler/LogInput.h"
 #include "file_server/reader/GloablFileDescriptorManager.h"
@@ -376,6 +377,7 @@ void LogFileReader::DumpMetaToMem(bool checkConfigFlag, int32_t idxInReaderArray
     checkPointPtr->mLastUpdateTime = mLastEventTime;
     checkPointPtr->mCache = mCache;
     checkPointPtr->mIdxInReaderArray = idxInReaderArray;
+    checkPointPtr->mFsUuid = GetFileSystemUuid(mDevInode.dev);
     CheckPointManager::Instance()->AddCheckPoint(checkPointPtr);
 }
 
@@ -408,7 +410,27 @@ void LogFileReader::InitReader(bool tailExisted, FileReadPolicy policy, uint32_t
         static CheckPointManager* checkPointManagerPtr = CheckPointManager::Instance();
         // hold on checkPoint share ptr, so this check point will not be delete in this block
         CheckPointPtr checkPointSharePtr;
-        if (checkPointManagerPtr->GetCheckPoint(mDevInode, GetConfigName(), checkPointSharePtr)) {
+        bool foundCheckpoint = checkPointManagerPtr->GetCheckPoint(mDevInode, GetConfigName(), checkPointSharePtr);
+        DevInode checkpointDev = mDevInode;
+        if (!foundCheckpoint) {
+            const std::string fsUuid = GetFileSystemUuid(mDevInode.dev);
+            if (!fsUuid.empty()
+                && checkPointManagerPtr->GetCheckPointByFsUuid(
+                    fsUuid, mDevInode.inode, GetConfigName(), checkPointSharePtr)
+                && checkPointSharePtr->mSignatureSize > 0
+                && CheckFileSignature(
+                    mHostLogPath, checkPointSharePtr->mSignatureHash, checkPointSharePtr->mSignatureSize)) {
+                foundCheckpoint = true;
+                checkpointDev = checkPointSharePtr->mDevInode;
+                LOG_INFO(sLogger,
+                         ("recover checkpoint by filesystem uuid", mHostLogPath)("config", GetConfigName())(
+                             "old dev", ToString(checkpointDev.dev))("new dev", ToString(mDevInode.dev))(
+                             "inode", ToString(mDevInode.inode))("fs uuid", fsUuid));
+            } else {
+                checkPointSharePtr.reset();
+            }
+        }
+        if (foundCheckpoint) {
             CheckPoint* checkPointPtr = checkPointSharePtr.get();
             mLastFilePos = checkPointPtr->mOffset;
             mLastForceRead = checkPointPtr->mLastForceRead;
@@ -447,8 +469,8 @@ void LogFileReader::InitReader(bool tailExisted, FileReadPolicy policy, uint32_t
                          "real file path", mRealLogPath)("last file position", mLastFilePos)(
                          "index in reader array", mIdxInReaderArrayFromLastCpt)("container id", mContainerID)(
                          "container stop", mContainerStopped)("skipFirstModify", mSkipFirstModify));
-            // delete checkpoint at last
-            checkPointManagerPtr->DeleteCheckPoint(mDevInode, GetConfigName());
+            // delete checkpoint at last. UUID recovery is stored under the previous device number.
+            checkPointManagerPtr->DeleteCheckPoint(checkpointDev, GetConfigName());
             // because the reader is initialized by checkpoint, so set first watch to false
             mFirstWatched = false;
         }
@@ -506,6 +528,20 @@ void LogFileReader::initExactlyOnce(uint32_t concurrency) {
             std::vector<std::string> rangeCptKeys;
             CheckpointManagerV2::AppendRangeKeys(primaryCptKey, concurrency, rangeCptKeys);
             sCptM->DeleteCheckpoints(rangeCptKeys);
+        } else {
+            bool identityChanged = false;
+            if (primaryCpt.dev() != mDevInode.dev) {
+                primaryCpt.set_dev(mDevInode.dev);
+                identityChanged = true;
+            }
+            const std::string fsUuid = GetFileSystemUuid(mDevInode.dev);
+            if (!fsUuid.empty() && primaryCpt.fs_uuid() != fsUuid) {
+                primaryCpt.set_fs_uuid(fsUuid);
+                identityChanged = true;
+            }
+            if (identityChanged) {
+                detail::updatePrimaryCheckpoint(primaryCptKey, primaryCpt, "dev");
+            }
         }
     }
     mEOOption->concurrency = hasCheckpoint ? primaryCpt.concurrency() : concurrency;
@@ -518,6 +554,10 @@ void LogFileReader::initExactlyOnce(uint32_t concurrency) {
         primaryCpt.set_real_path(mRealLogPath.empty() ? mHostLogPath : mRealLogPath);
         primaryCpt.set_dev(mDevInode.dev);
         primaryCpt.set_inode(mDevInode.inode);
+        const std::string fsUuid = GetFileSystemUuid(mDevInode.dev);
+        if (!fsUuid.empty()) {
+            primaryCpt.set_fs_uuid(fsUuid);
+        }
         detail::updatePrimaryCheckpoint(mEOOption->primaryCheckpointKey, primaryCpt, "all (new)");
     }
     mEOOption->primaryCheckpoint.Swap(&primaryCpt);
@@ -588,15 +628,30 @@ bool LogFileReader::validatePrimaryCheckpoint(const PrimaryCheckpointPB& cpt) {
 
             auto dirPath = boost::filesystem::path(filePath).parent_path();
             const auto searchResult = SearchFilePathByDevInodeInDirectory(dirPath.string(), 0, mDevInode, nullptr);
-            if (!searchResult) {
-                LOG_WARNING(sLogger, METHOD_LOG_PATTERN("can not find file with dev inode", mDevInode.inode));
-                return false;
+            if (searchResult) {
+                const auto& newFilePath = searchResult.value();
+                LOG_INFO(sLogger,
+                         METHOD_LOG_PATTERN("file has been rotated from", "")("from", filePath)("to", newFilePath));
+                filePath = newFilePath;
+                return true;
             }
-            const auto& newFilePath = searchResult.value();
-            LOG_INFO(sLogger,
-                     METHOD_LOG_PATTERN("file has been rotated from", "")("from", filePath)("to", newFilePath));
-            filePath = newFilePath;
-            return true;
+            if (cpt.has_fs_uuid() && !cpt.fs_uuid().empty()) {
+                DevInode matched;
+                const uint64_t inode = cpt.has_inode() ? cpt.inode() : mDevInode.inode;
+                auto const uuidSearch
+                    = SearchFilePathByInodeAndFsUuid(dirPath.string(), 0, inode, cpt.fs_uuid(), &matched);
+                if (!uuidSearch) {
+                    LOG_WARNING(sLogger, METHOD_LOG_PATTERN("can not find file with fs uuid", cpt.fs_uuid()));
+                    return false;
+                }
+                LOG_INFO(sLogger,
+                         METHOD_LOG_PATTERN("file has been rotated from", "")("from", filePath)("to",
+                                                                                                uuidSearch.value()));
+                filePath = uuidSearch.value();
+                return true;
+            }
+            LOG_WARNING(sLogger, METHOD_LOG_PATTERN("can not find file with dev inode", mDevInode.inode));
+            return false;
         };
         if (CheckFileSignature(filePath, sigHash, sigSize)
             || (hasFileBeenRotated() && CheckFileSignature(filePath, sigHash, sigSize))) {
