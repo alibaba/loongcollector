@@ -216,17 +216,28 @@ public:
     // @param resolveWithStat: if true, use stat to check entry type when the entry
     //   type from filesystem directory iteration API is not FILE or DIR,
     //   eg. LNK type under Linux.
-    // @return: the entry of the file. If it is sure that we reached the end, an
-    //   'false' entry will be returned. Otherwise, we will use UNKNOWN type entry
-    //   to indicate some errors, it is caller's job to handle this (eg. skip it).
-    // TODO: Most error happened when the entry is symbolic, maybe we can ignore
-    //   this and let caller to call something else to deal it.
+    // @return: an entry, or a 'false' entry on end of directory or a scan error.
+    //   Check GetLastErrorCode() to distinguish a scan error from normal end.
+    //   Errors resolving an individual entry's type still return UNKNOWN entries.
+    //   After a scan error, further reads return a 'false' entry until the directory
+    //   is closed and reopened.
     Entry ReadNext(bool resolveWithStat = true);
 
-    void Close();
+    // Close explicitly to check for errors before committing a directory snapshot.
+    // The return value describes closing only; GetLastErrorCode() also retains
+    // errors from opening or reading the directory.
+    // An already closed directory returns true. The handle is invalidated even if
+    // closing fails, so neither a second Close() nor the destructor retries it.
+    bool Close();
+
+    // Native error code from the last failed operation, or zero for a clean scan.
+    // Successful reads and Close() preserve errors. A new Open() attempt on a
+    // closed directory resets the error before trying to open it.
+    int GetLastErrorCode() const { return mLastErrorCode; }
 
 private:
     std::string mDirPath;
+    int mLastErrorCode = 0;
 #if defined(__linux__)
     DIR* mDir;
 #elif defined(_MSC_VER)
