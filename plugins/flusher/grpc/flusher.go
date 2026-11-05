@@ -131,14 +131,14 @@ func (f *Flusher) flushLogGroups(logGroupList []*protocol.LogGroup) error {
 // require a new gRPC service, which is out of the flusher Export scope.
 func (f *Flusher) Export(groups []*models.PipelineGroupEvents, _ pipeline.PipelineContext) error {
 	for _, groupEvents := range groups {
-		logGroup, err := converter.PipelineGroupEventsToLogGroup(groupEvents)
+		logGroups, err := converter.PipelineGroupEventsToLogGroups(groupEvents)
 		if err != nil {
 			return err
 		}
-		if logGroup == nil || len(logGroup.Logs) == 0 {
+		if len(logGroups) == 0 {
 			continue
 		}
-		if err := f.flushLogGroups([]*protocol.LogGroup{logGroup}); err != nil {
+		if err := f.flushLogGroups(logGroups); err != nil {
 			return err
 		}
 	}

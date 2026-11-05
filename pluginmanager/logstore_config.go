@@ -25,7 +25,6 @@ import (
 	"sync/atomic"
 
 	"github.com/alibaba/ilogtail/pkg/config"
-	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
@@ -68,13 +67,6 @@ func checkMixProcessMode(pluginCfg map[string]interface{}) mixProcessMode {
 	}
 }
 
-type ConfigVersion string
-
-var (
-	v1 ConfigVersion = "v1"
-	v2 ConfigVersion = "v2"
-)
-
 type LogstoreConfig struct {
 	// common fields
 	ProjectName          string
@@ -87,7 +79,6 @@ type LogstoreConfig struct {
 	//   is offered in configuration.
 	GlobalConfig *config.GlobalConfig
 
-	Version      ConfigVersion
 	Context      pipeline.Context
 	PluginRunner PluginRunner
 	// private fields
@@ -102,10 +93,10 @@ type LogstoreConfig struct {
 
 // Start initializes plugin instances in config and starts them.
 // Procedures:
-//  1. Start flusher goroutine and push FlushOutLogGroups inherited from last config
-//     instance to LogGroupsChan, so that they can be flushed to flushers.
+//  1. Start flusher goroutine and push the unsent event store inherited from last config
+//     instance to the output queue, so that they can be flushed to flushers.
 //  2. Start aggregators, allocate new goroutine for each one.
-//  3. Start processor goroutine to process logs from LogsChan.
+//  3. Start processor goroutine to process logs from the input queue.
 //  4. Start inputs (including metrics and services), just like aggregator, each input
 //     has its own goroutine.
 func (lc *LogstoreConfig) Start() {
@@ -147,39 +138,6 @@ var (
 	tagSeparator = []byte("~=~")
 )
 
-// extractTags extracts tags from rawTags and append them into log.
-// Rule: k1~=~v1^^^k2~=~v2
-// rawTags
-func extractTags(rawTags []byte, log *protocol.Log) {
-	defaultPrefixIndex := 0
-	for len(rawTags) != 0 {
-		idx := bytes.Index(rawTags, tagDelimiter)
-		var part []byte
-		if idx < 0 {
-			part = rawTags
-			rawTags = rawTags[len(rawTags):]
-		} else {
-			part = rawTags[:idx]
-			rawTags = rawTags[idx+len(tagDelimiter):]
-		}
-		if len(part) > 0 {
-			pos := bytes.Index(part, tagSeparator)
-			if pos > 0 {
-				log.Contents = append(log.Contents, &protocol.Log_Content{
-					Key:   string(part[:pos]),
-					Value: string(part[pos+len(tagSeparator):]),
-				})
-			} else {
-				log.Contents = append(log.Contents, &protocol.Log_Content{
-					Key:   defaultTagPrefix + strconv.Itoa(defaultPrefixIndex),
-					Value: string(part),
-				})
-			}
-			defaultPrefixIndex++
-		}
-	}
-}
-
 // extractTagsToLogTags extracts tags from rawTags and append them into []*protocol.LogTag.
 // Rule: k1~=~v1^^^k2~=~v2
 // rawTags
@@ -216,7 +174,7 @@ func extractTagsToLogTags(rawTags []byte) []*protocol.LogTag {
 }
 
 // ProcessRawLogV2 ...
-// V1 -> V2: enable topic field, and use tags field to pass more tags.
+// The versioned raw-log ABI carries topic metadata and separate group tags.
 // unsafe parameter: rawLog,packID and tags
 // safe parameter:  topic
 func (lc *LogstoreConfig) ProcessRawLogV2(rawLog []byte, packID string, topic string, tags []byte) int {
@@ -227,14 +185,10 @@ func (lc *LogstoreConfig) ProcessRawLogV2(rawLog []byte, packID string, topic st
 	if len(topic) > 0 {
 		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "__log_topic__", Value: topic})
 	}
-	// When UsingOldContentTag is set to false, the tag is now put into the context during cgo.
-	if !lc.GlobalConfig.UsingOldContentTag {
-		logTags := extractTagsToLogTags(tags)
-		lc.PluginRunner.ReceiveRawLog(&pipeline.LogWithContext{Log: log, Context: map[string]interface{}{"source": packID, "topic": topic, "tags": logTags}})
-	} else {
-		extractTags(tags, log)
-		lc.PluginRunner.ReceiveRawLog(&pipeline.LogWithContext{Log: log, Context: map[string]interface{}{"source": packID, "topic": topic}})
-	}
+	// The raw-log entry point follows the event model: tags are group
+	// attributes, never additional log contents.
+	logTags := extractTagsToLogTags(tags)
+	lc.PluginRunner.ReceiveRawLog(&pipeline.LogWithContext{Log: log, Context: map[string]interface{}{"source": packID, "topic": topic, "tags": logTags}})
 	return 0
 }
 
@@ -244,30 +198,7 @@ func (lc *LogstoreConfig) ProcessPipelineEventGroup(pbBytes []byte, packID strin
 		logger.Error(lc.Context.GetRuntimeContext(), selfmonitor.WrongProtobufAlarm, "cannot process pipeline event group passed by core, err", err)
 		return -1
 	}
-	if runner, ok := lc.PluginRunner.(*pluginv2Runner); ok {
-		runner.ReceivePipelineEventGroup(pbGroup, map[string]interface{}{ctxKeySource: packID})
-		return 0
-	}
-	logGroup, discarded, err := helper.TransferPBToLogGroupForV1(pbGroup)
-	if err != nil {
-		logger.Error(lc.Context.GetRuntimeContext(), selfmonitor.WrongProtobufAlarm,
-			"cannot convert pipeline event group for v1 runner", err, "config", lc.ConfigName)
-		return -1
-	}
-	if discarded {
-		return 0
-	}
-	if logGroup == nil || len(logGroup.Logs) == 0 {
-		return 0
-	}
-	ctx := map[string]interface{}{ctxKeySource: packID}
-	for k, v := range pbGroup.Metadata {
-		ctx[k] = string(v)
-	}
-	lc.PluginRunner.ReceiveLogGroup(pipeline.LogGroupWithContext{
-		LogGroup: logGroup,
-		Context:  ctx,
-	})
+	lc.PluginRunner.ReceivePipelineEventGroup(pbGroup, map[string]interface{}{ctxKeySource: packID})
 	return 0
 }
 
@@ -321,12 +252,12 @@ func createLogstoreConfig(project string, logstore string, configName string, lo
 		return nil, err
 	}
 
-	logstoreC.Version = fetchPluginVersion(plugins)
-	if logstoreC.PluginRunner, err = initPluginRunner(logstoreC); err != nil {
+	if err = validateStructureType(plugins); err != nil {
 		return nil, err
 	}
+	logstoreC.PluginRunner = initPluginRunner(logstoreC)
 	if lastConfigRunner, hasLastConfig := LastUnsendBuffer[configName]; hasLastConfig {
-		// Move unsent LogGroups from last config to new config.
+		// Move unsent event groups from last config to new config.
 		logstoreC.PluginRunner.Merge(lastConfigRunner)
 	}
 
@@ -559,9 +490,6 @@ func createLogstoreConfig(project string, logstore string, configName string, lo
 			return nil, fmt.Errorf("invalid aggregator type : %s, not json array", "aggregators")
 		}
 	}
-	if err = logstoreC.PluginRunner.AddDefaultAggregatorIfEmpty(); err != nil {
-		return nil, err
-	}
 
 	pluginConfig, flushersFound := plugins["flushers"]
 	if flushersFound {
@@ -595,33 +523,32 @@ func createLogstoreConfig(project string, logstore string, configName string, lo
 	return logstoreC, nil
 }
 
-func fetchPluginVersion(config map[string]interface{}) ConfigVersion {
-	if v, ok := config["global"]; ok {
-		if global, ok := v.(map[string]interface{}); ok {
-			if version, ok := global["StructureType"]; ok {
-				if str, ok := version.(string); ok {
-					return ConfigVersion(strings.ToLower(str))
-				}
-			}
-		}
+// StructureType is retained as a configuration compatibility field. The runtime
+// has one event pipeline; omitted settings select it without a legacy fallback.
+func validateStructureType(plugins map[string]interface{}) error {
+	global, exists := plugins["global"]
+	if !exists {
+		return nil
 	}
-	return v1
+	options, ok := global.(map[string]interface{})
+	if !ok {
+		return fmt.Errorf("global must be an object")
+	}
+	value, exists := options["StructureType"]
+	if !exists {
+		return nil
+	}
+	valueString, ok := value.(string)
+	if !ok || !strings.EqualFold(valueString, "v2") {
+		return fmt.Errorf("unsupported StructureType %v: only v2 is supported", value)
+	}
+	return nil
 }
 
-func initPluginRunner(lc *LogstoreConfig) (PluginRunner, error) {
-	switch lc.Version {
-	case v1:
-		return &pluginv1Runner{
-			LogstoreConfig: lc,
-			FlushOutStore:  NewFlushOutStore[protocol.LogGroup](),
-		}, nil
-	case v2:
-		return &pluginv2Runner{
-			LogstoreConfig: lc,
-			FlushOutStore:  NewFlushOutStore[models.PipelineGroupEvents](),
-		}, nil
-	default:
-		return nil, fmt.Errorf("undefined config version %s", lc.Version)
+func initPluginRunner(lc *LogstoreConfig) PluginRunner {
+	return &pluginRunner{
+		LogstoreConfig: lc,
+		FlushOutStore:  NewFlushOutStore[models.PipelineGroupEvents](),
 	}
 }
 
