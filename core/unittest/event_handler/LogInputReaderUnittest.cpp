@@ -26,6 +26,7 @@
 
 #include "app_config/AppConfig.h"
 #include "collection_pipeline/CollectionPipeline.h"
+#include "collection_pipeline/plugin/PluginRegistry.h"
 #include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "common/FileSystemUtil.h"
 #include "common/Flags.h"
@@ -120,6 +121,7 @@ public:
 
 protected:
     static void SetUpTestCase() {
+        PluginRegistry::GetInstance()->LoadPlugins();
         gRootDir = GetProcessExecutionDir();
         gLogName = "test.log";
         if (PATH_SEPARATOR[0] == gRootDir.at(gRootDir.size() - 1)) {
@@ -129,7 +131,7 @@ protected:
         filesystem::remove_all(gRootDir);
     }
 
-    static void TearDownTestCase() {}
+    static void TearDownTestCase() { PluginRegistry::GetInstance()->UnloadPlugins(); }
 
     void SetUp() override {
         // CRITICAL: Remove FileServer configs FIRST to avoid stale pointers
@@ -173,7 +175,6 @@ protected:
         string configStr;
         string errorMsg;
         unique_ptr<CollectionConfig> config;
-        unique_ptr<CollectionPipeline> pipeline;
 
         std::string jsonLogPath = UnitTestHelper::JsonEscapeDirPath(logPath);
         std::string jsonRealDir = UnitTestHelper::JsonEscapeDirPath(gRootDir + PATH_SEPARATOR + "real");
@@ -210,12 +211,12 @@ protected:
         Json::Value inputConfigJson = (*configJson)["inputs"][0];
 
         config.reset(new CollectionConfig(mConfigName, std::move(configJson), "/fake/path"));
-        APSARA_TEST_TRUE(config->Parse());
-        pipeline.reset(new CollectionPipeline());
-        APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
-        ctx.SetPipeline(*pipeline);
+        APSARA_TEST_TRUE_FATAL(config->Parse());
+        mPipeline.reset(new CollectionPipeline());
+        APSARA_TEST_TRUE_FATAL(mPipeline->Init(std::move(*config)));
+        ctx.SetPipeline(*mPipeline);
         ctx.SetConfigName(mConfigName);
-        ctx.SetProcessQueueKey(0);
+        ctx.SetProcessQueueKey(mPipeline->GetContext().GetProcessQueueKey());
 
         discoveryOpts = FileDiscoveryOptions();
         discoveryOpts.Init(inputConfigJson, ctx, "test");
@@ -225,7 +226,7 @@ protected:
         FileServer::GetInstance()->AddFileDiscoveryConfig(mConfigName, &discoveryOpts, &ctx);
         FileServer::GetInstance()->AddFileReaderConfig(mConfigName, &readerOpts, &ctx);
         FileServer::GetInstance()->AddMultilineConfig(mConfigName, &multilineOpts, &ctx);
-        ProcessQueueManager::GetInstance()->CreateOrUpdateCountBoundedQueue(0, 0, ctx);
+        ProcessQueueManager::GetInstance()->CreateOrUpdateCountBoundedQueue(ctx.GetProcessQueueKey(), 0, ctx);
 
         // Register handler - ensure we always create a new handler
         EventHandler* handler = new CreateModifyHandler(new CreateHandler());
@@ -346,6 +347,7 @@ private:
     FileReaderOptions readerOpts;
     MultilineOptions multilineOpts;
     FileTagOptions tagOpts;
+    unique_ptr<CollectionPipeline> mPipeline;
     CollectionPipelineContext ctx;
     FileDiscoveryConfig mConfig;
 

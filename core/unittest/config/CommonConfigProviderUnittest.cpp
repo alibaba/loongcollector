@@ -18,6 +18,7 @@
 #include "AppConfig.h"
 #include "Application.h"
 #include "collection_pipeline/CollectionPipelineManager.h"
+#include "collection_pipeline/plugin/PluginRegistry.h"
 #include "common/FileSystemUtil.h"
 #include "common/version.h"
 #include "config/ConfigDiff.h"
@@ -77,11 +78,12 @@ public:
         return true;
     }
 
-    static void SetUpTestCase() {}
+    static void SetUpTestCase() { PluginRegistry::GetInstance()->LoadPlugins(); }
 
     static void TearDownTestCase() {
         Application::GetInstance()->SetSigTermSignalFlag(true);
         FileServer::GetInstance()->Stop();
+        PluginRegistry::GetInstance()->UnloadPlugins();
     }
 
     // 在每个测试用例开始前的设置
@@ -456,7 +458,7 @@ void CommonConfigProviderUnittest::TestGetConfigUpdateAndConfigWatcher() {
 #endif
         CollectionPipelineManager::GetInstance()->UpdatePipelines(pipelineConfigDiff.first);
         APSARA_TEST_TRUE(pipelineConfigDiff.first.HasDiff());
-        APSARA_TEST_EQUAL(1U + builtinPipelineCnt, pipelineConfigDiff.first.mAdded.size());
+        ASSERT_EQ(1U + builtinPipelineCnt, pipelineConfigDiff.first.mAdded.size());
         APSARA_TEST_EQUAL(pipelineConfigDiff.first.mAdded[builtinPipelineCnt].mName, "config1");
         APSARA_TEST_EQUAL(CollectionPipelineManager::GetInstance()->GetAllConfigNames().size(),
                           1U + builtinPipelineCnt);

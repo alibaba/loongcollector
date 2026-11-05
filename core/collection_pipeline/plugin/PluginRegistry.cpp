@@ -19,6 +19,7 @@
 #include <cstring>
 
 #include <string>
+#include <unordered_set>
 
 #include "app_config/AppConfig.h"
 #include "common/Flags.h"
@@ -135,10 +136,33 @@ unique_ptr<FlusherInstance> PluginRegistry::CreateFlusher(const string& name,
 
 bool PluginRegistry::IsValidGoPlugin(const string& name) const {
 #ifndef __ANDROID__
-    // If the plugin is not a C++ plugin, iLogtail core considers it is a go plugin.
-    // Go PluginManager validates the go plugins instead of C++ core.
-    return !IsValidNativeInputPlugin(name, true) && !IsValidNativeInputPlugin(name, false)
-        && !IsValidNativeProcessorPlugin(name) && !IsValidNativeFlusherPlugin(name);
+    // Reserve built-in native input names even when their creators are disabled
+    // by platform or feature flags. They must fail native validation rather than
+    // be misclassified as Go inputs. This catalog does not restrict coexistence.
+    static const unordered_set<string> nativeInputNames = {
+        "input_file",
+        "input_container_stdio",
+        "input_static_file_onetime",
+        "input_internal_agent_logs_onetime",
+        "input_internal_alarms",
+        "input_internal_metrics",
+        "input_internal_config_container_info",
+        "input_prometheus",
+        "input_network_observer",
+        "input_process_security",
+        "input_file_security",
+        "input_network_security",
+        "input_agentsight",
+        "input_cpu_profiling",
+        "input_host_meta",
+        "input_host_monitor",
+        "input_forward",
+    };
+    // Registered dynamic native plugins are covered by the registry lookups.
+    // The Go manager validates the remaining names against its input creators.
+    return nativeInputNames.count(name) == 0 && !IsValidNativeInputPlugin(name, true)
+        && !IsValidNativeInputPlugin(name, false) && !IsValidNativeProcessorPlugin(name)
+        && !IsValidNativeFlusherPlugin(name);
 #else
     // android does not support go plugins
     return false;

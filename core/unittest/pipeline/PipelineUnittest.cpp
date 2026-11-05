@@ -44,6 +44,7 @@ public:
     void OnFailedInit() const;
     void OnInitVariousTopology() const;
     void TestProcessQueue() const;
+    void RejectMixedInputQueuesBeforeGoLoad() const;
     void OnInputFileWithJsonMultiline() const;
     void OnInputFileWithContainerDiscovery() const;
     void TestProcess() const;
@@ -2525,6 +2526,39 @@ void PipelineUnittest::TestProcessQueue() const {
     APSARA_TEST_EQUAL("", QueueKeyManager::GetInstance()->GetName(key));
 }
 
+void PipelineUnittest::RejectMixedInputQueuesBeforeGoLoad() const {
+    auto previousDetail = make_unique<Json::Value>();
+    (*previousDetail)["inputs"][0]["Type"] = "input_mock";
+    (*previousDetail)["flushers"][0]["Type"] = "flusher_mock";
+    CollectionConfig previousConfig(configName, std::move(previousDetail), filepath);
+    APSARA_TEST_TRUE(previousConfig.Parse());
+    CollectionPipeline previousPipeline;
+    APSARA_TEST_TRUE(previousPipeline.Init(std::move(previousConfig)));
+    const auto key = previousPipeline.GetContext().GetProcessQueueKey();
+    const auto previousQueue = ProcessQueueManager::GetInstance()->mQueues.at(key).first;
+    for (bool bytesFirst : {false, true}) {
+        auto detail = make_unique<Json::Value>();
+        auto& inputs = (*detail)["inputs"];
+        for (const auto& type :
+             {bytesFirst ? "BYTES_BOUNDED" : "COUNT_BOUNDED", bytesFirst ? "COUNT_BOUNDED" : "BYTES_BOUNDED"}) {
+            Json::Value input;
+            input["Type"] = "input_mock";
+            input["QueueType"] = type;
+            inputs.append(input);
+        }
+        (*detail)["processors"][0]["Type"] = "processor_add_fields";
+        (*detail)["flushers"][0]["Type"] = "flusher_mock";
+        CollectionConfig config(configName, std::move(detail), filepath);
+        APSARA_TEST_TRUE(config.Parse());
+        CollectionPipeline pipeline;
+        APSARA_TEST_FALSE(pipeline.Init(std::move(config)));
+        APSARA_TEST_EQUAL(1U, ProcessQueueManager::GetInstance()->mQueues.size());
+        APSARA_TEST_TRUE(previousQueue == ProcessQueueManager::GetInstance()->mQueues.at(key).first);
+        APSARA_TEST_EQUAL(QueueType::COUNT_BOUNDED, ProcessQueueManager::GetInstance()->mQueues.at(key).second);
+        APSARA_TEST_EQUAL(-1, pipeline.GetContext().GetProcessQueueKey());
+    }
+}
+
 void PipelineUnittest::OnInputFileWithJsonMultiline() const {
     unique_ptr<Json::Value> configJson;
     string configStr, errorMsg;
@@ -3131,6 +3165,7 @@ void PipelineUnittest::TestMultiFlusherAndRouter() const {
 UNIT_TEST_CASE(PipelineUnittest, OnSuccessfulInit)
 UNIT_TEST_CASE(PipelineUnittest, OnFailedInit)
 UNIT_TEST_CASE(PipelineUnittest, TestProcessQueue)
+UNIT_TEST_CASE(PipelineUnittest, RejectMixedInputQueuesBeforeGoLoad)
 UNIT_TEST_CASE(PipelineUnittest, OnInitVariousTopology)
 UNIT_TEST_CASE(PipelineUnittest, OnInputFileWithJsonMultiline)
 UNIT_TEST_CASE(PipelineUnittest, OnInputFileWithContainerDiscovery)
