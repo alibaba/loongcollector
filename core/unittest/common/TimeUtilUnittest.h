@@ -14,6 +14,12 @@
  * limitations under the License.
  */
 
+#if defined(__linux__)
+#include <cstdio>
+#include <unistd.h>
+
+#include <fstream>
+#endif
 #include <string>
 #include <vector>
 
@@ -34,6 +40,9 @@ public:
     void TestStrptimeNanosecond();
     void TestGetPreciseTimestampFromLogtailTime();
     void TestBootTimeDiff();
+#if defined(__linux__)
+    void TestGetBootTimeFromProcStat();
+#endif
     void TestKernelTimeToUTC();
     void TestGetTimeStamp();
 };
@@ -44,8 +53,38 @@ APSARA_UNIT_TEST_CASE(TimeUtilUnittest, TestNativeStrptimeFormat, 0);
 APSARA_UNIT_TEST_CASE(TimeUtilUnittest, TestStrptimeNanosecond, 0);
 APSARA_UNIT_TEST_CASE(TimeUtilUnittest, TestGetPreciseTimestampFromLogtailTime, 0);
 APSARA_UNIT_TEST_CASE(TimeUtilUnittest, TestBootTimeDiff, 0);
+#if defined(__linux__)
+APSARA_UNIT_TEST_CASE(TimeUtilUnittest, TestGetBootTimeFromProcStat, 0);
+#endif
 APSARA_UNIT_TEST_CASE(TimeUtilUnittest, TestKernelTimeToUTC, 0);
 APSARA_UNIT_TEST_CASE(TimeUtilUnittest, TestGetTimeStamp, 0);
+
+#if defined(__linux__)
+static void WriteProcStatFile(const std::string& path, const std::string& content) {
+    std::ofstream ofs(path);
+    ofs << content;
+}
+
+void TimeUtilUnittest::TestGetBootTimeFromProcStat() {
+    const std::string pathPrefix = "/tmp/loongcollector_proc_stat_" + std::to_string(getpid());
+    const std::string validPath = pathPrefix + "_valid";
+    const std::string missingBtimePath = pathPrefix + "_missing_btime";
+    const std::string invalidBtimePath = pathPrefix + "_invalid_btime";
+
+    WriteProcStatFile(validPath, "cpu  1 2 3 4 5 6 7 8 9 10\nbtime    \t1719922762\nintr 1\n");
+    APSARA_TEST_EQUAL(1719922762, GetBootTimeFromProcStat(validPath));
+
+    WriteProcStatFile(missingBtimePath, "cpu  1 2 3 4 5 6 7 8 9 10\nintr 1\n");
+    APSARA_TEST_EQUAL(0, GetBootTimeFromProcStat(missingBtimePath));
+
+    WriteProcStatFile(invalidBtimePath, "cpu  1 2 3 4 5 6 7 8 9 10\nbtime invalid\n");
+    APSARA_TEST_EQUAL(0, GetBootTimeFromProcStat(invalidBtimePath));
+
+    remove(validPath.c_str());
+    remove(missingBtimePath.c_str());
+    remove(invalidBtimePath.c_str());
+}
+#endif
 
 void TimeUtilUnittest::TestBootTimeDiff() {
     auto diff = GetTimeDiffFromMonotonic();
