@@ -44,6 +44,9 @@ DEFINE_FLAG_STRING(working_interface,
                    "Takes precedence over bind_interface for outgoing data egress binding.",
                    "");
 
+// machine info
+DEFINE_FLAG_BOOL(disable_identity_detect, "disable identity detect", false);
+
 // checkpoint
 DEFINE_FLAG_INT32(unused_checkpoints_clear_interval_sec, "", 600);
 
