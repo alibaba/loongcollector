@@ -58,6 +58,7 @@
     * [脚本执行数据](plugins/input/extended/input-command.md)
     * [【Debug】文本日志](plugins/input/extended/metric-debug-file.md)
     * [【示例】MetricInput](plugins/input/extended/metric-input-example.md)
+    * [网络连通性监控](plugins/input/extended/metric-input-netping.md)
     * [主机Meta数据](plugins/input/extended/metric-meta-host.md)
     * [【Debug】Mock数据-Metric](plugins/input/extended/metric-mock.md)
     * [主机监控数据](plugins/input/extended/metric-system.md)
