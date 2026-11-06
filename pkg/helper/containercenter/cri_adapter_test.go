@@ -458,6 +458,25 @@ func TestCreateContainerInfo(t *testing.T) {
 		require.Nil(t, detail)
 		require.Equal(t, ContainerStateContainerUnknown, state)
 	})
+
+	t.Run("nil status", func(t *testing.T) {
+		info, _ := json.Marshal(containerdContainerInfo{SandboxID: "sandbox-nil"})
+		service := &fakeCRIAdapterRuntimeService{
+			containerStatuses: map[string]*CriContainerStatusResponse{
+				"nil-status": {
+					Status: nil,
+					Info:   map[string]string{"info": string(info)},
+				},
+			},
+		}
+		wrapper := newCRIAdapterTestWrapper(t, service)
+
+		detail, _, state, err := wrapper.createContainerInfo("nil-status")
+
+		require.ErrorContains(t, err, "nil status")
+		require.Nil(t, detail)
+		require.Equal(t, ContainerStateContainerUnknown, state)
+	})
 }
 
 func TestWrapperK8sInfoByLabelsFiltersSandboxInternals(t *testing.T) {
@@ -476,6 +495,47 @@ func TestWrapperK8sInfoByLabelsFiltersSandboxInternals(t *testing.T) {
 		"existing": "value",
 		"team":     "observability",
 	}, detail.K8SInfo.Labels)
+}
+
+func TestWrapperK8sInfoByID(t *testing.T) {
+	t.Run("reads labels from sandbox", func(t *testing.T) {
+		service := &fakeCRIAdapterRuntimeService{
+			sandboxStatuses: map[string]*CriPodSandboxStatusResponse{
+				"sandbox-1": {
+					Status: &CriPodSandboxStatus{
+						Labels: map[string]string{"team": "observability"},
+					},
+				},
+			},
+		}
+		wrapper := newCRIAdapterTestWrapper(t, service)
+		detail := &DockerInfoDetail{
+			K8SInfo: &K8SInfo{Labels: map[string]string{"existing": "value"}},
+		}
+
+		wrapper.wrapperK8sInfoByID("sandbox-1", detail)
+
+		require.Equal(t, map[string]string{
+			"existing": "value",
+			"team":     "observability",
+		}, detail.K8SInfo.Labels)
+	})
+
+	t.Run("nil sandbox status", func(t *testing.T) {
+		service := &fakeCRIAdapterRuntimeService{
+			sandboxStatuses: map[string]*CriPodSandboxStatusResponse{
+				"sandbox-nil": {Status: nil},
+			},
+		}
+		wrapper := newCRIAdapterTestWrapper(t, service)
+		detail := &DockerInfoDetail{
+			K8SInfo: &K8SInfo{Labels: map[string]string{"existing": "value"}},
+		}
+
+		wrapper.wrapperK8sInfoByID("sandbox-nil", detail)
+
+		require.Equal(t, map[string]string{"existing": "value"}, detail.K8SInfo.Labels)
+	})
 }
 
 func TestCRIRuntimeWrapperFetchAll(t *testing.T) {
