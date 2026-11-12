@@ -40,5 +40,9 @@ func (wrapper *ServiceInputWrapper) StartService(pipelineContext pipeline.Pipeli
 	if input, ok := wrapper.Input.(pipeline.ServiceInputV2); ok {
 		return input.StartService(wrapper.pipelineCtxWrapper)
 	}
-	return wrapper.Input.(pipeline.ServiceInputV1).Start(&inputCollector{context: wrapper.pipelineCtxWrapper, configTags: wrapper.Tags})
+	return wrapper.Input.(pipeline.ServiceInputV1).Start(&inputCollector{
+		context:        wrapper.pipelineCtxWrapper,
+		configTags:     wrapper.Tags,
+		runtimeContext: wrapper.Config.Context.GetRuntimeContext(),
+	})
 }

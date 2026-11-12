@@ -44,7 +44,11 @@ func (wrapper *MetricInputWrapper) Init(pluginMeta *pipeline.PluginMeta, inputIn
 	}
 	wrapper.Interval = time.Duration(interval) * time.Millisecond
 	wrapper.pipelineCtxWrapper = newPipelineContextWrapper(nil, wrapper.outEventsTotal, wrapper.outEventGroupsTotal, wrapper.outSizeBytes)
-	wrapper.collector = &inputCollector{context: wrapper.pipelineCtxWrapper, configTags: wrapper.Tags}
+	wrapper.collector = &inputCollector{
+		context:        wrapper.pipelineCtxWrapper,
+		configTags:     wrapper.Tags,
+		runtimeContext: wrapper.Config.Context.GetRuntimeContext(),
+	}
 	return nil
 }
 

@@ -30,18 +30,18 @@ func ForEachLogTagGroup(group *models.PipelineGroupEvents, visit func(*models.Pi
 		return nil
 	}
 	for start := 0; start < len(group.Events); {
-		tags := logEventTags(group.Events[start])
+		tags := logEventTags(group.Events[start]).Iterator()
 		end := start + 1
-		for end < len(group.Events) && maps.Equal(tags.Iterator(), logEventTags(group.Events[end]).Iterator()) {
+		for end < len(group.Events) && maps.Equal(tags, logEventTags(group.Events[end]).Iterator()) {
 			end++
 		}
-		if start == 0 && end == len(group.Events) && tags.Len() == 0 {
+		if start == 0 && end == len(group.Events) && len(tags) == 0 {
 			return visit(group)
 		}
 		info := group.Group
-		if tags.Len() > 0 {
+		if len(tags) > 0 {
 			merged := models.NewTags()
-			merged.AddAll(tags.Iterator())
+			merged.AddAll(tags)
 			merged.AddAll(info.GetTags().Iterator())
 			info = models.NewGroup(info.GetMetadata(), merged)
 		}

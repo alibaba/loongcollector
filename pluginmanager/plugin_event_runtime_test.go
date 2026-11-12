@@ -216,3 +216,15 @@ func TestCollectorTagsStaySeparate(t *testing.T) {
 		})
 	}
 }
+
+func TestCollectorRejectsMismatchedArrays(t *testing.T) {
+	output := helper.NewObservePipelineContext(1)
+	ctx := &ContextImp{}
+	ctx.InitContext("project", "store", "array-input")
+	collector := &inputCollector{context: output, runtimeContext: ctx.GetRuntimeContext()}
+
+	collector.AddDataArray(nil, []string{"first", "second"}, []string{"value"})
+	require.Len(t, output.Collector().Observe(), 0)
+	collector.AddDataArray(nil, []string{"first"}, []string{"value", "extra"})
+	require.Len(t, output.Collector().Observe(), 0)
+}

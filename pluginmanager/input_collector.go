@@ -15,23 +15,27 @@
 package pluginmanager
 
 import (
+	"context"
 	"math"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/alibaba/ilogtail/pkg/helper"
+	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
 
 // inputCollector adapts the public Collector API at the input boundary. It emits
 // native events directly; no LogGroup or second runner is constructed.
 type inputCollector struct {
-	context    pipeline.PipelineContext
-	configTags map[string]string
+	context        pipeline.PipelineContext
+	configTags     map[string]string
+	runtimeContext context.Context
 }
 
 func (c *inputCollector) group(ctx map[string]interface{}) *models.GroupInfo {
@@ -79,6 +83,13 @@ func (c *inputCollector) AddDataWithContext(tags, fields map[string]string, ctx 
 }
 func (c *inputCollector) AddDataArrayWithContext(tags map[string]string, keys, values []string, ctx map[string]interface{}, t ...time.Time) {
 	if len(keys) != len(values) {
+		// A malformed row has no reliable key/value pairing.
+		alarmCtx := c.runtimeContext
+		if alarmCtx == nil {
+			alarmCtx = context.Background()
+		}
+		logger.Warningf(alarmCtx, selfmonitor.InputCollectAlarm,
+			"dropping input log with mismatched key/value counts (keys=%d, values=%d)", len(keys), len(values))
 		return
 	}
 	fields := make(map[string]string, len(keys))
