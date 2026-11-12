@@ -73,6 +73,22 @@ func (d *Decoder) DecodeV2(data []byte, req *http.Request) ([]*imodels.PipelineG
 	if err != nil {
 		return nil, err
 	}
+	if d.FieldsExtend {
+		// FieldsExtend explicitly requests the extended metric-log shape.
+		// Preserve these named fields as Log events; ordinary requests produce
+		// typed Metric events. Neither path constructs a LogGroup.
+		group := &imodels.PipelineGroupEvents{
+			Group: imodels.NewGroup(imodels.NewMetadata(), imodels.NewTags()),
+		}
+		for _, raw := range d.parsePointsToLogs(points, req) {
+			log := &imodels.Log{Timestamp: uint64(raw.GetTime())*1e9 + uint64(raw.GetTimeNs()), Tags: imodels.NewTags(), Contents: imodels.NewLogContents()}
+			for _, field := range raw.Contents {
+				log.Contents.Add(field.Key, field.Value)
+			}
+			group.Events = append(group.Events, log)
+		}
+		return []*imodels.PipelineGroupEvents{group}, nil
+	}
 	return d.parsePointsToEvents(points, req)
 }
 

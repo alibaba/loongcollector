@@ -16,11 +16,10 @@ package pluginmanager
 
 import (
 	"github.com/alibaba/ilogtail/pkg/models"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
 type FlushData interface {
-	protocol.LogGroup | models.PipelineGroupEvents
+	models.PipelineGroupEvents
 }
 
 type FlushOutStore[T FlushData] struct {

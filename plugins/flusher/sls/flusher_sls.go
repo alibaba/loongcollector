@@ -91,28 +91,32 @@ func (p *SlsFlusher) Flush(projectName string, logstoreName string, configName s
 	return nil
 }
 
-// Export sends typed PipelineEventGroup protobufs to C++. The protobuf uses a
-// oneof, so mixed groups are split into consecutive runs of the same event kind
-// without dropping events or changing their order. Flush retains the v1 ABI.
-func (p *SlsFlusher) Export(groupEventsList []*models.PipelineGroupEvents, _ pipeline.PipelineContext) error {
-	for _, groupEvents := range groupEventsList {
-		if groupEvents == nil || len(groupEvents.Events) == 0 {
-			continue
+// Export sends typed PipelineEventGroups to C++. Log tags are group-level
+// protocol attributes; adjacent events are partitioned by log tags and event
+// kind without changing their order.
+func (p *SlsFlusher) Export(groups []*models.PipelineGroupEvents, _ pipeline.PipelineContext) error {
+	for _, group := range groups {
+		if err := helper.ForEachLogTagGroup(group, p.exportPipelineGroup); err != nil {
+			return err
 		}
-		for start := 0; start < len(groupEvents.Events); {
-			if groupEvents.Events[start] == nil {
-				return fmt.Errorf("nil pipeline event at index %d", start)
-			}
-			kind := groupEvents.Events[start].GetType()
-			end := start + 1
-			for end < len(groupEvents.Events) && groupEvents.Events[end] != nil && groupEvents.Events[end].GetType() == kind {
-				end++
-			}
-			if err := p.sendPipelineEvents(groupEvents.Group, groupEvents.Events[start:end]); err != nil {
-				return err
-			}
-			start = end
+	}
+	return nil
+}
+
+func (p *SlsFlusher) exportPipelineGroup(group *models.PipelineGroupEvents) error {
+	for start := 0; start < len(group.Events); {
+		if group.Events[start] == nil {
+			return fmt.Errorf("nil pipeline event at index %d", start)
 		}
+		kind := group.Events[start].GetType()
+		end := start + 1
+		for end < len(group.Events) && group.Events[end] != nil && group.Events[end].GetType() == kind {
+			end++
+		}
+		if err := p.sendPipelineEvents(group.Group, group.Events[start:end]); err != nil {
+			return err
+		}
+		start = end
 	}
 	return nil
 }

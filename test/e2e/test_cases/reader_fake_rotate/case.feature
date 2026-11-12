@@ -6,8 +6,10 @@ Feature: reader fake rotate inode reuse
 
   Two watched directories share one config. The sidecar writes new/sub/app.log
   (inode X), waits for CloseTimeoutFilePtr, then recreates inode X at
-  old/app.log. A real rotate (old/app.log -> old/rotated.log) plus a new
-  old/app.log moves the active reader into the rotator map.
+  old/app.log. Allocation retries use an unwatched candidate file, so only
+  the confirmed inode can be collected. A real rotate
+  (old/app.log -> old/rotated.log) plus a new old/app.log moves the active
+  reader into the rotator map.
 
   DumpAllHandlersMeta writes rotators first, then actives. Last-writer-wins
   therefore keeps the stale new/sub checkpoint on a pre-#2646 baseline
@@ -36,7 +38,7 @@ Feature: reader fake rotate inode reuse
         CloseUnusedReaderIntervalSec: 2
     """
     Given loongcollector container mount {./volume} to {/root/test}
-    Given run command on datasource {mkdir -p test_cases/reader_fake_rotate/volume/old test_cases/reader_fake_rotate/volume/new/sub && rm -f test_cases/reader_fake_rotate/volume/inode_* test_cases/reader_fake_rotate/volume/scene_ready test_cases/reader_fake_rotate/volume/old/*.log test_cases/reader_fake_rotate/volume/new/sub/*.log}
+    Given run command on datasource {mkdir -p test_cases/reader_fake_rotate/volume/old test_cases/reader_fake_rotate/volume/new/sub && rm -f test_cases/reader_fake_rotate/volume/inode_* test_cases/reader_fake_rotate/volume/scene_ready test_cases/reader_fake_rotate/volume/old/*.log test_cases/reader_fake_rotate/volume/old/*.candidate test_cases/reader_fake_rotate/volume/new/sub/*.log}
     When start docker-compose {reader_fake_rotate}
     Given run command on datasource {sh test_cases/reader_fake_rotate/wait_scene_ready.sh}
     Then wait {5} seconds

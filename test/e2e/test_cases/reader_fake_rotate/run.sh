@@ -35,15 +35,21 @@ reuse_inode() {
 	dst="$2"
 	content="$3"
 	old_inode=$(stat -c %i "$src")
+	# Failed allocation attempts must stay outside the watched *.log glob.
+	# Publish the inode only after reuse is confirmed, or a retry can be
+	# collected as an extra batch before it is removed.
+	candidate="${dst}.candidate"
 	rm -f "$src"
 	i=0
 	while [ "$i" -lt 80 ]; do
-		printf '%s' "$content" >"$dst"
-		if [ "$(stat -c %i "$dst")" = "$old_inode" ]; then
+		printf '%s' "$content" >"$candidate"
+		if [ "$(stat -c %i "$candidate")" = "$old_inode" ]; then
+			mv "$candidate" "$dst"
+			echo "inode reused after $((i + 1)) allocation attempts"
 			echo "$old_inode" >"$VOLUME/inode_reused"
 			return 0
 		fi
-		rm -f "$dst"
+		rm -f "$candidate"
 		i=$((i + 1))
 		# CloseTimeoutFilePtr may still hold the inode; wait and retry.
 		if [ $((i % 5)) -eq 0 ]; then

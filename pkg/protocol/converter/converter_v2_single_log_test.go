@@ -21,6 +21,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/alibaba/ilogtail/pkg/config"
+	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/models"
 )
 
@@ -59,8 +60,10 @@ func TestPipelineGroupEventsToLogGroupConvertsMetricStructurally(t *testing.T) {
 		Events: []models.PipelineEvent{log, metric},
 	}
 
-	logGroup, err := PipelineGroupEventsToLogGroup(groupEvents)
+	logGroups, err := PipelineGroupEventsToLogGroups(groupEvents)
 	require.NoError(t, err)
+	require.Len(t, logGroups, 1)
+	logGroup := logGroups[0]
 	require.Len(t, logGroup.Logs, 2)
 
 	metricContents := make(map[string]string, len(logGroup.Logs[1].Contents))
@@ -70,4 +73,89 @@ func TestPipelineGroupEventsToLogGroupConvertsMetricStructurally(t *testing.T) {
 	assert.Equal(t, "m", metricContents[metricNameKey])
 	assert.Equal(t, "1", metricContents[metricValueKey])
 	assert.NotContains(t, metricContents, "__pipeline_passthrough__")
+}
+
+func TestPipelineGroupEventsToLogGroupsPreservesSeparateTags(t *testing.T) {
+	group := &models.PipelineGroupEvents{Group: models.NewGroup(models.NewMetadata(), models.NewTagsWithKeyValues("shared", "group"))}
+	for _, value := range []string{"a", "a", "b", "a"} {
+		group.Events = append(group.Events, models.NewSimpleLog([]byte(value), models.NewTagsWithKeyValues("container", value), 1))
+	}
+	wires, err := PipelineGroupEventsToLogGroups(group)
+	require.NoError(t, err)
+	require.Len(t, wires, 3)
+	for i, wire := range wires {
+		tags := map[string]string{}
+		for _, tag := range wire.LogTags {
+			tags[tag.Key] = tag.Value
+		}
+		require.Equal(t, []string{"a", "b", "a"}[i], tags["container"])
+		require.Equal(t, "group", tags["shared"])
+		require.Len(t, wire.Logs, []int{2, 1, 1}[i])
+		for _, log := range wire.Logs {
+			for _, field := range log.Contents {
+				require.NotEqual(t, "container", field.Key)
+			}
+		}
+	}
+	require.False(t, group.Group.Tags.Contains("container"))
+}
+
+func TestPipelineGroupEventsToLogGroupsPreservesReservedTopic(t *testing.T) {
+	tests := []struct {
+		name     string
+		tags     map[string]string
+		topic    string
+		wantTags map[string]string
+	}{
+		{name: "no tags"},
+		{
+			name:     "ordinary tags without topic",
+			tags:     map[string]string{"host": "h1", "topic": "ordinary"},
+			wantTags: map[string]string{"host": "h1", "topic": "ordinary"},
+		},
+		{
+			name:  "topic only",
+			tags:  map[string]string{"__topic__": "access"},
+			topic: "access",
+		},
+		{
+			name:     "topic with ordinary tags",
+			tags:     map[string]string{"__topic__": "access", "host": "h1"},
+			topic:    "access",
+			wantTags: map[string]string{"host": "h1"},
+		},
+		{
+			name:     "empty topic",
+			tags:     map[string]string{"__topic__": "", "host": "h1"},
+			wantTags: map[string]string{"host": "h1"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			groupInfo := models.NewGroup(models.NewMetadata(), models.NewTagsWithMap(tt.tags))
+			log := models.NewLog("", []byte("body"), "", "", "", models.NewTags(), 1_000_000_000)
+			pbGroup, err := helper.TransferPipelineEventGroupToPB(groupInfo, []models.PipelineEvent{log})
+			require.NoError(t, err)
+
+			incoming, err := helper.TransferPBToPipelineGroupEvents(pbGroup)
+			require.NoError(t, err)
+			groups, err := PipelineGroupEventsToLogGroups(incoming)
+			require.NoError(t, err)
+			require.Len(t, groups, 1)
+			lg := groups[0]
+			require.Equal(t, len(tt.tags), incoming.Group.Tags.Len())
+			for k, v := range tt.tags {
+				assert.Equal(t, v, incoming.Group.Tags.Get(k))
+			}
+			assert.Equal(t, tt.topic, lg.Topic)
+			require.Len(t, lg.Logs, 1)
+			assert.Equal(t, "body", lg.Logs[0].Contents[0].Value)
+			require.Len(t, lg.LogTags, len(tt.wantTags))
+			for _, tag := range lg.LogTags {
+				value, ok := tt.wantTags[tag.Key]
+				assert.True(t, ok, "unexpected tag %q", tag.Key)
+				assert.Equal(t, value, tag.Value)
+			}
+		})
+	}
 }

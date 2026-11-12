@@ -25,11 +25,10 @@
 |----------------------------------|------------|----------|---------|---------------------------------|
 | enable                           | bool       | 否        | true    | 是否启用当前采集配置。                       |
 | global                           | object     | 否        | 空       | 采集配置级全局参数，C++ 与 Go 侧都会读取；未列出的键可能作为扩展字段传给 Go 插件（见 `GlobalConfig::Init` 与 `extendedParams`）。                           |
-| global.StructureType             | string     | 否        | v1      | 插件系统配置结构版本：`v1` 或 `v2`（影响 Go 侧 `PluginRunner` 类型；未设置时按 v1）。               |
+| global.StructureType | string | 否 | v2 | Go 侧统一使用事件 Pipeline。省略或设置 `v2` 均启用统一 runner；`v1` 不再支持。 |
 | global.InputIntervalMs           | int        | 否        | 1000    | **扩展（Go）Input** 侧默认调度间隔，单位毫秒（不限于 MetricInput；与 `pkg/config.GlobalConfig.InputIntervalMs` 默认一致）。               |
 | global.InputMaxFirstCollectDelayMs| int       | 否        | 10000   | 扩展 Input 首次采集前随机等待上限（毫秒）；若大于 `InputIntervalMs` 则实际按间隔封顶（见 Go `GlobalConfig` 注释）。               |
 | global.EnableTimestampNanosecond | bool       | 否        | false   | 是否在序列化等路径中启用纳秒时间戳（C++ `GlobalConfig` 与传给 Go 的全局字段一致）。               |
-| global.UsingOldContentTag        | bool       | 否        | false   | 是否使用旧版 `content` Tag 行为（C++ `GlobalConfig`）。 |
 | global.PipelineMetaTagKey        | object     | 否        | 空       | 重命名或删除采集配置级 Tag。map 中 key 为原 tag 逻辑名（如 `HOST_NAME`），value 为新物理 tag 名；空串表示删除，`__default__` 表示默认值。可配置项见下文表 1。 |
 | global.AgentEnvMetaTagKey        | object     | 否        | 空       | 环境变量元数据 Tag 映射（`ProcessorTagNative` 等读取此键名）。C++ `GlobalConfig::sNativeParam` 中还包含 **`AgentMetaTagKey`**，用于与 Go 管线 JSON 交互；若与文档/示例不一致，以当前版本源码及单测为准。 |
 | global.ExcutionTimeout           | uint       | 条件      | —       | **仅一次性采集配置**：运行超时（秒），键名为源码中的 `ExcutionTimeout`（拼写与实现对齐）；范围在代码中裁剪为约 600～604800。 |
@@ -84,3 +83,11 @@ flushers:
 | HOST_ID | 是（企业版） | **host_id** |
 | CLOUD_PROVIDER | 是（企业版） | **cloud_provider** |
 | AGENT_TAG | 是（企业版） | **agent_tag** |
+
+### 事件 Pipeline 迁移
+
+Go 插件管理器统一使用 PipelineGroupEvents；Native 输入通过 PipelineEventGroup PB 直接进入处理链，不再回退为 LogGroup。已有配置可以省略 StructureType，显式填写时仅接受 v2；原来显式设置 v1 的配置需删除该项或改为 v2。
+
+未配置 aggregator 时，processor 输出直接交给 flusher，不再自动创建透传 aggregator 及其定时器。显式配置的 metadata 分组、攒批等 aggregator 仍有效。
+
+仍使用 Collector API 的输入插件在入口转换为事件对象；处理器、聚合器和发送插件使用事件接口。对外 gRPC/序列化协议可能仍使用 LogGroup，但不作为 runner 队列或 Native 桥接的中间模型。
