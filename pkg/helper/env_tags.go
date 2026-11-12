@@ -33,7 +33,10 @@ var envTagsLock sync.RWMutex
 func LoadEnvTags() {
 	envTagsLock.Lock() // Lock for writing
 	defer envTagsLock.Unlock()
-	envTagKeys := util.GetEnvTags(defaultLoongEnvTagKeys, defaultEnvTagKeys)
+	envTagKeys := os.Getenv("LOONG_ENV_TAGS")
+	if envTagKeys == "" {
+		envTagKeys = util.GetEnvTags(defaultLoongEnvTagKeys, defaultEnvTagKeys)
+	}
 	if len(envTagKeys) == 0 || len(EnvTags) > 0 {
 		return
 	}
