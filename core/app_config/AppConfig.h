@@ -314,6 +314,12 @@ private:
     // Read values will replace corresponding configs in loongcollector_config.json.
     void LoadEnvResourceLimit();
 
+    // LoadCgroupResourceLimit derives CPU/memory self-limits from the process cgroup when the opt-in flag
+    // resource_limit_from_cgroup is enabled. Called after LoadEnvResourceLimit, so a readable, finite cgroup
+    // limit takes precedence over env/json/flag; per resource, an unreadable or unlimited limit keeps the
+    // value already loaded from the existing config chain.
+    void LoadCgroupResourceLimit();
+
     // logtail is in purage container mode when STRING_FLAG(ilogtail_user_defined_id_env_name) or
     // "ALIYUN_LOGTAIL_USER_DEFINED_ID" exist and /logtail_host exist
     void CheckPurageContainerMode();

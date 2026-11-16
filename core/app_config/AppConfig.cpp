@@ -25,6 +25,7 @@
 
 #include "RuntimeUtil.h"
 #include "StringTools.h"
+#include "common/CgroupUtil.h"
 #include "common/EnvUtil.h"
 #include "common/FileSystemUtil.h"
 #include "common/JsonUtil.h"
@@ -61,6 +62,12 @@ DEFINE_FLAG_STRING(default_buffer_file_path, "set current execution dir in defau
 DEFINE_FLAG_STRING(buffer_file_path, "set buffer dir", "");
 DEFINE_FLAG_DOUBLE(default_machine_cpu_usage_threshold, "machine level", 0.4);
 DEFINE_FLAG_BOOL(default_resource_auto_scale, "", false);
+DEFINE_FLAG_BOOL(resource_limit_from_cgroup,
+                 "opt-in: derive CPU (cores) and memory (MiB) self-limits from the process cgroup at startup; "
+                 "when readable and finite, cgroup overrides env/json/flag per resource, otherwise the existing "
+                 "config chain is kept",
+                 false);
+DEFINE_FLAG_STRING(cgroup_root_path, "cgroup filesystem root used by resource_limit_from_cgroup", "/sys/fs/cgroup");
 DEFINE_FLAG_BOOL(default_input_flow_control, "", false);
 DEFINE_FLAG_INT32(max_open_files_limit, "max open files ulimit -n", 131072);
 DEFINE_FLAG_INT32(max_multi_config_size, "max multi config size", 20);
@@ -860,6 +867,37 @@ void AppConfig::LoadEnvResourceLimit() {
     LoadSingleValueEnvConfig("send_request_concurrency", mSendRequestConcurrency, (int32_t)10);
 }
 
+void AppConfig::LoadCgroupResourceLimit() {
+    if (!BOOL_FLAG(resource_limit_from_cgroup)) {
+        return;
+    }
+    const std::string& root = STRING_FLAG(cgroup_root_path);
+    float cores = 0.0F;
+    if (ReadCgroupCpuLimit(root, cores)) {
+        // The cgroup quota is a hard ceiling; never soft-scale above it (resource_auto_scale reads the scaled limit).
+        mCpuUsageUpLimit = cores;
+        mScaledCpuUsageUpLimit = cores;
+        LOG_INFO(sLogger, ("cpu self-limit from cgroup, cores", cores)("root", root));
+        if (cores < 0.4F) {
+            LOG_WARNING(sLogger, ("cgroup cpu quota below usual minimum, cores", cores));
+        }
+    } else {
+        LOG_WARNING(sLogger,
+                    ("cgroup cpu limit unreadable or unlimited, keep configured value", mCpuUsageUpLimit)("root", root));
+    }
+    int64_t memMiB = 0;
+    if (ReadCgroupMemLimit(root, memMiB)) {
+        mMemUsageUpLimit = memMiB;
+        LOG_INFO(sLogger, ("mem self-limit from cgroup, MiB", memMiB)("root", root));
+        if (memMiB < 384) {
+            LOG_WARNING(sLogger, ("cgroup memory limit below usual minimum, MiB", memMiB));
+        }
+    } else {
+        LOG_WARNING(sLogger,
+                    ("cgroup memory limit unreadable or unlimited, keep configured value", mMemUsageUpLimit)("root", root));
+    }
+}
+
 /**
  * @brief 检查是否处于纯容器模式
  *
@@ -1187,6 +1225,7 @@ void AppConfig::LoadResourceConf(const Json::Value& confJson) {
                          "ALIYUN_LOGTAIL_ENABLE_RESPONSE_VERIFICATION");
 
     LoadEnvResourceLimit();
+    LoadCgroupResourceLimit();
     CheckAndAdjustParameters();
 
     if (confJson.isMember("bind_interface") && confJson["bind_interface"].isString()) {
