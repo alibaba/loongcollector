@@ -63,13 +63,13 @@ bool ProcessorParseJsonNative::Init(const Json::Value& config) {
     // Runtime check for SIMD support
     mUseSimdJson = false;
 #if defined(__INCLUDE_SSE4_2__)
-    auto my_implementation = simdjson::get_available_implementations()["westmere"];
-    if (my_implementation && my_implementation->supported_by_runtime_system()) {
+    // simdjson selects the best kernel supported by the CPU at runtime (icelake, haswell, westmere, ...).
+    const std::string activeImplementation = simdjson::get_active_implementation()->name();
+    if (activeImplementation != "fallback" && activeImplementation != "unsupported") {
         mUseSimdJson = true;
-        simdjson::get_active_implementation() = my_implementation;
-        LOG_DEBUG(sLogger, ("simdjson active implementation : ", simdjson::get_active_implementation()->name()));
+        LOG_DEBUG(sLogger, ("simdjson active implementation : ", activeImplementation));
     } else {
-        LOG_DEBUG(sLogger, ("westmere not supported", "fallback to rapidjson"));
+        LOG_DEBUG(sLogger, ("no simdjson SIMD kernel supported", "fallback to rapidjson"));
     }
 #endif
 
