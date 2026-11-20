@@ -23,6 +23,10 @@
 #if defined(__INCLUDE_SSE4_2__)
 #include <cinttypes>
 #include <cstdio>
+#include <cstring>
+
+#include <memory>
+#include <string>
 
 #include "simdjson/simdjson.h"
 
@@ -259,15 +263,31 @@ bool ProcessorParseJsonNative::JsonLogLineParserSimdJson(LogEvent& sourceEvent,
     if (buffer.empty())
         return false;
 
-    simdjson::ondemand::parser parser;
-    simdjson::padded_string bufStr(buffer.data(), buffer.size());
+    // Processor threads may run the same instance concurrently, so the reused parser and buffer are per thread.
+    // Lines larger than kSimdJsonReuseMaxSize use local ones so that one huge line does not pin memory.
+    static constexpr size_t kSimdJsonReuseMaxSize = 64 * 1024;
+    thread_local simdjson::ondemand::parser sParser;
+    thread_local std::string sPaddedBuffer;
+    std::unique_ptr<simdjson::ondemand::parser> largeParser;
+    std::string largeBuffer;
+    simdjson::ondemand::parser* parser = &sParser;
+    std::string* paddedBuffer = &sPaddedBuffer;
+    if (buffer.size() > kSimdJsonReuseMaxSize) {
+        largeParser = std::make_unique<simdjson::ondemand::parser>();
+        parser = largeParser.get();
+        paddedBuffer = &largeBuffer;
+    }
+    paddedBuffer->resize(buffer.size() + simdjson::SIMDJSON_PADDING);
+    memcpy(paddedBuffer->data(), buffer.data(), buffer.size());
+    memset(paddedBuffer->data() + buffer.size(), 0, simdjson::SIMDJSON_PADDING);
+    simdjson::padded_string_view bufStr(paddedBuffer->data(), buffer.size(), paddedBuffer->size());
     simdjson::ondemand::document doc;
     simdjson::ondemand::object object;
 
     // Use try-catch to handle all simdjson parsing errors generically
     // This maintains compatibility with rapidjson's error handling approach
     try {
-        auto error = parser.iterate(bufStr).get(doc);
+        auto error = parser->iterate(bufStr).get(doc);
         if (error) {
             if (AlarmManager::GetInstance()->IsLowLevelAlarmValid()) {
                 LOG_WARNING(
