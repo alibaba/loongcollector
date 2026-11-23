@@ -36,6 +36,7 @@ class SLSSerializerUnittest : public ::testing::Test {
 public:
     void TestSerializeEventGroup();
     void TestSerializePBLogsMatchesBatchedEvents();
+    void TestSerializePBLogWire();
     void TestSerializeEventGroupList();
     void TestSerializeSpanLinksToString();
     void TestSerializeSpanEventsToString();
@@ -837,6 +838,57 @@ void SLSSerializerUnittest::TestSerializePBLogsMatchesBatchedEvents() {
     EXPECT_EQ(4U, counters[0]);
     EXPECT_EQ(2U, counters[2]);
     EXPECT_EQ(2U, counters[4]);
+}
+
+void SLSSerializerUnittest::TestSerializePBLogWire() {
+    models::PipelineEventGroup pb;
+    (*pb.mutable_metadata())["1"] = "file";
+    (*pb.mutable_tags())["__topic__"] = "topic";
+    pb.mutable_logs()->add_events();
+    auto* log = pb.mutable_logs()->add_events();
+    log->set_timestamp(1700000000123456789ULL);
+    log->set_level("info");
+    log->set_fileoffset(10);
+    log->set_rawsize(1024);
+    auto* field = log->add_contents();
+    field->set_key("first");
+    field->set_value(string("left\0right", 10));
+    field = log->add_contents();
+    field->set_key("second");
+    field->set_value(string(128, 'x'));
+
+    const string encoded = pb.SerializeAsString();
+    const auto wire = SLSLogGroupWireView::Parse(encoded, 2);
+    ASSERT_TRUE(wire);
+    ASSERT_EQ(2U, wire->mEventCount);
+    ASSERT_EQ(1U, wire->mLogs.size());
+    EXPECT_EQ(log->timestamp(), wire->mLogs.front().mTimestamp);
+    EXPECT_EQ(LogEvent::DataSizeForContents(0) + LogEvent::DataSizeForContents(149), wire->mLogInputSize);
+    models::PipelineEventGroup parsedHeader;
+    ASSERT_TRUE(parsedHeader.ParseFromArray(wire->mHeader.data(), wire->mHeader.size()));
+    EXPECT_EQ("topic", parsedHeader.tags().at("__topic__"));
+    EXPECT_EQ("file", parsedHeader.metadata().at("1"));
+
+    SLSEventGroupSerializer serializer(sFlusher.get());
+    SizedMap tags;
+    tags.Insert("__topic__", "topic");
+    tags.Insert("__pack_id__", "generated");
+    auto& globals = const_cast<GlobalConfig&>(mCtx.GetGlobalConfig());
+    for (bool enableNs : {false, true}) {
+        globals.mEnableTimestampNanosecond = enableNs;
+        string expected, actual, oldError, newError;
+        ASSERT_TRUE(serializer.DoSerializePBLogs(pb, tags.mInner, 5, expected, oldError)) << oldError;
+        ASSERT_TRUE(serializer.DoSerializePBLogWire(*wire, tags.mInner, 5, actual, newError)) << newError;
+        EXPECT_EQ(expected, actual);
+    }
+
+    EXPECT_FALSE(SLSLogGroupWireView::Parse(encoded.substr(0, encoded.size() - 1), 2));
+    EXPECT_FALSE(SLSLogGroupWireView::Parse(encoded + "\x20\x01", 2));
+    field->set_key("first"); // Repeated keys require last-value override.
+    EXPECT_FALSE(SLSLogGroupWireView::Parse(pb.SerializeAsString(), 2));
+    field->set_key("second");
+    field->clear_value(); // A missing proto3 value needs an explicit SLS field.
+    EXPECT_FALSE(SLSLogGroupWireView::Parse(pb.SerializeAsString(), 2));
 }
 
 void SLSSerializerUnittest::TestSerializeEventGroupList() {
@@ -1651,6 +1703,7 @@ void SLSSerializerUnittest::TestSerializeMetricEventWithMetadata() {
 
 UNIT_TEST_CASE(SLSSerializerUnittest, TestSerializeEventGroup)
 UNIT_TEST_CASE(SLSSerializerUnittest, TestSerializePBLogsMatchesBatchedEvents)
+UNIT_TEST_CASE(SLSSerializerUnittest, TestSerializePBLogWire)
 UNIT_TEST_CASE(SLSSerializerUnittest, TestSerializeEventGroupList)
 UNIT_TEST_CASE(SLSSerializerUnittest, TestSerializeSpanLinksToString)
 UNIT_TEST_CASE(SLSSerializerUnittest, TestSerializeSpanEventsToString)

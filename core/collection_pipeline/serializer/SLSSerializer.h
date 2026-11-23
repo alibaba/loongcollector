@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -27,6 +28,22 @@ namespace logtail {
 namespace models {
 class PipelineEventGroup;
 }
+
+// A Go log batch validated against the PEG log wire layout. The views
+// are borrowed only for the duration of the synchronous native callback.
+struct SLSLogGroupWireView {
+    struct Log {
+        uint64_t mTimestamp;
+        StringView mContents;
+    };
+
+    static std::optional<SLSLogGroupWireView> Parse(StringView wire, size_t eventCountHint);
+
+    StringView mHeader;
+    std::vector<Log> mLogs;
+    size_t mEventCount = 0;
+    size_t mLogInputSize = 0;
+};
 
 struct MetricEventContentCacheItem {
     std::vector<std::string> mMetricEventContentCache;
@@ -41,6 +58,12 @@ public:
                            size_t originalTagSize,
                            std::string& res,
                            std::string& errorMsg);
+
+    bool DoSerializePBLogWire(const SLSLogGroupWireView& group,
+                              const GroupTags& tags,
+                              size_t originalTagSize,
+                              std::string& res,
+                              std::string& errorMsg);
 
 private:
     bool Serialize(BatchedEvents&& p, std::string& res, std::string& errorMsg) override;

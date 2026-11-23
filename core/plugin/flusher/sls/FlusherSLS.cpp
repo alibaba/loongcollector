@@ -990,10 +990,18 @@ bool FlusherSLS::Send(const models::PipelineEventGroup& pbGroup, const string& s
     return Send(std::move(data), hash, logstore);
 }
 
+bool FlusherSLS::SendPBLogWire(const models::PipelineEventGroup& header,
+                               const SLSLogGroupWireView& wire,
+                               const string& shardHashKey,
+                               const string& logstore) {
+    return sendPBLogs(header, shardHashKey, logstore, &wire);
+}
+
 bool FlusherSLS::sendPBLogs(const models::PipelineEventGroup& pbGroup,
                             const string& shardHashKey,
-                            const string& logstore) {
-    if (pbGroup.logs().events_size() == 0) {
+                            const string& logstore,
+                            const SLSLogGroupWireView* wire) {
+    if (wire ? wire->mEventCount == 0 : pbGroup.logs().events_size() == 0) {
         LOG_WARNING(
             sLogger,
             ("failed to convert PipelineEventGroup PB", "error transfer PB to PipelineEventGroup: no log events"));
@@ -1021,8 +1029,10 @@ bool FlusherSLS::sendPBLogs(const models::PipelineEventGroup& pbGroup,
     tags.Insert(LOG_RESERVED_KEY_PACKAGE_ID, packId);
 
     string data, errorMsg;
-    if (!mGroupSerializer
-        || !mGroupSerializer->DoSerializePBLogs(pbGroup, tags.mInner, originalTagSize, data, errorMsg)) {
+    const bool serialized = mGroupSerializer
+        && (wire ? mGroupSerializer->DoSerializePBLogWire(*wire, tags.mInner, originalTagSize, data, errorMsg)
+                 : mGroupSerializer->DoSerializePBLogs(pbGroup, tags.mInner, originalTagSize, data, errorMsg));
+    if (!serialized) {
         LOG_WARNING(sLogger, ("failed to serialize PipelineEventGroup PB", errorMsg));
         return false;
     }
@@ -1030,6 +1040,7 @@ bool FlusherSLS::sendPBLogs(const models::PipelineEventGroup& pbGroup,
 }
 
 bool FlusherSLS::Send(string&& data, const string& shardHashKey, const string& logstore) {
+    const auto rawSize = data.size();
     string compressedData;
     if (mCompressor) {
         string errorMsg;
@@ -1048,7 +1059,7 @@ bool FlusherSLS::Send(string&& data, const string& shardHashKey, const string& l
             return false;
         }
     } else {
-        compressedData = data;
+        compressedData = std::move(data);
     }
 
     QueueKey key = mQueueKey;
@@ -1061,7 +1072,7 @@ bool FlusherSLS::Send(string&& data, const string& shardHashKey, const string& l
         }
     }
     return Flusher::PushToQueue(make_unique<SLSSenderQueueItem>(std::move(compressedData),
-                                                                data.size(),
+                                                                rawSize,
                                                                 this,
                                                                 key,
                                                                 logstore.empty() ? mLogstore : logstore,

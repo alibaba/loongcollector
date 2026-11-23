@@ -291,17 +291,22 @@ int LogtailPlugin::SendPipelineEventGroup(const char* configName,
                                           int logstoreSize,
                                           char* pbBuffer,
                                           int32_t pbSize,
-                                          int32_t /*eventCount*/,
+                                          int32_t eventCount,
                                           const char* shardHash,
                                           int shardHashSize) {
     if (configName == NULL || configNameSize <= 0 || pbBuffer == NULL || pbSize <= 0) {
         return -1;
     }
 
-    // The synchronous flusher borrows log contents until serialization finishes.
+    // Canonical logs can borrow the already encoded content fields until
+    // serialization finishes. The generated parser handles other PEG layouts.
+    auto wire = SLSLogGroupWireView::Parse(StringView(pbBuffer, pbSize), max(eventCount, int32_t{0}));
     google::protobuf::Arena arena;
     auto* pbGroup = google::protobuf::Arena::Create<models::PipelineEventGroup>(&arena);
-    if (!pbGroup->ParseFromArray(pbBuffer, pbSize)) {
+    if (wire && !pbGroup->ParseFromArray(wire->mHeader.data(), wire->mHeader.size())) {
+        wire.reset();
+    }
+    if (!wire && !pbGroup->ParseFromArray(pbBuffer, pbSize)) {
         LOG_WARNING(sLogger,
                     ("error", "SendPipelineEventGroup invalid PipelineEventGroup PB")("pb size", pbSize)(
                         "config", std::string(configName, configNameSize)));
@@ -333,7 +338,9 @@ int LogtailPlugin::SendPipelineEventGroup(const char* configName,
         if (!containerConfig->InitForProfile(plugin->mPluginContainerContext)) {
             return -1;
         }
-        return containerConfig->Send(*pbGroup, hash, logstore) ? 0 : -1;
+        const bool sent = wire ? containerConfig->SendPBLogWire(*pbGroup, *wire, hash, logstore)
+                               : containerConfig->Send(*pbGroup, hash, logstore);
+        return sent ? 0 : -1;
     }
 
     shared_ptr<CollectionPipeline> p = CollectionPipelineManager::GetInstance()->FindConfigByName(configNameStr);
@@ -358,7 +365,9 @@ int LogtailPlugin::SendPipelineEventGroup(const char* configName,
     if (shardHashSize > 0 && shardHash != nullptr) {
         hash.assign(shardHash, static_cast<size_t>(shardHashSize));
     }
-    return pConfig->Send(*pbGroup, hash, logstore) ? 0 : -1;
+    const bool sent = wire ? pConfig->SendPBLogWire(*pbGroup, *wire, hash, logstore)
+                           : pConfig->Send(*pbGroup, hash, logstore);
+    return sent ? 0 : -1;
 }
 
 bool LogtailPlugin::LoadPluginBase() {

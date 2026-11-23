@@ -164,6 +164,83 @@ void SerializeSpanAttributesToString(const SpanEvent& event, std::string& result
 
 namespace {
 
+bool ConsumeWireTag(StringView& wire, char tag) {
+    if (wire.empty() || wire.front() != tag) {
+        return false;
+    }
+    wire.remove_prefix(1);
+    return true;
+}
+
+bool ConsumeWireVarint(StringView& wire, uint64_t& value) {
+    value = 0;
+    for (size_t i = 0; i < wire.size() && i < 10; ++i) {
+        const auto byte = static_cast<uint8_t>(wire[i]);
+        if (i == 9 && byte > 1) {
+            return false;
+        }
+        value |= uint64_t(byte & 0x7f) << (i * 7);
+        if (byte < 0x80) {
+            // A noncanonical encoding is accepted by the fallback parser.
+            if (i != 0 && byte == 0) {
+                return false;
+            }
+            wire.remove_prefix(i + 1);
+            return true;
+        }
+    }
+    return false;
+}
+
+bool ConsumeWireBytes(StringView& wire, StringView& value) {
+    uint64_t size;
+    if (!ConsumeWireVarint(wire, size) || size > wire.size()) {
+        return false;
+    }
+    value = wire.substr(0, static_cast<size_t>(size));
+    wire.remove_prefix(static_cast<size_t>(size));
+    return true;
+}
+
+bool ParseSLSLogWire(StringView event, SLSLogGroupWireView& result) {
+    uint64_t timestamp = 0;
+    if (ConsumeWireTag(event, 0x08) && !ConsumeWireVarint(event, timestamp)) {
+        return false;
+    }
+    const auto contentsBegin = event;
+    // A group's native log conversion uses the first key position and last
+    // value for duplicates. Delegate duplicates and wider logs to that path.
+    array<StringView, 16> keys;
+    auto keysEnd = keys.begin();
+    size_t contentSize = 0;
+    while (ConsumeWireTag(event, 0x12)) {
+        StringView field, key, value;
+        if (keysEnd == keys.end() || !ConsumeWireBytes(event, field)
+            || !ConsumeWireTag(field, 0x0a) || !ConsumeWireBytes(field, key)
+            || !ConsumeWireTag(field, 0x12) || !ConsumeWireBytes(field, value) || !field.empty()
+            || find(keys.begin(), keysEnd, key) != keysEnd) {
+            return false;
+        }
+        *keysEnd++ = key;
+        contentSize += key.size() + value.size();
+    }
+    // PEG and SLS use the same wire fields for Contents, Key, and Value.
+    auto contents = contentsBegin.substr(0, contentsBegin.size() - event.size());
+    StringView level;
+    uint64_t ignored;
+    if ((ConsumeWireTag(event, 0x1a) && !ConsumeWireBytes(event, level))
+        || (ConsumeWireTag(event, 0x20) && !ConsumeWireVarint(event, ignored))
+        || (ConsumeWireTag(event, 0x28) && !ConsumeWireVarint(event, ignored)) || !event.empty()) {
+        return false;
+    }
+    ++result.mEventCount;
+    result.mLogInputSize += LogEvent::DataSizeForContents(contentSize);
+    if (!contents.empty()) {
+        result.mLogs.push_back({timestamp, contents});
+    }
+    return true;
+}
+
 bool PrepareSLSLogGroup(LogGroupSerializer& serializer, const GroupTags& tags, size_t logGroupSZ, string& errorMsg) {
     if (logGroupSZ == 0) {
         errorMsg = "all empty logs";
@@ -205,6 +282,70 @@ void SerializeSLSLogGroupTags(LogGroupSerializer& serializer, const GroupTags& t
 }
 
 } // namespace
+
+std::optional<SLSLogGroupWireView> SLSLogGroupWireView::Parse(StringView wire, size_t eventCountHint) {
+    const auto original = wire;
+    StringView mapEntry;
+    // Decode metadata and tags with the generated parser. Only the last,
+    // single logs field is handled by the borrowed view.
+    while (ConsumeWireTag(wire, 0x0a) || ConsumeWireTag(wire, 0x12)) {
+        if (!ConsumeWireBytes(wire, mapEntry)) {
+            return nullopt;
+        }
+    }
+    SLSLogGroupWireView group;
+    group.mHeader = original.substr(0, original.size() - wire.size());
+    StringView logs;
+    if (!ConsumeWireTag(wire, 0x1a) || !ConsumeWireBytes(wire, logs) || !wire.empty()) {
+        return nullopt;
+    }
+    group.mLogs.reserve(min({eventCountHint, logs.size() / 2, size_t{1024}}));
+    while (ConsumeWireTag(logs, 0x0a)) {
+        StringView event;
+        if (!ConsumeWireBytes(logs, event) || !ParseSLSLogWire(event, group)) {
+            return nullopt;
+        }
+    }
+    if (!logs.empty()) {
+        return nullopt;
+    }
+    return group;
+}
+
+bool SLSEventGroupSerializer::DoSerializePBLogWire(const SLSLogGroupWireView& group,
+                                                    const GroupTags& tags,
+                                                    size_t originalTagSize,
+                                                    string& res,
+                                                    string& errorMsg) {
+    const size_t inputSize = sizeof(EventsContainer) + originalTagSize + group.mLogInputSize;
+    return SerializeWithMetrics(inputSize, res, [&] {
+        const bool enableNs = mFlusher->GetContext().GetGlobalConfig().mEnableTimestampNanosecond;
+        size_t groupSize = 0;
+        for (const auto& log : group.mLogs) {
+            size_t logSize;
+            groupSize += GetLogSize(log.mContents.size(), enableNs, logSize);
+        }
+        LogGroupSerializer serializer;
+        if (!PrepareSLSLogGroup(serializer, tags, groupSize, errorMsg)) {
+            return false;
+        }
+        for (const auto& log : group.mLogs) {
+            size_t logSize;
+            GetLogSize(log.mContents.size(), enableNs, logSize);
+            const chrono::nanoseconds timestamp(log.mTimestamp);
+            const auto seconds = chrono::duration_cast<chrono::seconds>(timestamp);
+            serializer.StartToAddLog(logSize);
+            serializer.AddLogTime(seconds.count());
+            serializer.GetResult().append(log.mContents.data(), log.mContents.size());
+            if (enableNs) {
+                serializer.AddLogTimeNs((timestamp - seconds).count());
+            }
+        }
+        SerializeSLSLogGroupTags(serializer, tags);
+        res = std::move(serializer.GetResult());
+        return true;
+    });
+}
 
 bool SLSEventGroupSerializer::DoSerializePBLogs(const models::PipelineEventGroup& group,
                                                 const GroupTags& tags,

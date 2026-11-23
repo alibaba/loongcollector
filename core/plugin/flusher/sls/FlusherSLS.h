@@ -89,6 +89,11 @@ public:
     bool
     Send(const models::PipelineEventGroup& group, const std::string& shardHashKey, const std::string& logstore = "");
 
+    bool SendPBLogWire(const models::PipelineEventGroup& header,
+                       const SLSLogGroupWireView& wire,
+                       const std::string& shardHashKey,
+                       const std::string& logstore);
+
     // Legacy LogGroup wire data, for Go v1 and profile callers.
     bool Send(std::string&& data, const std::string& shardHashKey, const std::string& logstore = "");
 
@@ -137,8 +142,10 @@ private:
     bool SerializeAndPush(BatchedEventsList&& groupList);
     bool SerializeAndPush(PipelineEventGroup&& g); // for exactly once only
     bool PushToQueue(QueueKey key, std::unique_ptr<SenderQueueItem>&& item, uint32_t retryTimes = 500);
-    bool
-    sendPBLogs(const models::PipelineEventGroup& group, const std::string& shardHashKey, const std::string& logstore);
+    bool sendPBLogs(const models::PipelineEventGroup& group,
+                     const std::string& shardHashKey,
+                     const std::string& logstore,
+                     const SLSLogGroupWireView* wire = nullptr);
     std::string GetShardHashKey(const GroupTags& tags) const;
     std::string generatePackId(StringView prefix) const;
     void AddPackId(BatchedEvents& g) const;
