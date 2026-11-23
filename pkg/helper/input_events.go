@@ -28,7 +28,7 @@ import (
 
 // NewInputLog creates an event for a row of string fields and independent tags.
 func NewInputLog(tags, fields map[string]string, timestamps ...time.Time) *models.Log {
-	log := newInputLog(tags, models.NewLogContents(), timestamps)
+	log := newInputLog(tags, models.NewLogContentsWithCapacity(len(fields)), timestamps)
 	for key, value := range fields {
 		setInputLogField(log, key, value)
 	}

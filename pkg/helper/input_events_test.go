@@ -56,3 +56,20 @@ func TestNewInputLogRowRejectsMismatchedColumns(t *testing.T) {
 		require.Nil(t, log)
 	}
 }
+
+func TestNewInputLogDoesNotShareInputFields(t *testing.T) {
+	fields := map[string]string{"content": "body", "field": "value"}
+	for _, name := range []string{"a", "b", "c", "d", "e", "f", "g"} {
+		fields[name] = name
+	}
+	first := NewInputLog(nil, fields)
+	second := NewInputLog(nil, fields)
+
+	first.GetBody()[0] = 'B'
+	first.Contents.Add("field", "changed")
+	require.Equal(t, "body", fields["content"])
+	require.Equal(t, "value", fields["field"])
+	require.Equal(t, []byte("body"), second.GetBody())
+	require.Equal(t, "value", second.Contents.Get("field"))
+	require.Equal(t, len(fields), second.Contents.Len())
+}

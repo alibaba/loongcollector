@@ -183,5 +183,10 @@ func NewSimpleLevelLog(level string, body []byte, tags Tags, timestamp uint64) *
 }
 
 func NewLogContents() LogContents {
-	return NewKeyValues[interface{}]()
+	return NewLogContentsWithCapacity(0)
+}
+
+// NewLogContentsWithCapacity creates writable log fields with space for the expected fields.
+func NewLogContentsWithCapacity(expectedFields int) LogContents {
+	return &keyValuesImpl[interface{}]{keyValues: make(map[string]interface{}, expectedFields)}
 }

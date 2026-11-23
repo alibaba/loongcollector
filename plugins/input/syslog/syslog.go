@@ -594,7 +594,8 @@ func (s *Syslog) parse(b []byte, clientIP string, collector pipeline.PipelineCol
 			continue
 		}
 
-		fields := models.NewLogContents()
+		// Every parsed message has these nine standard fields.
+		fields := models.NewLogContentsWithCapacity(9)
 		fields.Add("_program_", rst.program)
 		fields.Add("_priority_", strconv.Itoa(rst.priority))
 		fields.Add("_facility_", strconv.Itoa(rst.facility))
