@@ -24,6 +24,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/alibaba/ilogtail/pkg/helper"
+	"github.com/alibaba/ilogtail/pkg/models"
+
 	"github.com/go-sql-driver/mysql"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
@@ -230,7 +233,8 @@ func (m *Mysql) CheckPointToString() string {
 }
 
 // Start starts the ServiceInput's service, whatever that may be
-func (m *Mysql) Start(collector pipeline.Collector) error {
+func (m *Mysql) StartService(ctx pipeline.PipelineContext) error {
+	collector := ctx.Collector()
 	m.waitGroup.Add(1)
 	defer m.waitGroup.Done()
 	// initialize additional query intervals
@@ -272,7 +276,7 @@ func (m *Mysql) Start(collector pipeline.Collector) error {
 		select {
 		case <-timer.C:
 			startTime := time.Now()
-			err = m.Collect(collector)
+			err = m.collect(collector)
 			if err != nil {
 				logger.Warning(m.context.GetRuntimeContext(), selfmonitor.MysqlQueryAlarm, "sql query error", err)
 			}
@@ -286,14 +290,14 @@ func (m *Mysql) Start(collector pipeline.Collector) error {
 			}
 			logger.Debug(m.context.GetRuntimeContext(), "sql collect done, start", startTime, "end", endTime, "intervalMs", m.IntervalMs)
 		case <-m.shutdown:
-			m.SaveCheckPoint(collector)
+			m.SaveCheckPoint()
 			logger.Debug(m.context.GetRuntimeContext(), "recv shutdown signal", "start to exit")
 			return nil
 		}
 	}
 }
 
-func (m *Mysql) Collect(collector pipeline.Collector) error {
+func (m *Mysql) collect(collector pipeline.PipelineCollector) error {
 	if m.dbStatment == nil {
 		return fmt.Errorf("unknow error, instance not init")
 	}
@@ -318,7 +322,7 @@ func (m *Mysql) Collect(collector pipeline.Collector) error {
 			if rowCount > 0 {
 				logger.Debug(m.context.GetRuntimeContext(), "syn sql success, data count", rowCount, "offset", startOffset, "pagesize", m.PageSize)
 				if m.CheckPointSavePerPage {
-					m.SaveCheckPoint(collector)
+					m.SaveCheckPoint()
 				}
 			}
 			if m.MaxSyncSize > 0 && (startOffset+rowCount) >= m.MaxSyncSize {
@@ -336,7 +340,7 @@ func (m *Mysql) Collect(collector pipeline.Collector) error {
 			}
 		}
 		if !m.CheckPointSavePerPage && totalRowCount > 0 {
-			m.SaveCheckPoint(collector)
+			m.SaveCheckPoint()
 		}
 		m.collectTotal.Add(int64(totalRowCount))
 	} else {
@@ -347,7 +351,7 @@ func (m *Mysql) Collect(collector pipeline.Collector) error {
 		rowCount := m.ParseRows(rows, collector)
 		if rowCount > 0 {
 			logger.Debug(m.context.GetRuntimeContext(), "syn sql success, data count", rowCount)
-			m.SaveCheckPoint(collector)
+			m.SaveCheckPoint()
 		}
 		m.collectTotal.Add(int64(rowCount))
 	}
@@ -355,7 +359,7 @@ func (m *Mysql) Collect(collector pipeline.Collector) error {
 	return nil
 }
 
-func (m *Mysql) SaveCheckPoint(collector pipeline.Collector) {
+func (m *Mysql) SaveCheckPoint() {
 	cp := CheckPoint{CheckPointColumn: m.CheckPointColumn, CheckPointColumnType: m.CheckPointColumnType, Value: m.CheckPointToString(), LastUpdateTime: time.Now()}
 	buf, err := json.Marshal(&cp)
 	if err != nil {
@@ -371,7 +375,7 @@ func (m *Mysql) SaveCheckPoint(collector pipeline.Collector) {
 	}
 }
 
-func (m *Mysql) ParseRows(rows *sql.Rows, collector pipeline.Collector) int {
+func (m *Mysql) ParseRows(rows *sql.Rows, collector pipeline.PipelineCollector) int {
 	// Must be closed manually, otherwise the connection will not be closed when the statement
 	//   is a storage procedure call such as 'CALL SP(?)' or error happened.
 	defer rows.Close()
@@ -424,7 +428,12 @@ func (m *Mysql) ParseRows(rows *sql.Rows, collector pipeline.Collector) int {
 				m.columnStringValues[index] = "null"
 			}
 		}
-		collector.AddDataArray(nil, m.columnsKeyBuffer, m.columnStringValues)
+		event, err := helper.NewInputLogRow(nil, m.columnsKeyBuffer, m.columnStringValues)
+		if err != nil {
+			logger.Warning(m.context.GetRuntimeContext(), selfmonitor.MysqlParseAlarm, "invalid log row", err)
+			return rowCount
+		}
+		collector.Collect(models.NewGroup(models.NewMetadata(), models.NewTags()), event)
 		rowCount++
 	}
 	if rowCount != 0 {

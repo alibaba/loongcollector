@@ -31,66 +31,26 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/alibaba/ilogtail/pkg/models"
-	"github.com/alibaba/ilogtail/pkg/protocol"
-	"github.com/alibaba/ilogtail/plugins/test"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
 )
 
-func makeTestLogGroupList() *protocol.LogGroupList {
-	fields := map[string]string{}
-	lgl := &protocol.LogGroupList{
-		LogGroupList: make([]*protocol.LogGroup, 0, 10),
-	}
+func makeTestPipelineEventGroups() []*models.PipelineGroupEvents {
+	groups := make([]*models.PipelineGroupEvents, 0, 10)
+	timestamp := uint64(time.Now().Unix()) * uint64(time.Second)
 	for i := 1; i <= 10; i++ {
-		lg := &protocol.LogGroup{
-			Logs:   make([]*protocol.Log, 0, 10),
-			Source: "",
+		group := &models.PipelineGroupEvents{
+			Group:  models.NewGroup(models.NewMetadata(), models.NewTagsWithKeyValues("host.ip", "")),
+			Events: make([]models.PipelineEvent, 0, 10),
 		}
 		for j := 1; j <= 10; j++ {
-			fields["group"] = strconv.Itoa(i)
-			fields["message"] = "The message: " + strconv.Itoa(j)
-			l := test.CreateLogByFields(fields)
-			lg.Logs = append(lg.Logs, l)
+			log := models.NewSimpleLog(nil, models.NewTags(), timestamp)
+			log.GetIndices().Add("group", strconv.Itoa(i))
+			log.GetIndices().Add("message", "The message: "+strconv.Itoa(j))
+			group.Events = append(group.Events, log)
 		}
-		lgl.LogGroupList = append(lgl.LogGroupList, lg)
+		groups = append(groups, group)
 	}
-	return lgl
-}
-
-func makeParityLogGroups() ([]*protocol.LogGroup, []*models.PipelineGroupEvents) {
-	lg := makeTestLogGroupList().GetLogGroupList()[0]
-	single := &protocol.LogGroup{
-		Logs:   []*protocol.Log{lg.Logs[0]},
-		Source: "",
-	}
-	v1Groups := []*protocol.LogGroup{single}
-	return v1Groups, makePipelineGroupEventsFromLogGroups(v1Groups)
-}
-
-func makePipelineGroupEventsFromLogGroups(v1Groups []*protocol.LogGroup) []*models.PipelineGroupEvents {
-	v2Groups := make([]*models.PipelineGroupEvents, 0, len(v1Groups))
-	for _, lg := range v1Groups {
-		groupTags := models.NewTags()
-		groupTags.Add("host.ip", lg.Source)
-		for _, tag := range lg.LogTags {
-			groupTags.Add(tag.Key, tag.Value)
-		}
-		group := models.NewGroup(models.NewMetadata(), groupTags)
-		events := make([]models.PipelineEvent, 0, len(lg.Logs))
-		for _, log := range lg.Logs {
-			ts := uint64(log.GetTime()) * 1e9
-			if log.TimeNs != nil {
-				ts += uint64(*log.TimeNs)
-			}
-			v2Log := models.NewLog("", nil, "", "", "", models.NewTags(), ts)
-			for _, c := range log.Contents {
-				v2Log.GetIndices().Add(c.Key, c.Value)
-			}
-			events = append(events, v2Log)
-		}
-		v2Groups = append(v2Groups, &models.PipelineGroupEvents{Group: group, Events: events})
-	}
-	return v2Groups
+	return groups
 }
 
 func normalizeJSONLines(lines [][]byte) []string {
@@ -113,11 +73,12 @@ func normalizeJSONLines(lines [][]byte) []string {
 }
 
 func TestFlusherLokiExportLogs(t *testing.T) {
-	wires, groups := makeParityLogGroups()
+	groups := makeTestPipelineEventGroups()[:1]
+	groups[0].Events = groups[0].Events[:1]
 	lines := captureLokiEntries(t, func(f *FlusherLoki) error {
 		return f.Export(groups, nil)
 	})
-	require.Equal(t, expectedLogRecords(t, wires), normalizeJSONLines(toBytes(lines)))
+	require.Equal(t, expectedLogRecords(t, groups), normalizeJSONLines(toBytes(lines)))
 }
 
 func TestFlusherLoki_ExportMetricExpansion(t *testing.T) {
@@ -303,17 +264,15 @@ func toBytes(lines []string) [][]byte {
 }
 
 // expectedLogRecords describes the external JSON record for the log fixtures.
-func expectedLogRecords(t *testing.T, groups []*protocol.LogGroup) []string {
+func expectedLogRecords(t *testing.T, groups []*models.PipelineGroupEvents) []string {
 	t.Helper()
 	var rows [][]byte
 	for _, group := range groups {
-		for _, log := range group.Logs {
-			fields := make(map[string]string, len(log.Contents))
-			for _, field := range log.Contents {
-				fields[field.Key] = field.Value
-			}
+		for _, event := range group.Events {
+			log := event.(*models.Log)
+			fields := log.GetIndices().Iterator()
 			data, err := json.Marshal(map[string]any{
-				"contents": fields, "tags": map[string]string{"host.ip": group.Source}, "time": log.Time,
+				"contents": fields, "tags": group.Group.GetTags().Iterator(), "time": log.Timestamp / uint64(time.Second),
 			})
 			require.NoError(t, err)
 			rows = append(rows, data)

@@ -29,7 +29,6 @@ The input plugin is used for reading data.
 type InputWrapper struct {
 	pipeline.PluginContext
 	Config   *LogstoreConfig
-	Tags     map[string]string
 	Interval time.Duration
 
 	// SourceMetricRecord is the plugin_source-level MetricsRecord (category=plugin_source).

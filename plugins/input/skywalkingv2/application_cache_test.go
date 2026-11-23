@@ -176,7 +176,8 @@ func TestRegistryEndpointWithExistApplication(test *testing.T) {
 	endpoint := cache.registryEndpoint(applicationID, "test")
 
 	if endpoint == nil {
-		test.Fatalf("not found exist application")
+		test.Error("not found exist application")
+		return
 	}
 
 	if endpoint.endpointName != "test" {
@@ -194,8 +195,9 @@ func TestRegistryEndpointWithSameEndpoint(test *testing.T) {
 	endpoint := cache.registryEndpoint(applicationID, "test")
 	endpoint1 := cache.registryEndpoint(applicationID, "test")
 
-	if endpoint == nil {
-		test.Fatalf("not found exist application")
+	if endpoint == nil || endpoint1 == nil {
+		test.Error("not found exist application")
+		return
 	}
 
 	if endpoint.applicationID != endpoint1.applicationID {

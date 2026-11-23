@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/alibaba/ilogtail/pkg/config"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pkg/util"
@@ -257,6 +258,25 @@ func (hd *HistogramData) ToMetricLogs(name string, timeMs int64, labels *MetricL
 // Note: must pass safe string
 func NewMetricLog(name string, t int64, value float64, labels *MetricLabels) *protocol.Log {
 	return NewMetricLogStringVal(name, t, FormatMetricLogValue(value), labels)
+}
+
+// NewInputMetric builds an untyped metric from the labels and timestamp used by SLS metric inputs.
+func NewInputMetric(name string, timestamp int64, value float64, labels *MetricLabels) *models.Metric {
+	var timestampBuffer [20]byte
+	switch digits := len(strconv.AppendInt(timestampBuffer[:0], timestamp, 10)); digits {
+	case 13:
+		timestamp *= int64(time.Millisecond)
+	case 19:
+	default:
+		timestamp = int64(float64(timestamp) * math.Pow10(19-digits))
+	}
+	tags := models.NewTags()
+	if labels != nil {
+		for _, label := range labels.keyValues {
+			tags.Add(label.Name, label.Value)
+		}
+	}
+	return models.NewSingleValueMetric(FormatMetricLogName(name), models.MetricTypeUntyped, tags, timestamp, value)
 }
 
 // FormatMetricLogValue formats a floating-point value for the SLS metric row schema.

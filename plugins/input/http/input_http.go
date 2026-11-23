@@ -26,6 +26,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/alibaba/ilogtail/pkg/helper"
+	"github.com/alibaba/ilogtail/pkg/models"
+
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
@@ -293,8 +296,9 @@ func (h *Response) httpGather(address string) (map[string]string, error) {
 	return fields, nil
 }
 
-// Collect gets all metric fields and tags and returns any errors it encounters
-func (h *Response) Collect(collector pipeline.Collector) error {
+// Read gets all metric fields and tags and returns any errors it encounters
+func (h *Response) Read(ctx pipeline.PipelineContext) error {
+	collector := ctx.Collector()
 	// should not occur
 	if h.tags == nil || h.client == nil {
 		return nil
@@ -318,7 +322,7 @@ func (h *Response) Collect(collector pipeline.Collector) error {
 		}
 		if len(fields) > 0 {
 			// Add metrics
-			collector.AddData(h.tags, fields)
+			collector.Collect(models.NewGroup(models.NewMetadata(), models.NewTags()), helper.NewInputLog(h.tags, fields))
 		}
 	}
 

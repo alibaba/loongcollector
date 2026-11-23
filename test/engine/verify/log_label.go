@@ -23,7 +23,6 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/test/config"
 	"github.com/alibaba/ilogtail/test/engine/control"
 	"github.com/alibaba/ilogtail/test/engine/setup/subscriber"
@@ -42,7 +41,7 @@ func LogLabel(ctx context.Context, expectLabelsStr string) (context.Context, err
 	timeoutCtx, cancel := context.WithTimeout(context.TODO(), config.TestConfig.RetryTimeout)
 	defer cancel()
 	var err error
-	var groups []*protocol.LogGroup
+	var groups []*subscriber.Batch
 	err = retry.Do(
 		func() error {
 			groups, err = subscriber.TestSubscriber.GetData(control.GetQuery(ctx), from)
@@ -62,8 +61,8 @@ func LogLabel(ctx context.Context, expectLabelsStr string) (context.Context, err
 	}
 
 	for _, group := range groups {
-		for _, log := range group.Logs {
-			for _, content := range log.Contents {
+		for _, log := range group.Records {
+			for _, content := range log.Fields {
 				if content.Key == "__labels__" {
 					parts := strings.Split(content.Value, "|")
 					if len(expectLabels) != len(parts) {

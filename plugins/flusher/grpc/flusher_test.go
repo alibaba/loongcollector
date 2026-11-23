@@ -56,16 +56,6 @@ func (receiver *reportReceiver) Collect(stream protocol.PipelineEventGroupReport
 	}
 }
 
-type legacyReceiver struct {
-	protocol.UnimplementedLogReportServiceServer
-	calls chan struct{}
-}
-
-func (receiver *legacyReceiver) Collect(stream protocol.LogReportService_CollectServer) error {
-	receiver.calls <- struct{}{}
-	return stream.SendAndClose(&protocol.Response{Code: protocol.ResponseCode_Success})
-}
-
 func testFlusher(t *testing.T, register func(*grpc.Server)) *Flusher {
 	t.Helper()
 	listener := bufconn.Listen(1024 * 1024)
@@ -203,13 +193,9 @@ func TestFlusherExportReturnsServerStatus(t *testing.T) {
 		require.Equal(t, codes.PermissionDenied, status.Code(err), "%v", err)
 		require.Len(t, receiver.reports, 1)
 	})
-	t.Run("legacy service only", func(t *testing.T) {
-		receiver := &legacyReceiver{calls: make(chan struct{}, 1)}
-		flusher := testFlusher(t, func(server *grpc.Server) {
-			protocol.RegisterLogReportServiceServer(server, receiver)
-		})
+	t.Run("event service absent", func(t *testing.T) {
+		flusher := testFlusher(t, func(*grpc.Server) {})
 		err := flusher.Export([]*models.PipelineGroupEvents{group}, nil)
 		require.Equal(t, codes.Unimplemented, status.Code(err), "%v", err)
-		require.Empty(t, receiver.calls)
 	})
 }

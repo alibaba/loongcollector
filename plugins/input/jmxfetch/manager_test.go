@@ -19,8 +19,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alibaba/ilogtail/pkg/helper"
+
 	"github.com/alibaba/ilogtail/pkg/logger"
-	"github.com/alibaba/ilogtail/plugins/test"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
 
 	"github.com/stretchr/testify/assert"
@@ -60,7 +61,7 @@ func TestManager_Register_static_config(t *testing.T) {
 	m.collector = NewLogCollector("test")
 	go m.run()
 	go m.collector.Run()
-	m.RegisterCollector(mock.NewEmptyContext("", "", "11"), "test1", &test.MockMetricCollector{}, []*FilterInner{
+	m.RegisterCollector(mock.NewEmptyContext("", "", "11"), "test1", helper.NewNoopPipelineContext().Collector(), []*FilterInner{
 		{
 			Domain:    "kafka.producer",
 			BeanRegex: "kafka\\.producer:type=producer-metrics,client-id=.*",
@@ -98,7 +99,7 @@ func TestManager_RegisterCollector_And_Start_Stop(t *testing.T) {
 	m.initConfDir()
 	go m.run()
 	go m.collector.Run()
-	m.RegisterCollector(mock.NewEmptyContext("", "", "11"), "test1", &test.MockMetricCollector{}, []*FilterInner{
+	m.RegisterCollector(mock.NewEmptyContext("", "", "11"), "test1", helper.NewNoopPipelineContext().Collector(), []*FilterInner{
 		{
 			Domain:    "kafka.producer",
 			BeanRegex: "kafka\\.producer:type=producer-metrics,client-id=.*",

@@ -25,7 +25,6 @@ import (
 
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/models"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 
 	"github.com/pyroscope-io/pyroscope/pkg/structs/transporttrie"
 	"github.com/stretchr/testify/assert"
@@ -64,11 +63,13 @@ func TestDecoder_DecodeTire(t *testing.T) {
 	request, err := http.NewRequest("POST", "http://localhost:8080?aggregationType=sum&from=1673495500&name=demo.cpu{a=b}&sampleRate=100&spyName=ebpfspy&units=samples&until=1673495510", &buf)
 	request.Header.Set("Content-Type", "binary/octet-stream+trie")
 	assert.NoError(t, err)
-	d := new(Decoder)
-	logs, err := d.Decode(buf.Bytes(), request, map[string]string{"cluster": "sls-mall"})
-	assert.NoError(t, err)
-	assert.True(t, len(logs) == 9)
-	log := logs[1]
+	d := &Decoder{Tags: map[string]string{"cluster": "sls-mall"}}
+	groups, err := d.Decode(buf.Bytes(), request)
+	require.NoError(t, err)
+	require.Len(t, groups, 1)
+	require.Len(t, groups[0].Events, 9)
+	log := groups[0].Events[1].(*models.Log)
+	require.Equal(t, uint64(1673495500000000000), log.GetTimestamp())
 	require.Equal(t, ReadLogVal(log, "name"), "baz")
 	require.Equal(t, ReadLogVal(log, "stack"), "bar\nfoo")
 	require.Equal(t, ReadLogVal(log, "language"), "ebpf")
@@ -81,14 +82,6 @@ func TestDecoder_DecodeTire(t *testing.T) {
 	require.Equal(t, ReadLogVal(log, "labels"), "{\"__name__\":\"demo\",\"a\":\"b\",\"cluster\":\"sls-mall\"}")
 	require.Equal(t, ReadLogVal(log, "val"), "10000000.00")
 
-	d.Tags = map[string]string{"cluster": "sls-mall"}
-	groups, err := d.DecodeV2(buf.Bytes(), request)
-	require.NoError(t, err)
-	require.Len(t, groups, 1)
-	require.Len(t, groups[0].Events, len(logs))
-	event := groups[0].Events[1].(*models.Log)
-	require.Equal(t, uint64(log.GetTime())*1_000_000_000+uint64(log.GetTimeNs()), event.GetTimestamp())
-	require.Equal(t, ReadLogVal(log, "labels"), event.GetIndices().Get("labels"))
 }
 
 func TestDecoder_DecodePprofCumulative(t *testing.T) {
@@ -103,10 +96,15 @@ func TestDecoder_DecodePprofCumulative(t *testing.T) {
 	request, err := http.NewRequest("POST", d.Req.URL, bytes.NewReader(d.Req.Body))
 	require.NoError(t, err)
 	request.Header = d.Req.Header
-	dec := new(Decoder)
-	logs, err := dec.Decode(d.Req.Body, request, map[string]string{"cluster": "sls-mall"})
+	dec := &Decoder{Tags: map[string]string{"cluster": "sls-mall"}}
+	groups, err := dec.Decode(d.Req.Body, request)
 	require.NoError(t, err)
-	require.Equal(t, len(logs), 4)
+	require.Len(t, groups, 1)
+	require.Len(t, groups[0].Events, 4)
+	logs := make([]*models.Log, 0, len(groups[0].Events))
+	for _, event := range groups[0].Events {
+		logs = append(logs, event.(*models.Log))
+	}
 	sort.Slice(logs, func(i, j int) bool {
 		if ReadLogVal(logs[i], "name") < ReadLogVal(logs[j], "name") {
 			return true
@@ -133,11 +131,7 @@ func TestDecoder_DecodePprofCumulative(t *testing.T) {
 }
 
 // ReadLogVal returns the log content value for the input key, and returns empty string when not found.
-func ReadLogVal(log *protocol.Log, key string) string {
-	for _, content := range log.Contents {
-		if content.Key == key {
-			return content.Value
-		}
-	}
-	return ""
+func ReadLogVal(log *models.Log, key string) string {
+	value, _ := log.GetIndices().Get(key).(string)
+	return value
 }

@@ -31,7 +31,6 @@ import (
 	"github.com/alibaba/ilogtail/pkg/helper/profile/pyroscope/raw"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/protocol/decoder/common"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
@@ -42,11 +41,15 @@ type Decoder struct {
 	Tags map[string]string
 }
 
-func (d *Decoder) DecodeV2(data []byte, req *http.Request) ([]*models.PipelineGroupEvents, error) {
+func (d *Decoder) Decode(data []byte, req *http.Request) ([]*models.PipelineGroupEvents, error) {
 	if req == nil {
 		return nil, fmt.Errorf("pyroscope decoder requires an HTTP request")
 	}
-	logs, err := d.Decode(data, req, d.Tags)
+	in, err := d.extractRawInput(data, req)
+	if err != nil {
+		return nil, err
+	}
+	logs, err := in.Profile.Parse(context.Background(), &in.Metadata, d.Tags)
 	if err != nil || len(logs) == 0 {
 		return nil, err
 	}
@@ -54,14 +57,6 @@ func (d *Decoder) DecodeV2(data []byte, req *http.Request) ([]*models.PipelineGr
 		Group:  models.NewGroup(models.NewMetadata(), models.NewTags()),
 		Events: common.WireLogsToEvents(logs),
 	}}, nil
-}
-
-func (d *Decoder) Decode(data []byte, req *http.Request, tags map[string]string) (logs []*protocol.Log, err error) {
-	in, err := d.extractRawInput(data, req)
-	if err != nil {
-		return nil, err
-	}
-	return in.Profile.Parse(context.Background(), &in.Metadata, tags)
 }
 
 func (d *Decoder) extractRawInput(data []byte, req *http.Request) (*profile.Input, error) {

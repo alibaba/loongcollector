@@ -19,6 +19,8 @@ import (
 	"sort"
 	"time"
 
+	"github.com/alibaba/ilogtail/pkg/models"
+
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
@@ -84,7 +86,8 @@ func (ip *InputProcess) Description() string {
 	return "Support collect process metrics on the host machine or Linux virtual environments."
 }
 
-func (ip *InputProcess) Collect(collector pipeline.Collector) error {
+func (ip *InputProcess) Read(ctx pipeline.PipelineContext) error {
+	collector := ctx.Collector()
 	ip.collectTime = time.Now()
 	matchedProcesses, err := ip.filterMatchedProcesses()
 	if err != nil {
@@ -219,7 +222,7 @@ func (ip *InputProcess) filterTopAndThresholdMatchedProcesses(processList []proc
 	return
 }
 
-func (ip *InputProcess) addCPUMetrics(pc processCache, labels *helper.MetricLabels, collector pipeline.Collector) {
+func (ip *InputProcess) addCPUMetrics(pc processCache, labels *helper.MetricLabels, collector pipeline.PipelineCollector) {
 	if percentage := pc.GetProcessStatus().CPUPercentage; percentage != nil {
 
 		ip.addMetric(collector, "process_cpu_percent", &ip.collectTime, labels, percentage.TotalPercentage)
@@ -228,11 +231,11 @@ func (ip *InputProcess) addCPUMetrics(pc processCache, labels *helper.MetricLabe
 	}
 }
 
-func (ip *InputProcess) addMetric(collector pipeline.Collector, name string, t *time.Time, labels *helper.MetricLabels, val float64) {
-	collector.AddRawLog(helper.NewMetricLog(name, t.UnixNano(), val, labels))
+func (ip *InputProcess) addMetric(collector pipeline.PipelineCollector, name string, t *time.Time, labels *helper.MetricLabels, val float64) {
+	collector.Collect(models.NewGroup(models.NewMetadata(), models.NewTags()), helper.NewInputMetric(name, t.UnixNano(), val, labels))
 }
 
-func (ip *InputProcess) addMemMetrics(pc processCache, labels *helper.MetricLabels, collector pipeline.Collector) {
+func (ip *InputProcess) addMemMetrics(pc processCache, labels *helper.MetricLabels, collector pipeline.PipelineCollector) {
 	if mem := pc.GetProcessStatus().Memory; mem != nil {
 		ip.addMetric(collector, "process_mem_rss", &ip.collectTime, labels, float64(mem.Rss))
 		ip.addMetric(collector, "process_mem_swap", &ip.collectTime, labels, float64(mem.Swap))
@@ -241,19 +244,19 @@ func (ip *InputProcess) addMemMetrics(pc processCache, labels *helper.MetricLabe
 	}
 }
 
-func (ip *InputProcess) addThreadMetrics(pc processCache, labels *helper.MetricLabels, collector pipeline.Collector) {
+func (ip *InputProcess) addThreadMetrics(pc processCache, labels *helper.MetricLabels, collector pipeline.PipelineCollector) {
 	if pc.FetchThreads() {
 		ip.addMetric(collector, "process_threads", &ip.collectTime, labels, float64(pc.GetProcessStatus().ThreadsNum))
 	}
 }
 
-func (ip *InputProcess) addOpenFilesMetrics(pc processCache, labels *helper.MetricLabels, collector pipeline.Collector) {
+func (ip *InputProcess) addOpenFilesMetrics(pc processCache, labels *helper.MetricLabels, collector pipeline.PipelineCollector) {
 	if pc.FetchFds() {
 		ip.addMetric(collector, "process_fds", &ip.collectTime, labels, float64(pc.GetProcessStatus().FdsNum))
 	}
 }
 
-func (ip *InputProcess) addNetIOMetrics(pc processCache, labels *helper.MetricLabels, collector pipeline.Collector) {
+func (ip *InputProcess) addNetIOMetrics(pc processCache, labels *helper.MetricLabels, collector pipeline.PipelineCollector) {
 	if pc.FetchNetIO() {
 		net := pc.GetProcessStatus().NetIO
 		ip.addMetric(collector, "process_net_in_bytes", &ip.collectTime, labels, float64(net.InBytes))
@@ -263,7 +266,7 @@ func (ip *InputProcess) addNetIOMetrics(pc processCache, labels *helper.MetricLa
 	}
 }
 
-func (ip *InputProcess) addIOMetrics(pc processCache, labels *helper.MetricLabels, collector pipeline.Collector) {
+func (ip *InputProcess) addIOMetrics(pc processCache, labels *helper.MetricLabels, collector pipeline.PipelineCollector) {
 	if pc.FetchIO() {
 		io := pc.GetProcessStatus().IO
 		ip.addMetric(collector, "process_read_bytes", &ip.collectTime, labels, float64(io.ReadeBytes))

@@ -16,7 +16,6 @@ package pluginmanager
 
 import (
 	"fmt"
-	"math"
 	"testing"
 	"time"
 
@@ -66,17 +65,6 @@ func TestProcessorDirectlyForwardsAllEventTypes(t *testing.T) {
 		})
 	}
 }
-func TestCollectorInputEmitsNamedContents(t *testing.T) {
-	ctx := helper.NewObservePipelineContext(4)
-	collector := &inputCollector{context: ctx}
-	collector.AddDataWithContext(map[string]string{"tag": "value"}, map[string]string{"content": "body", "field": "named"}, map[string]interface{}{"source": "id"}, time.Unix(10, 20))
-	group := <-ctx.Collector().Observe()
-	log := group.Events[0].(*models.Log)
-	require.Equal(t, "named", log.Contents.Get("field"))
-	require.Equal(t, "value", log.Tags.Get("tag"))
-	require.Equal(t, []byte("body"), log.GetBody())
-	require.Equal(t, uint64(10000000020), log.Timestamp)
-}
 func BenchmarkPipelineConfigInit(b *testing.B) {
 	jsonConfig := `{"global":{"StructureType":"v2"},"flushers":[{"type":"flusher_stdout"}]}`
 	b.ReportAllocs()
@@ -107,19 +95,19 @@ func TestRunnerRestoresPendingGroupsBeforeStart(t *testing.T) {
 	require.Zero(t, store.Len())
 }
 
-type collectorOnlyInput struct{}
+type eventMetricInput struct{}
 
-func (*collectorOnlyInput) Init(pipeline.Context) (int, error) { return 0, nil }
-func (*collectorOnlyInput) Description() string                { return "collector compatibility" }
-func (*collectorOnlyInput) Collect(collector pipeline.Collector) error {
-	collector.AddData(nil, map[string]string{"content": "body", "key": "value"})
+func (*eventMetricInput) Init(pipeline.Context) (int, error) { return 0, nil }
+func (*eventMetricInput) Description() string                { return "event input" }
+func (*eventMetricInput) Read(ctx pipeline.PipelineContext) error {
+	ctx.Collector().Collect(models.NewGroup(nil, nil), helper.NewInputLog(nil, map[string]string{"content": "body", "key": "value"}))
 	return nil
 }
-func TestCollectorOnlyInputUsesEventCounters(t *testing.T) {
+func TestMetricInputUsesEventCounters(t *testing.T) {
 	ctx := &ContextImp{}
 	ctx.InitContext("project", "store", "collector")
 	runner := &pluginRunner{LogstoreConfig: &LogstoreConfig{Context: ctx, GlobalConfig: &config.GlobalConfig{}}}
-	require.NoError(t, runner.addMetricInput(&pipeline.PluginMeta{PluginID: "1", PluginType: "collector"}, &collectorOnlyInput{}, 1000))
+	require.NoError(t, runner.addMetricInput(&pipeline.PluginMeta{PluginID: "1", PluginType: "collector"}, &eventMetricInput{}, 1000))
 	output := helper.NewObservePipelineContext(2)
 	require.NoError(t, runner.MetricPlugins[0].Read(output))
 	group := <-output.Collector().Observe()
@@ -131,29 +119,6 @@ func TestCollectorOnlyInputUsesEventCounters(t *testing.T) {
 		require.Equal(t, "1.0000", counters["out_events_total"])
 	}
 }
-func TestCollectorMetricLogBecomesMetric(t *testing.T) {
-	output := helper.NewObservePipelineContext(2)
-	collector := &inputCollector{context: output}
-	labels := &helper.MetricLabels{}
-	labels.Append("city", "hz")
-	collector.AddRawLog(helper.NewMetricLog("counter", time.Unix(10, 20).UnixNano(), 42, labels))
-	event := (<-output.Collector().Observe()).Events[0]
-	metric, ok := event.(*models.Metric)
-	require.True(t, ok)
-	require.Equal(t, "counter", metric.Name)
-	require.Equal(t, "hz", metric.Tags.Get("city"))
-	require.Equal(t, float64(42), metric.Value.GetSingleValue())
-}
-
-func TestCollectorStaleMetricPreservesNaNPayload(t *testing.T) {
-	output := helper.NewObservePipelineContext(1)
-	collector := &inputCollector{context: output}
-	collector.AddRawLog(helper.NewMetricLog("stale", time.Now().UnixNano(), math.Float64frombits(helper.StaleNaN), &helper.MetricLabels{}))
-	metric, ok := (<-output.Collector().Observe()).Events[0].(*models.Metric)
-	require.True(t, ok)
-	require.Equal(t, helper.StaleNaN, math.Float64bits(metric.Value.GetSingleValue()))
-}
-
 func TestNativeInputPreservesFieldsAndGroupTags(t *testing.T) {
 	ctx := &ContextImp{}
 	ctx.InitContext("project", "store", "native")
@@ -174,21 +139,25 @@ func TestNativeInputPreservesFieldsAndGroupTags(t *testing.T) {
 	require.Equal(t, "pack", group.Group.Metadata.Get("source"))
 }
 
-// Collector tags stay separate from contents in memory and on the output wire.
-func TestCollectorTagsStaySeparate(t *testing.T) {
+// Input tags stay separate from contents in memory and on the output wire.
+func TestInputEventTagsStaySeparate(t *testing.T) {
 	for _, array := range []bool{false, true} {
 		t.Run(fmt.Sprintf("array=%t", array), func(t *testing.T) {
-			output := helper.NewObservePipelineContext(1)
-			collector := &inputCollector{context: output, configTags: map[string]string{"configured": "value"}}
-			tags := map[string]string{"_method_": "GET", "_image_name_": "example-container:latest"}
-			ctx := map[string]interface{}{"source": "container", "tags": []*protocol.LogTag{{Key: "group", Value: "tag"}}}
+			tags := map[string]string{"_method_": "GET", "_image_name_": "example-container:latest", "configured": "value"}
+			var log *models.Log
 			if array {
-				collector.AddDataArrayWithContext(tags, []string{"content", "field"}, []string{"body", "value"}, ctx, time.Unix(10, 20))
+				var err error
+				log, err = helper.NewInputLogRow(tags, []string{"content", "field"}, []string{"body", "value"}, time.Unix(10, 20))
+				require.NoError(t, err)
 			} else {
-				collector.AddDataWithContext(tags, map[string]string{"content": "body", "field": "value"}, ctx, time.Unix(10, 20))
+				log = helper.NewInputLog(tags, map[string]string{"content": "body", "field": "value"}, time.Unix(10, 20))
 			}
-			group := <-output.Collector().Observe()
-			log := group.Events[0].(*models.Log)
+			group := &models.PipelineGroupEvents{
+				Group:  models.NewGroup(models.NewMetadataWithKeyValues("source", "container"), models.NewTagsWithKeyValues("group", "tag")),
+				Events: []models.PipelineEvent{log},
+			}
+			require.Equal(t, "value", log.GetIndices().Get("field"))
+			require.Equal(t, uint64(10000000020), log.GetTimestamp())
 			require.Equal(t, "GET", log.Tags.Get("_method_"))
 			require.False(t, log.Contents.Contains("_method_"))
 			require.Equal(t, "example-container:latest", log.Tags.Get("_image_name_"))
@@ -212,16 +181,4 @@ func TestCollectorTagsStaySeparate(t *testing.T) {
 			require.Equal(t, []byte("body"), receivedLog.GetBody())
 		})
 	}
-}
-
-func TestCollectorRejectsMismatchedArrays(t *testing.T) {
-	output := helper.NewObservePipelineContext(1)
-	ctx := &ContextImp{}
-	ctx.InitContext("project", "store", "array-input")
-	collector := &inputCollector{context: output, runtimeContext: ctx.GetRuntimeContext()}
-
-	collector.AddDataArray(nil, []string{"first", "second"}, []string{"value"})
-	require.Len(t, output.Collector().Observe(), 0)
-	collector.AddDataArray(nil, []string{"first"}, []string{"value", "extra"})
-	require.Len(t, output.Collector().Observe(), 0)
 }

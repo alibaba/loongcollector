@@ -24,10 +24,8 @@ import (
 
 	dogstatsd "github.com/narqo/go-dogstatsd-parser"
 
-	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/protocol/decoder/common"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
@@ -37,23 +35,11 @@ type Decoder struct {
 	mu   sync.Mutex
 }
 
-func (d *Decoder) Decode(data []byte, _ *http.Request, _ map[string]string) (logs []*protocol.Log, err error) {
-	timestamp := time.Now().UnixNano()
-	d.parseMetrics(data, func(metric *dogstatsd.Metric, value float64) {
-		var labels helper.MetricLabels
-		for key, tag := range metric.Tags {
-			labels.Append(key, tag)
-		}
-		logs = append(logs, helper.NewMetricLog(metric.Name, timestamp, value, &labels))
-	})
-	return logs, nil
-}
-
 func (d *Decoder) ParseRequest(res http.ResponseWriter, req *http.Request, maxBodySize int64) ([]byte, int, error) {
 	return common.CollectBody(res, req, maxBodySize)
 }
 
-func (d *Decoder) DecodeV2(data []byte, _ *http.Request) ([]*models.PipelineGroupEvents, error) {
+func (d *Decoder) Decode(data []byte, _ *http.Request) ([]*models.PipelineGroupEvents, error) {
 	timestamp := time.Now().UnixNano()
 	var events []models.PipelineEvent
 	d.parseMetrics(data, func(metric *dogstatsd.Metric, value float64) {

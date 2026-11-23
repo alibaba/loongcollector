@@ -4,9 +4,9 @@ LoongCollector Go 侧的采集配置使用 `Pipeline Event` 作为内部数据�
 
 ## SLS Log Protocol
 
-兼容的采集接口（如 `Collector.AddRawLog`）接收 `protocol.Log`，在进入 Pipeline 时转换为事件。Go 的 `flusher_sls` 将 `PipelineEventGroup` PB 传回 C++，由 C++ Flusher 在 SLS 日志出口序列化为 `LogGroup`。Go 的 SLS 输入解码器在接收时将 SLS protobuf 转成事件。协议结构见 [SLS 协议](log-protocol/protocol-spec/sls.md)。
+采集插件通过 `PipelineContext` 直接提交事件。Go 的 `flusher_sls` 将 `PipelineEventGroup` PB 传回 C++，由 C++ Flusher 在 SLS 日志出口序列化为 `LogGroup`。Go 的 SLS 输入解码器解析外部 protobuf 后直接提交事件，Go 中没有 `LogGroup` 类型。协议结构见 [SLS 协议](log-protocol/protocol-spec/sls.md)。
 
-`flusher_grpc` 通过 `logtail.report.PipelineEventGroupReportService/Collect` 流式发送事件。接收端应先按 [事件 gRPC proto](../../../pkg/protocol/proto/pipeline_event_group_transfer.proto) 注册该服务并生成代码。每条请求携带一批同类事件及组元数据、组标签和可选发送目的地。组内事件的独立标签另行编码。接收端读完流后发送 `PipelineEventGroupReportResponse`，拒收时返回非 OK gRPC 状态。旧 `LogReportService.Collect` 接收端升级后才能接收新的事件流。
+`flusher_grpc` 通过 `logtail.report.PipelineEventGroupReportService/Collect` 流式发送事件。接收端应先按 [事件 gRPC proto](../../../pkg/protocol/proto/pipeline_event_group_transfer.proto) 注册该服务并生成代码。每条请求携带一批同类事件及组元数据、组标签和可选发送目的地。组内事件的独立标签另行编码。接收端读完流后发送 `PipelineEventGroupReportResponse`，拒收时返回非 OK gRPC 状态。接收端需实现新的流式事件 RPC。
 
 ## Pipeline Event
 

@@ -16,6 +16,10 @@ package process
 
 import (
 	"github.com/shirou/gopsutil/process"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/alibaba/ilogtail/pkg/models"
 
 	"encoding/json"
 	"fmt"
@@ -28,7 +32,6 @@ import (
 
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/plugins/test"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
 )
 
@@ -123,15 +126,20 @@ func TestInputProcess_RegexMatching(t *testing.T) {
 		t.Errorf("cannot init the mock process plugin: %v", err)
 		return
 	}
-	c := &test.MockMetricCollector{}
-	_ = p.Collect(c)
-	_ = p.Collect(c)
-	if len(c.Logs) != 7 {
-		bytes, _ := json.Marshal(c.Logs)
+	c := helper.NewGroupedPipelineContext()
+	_ = p.Read(c)
+	_ = p.Read(c)
+	groups := c.Collector().ToArray()
+	if len(groups) != 7 {
+		bytes, _ := json.Marshal(groups)
 		t.Errorf("regex matching should only match one process: %s", string(bytes))
 	} else {
-		for _, log := range c.Logs {
-			bytes, _ := json.Marshal(log)
+		for _, group := range groups {
+			require.Len(t, group.Events, 1)
+			metric, ok := group.Events[0].(*models.Metric)
+			require.True(t, ok)
+			assert.NotEmpty(t, metric.GetName())
+			bytes, _ := json.Marshal(metric)
 			fmt.Printf("got metrics: %s\n", string(bytes))
 		}
 	}

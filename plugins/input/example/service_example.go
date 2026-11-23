@@ -19,6 +19,9 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/alibaba/ilogtail/pkg/helper"
+	"github.com/alibaba/ilogtail/pkg/models"
+
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 )
@@ -46,13 +49,14 @@ func (s *ServiceExample) Description() string {
 // Start the service example plugin would run in a separate go routine, so it is blocking method.
 // The ServiceInput plugin is suitable for receiving the external input data.
 // In the demo, we implemented an http server to accept the specified header of requests.
-func (s *ServiceExample) Start(collector pipeline.Collector) error {
+func (s *ServiceExample) StartService(ctx pipeline.PipelineContext) error {
+	collector := ctx.Collector()
 	logger.Info(s.context.GetRuntimeContext(), "start the example plugin")
 	mux := http.NewServeMux()
 	mux.HandleFunc("/data", func(writer http.ResponseWriter, request *http.Request) {
 		val := request.Header.Get("test")
 		if val != "" {
-			collector.AddDataArray(nil, []string{"test"}, []string{val})
+			collector.Collect(models.NewGroup(models.NewMetadata(), models.NewTags()), helper.NewInputLog(nil, map[string]string{"test": val}))
 		}
 	})
 	s.server = &http.Server{

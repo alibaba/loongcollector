@@ -30,7 +30,7 @@ mkdir example_plugin
 
 ### 4. 编写插件代码
 
-新插件建议实现 `ServiceInputV2`（`StartService`），通过 `PipelineContext.Collector()` 直接提交事件。已有 `ServiceInputV1` 插件可继续使用 `Start(Collector)` 和 `AddRawLog`，采集器会在输入边界将日志转换为事件。下面的示例通过 `StartService` 提交指标事件。
+服务型插件实现 `ServiceInput`，在 `StartService(PipelineContext)` 中取得事件 Collector。旧插件需把采集入口迁移到 `Read(PipelineContext)` 或 `StartService(PipelineContext)`，然后重新编译。下面的示例提交指标事件。
 
 ```shell
 cd example_plugin

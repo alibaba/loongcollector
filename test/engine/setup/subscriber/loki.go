@@ -25,7 +25,6 @@ import (
 	"github.com/mitchellh/mapstructure"
 
 	"github.com/alibaba/ilogtail/pkg/doc"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
 const lokiName = "loki"
@@ -72,7 +71,7 @@ func (l *LokiSubscriber) Description() string {
 	return "this a loki subscriber, which is the default mock backend for loongcollector."
 }
 
-func (l *LokiSubscriber) GetData(sql string, startTime int32) ([]*protocol.LogGroup, error) {
+func (l *LokiSubscriber) GetData(sql string, startTime int32) ([]*Batch, error) {
 	host, err := TryReplacePhysicalAddress(l.Address)
 	if err != nil {
 		return nil, err
@@ -89,8 +88,8 @@ func (l *LokiSubscriber) GetData(sql string, startTime int32) ([]*protocol.LogGr
 	l.url = fmt.Sprintf("%s/loki/api/v1/query_range", host)
 	l.query = fmt.Sprintf("{%s}", strings.Join(queries, ", "))
 	l.lastTimestamp = int64(startTime)
-	logGroup, _, err := l.queryRecords()
-	return []*protocol.LogGroup{logGroup}, err
+	batch, _, err := l.queryRecords()
+	return []*Batch{batch}, err
 }
 
 func (l *LokiSubscriber) Stop() error {
@@ -101,9 +100,9 @@ func (l *LokiSubscriber) FlusherConfig() string {
 	return ""
 }
 
-func (l *LokiSubscriber) queryRecords() (logGroup *protocol.LogGroup, maxTimestamp int64, err error) {
-	logGroup = &protocol.LogGroup{
-		Logs: []*protocol.Log{},
+func (l *LokiSubscriber) queryRecords() (batch *Batch, maxTimestamp int64, err error) {
+	batch = &Batch{
+		Records: []*Record{},
 	}
 	req, _ := http.NewRequest("GET", l.url, nil)
 	if l.TenantID != "" {
@@ -128,7 +127,7 @@ func (l *LokiSubscriber) queryRecords() (logGroup *protocol.LogGroup, maxTimesta
 	}
 	for _, result := range queryResponse.Data.Result {
 		for _, value := range result.Values {
-			log := &protocol.Log{}
+			log := &Record{}
 			lc := logContent{}
 			logTimestamp, _ := strconv.ParseInt(value[0], 10, 64)
 			if logTimestamp > maxTimestamp {
@@ -138,12 +137,12 @@ func (l *LokiSubscriber) queryRecords() (logGroup *protocol.LogGroup, maxTimesta
 				return
 			}
 			for k, v := range lc.Contents {
-				log.Contents = append(log.Contents, &protocol.Log_Content{Key: k, Value: v})
+				log.Fields = append(log.Fields, Field{Key: k, Value: v})
 			}
 			for k, v := range lc.Tags {
-				log.Contents = append(log.Contents, &protocol.Log_Content{Key: k, Value: v})
+				log.Fields = append(log.Fields, Field{Key: k, Value: v})
 			}
-			logGroup.Logs = append(logGroup.Logs, log)
+			batch.Records = append(batch.Records, log)
 		}
 	}
 	return

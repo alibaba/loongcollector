@@ -28,7 +28,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/protocol"
@@ -100,98 +99,6 @@ func CreateLogByFields(fields map[string]string) *protocol.Log {
 	nowTime := time.Now()
 	protocol.SetLogTime(&slsLog, uint32(nowTime.Unix()))
 	return &slsLog
-}
-
-type MockLog struct {
-	Tags   map[string]string
-	Fields map[string]string
-}
-
-type MockCollector struct {
-	Logs    []*MockLog
-	RawLogs []*protocol.Log
-}
-
-func (c *MockCollector) AddData(
-	tags map[string]string, fields map[string]string, t ...time.Time) {
-	c.AddDataWithContext(tags, fields, nil, t...)
-}
-
-func (c *MockCollector) AddDataArray(
-	tags map[string]string, columns []string, values []string, t ...time.Time) {
-	c.AddDataArrayWithContext(tags, columns, values, nil, t...)
-}
-
-func (c *MockCollector) AddRawLog(log *protocol.Log) {
-	c.AddRawLogWithContext(log, nil)
-}
-
-func (c *MockCollector) AddDataWithContext(
-	tags map[string]string, fields map[string]string, ctx map[string]interface{}, t ...time.Time) {
-	c.Logs = append(c.Logs, &MockLog{tags, fields})
-}
-
-func (c *MockCollector) AddDataArrayWithContext(
-	tags map[string]string, columns []string, values []string, ctx map[string]interface{}, t ...time.Time) {
-}
-
-func (c *MockCollector) AddRawLogWithContext(log *protocol.Log, ctx map[string]interface{}) {
-	c.RawLogs = append(c.RawLogs, log)
-}
-
-type MockMetricCollector struct {
-	Logs    []*protocol.Log
-	Tags    map[string]string
-	RawLogs []*protocol.Log
-	// Benchmark switch ignore the cpu and memory performance influences when opening.
-	Benchmark bool
-}
-
-func (m *MockMetricCollector) AddData(tags map[string]string, fields map[string]string, t ...time.Time) {
-	m.AddDataWithContext(tags, fields, nil, t...)
-}
-
-func (m *MockMetricCollector) AddDataArray(tags map[string]string, columns []string, values []string, t ...time.Time) {
-	m.AddDataArrayWithContext(tags, columns, values, nil, t...)
-}
-
-func (m *MockMetricCollector) AddRawLog(log *protocol.Log) {
-	m.AddRawLogWithContext(log, nil)
-}
-
-func (m *MockMetricCollector) AddDataWithContext(tags map[string]string, fields map[string]string, ctx map[string]interface{}, t ...time.Time) {
-	if m.Benchmark {
-		return
-	}
-	var logTime time.Time
-	if len(t) == 0 {
-		logTime = time.Now()
-	} else {
-		logTime = t[0]
-	}
-	slsLog, _ := helper.CreateLog(logTime, len(t) != 0, m.Tags, tags, fields)
-	m.Logs = append(m.Logs, slsLog)
-}
-
-func (m *MockMetricCollector) AddDataArrayWithContext(tags map[string]string, columns []string, values []string, ctx map[string]interface{}, t ...time.Time) {
-	if m.Benchmark {
-		return
-	}
-	var logTime time.Time
-	if len(t) == 0 {
-		logTime = time.Now()
-	} else {
-		logTime = t[0]
-	}
-	slsLog, _ := helper.CreateLogByArray(logTime, len(t) != 0, m.Tags, tags, columns, values)
-	m.Logs = append(m.Logs, slsLog)
-}
-
-func (m *MockMetricCollector) AddRawLogWithContext(log *protocol.Log, ctx map[string]interface{}) {
-	if m.Benchmark {
-		return
-	}
-	m.Logs = append(m.Logs, log)
 }
 
 type portpair struct {

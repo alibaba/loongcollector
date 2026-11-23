@@ -22,7 +22,6 @@ import (
 	"github.com/avast/retry-go/v4"
 	"gopkg.in/yaml.v3"
 
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/test/config"
 	"github.com/alibaba/ilogtail/test/engine/control"
 	"github.com/alibaba/ilogtail/test/engine/setup/subscriber"
@@ -41,7 +40,7 @@ func TagKV(ctx context.Context, expectKeyValuesStr string) (context.Context, err
 	timeoutCtx, cancel := context.WithTimeout(context.TODO(), config.TestConfig.RetryTimeout)
 	defer cancel()
 	var err error
-	var groups []*protocol.LogGroup
+	var groups []*subscriber.Batch
 	err = retry.Do(
 		func() error {
 			groups, err = subscriber.TestSubscriber.GetData(control.GetQuery(ctx), from)
@@ -57,7 +56,9 @@ func TagKV(ctx context.Context, expectKeyValuesStr string) (context.Context, err
 
 	kvRegexps := make(map[string]*regexp.Regexp)
 	expectKeyValues := make(map[string]string)
-	err = yaml.Unmarshal([]byte(expectKeyValuesStr), expectKeyValues)
+	if err := yaml.Unmarshal([]byte(expectKeyValuesStr), &expectKeyValues); err != nil {
+		return ctx, err
+	}
 	for k, v := range expectKeyValues {
 		reg, err := regexp.Compile(v)
 		if err != nil {
@@ -68,16 +69,13 @@ func TagKV(ctx context.Context, expectKeyValuesStr string) (context.Context, err
 
 	for _, group := range groups {
 		for k, reg := range kvRegexps {
-			for _, tag := range group.LogTags {
-				if tag.Key == k {
-					if !reg.MatchString(tag.Value) {
-						return ctx, fmt.Errorf("want contains KV %s:%s, but got %s:%s", k, reg.String(), tag.Key, tag.Value)
-					}
-					goto find
-				}
+			value, found := group.Tags[k]
+			if !found {
+				return ctx, fmt.Errorf("want contains KV %s:%s, but not found", k, reg)
 			}
-			return ctx, fmt.Errorf("want contains KV %s:%s, but not found", k, reg.String())
-		find:
+			if !reg.MatchString(value) {
+				return ctx, fmt.Errorf("want contains KV %s:%s, but got %s:%s", k, reg, k, value)
+			}
 		}
 	}
 	return ctx, nil

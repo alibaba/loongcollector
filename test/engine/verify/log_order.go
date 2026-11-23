@@ -22,7 +22,6 @@ import (
 
 	"github.com/avast/retry-go/v4"
 
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/test/config"
 	"github.com/alibaba/ilogtail/test/engine/control"
 	"github.com/alibaba/ilogtail/test/engine/setup/subscriber"
@@ -41,7 +40,7 @@ func LogOrder(ctx context.Context) (context.Context, error) {
 	timeoutCtx, cancel := context.WithTimeout(context.TODO(), config.TestConfig.RetryTimeout)
 	defer cancel()
 	var err error
-	var groups []*protocol.LogGroup
+	var groups []*subscriber.Batch
 	err = retry.Do(
 		func() error {
 			groups, err = subscriber.TestSubscriber.GetData(control.GetQuery(ctx), from)
@@ -58,13 +57,13 @@ func LogOrder(ctx context.Context) (context.Context, error) {
 	// Check log order
 	currentLogNo := 0
 	for i := 0; i < len(groups); i++ {
-		for j := 0; j < len(groups[i].Logs); j++ {
+		for j := 0; j < len(groups[i].Records); j++ {
 			if j == 0 {
-				currentLogNo, _ = getLogNoFromLog(groups[i].Logs[j])
+				currentLogNo, _ = getLogNoFromLog(groups[i].Records[j])
 				continue
 			}
-			if groups[i].Logs[j].Time > groups[i].Logs[j-1].Time {
-				if nextLogNo, ok := getLogNoFromLog(groups[i].Logs[j]); ok {
+			if groups[i].Records[j].Timestamp/1e9 > groups[i].Records[j-1].Timestamp/1e9 {
+				if nextLogNo, ok := getLogNoFromLog(groups[i].Records[j]); ok {
 					if nextLogNo != currentLogNo+1 {
 						return ctx, fmt.Errorf("log order is not correct, current logNo: %d, next logNo: %d", currentLogNo, nextLogNo)
 					}
@@ -77,8 +76,8 @@ func LogOrder(ctx context.Context) (context.Context, error) {
 	return ctx, nil
 }
 
-func getLogNoFromLog(log *protocol.Log) (int, bool) {
-	for _, content := range log.Contents {
+func getLogNoFromLog(log *subscriber.Record) (int, bool) {
+	for _, content := range log.Fields {
 		if content.Key == "logNo" {
 			logNo, err := strconv.Atoi(content.Value)
 			if err != nil {

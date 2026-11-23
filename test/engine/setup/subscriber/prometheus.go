@@ -27,7 +27,6 @@ import (
 
 	"github.com/alibaba/ilogtail/pkg/doc"
 	"github.com/alibaba/ilogtail/pkg/logger"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
 const prometheusName = "prometheus"
@@ -45,7 +44,7 @@ func (p *PrometheusSubscriber) Description() string {
 	return "prometheus subscriber queries instant vectors via HTTP API"
 }
 
-func (p *PrometheusSubscriber) GetData(_ string, _ int32) ([]*protocol.LogGroup, error) {
+func (p *PrometheusSubscriber) GetData(_ string, _ int32) ([]*Batch, error) {
 	if p.Query == "" {
 		p.Query = "agent_cpu"
 	}
@@ -78,29 +77,29 @@ func (p *PrometheusSubscriber) GetData(_ string, _ int32) ([]*protocol.LogGroup,
 		return nil, err
 	}
 	if parsed.Status != "success" || len(parsed.Data.Result) == 0 {
-		return []*protocol.LogGroup{{Logs: []*protocol.Log{}}}, nil
+		return []*Batch{{Records: []*Record{}}}, nil
 	}
-	logGroup := &protocol.LogGroup{Logs: make([]*protocol.Log, 0, len(parsed.Data.Result))}
+	batch := &Batch{Records: make([]*Record, 0, len(parsed.Data.Result))}
 	for _, r := range parsed.Data.Result {
-		log := &protocol.Log{Contents: make([]*protocol.Log_Content, 0, 8)}
+		log := &Record{Fields: make([]Field, 0, 8)}
 		if name, ok := r.Metric["__name__"]; ok {
-			log.Contents = append(log.Contents, &protocol.Log_Content{Key: "__name__", Value: name})
+			log.Fields = append(log.Fields, Field{Key: "__name__", Value: name})
 		}
 		for k, v := range r.Metric {
 			if k == "__name__" {
 				continue
 			}
-			log.Contents = append(log.Contents, &protocol.Log_Content{Key: k, Value: v})
+			log.Fields = append(log.Fields, Field{Key: k, Value: v})
 		}
 		if len(r.Value) >= 2 {
 			if valStr, ok := r.Value[1].(string); ok {
-				log.Contents = append(log.Contents, &protocol.Log_Content{Key: "__value__", Value: valStr})
+				log.Fields = append(log.Fields, Field{Key: "__value__", Value: valStr})
 			}
 		}
-		logGroup.Logs = append(logGroup.Logs, log)
+		batch.Records = append(batch.Records, log)
 	}
-	logger.Debugf(context.Background(), "prometheus subscriber got %d samples for query %s", len(logGroup.Logs), p.Query)
-	return []*protocol.LogGroup{logGroup}, nil
+	logger.Debugf(context.Background(), "prometheus subscriber got %d samples for query %s", len(batch.Records), p.Query)
+	return []*Batch{batch}, nil
 }
 
 func (p *PrometheusSubscriber) FlusherConfig() string {

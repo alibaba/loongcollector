@@ -15,7 +15,6 @@
 package skywalkingv3
 
 import (
-	"github.com/alibaba/ilogtail/pkg/pipeline"
 	v3 "github.com/alibaba/ilogtail/plugins/input/skywalkingv3/skywalking/network/common/v3"
 	agent "github.com/alibaba/ilogtail/plugins/input/skywalkingv3/skywalking/network/language/agent/v3"
 )
@@ -24,10 +23,7 @@ type perfDataHandler interface {
 	collectorPerfData(logs *agent.BrowserPerfData) (*v3.Commands, error)
 }
 
-type perfDataHandlerImpl struct {
-	context   pipeline.Context
-	collector pipeline.Collector
-}
+type perfDataHandlerImpl struct{}
 
 func (p perfDataHandlerImpl) collectorPerfData(perfData *agent.BrowserPerfData) (*v3.Commands, error) {
 	return &v3.Commands{}, nil

@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/encoding/protowire"
 	"gotest.tools/assert"
 
 	"github.com/alibaba/ilogtail/pkg/helper"
@@ -235,26 +236,28 @@ func TestInputSLS(t *testing.T) {
 	})
 	require.NoError(t, err)
 	nanos := uint32(987654321)
-	wire := &protocol.LogGroup{
-		Source:      "sender",
-		Topic:       "access",
-		Category:    "original-logstore",
-		MachineUUID: "sender-id",
-		LogTags:     []*protocol.LogTag{{Key: "node", Value: "edge"}},
-		Logs: []*protocol.Log{
-			{
-				Time: 1700000000, TimeNs: &nanos,
-				Contents: []*protocol.Log_Content{
-					{Key: "content", Value: "message"},
-					{Key: "node", Value: "field-not-tag"},
-					{Key: "__tag__:as_content", Value: "literal"},
-				},
+	var body []byte
+	for _, log := range []*protocol.Log{
+		{
+			Time: 1700000000, TimeNs: &nanos,
+			Contents: []*protocol.Log_Content{
+				{Key: "content", Value: "message"},
+				{Key: "node", Value: "field-not-tag"},
+				{Key: "__tag__:as_content", Value: "literal"},
 			},
-			{Time: 1700000001, Contents: []*protocol.Log_Content{{Key: "empty", Value: ""}}},
 		},
+		{Time: 1700000001, Contents: []*protocol.Log_Content{{Key: "empty", Value: ""}}},
+	} {
+		wire, marshalErr := log.Marshal()
+		require.NoError(t, marshalErr)
+		body = protowire.AppendBytes(protowire.AppendTag(body, 1, protowire.BytesType), wire)
 	}
-	body, err := wire.Marshal()
+	for i, value := range []string{"original-logstore", "access", "sender", "sender-id"} {
+		body = protowire.AppendString(protowire.AppendTag(body, protowire.Number(i+2), protowire.BytesType), value)
+	}
+	tag, err := (&protocol.LogTag{Key: "node", Value: "edge"}).Marshal()
 	require.NoError(t, err)
+	body = protowire.AppendBytes(protowire.AppendTag(body, 6, protowire.BytesType), tag)
 	groups := collectRequestEvents(t, input, body, http.StatusOK)
 	require.Len(t, groups, 1)
 	require.Equal(t, map[string]string{"node": "edge", pipeline.TopicTagKey: "access", "__machine_uuid__": "sender-id"}, groups[0].Group.GetTags().Iterator())

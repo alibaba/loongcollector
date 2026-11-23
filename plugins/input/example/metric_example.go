@@ -18,6 +18,8 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/alibaba/ilogtail/pkg/models"
+
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/util"
@@ -30,7 +32,6 @@ type MetricsExample struct {
 	counter      int
 	gauge        int
 	commonLabels helper.MetricLabels
-	labels       string
 }
 
 // Init method would be triggered before working. In the example plugin, we set the initial
@@ -38,11 +39,9 @@ type MetricsExample struct {
 func (m *MetricsExample) Init(context pipeline.Context) (int, error) {
 	// set the initial value
 	m.counter = 100
-	// use helper.KeyValues to store metric labels
+	// use helper.MetricLabels to store metric labels
 	m.commonLabels.Append("hostname", util.GetHostName())
 	m.commonLabels.Append("ip", util.GetIPAddress())
-	// convert the commonLabels to string to reduce memory cost because the labels is the fixed value.
-	m.labels = m.commonLabels.String()
 	return 0, nil
 }
 
@@ -50,16 +49,17 @@ func (m *MetricsExample) Description() string {
 	return "This is a metric input example plugin, this plugin would show how to write a simple metric input plugin."
 }
 
-// Collect is called every trigger interval to collect the metrics and send them to the collector.
-func (m *MetricsExample) Collect(collector pipeline.Collector) error {
+// Read is called every trigger interval to collect the metrics and send them to the collector.
+func (m *MetricsExample) Read(ctx pipeline.PipelineContext) error {
+	collector := ctx.Collector()
 	// counter increment
 	m.counter++
 	// create a random value as gauge value
 	m.gauge = rand.Intn(100) //nolint:gosec
 
 	// collect the metrics
-	collector.AddRawLog(helper.NewMetricLog("example_counter", time.Now().UnixNano(), float64(m.counter), &m.commonLabels))
-	collector.AddRawLog(helper.NewMetricLog("example_gauge", time.Now().UnixNano(), float64(m.gauge), &m.commonLabels))
+	collector.Collect(models.NewGroup(models.NewMetadata(), models.NewTags()), helper.NewInputMetric("example_counter", time.Now().UnixNano(), float64(m.counter), &m.commonLabels))
+	collector.Collect(models.NewGroup(models.NewMetadata(), models.NewTags()), helper.NewInputMetric("example_gauge", time.Now().UnixNano(), float64(m.gauge), &m.commonLabels))
 	return nil
 }
 

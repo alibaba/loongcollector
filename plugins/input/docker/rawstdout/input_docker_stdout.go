@@ -23,6 +23,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/alibaba/ilogtail/pkg/helper"
+	"github.com/alibaba/ilogtail/pkg/models"
+
 	"github.com/dlclark/regexp2"
 	"github.com/moby/moby/api/pkg/stdcopy"
 	"github.com/moby/moby/api/types/container"
@@ -31,7 +34,6 @@ import (
 	"github.com/alibaba/ilogtail/pkg/helper/containercenter"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
@@ -103,28 +105,22 @@ type stdoutSyner struct {
 	stderr               bool
 }
 
-func (ss *stdoutSyner) newContainerPump(c pipeline.Collector, stdout, stderr *io.PipeReader) {
+func (ss *stdoutSyner) newContainerPump(c pipeline.PipelineCollector, stdout, stderr *io.PipeReader) {
 	settings := ss.context.GetPipelineScopeConfig()
 	usingOldContentTag := settings != nil && settings.UsingOldContentTag
 	tags := ss.info.GetStdoutTags(ss.ExternalEnvTag, ss.ExternalK8sLabelTag, usingOldContentTag)
-	var logContext map[string]interface{}
-	if !usingOldContentTag && len(tags) > 0 {
-		groupTags := make([]*protocol.LogTag, 0, len(tags))
-		for key, value := range tags {
-			groupTags = append(groupTags, &protocol.LogTag{Key: key, Value: value})
-		}
-		logContext = map[string]interface{}{"tags": groupTags}
-	}
-	pump := func(source string, tags map[string]string, input io.Reader) {
-		ss.wg.Add(1)
+	pump := func(source string, input io.Reader) {
 		defer ss.wg.Done()
 		keys := []string{"_time_", "_source_", "content"}
 		values := []string{"", source, ""}
 		emit := func() {
-			c.AddDataArrayWithContext(nil, keys, values, logContext)
+			log, _ := helper.NewInputLogRow(nil, keys, values)
+			groupTags := models.NewTags()
+			groupTags.AddAll(tags)
+			c.Collect(models.NewGroup(models.NewMetadata(), groupTags), log)
 		}
 		if usingOldContentTag {
-			// Legacy Collector rows put the container tags before the log fields.
+			// Put the container fields before the log fields for ordered consumers.
 			legacyKeys := make([]string, 0, len(tags)+len(keys))
 			legacyValues := make([]string, 0, len(tags)+len(values))
 			for key, value := range tags {
@@ -135,7 +131,8 @@ func (ss *stdoutSyner) newContainerPump(c pipeline.Collector, stdout, stderr *io
 			legacyValues = append(legacyValues, values...)
 			emit = func() {
 				copy(legacyValues[len(tags):], values)
-				c.AddDataArray(nil, legacyKeys, legacyValues, time.Now().Truncate(time.Second))
+				log, _ := helper.NewInputLogRow(nil, legacyKeys, legacyValues, time.Now().Truncate(time.Second))
+				c.Collect(models.NewGroup(models.NewMetadata(), models.NewTags()), log)
 			}
 		}
 
@@ -231,14 +228,16 @@ func (ss *stdoutSyner) newContainerPump(c pipeline.Collector, stdout, stderr *io
 		}
 	}
 	if stdout != nil {
-		go pump("stdout", tags, stdout)
+		ss.wg.Add(1)
+		go pump("stdout", stdout)
 	}
 	if stderr != nil {
-		go pump("stderr", tags, stderr)
+		ss.wg.Add(1)
+		go pump("stderr", stderr)
 	}
 }
 
-func (ss *stdoutSyner) Start(c pipeline.Collector) {
+func (ss *stdoutSyner) Start(c pipeline.PipelineCollector) {
 	if ss.beginLineCheckLength <= 0 {
 		ss.beginLineCheckLength = 10 * 1024
 	}
@@ -444,11 +443,7 @@ func (sds *ServiceDockerStdout) Description() string {
 
 // Collect takes in an accumulator and adds the metrics that the Input
 // gathers. This is called every "interval"
-func (sds *ServiceDockerStdout) Collect(pipeline.Collector) error {
-	return nil
-}
-
-func (sds *ServiceDockerStdout) FlushAll(c pipeline.Collector, firstStart bool) error {
+func (sds *ServiceDockerStdout) FlushAll(c pipeline.PipelineCollector, firstStart bool) error {
 	var err error
 	dockerInfos := containercenter.GetContainerByAcceptedInfo(
 		sds.IncludeLabel, sds.ExcludeLabel,
@@ -531,7 +526,8 @@ func (sds *ServiceDockerStdout) GetCheckPoint() *StdoutCheckPoint {
 }
 
 // Start starts the ServiceInput's service, whatever that may be
-func (sds *ServiceDockerStdout) Start(c pipeline.Collector) error {
+func (sds *ServiceDockerStdout) StartService(ctx pipeline.PipelineContext) error {
+	c := ctx.Collector()
 	sds.shutdown = make(chan struct{})
 	sds.waitGroup.Add(1)
 	defer sds.waitGroup.Done()

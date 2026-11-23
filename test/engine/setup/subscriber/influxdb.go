@@ -29,7 +29,6 @@ import (
 
 	"github.com/alibaba/ilogtail/pkg/doc"
 	"github.com/alibaba/ilogtail/pkg/logger"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
@@ -56,7 +55,7 @@ func (i *InfluxdbSubscriber) Description() string {
 	return "this's a influxdb subscriber, which will query inserted records from influxdb periodically."
 }
 
-func (i *InfluxdbSubscriber) GetData(_ string, startTime int32) ([]*protocol.LogGroup, error) {
+func (i *InfluxdbSubscriber) GetData(_ string, startTime int32) ([]*Batch, error) {
 	host, err := TryReplacePhysicalAddress(i.DbHost)
 	if err != nil {
 		return nil, err
@@ -90,9 +89,9 @@ func (i *InfluxdbSubscriber) GetData(_ string, startTime int32) ([]*protocol.Log
 		logger.Warning(context.Background(), selfmonitor.InfluxdbSubscriberAlarm, "err", err)
 		return nil, err
 	}
-	logGroup := i.queryRecords2LogGroup(resp.Results)
-	logger.Debugf(context.Background(), "subscriber get new logs count: %v", len(logGroup.Logs))
-	return []*protocol.LogGroup{logGroup}, nil
+	batch := i.queryRecords(resp.Results)
+	logger.Debugf(context.Background(), "subscriber get new logs count: %v", len(batch.Records))
+	return []*Batch{batch}, nil
 }
 
 func (i *InfluxdbSubscriber) FlusherConfig() string {
@@ -119,9 +118,9 @@ func (i *InfluxdbSubscriber) createDatabase() error {
 	return nil
 }
 
-func (i *InfluxdbSubscriber) queryRecords2LogGroup(results []client.Result) (logGroup *protocol.LogGroup) {
-	logGroup = &protocol.LogGroup{
-		Logs: []*protocol.Log{},
+func (i *InfluxdbSubscriber) queryRecords(results []client.Result) (batch *Batch) {
+	batch = &Batch{
+		Records: []*Record{},
 	}
 
 	for _, result := range results {
@@ -146,8 +145,8 @@ func (i *InfluxdbSubscriber) queryRecords2LogGroup(results []client.Result) (log
 							timestamp = strconv.FormatFloat(t, 'f', -1, 64)
 						}
 
-						log := &protocol.Log{
-							Contents: []*protocol.Log_Content{
+						log := &Record{
+							Fields: []Field{
 								{Key: "__name__", Value: i.buildName(serie.Name, field)},
 								{Key: "__labels__", Value: labels},
 								{Key: "__time_nano__", Value: timestamp},
@@ -155,15 +154,15 @@ func (i *InfluxdbSubscriber) queryRecords2LogGroup(results []client.Result) (log
 						}
 
 						typ, val := i.buildValue(v)
-						log.Contents = append(log.Contents, &protocol.Log_Content{
+						log.Fields = append(log.Fields, Field{
 							Key:   "__value__",
 							Value: val,
-						}, &protocol.Log_Content{
+						}, Field{
 							Key:   "__type__",
 							Value: typ,
 						})
 
-						logGroup.Logs = append(logGroup.Logs, log)
+						batch.Records = append(batch.Records, log)
 					}
 				}
 			}

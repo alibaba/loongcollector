@@ -15,7 +15,10 @@
 package sls
 
 import (
+	"fmt"
 	"net/http"
+
+	"google.golang.org/protobuf/encoding/protowire"
 
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
@@ -23,49 +26,90 @@ import (
 	"github.com/alibaba/ilogtail/pkg/protocol/decoder/common"
 )
 
-// Decoder impl
-type Decoder struct {
-}
-
-// Decode impl
-func (d *Decoder) Decode(data []byte, req *http.Request, tags map[string]string) ([]*protocol.Log, error) {
-	logGroup := &protocol.LogGroup{}
-	if err := logGroup.Unmarshal(data); err != nil {
-		return nil, err
-	}
-	return logGroup.Logs, nil
-}
+type Decoder struct{}
 
 func (d *Decoder) ParseRequest(res http.ResponseWriter, req *http.Request, maxBodySize int64) (data []byte, statusCode int, err error) {
 	return common.CollectBody(res, req, maxBodySize)
 }
 
-// DecodeV2 converts the external SLS wire group at ingress.
-func (d *Decoder) DecodeV2(data []byte, _ *http.Request) ([]*models.PipelineGroupEvents, error) {
-	wireGroup := &protocol.LogGroup{}
-	if err := wireGroup.Unmarshal(data); err != nil {
-		return nil, err
+// Decode reads the SLS protobuf group envelope directly into pipeline events.
+func (d *Decoder) Decode(data []byte, _ *http.Request) ([]*models.PipelineGroupEvents, error) {
+	const (
+		logField         = 1
+		categoryField    = 2
+		topicField       = 3
+		sourceField      = 4
+		machineUUIDField = 5
+		tagField         = 6
+	)
+
+	result := &models.PipelineGroupEvents{Group: models.NewGroup(models.NewMetadata(), models.NewTags())}
+	var topic, machineUUID string
+	for len(data) > 0 {
+		field, kind, consumed := protowire.ConsumeTag(data)
+		if consumed < 0 {
+			return nil, fmt.Errorf("read SLS group field: %w", protowire.ParseError(consumed))
+		}
+		if !field.IsValid() {
+			return nil, fmt.Errorf("invalid SLS group field number %d", field)
+		}
+		data = data[consumed:]
+		if field < logField || field > tagField {
+			consumed = protowire.ConsumeFieldValue(field, kind, data)
+			if consumed < 0 {
+				return nil, fmt.Errorf("skip SLS group field %d: %w", field, protowire.ParseError(consumed))
+			}
+			data = data[consumed:]
+			continue
+		}
+		if kind != protowire.BytesType {
+			return nil, fmt.Errorf("invalid wire type %d for SLS group field %d", kind, field)
+		}
+		value, consumed := protowire.ConsumeBytes(data)
+		if consumed < 0 {
+			return nil, fmt.Errorf("read SLS group field %d: %w", field, protowire.ParseError(consumed))
+		}
+		data = data[consumed:]
+		switch field {
+		case logField:
+			var log protocol.Log
+			if err := log.Unmarshal(value); err != nil {
+				return nil, fmt.Errorf("read SLS log: %w", err)
+			}
+			result.Events = append(result.Events, common.WireLogToEvent(&log))
+		case tagField:
+			var tag protocol.LogTag
+			if err := tag.Unmarshal(value); err != nil {
+				return nil, fmt.Errorf("read SLS log tag: %w", err)
+			}
+			result.Group.Tags.Add(tag.GetKey(), tag.GetValue())
+		case categoryField:
+			setMetadata(result.Group.Metadata, "sls.category", value)
+		case sourceField:
+			setMetadata(result.Group.Metadata, "source", value)
+		case topicField:
+			topic = string(value)
+		case machineUUIDField:
+			machineUUID = string(value)
+		}
 	}
-	if len(wireGroup.Logs) == 0 {
+	if len(result.Events) == 0 {
 		return nil, nil
 	}
+	if topic != "" {
+		result.Group.Tags.Add(pipeline.TopicTagKey, topic)
+	}
+	if machineUUID != "" {
+		result.Group.Tags.Add("__machine_uuid__", machineUUID)
+	}
+	return []*models.PipelineGroupEvents{result}, nil
+}
 
-	group := models.NewGroup(models.NewMetadata(), models.NewTags())
-	for _, tag := range wireGroup.LogTags {
-		group.Tags.Add(tag.GetKey(), tag.GetValue())
+// A repeated scalar field uses its last value. Empty values mean missing metadata.
+func setMetadata(metadata models.Metadata, key string, value []byte) {
+	if len(value) == 0 {
+		metadata.Delete(key)
+	} else {
+		metadata.Add(key, string(value))
 	}
-	if topic := wireGroup.GetTopic(); topic != "" {
-		group.Tags.Add(pipeline.TopicTagKey, topic)
-	}
-	if source := wireGroup.GetSource(); source != "" {
-		group.Metadata.Add("source", source)
-	}
-	if category := wireGroup.GetCategory(); category != "" {
-		group.Metadata.Add("sls.category", category)
-	}
-	if machineUUID := wireGroup.GetMachineUUID(); machineUUID != "" {
-		group.Tags.Add("__machine_uuid__", machineUUID)
-	}
-
-	return []*models.PipelineGroupEvents{{Group: group, Events: common.WireLogsToEvents(wireGroup.Logs)}}, nil
 }

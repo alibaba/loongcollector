@@ -45,11 +45,7 @@ func (s *ServiceTelegraf) Description() string {
 	return "service for Telegraf agent"
 }
 
-func (s *ServiceTelegraf) Collect(collector pipeline.Collector) error {
-	return nil
-}
-
-func (s *ServiceTelegraf) Start(collector pipeline.Collector) error {
+func (s *ServiceTelegraf) StartService(pipeline.PipelineContext) error {
 	s.tm.RegisterConfig(s.context, s.config)
 	return nil
 }

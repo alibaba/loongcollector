@@ -22,8 +22,13 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/alibaba/ilogtail/pkg/helper"
+	"github.com/alibaba/ilogtail/pkg/models"
+
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/plugins/test"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
 )
 
@@ -56,29 +61,34 @@ func TestInputProcess_Collect(t *testing.T) {
 		t.Errorf("cannot init the mock process plugin: %v", err)
 		return
 	}
-	c := &test.MockMetricCollector{}
+	c := helper.NewGroupedPipelineContext()
 	p.TopNCPU = 1
 
-	_ = p.Collect(c)
+	_ = p.Read(c)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c.Logs = nil
+			c.Collector().ToArray()
 			p.OpenFD = tt.conditions.OpenFD
 			p.IO = tt.conditions.IO
 			p.NetIO = tt.conditions.NetIO
 			p.Thread = tt.conditions.Thread
 
-			if err := p.Collect(c); err != nil {
+			if err := p.Read(c); err != nil {
 				t.Errorf("cannot collect the process metrics: %v", err)
 				return
 			}
-			if len(c.Logs) != tt.wantNum {
-				bytes, _ := json.Marshal(c.Logs)
-				t.Errorf("process v2 plugins want to collect %d metrics, but got %d: %s", tt.wantNum, len(c.Logs), string(bytes))
+			groups := c.Collector().ToArray()
+			if len(groups) != tt.wantNum {
+				bytes, _ := json.Marshal(groups)
+				t.Errorf("process v2 plugins want to collect %d metrics, but got %d: %s", tt.wantNum, len(groups), string(bytes))
 				return
 			}
-			for _, log := range c.Logs {
-				bytes, _ := json.Marshal(log)
+			for _, group := range groups {
+				require.Len(t, group.Events, 1)
+				metric, ok := group.Events[0].(*models.Metric)
+				require.True(t, ok)
+				assert.NotEmpty(t, metric.GetName())
+				bytes, _ := json.Marshal(metric)
 				fmt.Printf("got metrics: %s\n", string(bytes))
 			}
 		})

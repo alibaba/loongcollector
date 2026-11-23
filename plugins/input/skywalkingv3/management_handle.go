@@ -96,9 +96,8 @@ func (r *ResourcePropertiesCache) load(ctx pipeline.Context) bool {
 }
 
 type ManagementHandler struct {
-	context   pipeline.Context
-	collector pipeline.Collector
-	cache     *ResourcePropertiesCache
+	context pipeline.Context
+	cache   *ResourcePropertiesCache
 }
 
 func (m *ManagementHandler) keepAliveHandler(req *management.InstancePingPkg) (*v3.Commands, error) {
@@ -122,11 +121,10 @@ type reportInstancePropertiesHandler interface {
 	reportInstanceProperties(instanceProperties *management.InstanceProperties) (result *v3.Commands, e error)
 }
 
-func NewManagementHandler(context pipeline.Context, collector pipeline.Collector, cache *ResourcePropertiesCache) *ManagementHandler {
+func NewManagementHandler(context pipeline.Context, cache *ResourcePropertiesCache) *ManagementHandler {
 	return &ManagementHandler{
-		context:   context,
-		collector: collector,
-		cache:     cache,
+		context: context,
+		cache:   cache,
 	}
 }
 

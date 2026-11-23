@@ -1,44 +1,20 @@
 # 如何开发 Input 插件
 
-开发前请先阅读 [`pkg/pipeline/input.go`](https://github.com/alibaba/loongcollector/blob/main/pkg/pipeline/input.go) 中的接口分层：`MetricInput` 和 `ServiceInput` 定义生命周期，采集方法分为事件入口和 Collector 兼容入口。
+Go Input 使用 `PipelineContext.Collector()` 提交 `models.PipelineEvent`。接口定义见 [pkg/pipeline/input.go](https://github.com/alibaba/loongcollector/blob/main/pkg/pipeline/input.go)。
 
-目前 Input 分为两类：
-
-* **MetricInput**：由插件框架按周期调度，适合定时拉取指标等场景。
-* **ServiceInput**：在独立 goroutine 中常驻运行，适合接受外部推送（如 HTTP 接收 trace）等场景。
-
-新 Input 使用 `PipelineContext` 提交 `models` 中的事件。已有 `Collector` 插件由框架在入口转成事件，进入同一条 Pipeline。
+* `MetricInput` 由框架按周期调用 `Read`，适合定时拉取指标等场景。
+* `ServiceInput` 通过 `StartService` 启动持续运行的采集服务，适合接收推送或监听连接。
 
 内置 `metric_container` 可作为定时事件采集的参考。`InputContainer.Read(PipelineContext) error` 将容器配置快照构造为 `models.Log`，再通过 `ctx.Collector().Collect` 逐个提交。实现见 [`self_telemetry_container_config.go`](../../../../../pluginmanager/self_telemetry_container_config.go)。
 
-## MetricInput：事件与 Collector 接口
+## MetricInput
 
-### 公共部分（`MetricInput`）
-
-* **Init**：参数校验与资源准备；返回值为 **调用周期（毫秒）** 与 **error**。周期为 `0` 时使用全局默认周期。若 `Init` 返回非 nil error，该插件实例会被丢弃。
-* **Description**：一句插件说明。
-
-### Collector 兼容入口：`MetricInputV1`
-
-* **Collect(Collector) error**：在每到的一个周期内被调用，将数据写入传入的 `Collector`。
-
-### 事件入口：`MetricInputV2`
-
-* **Read(PipelineContext) error**：在每到的一个周期内被调用，通过 `PipelineContext` 访问 `Collector()` 等能力写入数据。
+`Init` 返回采集周期（毫秒）。返回 0 使用全局默认周期。每次调度调用 `Read`，通过传入的 PipelineContext 提交事件。
 
 ```go
 type MetricInput interface {
     Init(Context) (int, error)
     Description() string
-}
-
-type MetricInputV1 interface {
-    MetricInput
-    Collect(Collector) error
-}
-
-type MetricInputV2 interface {
-    MetricInput
     Read(PipelineContext) error
 }
 ```
@@ -53,36 +29,16 @@ type MetricInputV2 interface {
 6. **代码规范**：使用 `make lint` 检查代码风格与静态检查项。
 7. **提交变更**：提交 Pull Request，并在描述中说明行为、配置示例与测试结果（如有）。
 
-## ServiceInput：事件与 Collector 接口
+## ServiceInput
 
-### 公共部分（`ServiceInput`）
-
-* **Init** / **Description**：与 MetricInput 相同。**注意**：Init 返回的周期对 ServiceInput **无意义**（不会被按周期调度）。
-* **Stop**：必须可靠退出，避免阻塞进程退出。
-
-### Collector 兼容入口：`ServiceInputV1`
-
-* **Start(Collector) error**：在专属 goroutine 中启动采集逻辑。
-
-### 事件入口：`ServiceInputV2`
-
-* **StartService(PipelineContext) error**：在专属 goroutine 中启动；通过 `PipelineContext` 获取 `Collector()` 等。
+`StartService` 启动采集并使用 PipelineContext 提交事件。`Stop` 负责关闭连接及采集协程。ServiceInput 的 Init 返回值不参与周期调度。
 
 ```go
 type ServiceInput interface {
     Init(Context) (int, error)
     Description() string
-    Stop() error
-}
-
-type ServiceInputV1 interface {
-    ServiceInput
-    Start(Collector) error
-}
-
-type ServiceInputV2 interface {
-    ServiceInput
     StartService(PipelineContext) error
+    Stop() error
 }
 ```
 

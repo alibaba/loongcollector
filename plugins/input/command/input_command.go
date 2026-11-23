@@ -30,7 +30,6 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
 type InputCommand struct {
@@ -169,7 +168,8 @@ func isValidBinPath(cmdPath string) error {
 	_, err := os.Stat(cmdPath)
 	return err
 }
-func (in *InputCommand) Collect(collector pipeline.Collector) error {
+func (in *InputCommand) Read(ctx pipeline.PipelineContext) error {
+	collector := ctx.Collector()
 	// stderrStr is used to store the standard error output generated during command execution.
 	// It captures any error messages or diagnostic information produced by the command.
 	stdoutStr, stderrStr, isKilled, err := RunCommandWithTimeOut(in.TimeoutMilliSeconds, in.cmdUser, in.currentUser, in.CmdPath, in.Environments, in.scriptPath)
@@ -211,21 +211,15 @@ func (in *InputCommand) Collect(collector pipeline.Collector) error {
 		outSplitArr = []string{stdoutStr}
 	}
 
-	for _, splitStr := range outSplitArr {
-		log := &protocol.Log{
-			Time: uint32(time.Now().Unix()),
-			Contents: []*protocol.Log_Content{
-				{
-					Key:   models.ContentKey,
-					Value: splitStr,
-				},
-				{
-					Key:   ScriptMd5,
-					Value: in.scriptContentMd5,
-				},
-			},
+	for _, line := range outSplitArr {
+		log := &models.Log{
+			Timestamp: uint64(time.Now().Truncate(time.Second).UnixNano()),
+			Contents:  models.NewOrderedLogContents(2),
+			Tags:      models.NewTags(),
 		}
-		collector.AddRawLog(log)
+		log.SetBody([]byte(line))
+		log.Contents.Add(ScriptMd5, in.scriptContentMd5)
+		collector.Collect(models.NewGroup(models.NewMetadata(), models.NewTags()), log)
 	}
 	return nil
 }

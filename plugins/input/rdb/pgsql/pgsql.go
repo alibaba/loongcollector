@@ -89,15 +89,11 @@ func (m *Pgsql) dsnConfig() string {
 }
 
 // Start starts the ServiceInput's service, whatever that may be
-func (m *Pgsql) Start(collector pipeline.Collector) error {
+func (m *Pgsql) StartService(ctx pipeline.PipelineContext) error {
 	connStr := m.dsnConfig()
-	return m.Rdb.Start(collector, connStr, func() error {
+	return m.Rdb.Start(ctx.Collector(), connStr, func() error {
 		return nil
 	}, nil)
-}
-
-func (m *Pgsql) Collect(collector pipeline.Collector) error {
-	return m.Rdb.Collect(collector, nil)
 }
 
 // Stop stops the services and closes any necessary channels and connections

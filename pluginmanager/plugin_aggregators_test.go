@@ -135,18 +135,22 @@ func TestRouterUsesInputFieldOrderAfterProcessors(t *testing.T) {
 		name      string
 		processor string
 		store     string
-		input     func(*inputCollector)
+		input     func(t *testing.T) models.PipelineEvent
 	}{
 		{name: "array-drop", processor: `{"type":"processor_drop","detail":{"DropKeys":["z"]}}`, store: "second",
-			input: func(c *inputCollector) {
-				c.AddDataArray(nil, []string{"z", "b", "a"}, []string{"first", "second", "third"})
+			input: func(t *testing.T) models.PipelineEvent {
+				log, err := helper.NewInputLogRow(nil, []string{"z", "b", "a"}, []string{"first", "second", "third"})
+				require.NoError(t, err)
+				return log
 			}},
-		{name: "raw-rename", processor: `{"type":"processor_rename","detail":{"SourceKeys":["z"],"DestKeys":["y"]}}`, store: "first",
-			input: func(c *inputCollector) {
-				c.AddRawLog(&protocol.Log{Contents: []*protocol.Log_Content{{Key: "z", Value: "first"}, {Key: "b", Value: "second"}, {Key: "a", Value: "third"}}})
+		{name: "wire-rename", processor: `{"type":"processor_rename","detail":{"SourceKeys":["z"],"DestKeys":["y"]}}`, store: "first",
+			input: func(t *testing.T) models.PipelineEvent {
+				return helper.InputEventFromProtocolLog(&protocol.Log{Contents: []*protocol.Log_Content{{Key: "z", Value: "first"}, {Key: "b", Value: "second"}, {Key: "a", Value: "third"}}})
 			}},
 		{name: "typed-metric", processor: "", store: "metric",
-			input: func(c *inputCollector) { c.AddRawLog(helper.NewMetricLog("metric", time.Now().UnixNano(), 1, nil)) }},
+			input: func(t *testing.T) models.PipelineEvent {
+				return models.NewSingleValueMetric("metric", models.MetricTypeUntyped, models.NewTags(), time.Now().UnixNano(), 1)
+			}},
 	}
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
@@ -154,7 +158,7 @@ func TestRouterUsesInputFieldOrderAfterProcessors(t *testing.T) {
 				`{"DropDisMatch":true,"RouterRegex":["first","second","third","metric"],"RouterLogstore":["first","second","third","metric"]}`, "["+tt.processor+"]")
 			run := cfg.PluginRunner.(*pluginRunner)
 			cfg.Start()
-			tt.input(&inputCollector{context: run.InputPipeContext})
+			run.InputPipeContext.Collector().Collect(models.NewGroup(nil, nil), tt.input(t))
 			require.NoError(t, cfg.Stop(true))
 			groups := aggregatorTestFlusher(cfg).GroupEvents
 			require.Len(t, groups, 1)
@@ -265,8 +269,9 @@ func TestSplitterPreservesDistinctBodiesAndSourceRouting(t *testing.T) {
 				"["+tt.processor+"]")
 			cfg.Start()
 			run := cfg.PluginRunner.(*pluginRunner)
-			collector := &inputCollector{context: run.InputPipeContext}
-			collector.AddDataArray(map[string]string{"tenant": "test"}, tt.keys, tt.values, time.Unix(1700000000, 123456789))
+			log, err := helper.NewInputLogRow(map[string]string{"tenant": "test"}, tt.keys, tt.values, time.Unix(1700000000, 123456789))
+			require.NoError(t, err)
+			run.InputPipeContext.Collector().Collect(models.NewGroup(nil, nil), log)
 			require.NoError(t, cfg.Stop(true))
 			got := make(map[string]string)
 			for _, group := range aggregatorTestFlusher(cfg).GroupEvents {

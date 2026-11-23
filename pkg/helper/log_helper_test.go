@@ -15,7 +15,10 @@
 package helper
 
 import (
+	"math"
+
 	"github.com/alibaba/ilogtail/pkg/config"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 
@@ -62,6 +65,41 @@ func TestMetricLabels_Append(t *testing.T) {
 	log = NewMetricLog("name@", 1691646109945, 1, &ml2)
 	require.Equal(t, `Time:1691646109 Contents:<Key:"__name__" Value:"name_" > Contents:<Key:"__time_nano__" Value:"1691646109945000000" > Contents:<Key:"__labels__" Value:"key_#$#val_" > Contents:<Key:"__value__" Value:"1" > Time_ns:945000000 `, log.String())
 
+}
+
+func TestNewInputMetric(t *testing.T) {
+	prior := config.LoongcollectorGlobalConfig.EnableSlsMetricsFormat
+	t.Cleanup(func() { config.LoongcollectorGlobalConfig.EnableSlsMetricsFormat = prior })
+
+	for _, test := range []struct {
+		name      string
+		format    bool
+		timestamp int64
+		wantTime  uint64
+		wantName  string
+		wantKey   string
+		wantValue string
+	}{
+		{"formats millisecond input", true, 1691646109945, 1691646109945000000, "test_", "a_", "last_value"},
+		{"preserves nanosecond input", false, 1691646109945123456, 1691646109945123456, "test@", "a@", "last|value"},
+		{"normalizes second input", true, 1691646109, 1691646109000000000, "test_", "a_", "last_value"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			config.LoongcollectorGlobalConfig.EnableSlsMetricsFormat = test.format
+			var labels MetricLabels
+			labels.Append("a@", "first")
+			labels.Append("a@", "last|value")
+			metric := NewInputMetric("test@", test.timestamp, math.Float64frombits(StaleNaN), &labels)
+			require.Equal(t, test.wantTime, metric.GetTimestamp())
+			require.Equal(t, test.wantName, metric.GetName())
+			require.Equal(t, models.MetricTypeUntyped, metric.GetMetricType())
+			require.Equal(t, map[string]string{test.wantKey: test.wantValue}, metric.GetTags().Iterator())
+			require.Equal(t, StaleNaN, math.Float64bits(metric.GetValue().GetSingleValue()))
+
+			labels.Replace("a@", "updated")
+			require.Equal(t, test.wantValue, metric.GetTags().Get(test.wantKey))
+		})
+	}
 }
 
 func Test_GetMetricName(t *testing.T) {

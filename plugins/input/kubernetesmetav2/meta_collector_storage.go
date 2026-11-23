@@ -11,9 +11,9 @@ import (
 
 func (m *metaCollector) processStorageClassEntity(data *k8smeta.ObjectWrapper, method string) []models.PipelineEvent {
 	if obj, ok := data.Raw.(*storage.StorageClass); ok {
-		log := &models.Log{}
+		log := &models.Log{Tags: models.NewTags()}
 		log.Contents = models.NewLogContents()
-		log.Timestamp = uint64(time.Now().Unix())
+		log.Timestamp = uint64(time.Now().Truncate(time.Second).UnixNano())
 		m.processEntityCommonPart(log.Contents, obj.Kind, obj.Namespace, obj.Name, method, data.FirstObservedTime, data.LastObservedTime, obj.CreationTimestamp)
 
 		// custom fields

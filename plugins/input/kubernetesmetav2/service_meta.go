@@ -85,7 +85,6 @@ type ServiceK8sMeta struct {
 	// other
 	context       pipeline.Context
 	metaManager   *k8smeta.MetaManager
-	collector     pipeline.Collector
 	metaCollector *metaCollector
 	configName    string
 	clusterID     string
@@ -122,11 +121,10 @@ func (s *ServiceK8sMeta) Stop() error {
 	return s.metaCollector.Stop()
 }
 
-func (s *ServiceK8sMeta) Start(collector pipeline.Collector) error {
-	s.collector = collector
+func (s *ServiceK8sMeta) StartService(ctx pipeline.PipelineContext) error {
 	s.metaCollector = &metaCollector{
 		serviceK8sMeta:  s,
-		collector:       collector,
+		collector:       ctx.Collector(),
 		stopCh:          make(chan struct{}),
 		entityProcessor: make(map[string]ProcessFunc),
 	}

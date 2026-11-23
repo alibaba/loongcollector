@@ -20,6 +20,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/alibaba/ilogtail/pkg/helper"
+	"github.com/alibaba/ilogtail/pkg/models"
+
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 )
@@ -55,14 +58,9 @@ func (p *ServiceMock) Description() string {
 	return "mock service input plugin for logtail"
 }
 
-// Gather takes in an accumulator and adds the metrics that the Input
-// gathers. This is called every "interval"
-func (p *ServiceMock) Collect(pipeline.Collector) error {
-	return nil
-}
-
 // Start starts the ServiceInput's service, whatever that may be
-func (p *ServiceMock) Start(c pipeline.Collector) error {
+func (p *ServiceMock) StartService(ctx pipeline.PipelineContext) error {
+	collector := ctx.Collector()
 	p.shutdown = make(chan struct{})
 	p.waitGroup.Add(1)
 	defer p.waitGroup.Done()
@@ -81,7 +79,7 @@ func (p *ServiceMock) Start(c pipeline.Collector) error {
 		}
 		beginTime := time.Now()
 		for i := 0; i < p.LogsPerSecond; i++ {
-			p.MockOneLog(c)
+			p.MockOneLog(collector)
 		}
 		nowTime := time.Now()
 		sleepTime := time.Millisecond // make sure p.shutdown has high priority
@@ -103,11 +101,11 @@ func (p *ServiceMock) Start(c pipeline.Collector) error {
 	}
 }
 
-func (p *ServiceMock) MockOneLog(c pipeline.Collector) {
-	fields := p.Fields
+func (p *ServiceMock) MockOneLog(c pipeline.PipelineCollector) {
 	p.Index++
-	fields["Index"] = strconv.FormatInt(p.Index, 10)
-	c.AddData(p.Tags, p.Fields)
+	event := helper.NewInputLog(p.Tags, p.Fields)
+	event.Contents.Add("Index", strconv.FormatInt(p.Index, 10))
+	c.Collect(models.NewGroup(models.NewMetadata(), models.NewTags()), event)
 }
 
 // Stop stops the services and closes any necessary channels and connections

@@ -42,5 +42,5 @@ The metric attributes include a JSON representation of string, boolean,
 array, and object values. Raw events are in `raw_events` with the event group
 oneof left unset.
 
-Existing clients can continue using `LogReportService` on servers that expose
-it. The Go flusher uses the event service for every export.
+The Go flusher uses the event service for every export. Deploy the event
+receiver when upgrading a pipeline that used the previous log service.

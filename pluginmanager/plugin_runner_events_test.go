@@ -25,38 +25,8 @@ import (
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
-
-func TestInputCollector_ConvertsRawLog(t *testing.T) {
-	timeSec := uint32(time.Now().Unix())
-	ctx := &mockContect{}
-	collector := &inputCollector{context: ctx}
-	collector.AddRawLog(&protocol.Log{
-		Time: timeSec,
-		Contents: []*protocol.Log_Content{
-			{Key: contentKey, Value: "test content"},
-			{Key: fileOffsetKey, Value: "10"},
-			{Key: tagPrefix + "tenant", Value: "default"},
-		},
-	})
-
-	logContent := models.NewOrderedLogContents(1)
-	logContent.Add(models.BodyKey, []byte("test content"))
-	assert.Len(t, ctx.logs, 1)
-	assert.Equal(t, models.PipelineGroupEvents{
-		Group: models.NewGroup(models.NewMetadata(), models.NewTags()),
-		Events: []models.PipelineEvent{
-			&models.Log{
-				Timestamp: uint64(timeSec) * 1e9,
-				Offset:    10,
-				Tags:      models.NewTagsWithKeyValues("tenant", "default"),
-				Contents:  logContent,
-			},
-		},
-	}, ctx.logs[0])
-}
 
 type mockContect struct {
 	logs []models.PipelineGroupEvents

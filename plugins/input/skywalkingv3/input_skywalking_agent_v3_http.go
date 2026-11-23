@@ -51,7 +51,8 @@ func (s *SkywalkingHTTPServerInput) Description() string {
 	return "This is a skywalking v3 http server input"
 }
 
-func (s *SkywalkingHTTPServerInput) Start(collector pipeline.Collector) error {
+func (s *SkywalkingHTTPServerInput) StartService(ctx pipeline.PipelineContext) error {
+	collector := ctx.Collector()
 	logger.Info(s.context.GetRuntimeContext(), "Start skywalking v3 http server")
 	mux := http.NewServeMux()
 
@@ -69,9 +70,8 @@ func (s *SkywalkingHTTPServerInput) Start(collector pipeline.Collector) error {
 	}
 
 	managementHandler := &ManagementHandler{
-		context:   s.context,
-		collector: collector,
-		cache:     resourcePropertiesCache,
+		context: s.context,
+		cache:   resourcePropertiesCache,
 	}
 
 	loggingHandler := &loggingHandler{
@@ -87,7 +87,7 @@ func (s *SkywalkingHTTPServerInput) Start(collector pipeline.Collector) error {
 	mux.HandleFunc("/v3/events", s.registerEventHandler())
 	mux.HandleFunc("/browser/errorLog", s.registerErrorLogHandler(loggingHandler))
 	mux.HandleFunc("/browser/errorLogs", s.registerErrorLogsHandler(loggingHandler))
-	mux.HandleFunc("/browser/perfData", s.registerPerfData(&perfDataHandlerImpl{s.context, collector}))
+	mux.HandleFunc("/browser/perfData", s.registerPerfData(&perfDataHandlerImpl{}))
 	if s.Address == "" {
 		s.Address = "0.0.0.0:12800"
 	}

@@ -26,12 +26,6 @@ import (
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
-var (
-	tagPrefix     = "__tag__:"
-	fileOffsetKey = tagPrefix + "__file_offset__"
-	contentKey    = "content"
-)
-
 type pluginRunner struct {
 	// Event pipeline contexts and lifecycle controls.
 	InputPipeContext     pipeline.PipelineContext

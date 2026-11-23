@@ -28,15 +28,20 @@ func WireLogsToEvents(logs []*protocol.Log) []models.PipelineEvent {
 		if wireLog == nil {
 			continue
 		}
-		contents := models.NewOrderedLogContents(len(wireLog.Contents))
-		for _, field := range wireLog.Contents {
-			contents.Add(field.GetKey(), field.GetValue())
-		}
-		events = append(events, &models.Log{
-			Timestamp: uint64(wireLog.GetTime())*uint64(time.Second) + uint64(wireLog.GetTimeNs()),
-			Contents:  contents,
-			Tags:      models.NewTags(),
-		})
+		events = append(events, WireLogToEvent(wireLog))
 	}
 	return events
+}
+
+// WireLogToEvent preserves the timestamp and ordered fields of a wire log.
+func WireLogToEvent(wireLog *protocol.Log) *models.Log {
+	contents := models.NewOrderedLogContents(len(wireLog.Contents))
+	for _, field := range wireLog.Contents {
+		contents.Add(field.GetKey(), field.GetValue())
+	}
+	return &models.Log{
+		Timestamp: uint64(wireLog.GetTime())*uint64(time.Second) + uint64(wireLog.GetTimeNs()),
+		Contents:  contents,
+		Tags:      models.NewTags(),
+	}
 }

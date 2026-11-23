@@ -156,7 +156,7 @@ func (s *ServiceHTTP) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			},
 		}
 	}
-	groups, err := s.decoder.DecodeV2(data, r)
+	groups, err := s.decoder.Decode(data, r)
 	if err != nil {
 		logger.Warning(s.context.GetRuntimeContext(), selfmonitor.DecodeBodyFailAlarm, "decode body failed", err, "request", r.URL.String())
 		BadRequest(w)

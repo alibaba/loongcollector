@@ -17,13 +17,16 @@ package stdout
 import (
 	"bytes"
 	"errors"
+	"maps"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
+	"github.com/alibaba/ilogtail/pkg/models"
+
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
@@ -72,12 +75,12 @@ type DockerStdoutProcessor struct {
 	stdout               bool
 	stderr               bool
 	context              pipeline.Context
-	collector            pipeline.Collector
+	collector            pipeline.PipelineCollector
 
 	needCheckStream bool
-	logContext      map[string]interface{}
-	tags            []protocol.Log_Content
-	fieldNum        int
+	source          string
+	groupTags       map[string]string
+	contentTags     map[string]string
 
 	// save last parsed logs
 	lastLogs      []*LogMessage
@@ -85,7 +88,7 @@ type DockerStdoutProcessor struct {
 }
 
 func NewDockerStdoutProcessor(beginLineReg *regexp.Regexp, beginLineTimeout time.Duration, beginLineCheckLength int,
-	maxLogSize int, stdout bool, stderr bool, context pipeline.Context, collector pipeline.Collector,
+	maxLogSize int, stdout bool, stderr bool, context pipeline.Context, collector pipeline.PipelineCollector,
 	tags map[string]string, source string) *DockerStdoutProcessor {
 	processor := &DockerStdoutProcessor{
 		beginLineReg:         beginLineReg,
@@ -96,7 +99,8 @@ func NewDockerStdoutProcessor(beginLineReg *regexp.Regexp, beginLineTimeout time
 		stderr:               stderr,
 		context:              context,
 		collector:            collector,
-		logContext:           map[string]interface{}{"source": source},
+		source:               source,
+		contentTags:          maps.Clone(tags),
 	}
 
 	if stdout && stderr {
@@ -104,10 +108,6 @@ func NewDockerStdoutProcessor(beginLineReg *regexp.Regexp, beginLineTimeout time
 	} else {
 		processor.needCheckStream = true
 	}
-	for k, v := range tags {
-		processor.tags = append(processor.tags, protocol.Log_Content{Key: k, Value: v})
-	}
-	processor.fieldNum = len(processor.tags) + 3
 	return processor
 }
 
@@ -230,7 +230,7 @@ func (p *DockerStdoutProcessor) Process(fileBlock []byte, noChangeInterval time.
 			switch {
 			case p.beginLineReg == nil && len(p.lastLogs) == 0 && lastChar == '\n':
 				// collect single line
-				p.collector.AddRawLogWithContext(p.newRawLogBySingleLine(thisLog), p.logContext)
+				p.collect(p.newLogBySingleLine(thisLog))
 			case p.beginLineReg == nil:
 				// collect spilt multi lines, such as containerd.
 				if lastChar != '\n' {
@@ -239,7 +239,7 @@ func (p *DockerStdoutProcessor) Process(fileBlock []byte, noChangeInterval time.
 				p.lastLogs = append(p.lastLogs, thisLog)
 				p.lastLogsCount += len(thisLog.Content) + 24
 				if lastChar == '\n' {
-					p.collector.AddRawLogWithContext(p.newRawLogByMultiLine(), p.logContext)
+					p.collect(p.newLogByMultiLine())
 				}
 			default:
 				// collect user multi lines.
@@ -251,7 +251,7 @@ func (p *DockerStdoutProcessor) Process(fileBlock []byte, noChangeInterval time.
 				}
 				if p.beginLineReg.Match(checkLine) {
 					if len(p.lastLogs) != 0 {
-						p.collector.AddRawLogWithContext(p.newRawLogByMultiLine(), p.logContext)
+						p.collect(p.newLogByMultiLine())
 					}
 				}
 				thisLog.safeContent()
@@ -268,52 +268,64 @@ func (p *DockerStdoutProcessor) Process(fileBlock []byte, noChangeInterval time.
 
 	// last line and multi line timeout expired
 	if len(p.lastLogs) > 0 && (noChangeInterval > p.beginLineTimeout || p.lastLogsCount > p.maxLogSize) {
-		p.collector.AddRawLogWithContext(p.newRawLogByMultiLine(), p.logContext)
+		p.collect(p.newLogByMultiLine())
 	}
 
 	// no new line
 	if nowIndex == 0 && len(fileBlock) > 0 {
 		thisLog := p.ParseContainerLogLine(fileBlock)
 		if p.StreamAllowed(thisLog) {
-			p.collector.AddRawLogWithContext(p.newRawLogBySingleLine(thisLog), p.logContext)
+			p.collect(p.newLogBySingleLine(thisLog))
 			processedCount = len(fileBlock)
 		}
 	}
 	return processedCount
 }
 
-// newRawLogBySingleLine convert single line log to protocol.Log.
-func (p *DockerStdoutProcessor) newRawLogBySingleLine(msg *LogMessage) *protocol.Log {
-	nowTime := time.Now()
-	log := &protocol.Log{
-		Contents: make([]*protocol.Log_Content, 0, p.fieldNum),
+func (p *DockerStdoutProcessor) collect(log *models.Log) {
+	tags := models.NewTags()
+	tags.AddAll(p.groupTags)
+	metadata := models.NewMetadataWithKeyValues("source", p.source)
+	p.collector.Collect(models.NewGroup(metadata, tags), log)
+}
+
+func (p *DockerStdoutProcessor) newLog(body []byte, timestamp, stream string) *models.Log {
+	const tagPrefix = "__tag__:"
+	log := &models.Log{
+		Timestamp: uint64(time.Now().Truncate(time.Second).UnixNano()),
+		Contents:  models.NewOrderedLogContents(len(p.contentTags) + 3),
+		Tags:      models.NewTags(),
 	}
-	protocol.SetLogTime(log, uint32(nowTime.Unix()))
-	if len(msg.Content) > 0 && msg.Content[len(msg.Content)-1] == '\n' {
-		msg.Content = msg.Content[0 : len(msg.Content)-1]
-	}
-	msg.safeContent()
-	log.Contents = append(log.Contents, &protocol.Log_Content{
-		Key:   "content",
-		Value: util.ZeroCopyBytesToString(msg.Content),
-	})
-	log.Contents = append(log.Contents, &protocol.Log_Content{
-		Key:   "_time_",
-		Value: msg.Time,
-	})
-	log.Contents = append(log.Contents, &protocol.Log_Content{
-		Key:   "_source_",
-		Value: msg.StreamType,
-	})
-	for i := range p.tags {
-		copy := p.tags[i]
-		log.Contents = append(log.Contents, &copy)
+	log.SetBody(body)
+	log.Contents.Add("_time_", timestamp)
+	log.Contents.Add("_source_", stream)
+	// Older file-based stdout payloads encode tags and offsets with reserved prefixes.
+	for key, value := range p.contentTags {
+		switch {
+		case key == models.BodyKey:
+			log.SetBody([]byte(value))
+		case key == tagPrefix+"__file_offset__":
+			if offset, err := strconv.ParseInt(value, 10, 64); err == nil {
+				log.SetOffset(uint64(offset))
+			}
+		case strings.HasPrefix(key, tagPrefix):
+			log.Tags.Add(strings.TrimPrefix(key, tagPrefix), value)
+		default:
+			log.Contents.Add(key, value)
+		}
 	}
 	return log
 }
 
-// newRawLogByMultiLine convert last logs to protocol.Log.
-func (p *DockerStdoutProcessor) newRawLogByMultiLine() *protocol.Log {
+func (p *DockerStdoutProcessor) newLogBySingleLine(msg *LogMessage) *models.Log {
+	if len(msg.Content) > 0 && msg.Content[len(msg.Content)-1] == '\n' {
+		msg.Content = msg.Content[:len(msg.Content)-1]
+	}
+	msg.safeContent()
+	return p.newLog(msg.Content, msg.Time, msg.StreamType)
+}
+
+func (p *DockerStdoutProcessor) newLogByMultiLine() *models.Log {
 	lastOne := p.lastLogs[len(p.lastLogs)-1]
 	if len(lastOne.Content) > 0 && lastOne.Content[len(lastOne.Content)-1] == '\n' {
 		lastOne.Content = lastOne.Content[:len(lastOne.Content)-1]
@@ -330,27 +342,7 @@ func (p *DockerStdoutProcessor) newRawLogByMultiLine() *protocol.Log {
 		p.lastLogs[index] = nil
 	}
 
-	nowTime := time.Now()
-	log := &protocol.Log{
-		Contents: make([]*protocol.Log_Content, 0, p.fieldNum),
-	}
-	protocol.SetLogTime(log, uint32(nowTime.Unix()))
-	log.Contents = append(log.Contents, &protocol.Log_Content{
-		Key:   "content",
-		Value: multiLine.String(),
-	})
-	log.Contents = append(log.Contents, &protocol.Log_Content{
-		Key:   "_time_",
-		Value: lastOne.Time,
-	})
-	log.Contents = append(log.Contents, &protocol.Log_Content{
-		Key:   "_source_",
-		Value: lastOne.StreamType,
-	})
-	for i := range p.tags {
-		copy := p.tags[i]
-		log.Contents = append(log.Contents, &copy)
-	}
+	log := p.newLog(util.ZeroCopyStringToBytes(multiLine.String()), lastOne.Time, lastOne.StreamType)
 	// reset multiline cache
 	p.lastLogs = p.lastLogs[:0]
 	p.lastLogsCount = 0

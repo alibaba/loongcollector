@@ -29,7 +29,7 @@ type InputDockerFile struct {
 func (i *InputDockerFile) Description() string {
 	return "metric_container_info"
 }
-func (i *InputDockerFile) Collect(collector pipeline.Collector) error {
+func (i *InputDockerFile) Read(pipeline.PipelineContext) error {
 	return nil
 }
 func (i *InputDockerFile) Init(context pipeline.Context) (int, error) {

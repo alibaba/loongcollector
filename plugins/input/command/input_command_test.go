@@ -21,11 +21,16 @@ import (
 	"os/user"
 	"runtime"
 	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
+
+	"github.com/alibaba/ilogtail/pkg/helper"
+	"github.com/alibaba/ilogtail/pkg/models"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/plugins/test"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
 )
 
@@ -60,7 +65,7 @@ func TestCommandTestCollecetUserBase64WithTimeout(t *testing.T) {
 
 	ctx := mock.NewEmptyContext("project", "store", "config")
 	p := pipeline.MetricInputs[pluginType]().(*InputCommand)
-	c := new(test.MockMetricCollector)
+	c := helper.NewNoopPipelineContext()
 	// Script set to sleep for 5 seconds
 	scriptContent := `sleep 5 &&  echo -e "__labels__:a#\$#1|b#\$#2    __value__:0  __name__:metric_command_example \n __labels__:a#\$#3|b#\$#4    __value__:3  __name__:metric_command_example2"`
 
@@ -77,7 +82,7 @@ func TestCommandTestCollecetUserBase64WithTimeout(t *testing.T) {
 		t.Errorf("cannot init InputCommand: %v", err)
 		return
 	}
-	err = p.Collect(c)
+	err = p.Read(c)
 	if err == nil {
 		t.Errorf("expect error with timeout")
 	}
@@ -92,7 +97,7 @@ func TestCommandTestCollecetUserBase64(t *testing.T) {
 	fmt.Printf("Username %s\n", u.Username)
 	ctx := mock.NewEmptyContext("project", "store", "config")
 	p := pipeline.MetricInputs[pluginType]().(*InputCommand)
-	c := new(test.MockMetricCollector)
+	c := helper.NewNoopPipelineContext()
 	scriptContent := `echo -e "__labels__:a#\$#1|b#\$#2    __value__:0  __name__:metric_command_example \n __labels__:a#\$#3|b#\$#4    __value__:3  __name__:metric_command_example2"`
 	// base64
 	p.ScriptType = "shell"
@@ -106,8 +111,8 @@ func TestCommandTestCollecetUserBase64(t *testing.T) {
 		t.Errorf("cannot init InputCommand: %v", err)
 		return
 	}
-	if err := p.Collect(c); err != nil {
-		t.Errorf("Collect() error = %v, user = %s, scriptContent = %s", err, p.User, p.ScriptContent)
+	if err := p.Read(c); err != nil {
+		t.Errorf("Read() error = %v, user = %s, scriptContent = %s", err, p.User, p.ScriptContent)
 		return
 	}
 }
@@ -122,7 +127,7 @@ func TestCommandTestCollect(t *testing.T) {
 
 	ctx := mock.NewEmptyContext("project", "store", "config")
 	p := pipeline.MetricInputs[pluginType]().(*InputCommand)
-	c := new(test.MockMetricCollector)
+	c := helper.NewObservePipelineContext(4)
 
 	p.ScriptContent = `echo "test"`
 	p.ScriptType = "shell"
@@ -135,10 +140,18 @@ func TestCommandTestCollect(t *testing.T) {
 		t.Errorf("cannot init InputCommand: %v", err)
 		return
 	}
-	if err := p.Collect(c); err != nil {
-		t.Errorf("Collect() error = %v", err)
+	if err := p.Read(c); err != nil {
+		t.Errorf("Read() error = %v", err)
 		return
 	}
+	groups := c.Collector().ToArray()
+	require.Len(t, groups, 1)
+	require.Len(t, groups[0].Events, 1)
+	log, ok := groups[0].Events[0].(*models.Log)
+	require.True(t, ok)
+	assert.Equal(t, "test", string(log.GetBody()))
+	assert.Equal(t, p.scriptContentMd5, log.GetIndices().Get(ScriptMd5))
+	assert.Zero(t, log.GetTimestamp()%uint64(time.Second))
 }
 
 func TestCommandTestExceptionCollect(t *testing.T) {
@@ -150,7 +163,7 @@ func TestCommandTestExceptionCollect(t *testing.T) {
 	fmt.Printf("Username %s\n", u.Username)
 	ctx := mock.NewEmptyContext("project", "store", "config")
 	p := pipeline.MetricInputs[pluginType]().(*InputCommand)
-	c := new(test.MockMetricCollector)
+	c := helper.NewNoopPipelineContext()
 
 	p.ScriptContent = `echo "1"`
 	p.ScriptType = "shell"
@@ -163,8 +176,8 @@ func TestCommandTestExceptionCollect(t *testing.T) {
 		t.Errorf("cannot init InputCommand: %v", err)
 		return
 	}
-	if err := p.Collect(c); err != nil {
-		t.Errorf("Collect() error = %v", err)
+	if err := p.Read(c); err != nil {
+		t.Errorf("Read() error = %v", err)
 		return
 	}
 
@@ -179,7 +192,7 @@ func TestCommandTestTimeoutCollect(t *testing.T) {
 	fmt.Printf("Username %s\n", u.Username)
 	ctx := mock.NewEmptyContext("project", "store", "config")
 	p := pipeline.MetricInputs[pluginType]().(*InputCommand)
-	c := new(test.MockMetricCollector)
+	c := helper.NewNoopPipelineContext()
 
 	p.ScriptContent = `sleep 10`
 	p.ScriptType = "shell"
@@ -192,11 +205,11 @@ func TestCommandTestTimeoutCollect(t *testing.T) {
 		t.Errorf("cannot init InputCommand: %v", err)
 		return
 	}
-	if err := p.Collect(c); err != nil {
+	if err := p.Read(c); err != nil {
 		if err.Error() == "exec cmd error errInfo:exec command timed out, stderr:, stdout:" {
 			fmt.Println(err.Error())
 		} else {
-			t.Errorf("Collect() error = %v", err)
+			t.Errorf("Read() error = %v", err)
 			return
 		}
 

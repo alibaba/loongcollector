@@ -16,10 +16,8 @@ package raw
 
 import (
 	"net/http"
-	"time"
 
 	"github.com/alibaba/ilogtail/pkg/models"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/protocol/decoder/common"
 )
 
@@ -27,7 +25,7 @@ type Decoder struct {
 	DisableUncompress bool
 }
 
-func (d *Decoder) DecodeV2(data []byte, req *http.Request) (groups []*models.PipelineGroupEvents, decodeErr error) {
+func (d *Decoder) Decode(data []byte, req *http.Request) (groups []*models.PipelineGroupEvents, decodeErr error) {
 	groupEvents := &models.PipelineGroupEvents{}
 	groupEvents.Group = models.NewGroup(models.NewMetadata(), models.NewTags())
 	groupEvents.Events = []models.PipelineEvent{models.ByteArray(data)}
@@ -39,18 +37,4 @@ func (d *Decoder) ParseRequest(res http.ResponseWriter, req *http.Request, maxBo
 		return common.CollectRawBody(res, req, maxBodySize)
 	}
 	return common.CollectBody(res, req, maxBodySize)
-}
-
-func (d *Decoder) Decode(data []byte, req *http.Request, tags map[string]string) (logs []*protocol.Log, err error) {
-	log := &protocol.Log{
-		Time: uint32(time.Now().Unix()),
-		Contents: []*protocol.Log_Content{
-			{
-				Key:   models.ContentKey,
-				Value: string(data),
-			},
-		},
-	}
-	logs = append(logs, log)
-	return logs, nil
 }

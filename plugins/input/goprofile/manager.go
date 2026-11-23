@@ -21,6 +21,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/alibaba/ilogtail/pkg/models"
+
 	"github.com/mitchellh/mapstructure"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/pyroscope-io/pyroscope/pkg/ingestion"
@@ -61,7 +63,7 @@ func (r *Register) Unregister(collector prometheus.Collector) bool {
 }
 
 type Ingestion struct {
-	collector pipeline.Collector
+	collector pipeline.PipelineCollector
 }
 
 func (i *Ingestion) Ingest(ctx context.Context, input *ingestion.IngestInput) error {
@@ -92,7 +94,9 @@ func (i *Ingestion) Ingest(ctx context.Context, input *ingestion.IngestInput) er
 		return err
 	}
 	for _, log := range logs {
-		i.collector.AddRawLog(log)
+		if event := helper.InputEventFromProtocolLog(log); event != nil {
+			i.collector.Collect(models.NewGroup(models.NewMetadata(), models.NewTags()), event)
+		}
 	}
 	return nil
 }
@@ -102,7 +106,7 @@ type Manager struct {
 	discoveryManager *discovery.Manager
 }
 
-func NewManager(collector pipeline.Collector) *Manager {
+func NewManager(collector pipeline.PipelineCollector) *Manager {
 	logrusLogger := logrus.New()
 	logrusLogger.SetOutput(os.Stdout)
 	if logger.DebugFlag() {

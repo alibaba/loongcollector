@@ -21,8 +21,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
+	"github.com/alibaba/ilogtail/pkg/helper"
+	"github.com/alibaba/ilogtail/pkg/models"
+
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/plugins/test"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
 
 	"github.com/shirou/gopsutil/process"
@@ -69,7 +73,7 @@ func TestInputNodeMeta_Collect(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := mock.NewEmptyContext("project", "store", "config")
 			p := pipeline.MetricInputs[pluginType]().(*InputNodeMeta)
-			c := new(test.MockMetricCollector)
+			c := helper.NewGroupedPipelineContext()
 			p.Disk = tt.args.Disk
 			p.CPU = tt.args.CPU
 			p.Memory = tt.args.Memory
@@ -80,15 +84,20 @@ func TestInputNodeMeta_Collect(t *testing.T) {
 				t.Errorf("cannot init meta node plugin: %v", err)
 				return
 			}
-			if err := p.Collect(c); err != nil {
-				t.Errorf("Collect() error = %v", err)
-				return
-			} else if len(c.Logs) != tt.wantNodeNum {
-				t.Errorf("Collect() want collect %d logs, but got %d", tt.wantNodeNum, len(c.Logs))
+			if err := p.Read(c); err != nil {
+				t.Errorf("Read() error = %v", err)
 				return
 			}
-			for _, log := range c.Logs {
-				contents := log.Contents
+			groups := c.Collector().ToArray()
+			if len(groups) != tt.wantNodeNum {
+				t.Errorf("Collect() want collect %d logs, but got %d", tt.wantNodeNum, len(groups))
+				return
+			}
+			for _, group := range groups {
+				require.Len(t, group.Events, 1)
+				log, ok := group.Events[0].(*models.Log)
+				require.True(t, ok)
+				contents := log.GetIndices().Iterator()
 				metaLogItemNum := 5
 				if len(contents) != metaLogItemNum {
 					t.Errorf("Meta log contents should have %d items ,but got %d", metaLogItemNum, len(contents))
@@ -99,23 +108,25 @@ func TestInputNodeMeta_Collect(t *testing.T) {
 					err = json.Unmarshal([]byte(str), &res)
 					return
 				}
-				for _, content := range contents {
-					switch content.Key {
+				for key, field := range contents {
+					value, ok := field.(string)
+					require.True(t, ok)
+					switch key {
 					case "id":
-						if content.Value == "" {
+						if value == "" {
 							t.Error("meta log id must not be null")
 						}
 					case "labels":
-						m, _ := convert2Map(content.Value)
+						m, _ := convert2Map(value)
 						if len(m) != tt.wantLabelNum {
 							t.Errorf("meta log host labels want %d num, but got %d", tt.wantLabelNum, len(m))
 						}
 					case "type":
-						if content.Value != tt.wantNodeType {
-							t.Errorf("meta log type want %s, but got %s", tt.wantNodeType, content.Value)
+						if value != tt.wantNodeType {
+							t.Errorf("meta log type want %s, but got %s", tt.wantNodeType, value)
 						}
 					case "attributes":
-						res, err := convert2Map(content.Value)
+						res, err := convert2Map(value)
 						if err != nil {
 							t.Errorf("deserialize error: %v", err)
 							return
@@ -145,11 +156,11 @@ func TestInputNodeMeta_Collect(t *testing.T) {
 								t.Errorf("meta log arrtributes want %d num, but got %d", tt.wantAttributesNum, len(meta))
 							}
 						default:
-							t.Errorf("the attributes pattern is error: %v", content.Value)
+							t.Errorf("the attributes pattern is error: %v", value)
 						}
 					}
 				}
-				fmt.Printf("got:%s\n", log.String())
+				fmt.Printf("got:%s\n", log.GetIndices().Iterator())
 			}
 		})
 	}

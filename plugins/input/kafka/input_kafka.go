@@ -232,7 +232,7 @@ func (k *InputKafka) onMessage(msg *sarama.ConsumerMessage) {
 	if msg == nil {
 		return
 	}
-	groups, err := k.decoder.DecodeV2(msg.Value, k.decodeRequest(msg.Headers))
+	groups, err := k.decoder.Decode(msg.Value, k.decodeRequest(msg.Headers))
 	if err != nil {
 		logger.Warning(k.context.GetRuntimeContext(), selfmonitor.DecodeMessageFailAlarm, "decode message failed", err)
 		return

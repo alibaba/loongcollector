@@ -18,15 +18,15 @@ import (
 	"context"
 
 	"github.com/alibaba/ilogtail/pkg/helper"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	common "github.com/alibaba/ilogtail/plugins/input/skywalkingv3/skywalking/network/common/v3"
 	agent "github.com/alibaba/ilogtail/plugins/input/skywalkingv3/skywalking/network/language/agent/v3"
 )
 
 type CLRMetricHandler struct {
 	context   pipeline.Context
-	collector pipeline.Collector
+	collector pipeline.PipelineCollector
 	interval  int64
 	lastTime  int64
 }
@@ -43,53 +43,53 @@ func (c *CLRMetricHandler) Collect(ctx context.Context, req *agent.CLRMetricColl
 		}
 		logs := c.toMetricStoreFormat(metric, req.Service, req.ServiceInstance)
 		for _, log := range logs {
-			c.collector.AddRawLog(log)
+			c.collector.Collect(models.NewGroup(models.NewMetadata(), models.NewTags()), log)
 		}
 	}
 	return &common.Commands{}, nil
 }
 
-func (c *CLRMetricHandler) toMetricStoreFormat(metric *agent.CLRMetric, service string, serviceInstance string) []*protocol.Log {
-	var logs []*protocol.Log
+func (c *CLRMetricHandler) toMetricStoreFormat(metric *agent.CLRMetric, service string, serviceInstance string) []*models.Metric {
+	var logs []*models.Metric
 	var labels helper.MetricLabels
 	labels.Append("service", service)
 	labels.Append("serviceInstance", serviceInstance)
-	cpuUsage := helper.NewMetricLog("skywalking_clr_cpu_usage", metric.Time, metric.GetCpu().UsagePercent, &labels)
+	cpuUsage := helper.NewInputMetric("skywalking_clr_cpu_usage", metric.Time, metric.GetCpu().UsagePercent, &labels)
 	logs = append(logs, cpuUsage)
 
 	gc := metric.Gc
 	gcLabels := labels.Clone()
 	gcLabels.Append("gen", "gen0")
-	gen0GcCount := helper.NewMetricLog("skywalking_clr_gc_count", metric.GetTime(), float64(gc.Gen0CollectCount), gcLabels)
+	gen0GcCount := helper.NewInputMetric("skywalking_clr_gc_count", metric.GetTime(), float64(gc.Gen0CollectCount), gcLabels)
 	logs = append(logs, gen0GcCount)
 
 	gcLabels.Replace("gen", "gen1")
-	gen1GcCount := helper.NewMetricLog("skywalking_clr_gc_count", metric.GetTime(), float64(gc.Gen1CollectCount), gcLabels)
+	gen1GcCount := helper.NewInputMetric("skywalking_clr_gc_count", metric.GetTime(), float64(gc.Gen1CollectCount), gcLabels)
 	logs = append(logs, gen1GcCount)
 
 	gcLabels.Replace("gen", "gen2")
-	gen2GcCount := helper.NewMetricLog("skywalking_clr_gc_count", metric.GetTime(), float64(gc.Gen2CollectCount), gcLabels)
+	gen2GcCount := helper.NewInputMetric("skywalking_clr_gc_count", metric.GetTime(), float64(gc.Gen2CollectCount), gcLabels)
 	logs = append(logs, gen2GcCount)
 
-	heapMemory := helper.NewMetricLog("skywalking_clr_heap_memory", metric.GetTime(), float64(gc.HeapMemory), &labels)
+	heapMemory := helper.NewInputMetric("skywalking_clr_heap_memory", metric.GetTime(), float64(gc.HeapMemory), &labels)
 	logs = append(logs, heapMemory)
 
 	thread := metric.Thread
 	threadLabels := labels.CloneInto(gcLabels)
 	threadLabels.Append("type", "availableCompletionPortThreads")
-	availableCompletionPortThreads := helper.NewMetricLog("skywalking_clr_threads", metric.GetTime(), float64(thread.AvailableCompletionPortThreads), threadLabels)
+	availableCompletionPortThreads := helper.NewInputMetric("skywalking_clr_threads", metric.GetTime(), float64(thread.AvailableCompletionPortThreads), threadLabels)
 	logs = append(logs, availableCompletionPortThreads)
 
 	threadLabels.Replace("type", "availableWorkerThreads")
-	availableWorkerThreads := helper.NewMetricLog("skywalking_clr_threads", metric.GetTime(), float64(thread.AvailableWorkerThreads), threadLabels)
+	availableWorkerThreads := helper.NewInputMetric("skywalking_clr_threads", metric.GetTime(), float64(thread.AvailableWorkerThreads), threadLabels)
 	logs = append(logs, availableWorkerThreads)
 
 	threadLabels.Replace("type", "maxCompletionPortThreads")
-	maxCompletionPortThreads := helper.NewMetricLog("skywalking_clr_threads", metric.GetTime(), float64(thread.MaxCompletionPortThreads), threadLabels)
+	maxCompletionPortThreads := helper.NewInputMetric("skywalking_clr_threads", metric.GetTime(), float64(thread.MaxCompletionPortThreads), threadLabels)
 	logs = append(logs, maxCompletionPortThreads)
 
 	threadLabels.Replace("type", "maxWorkerThreads")
-	maxWorkerThreads := helper.NewMetricLog("skywalking_clr_threads", metric.GetTime(), float64(thread.MaxWorkerThreads), threadLabels)
+	maxWorkerThreads := helper.NewInputMetric("skywalking_clr_threads", metric.GetTime(), float64(thread.MaxWorkerThreads), threadLabels)
 	logs = append(logs, maxWorkerThreads)
 	return logs
 }

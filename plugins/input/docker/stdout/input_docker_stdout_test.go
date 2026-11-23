@@ -16,6 +16,15 @@ package stdout
 
 import (
 	"testing"
+	"time"
+
+	"github.com/stretchr/testify/require"
+
+	"github.com/alibaba/ilogtail/pkg/config"
+	"github.com/alibaba/ilogtail/pkg/helper"
+	"github.com/alibaba/ilogtail/pkg/helper/containercenter"
+	"github.com/alibaba/ilogtail/pkg/models"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 
 	"github.com/moby/moby/api/types/container"
 	"github.com/stretchr/testify/assert"
@@ -156,5 +165,68 @@ func TestServiceDockerStdout_Init(t *testing.T) {
 func stdoutHostConfigWithLogDriver(driver string) *container.HostConfig {
 	return &container.HostConfig{
 		LogConfig: container.LogConfig{Type: driver},
+	}
+}
+
+type stdoutTestContext struct {
+	pipeline.Context
+	oldContentTags bool
+}
+
+func (c stdoutTestContext) GetPipelineScopeConfig() *config.GlobalConfig {
+	return &config.GlobalConfig{UsingOldContentTag: c.oldContentTags}
+}
+
+func TestDockerFileSynerPreservesTagModeAndSource(t *testing.T) {
+	for _, mode := range []struct {
+		name           string
+		oldContentTags bool
+	}{
+		{"group tags", false},
+		{"content tags", true},
+	} {
+		t.Run(mode.name, func(t *testing.T) {
+			ctx := helper.NewObservePipelineContext(4)
+			input := &ServiceDockerStdout{
+				context:    stdoutTestContext{Context: mock.NewEmptyContext("project", "logstore", "config"), oldContentTags: mode.oldContentTags},
+				collector:  ctx.Collector(),
+				Stdout:     true,
+				Stderr:     true,
+				MaxLogSize: 4096,
+			}
+			info := &containercenter.DockerInfoDetail{
+				ContainerNameTag: map[string]string{"container": "test-container"},
+			}
+			info.ContainerInfo.ID = "test-id"
+			syner := NewDockerFileSyner(input, info, map[string]helper.LogFileReaderCheckPoint{
+				info.ContainerInfo.ID: {Path: "unused.log"},
+			})
+			const line = `{"log":"test line\n","time":"2025-01-01T00:00:00.123456789Z","stream":"stdout"}` + "\n"
+			processor := syner.dockerFileProcessor
+			processor.Process([]byte(line+line), 0)
+			groups := ctx.Collector().ToArray()
+			require.Len(t, groups, 2)
+			for _, group := range groups {
+				require.Len(t, group.Events, 1)
+				log, ok := group.Events[0].(*models.Log)
+				require.True(t, ok)
+				require.Equal(t, "test line", string(log.GetBody()))
+				require.Equal(t, "2025-01-01T00:00:00.123456789Z", log.GetIndices().Get("_time_"))
+				require.Equal(t, "stdout", log.GetIndices().Get("_source_"))
+				require.Equal(t, uint64(0), log.GetTimestamp()%uint64(time.Second))
+				require.NotEmpty(t, group.Group.GetMetadata().Get("source"))
+				require.False(t, log.GetTags().Contains("container"))
+				if mode.oldContentTags {
+					require.Equal(t, "test-container", log.GetIndices().Get("container"))
+					require.False(t, group.Group.GetTags().Contains("container"))
+				} else {
+					require.False(t, log.GetIndices().Contains("container"))
+					require.Equal(t, "test-container", group.Group.GetTags().Get("container"))
+				}
+			}
+			require.Equal(t, groups[0].Group.GetMetadata().Get("source"), groups[1].Group.GetMetadata().Get("source"))
+			groups[0].Group.GetTags().Add("local", "changed")
+			require.False(t, groups[1].Group.GetTags().Contains("local"))
+		})
 	}
 }

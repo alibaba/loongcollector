@@ -29,6 +29,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/alibaba/ilogtail/pkg/helper"
+	"github.com/alibaba/ilogtail/pkg/models"
+
 	"github.com/coreos/go-systemd/sdjournal"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
@@ -183,12 +186,6 @@ func (sj *ServiceJournal) Description() string {
 	return "journal input plugin for logtail"
 }
 
-// Collect takes in an accumulator and adds the metrics that the Input
-// gathers. This is called every "interval"
-func (sj *ServiceJournal) Collect(pipeline.Collector) error {
-	return nil
-}
-
 func (sj *ServiceJournal) initJournal() error {
 	var err error
 	seekToHelper := func(position string, err error) error {
@@ -284,7 +281,8 @@ func (sj *ServiceJournal) initJournal() error {
 }
 
 // Start starts the ServiceInput's service, whatever that may be
-func (sj *ServiceJournal) Start(c pipeline.Collector) error {
+func (sj *ServiceJournal) StartService(ctx pipeline.PipelineContext) error {
+	collector := ctx.Collector()
 	sj.shutdown = make(chan struct{})
 	sj.waitGroup.Add(1)
 	defer sj.waitGroup.Done()
@@ -298,7 +296,7 @@ RunLoop:
 		runShutdown := make(chan struct{})
 		var runWaitGroup sync.WaitGroup
 		runWaitGroup.Add(1)
-		go sj.run(c, runShutdown, &runWaitGroup)
+		go sj.run(collector, runShutdown, &runWaitGroup)
 
 		t := time.NewTimer(time.Second * time.Duration(sj.ResetIntervalSecond))
 		select {
@@ -327,7 +325,7 @@ func (sj *ServiceJournal) Stop() error {
 	return nil
 }
 
-func (sj *ServiceJournal) run(c pipeline.Collector, shutdown chan struct{}, wg *sync.WaitGroup) {
+func (sj *ServiceJournal) run(c pipeline.PipelineCollector, shutdown chan struct{}, wg *sync.WaitGroup) {
 	defer func() {
 		sj.SaveCheckpoint(true)
 		logger.Info(sj.context.GetRuntimeContext(), "journal", "start close")
@@ -337,8 +335,6 @@ func (sj *ServiceJournal) run(c pipeline.Collector, shutdown chan struct{}, wg *
 		wg.Done()
 	}()
 
-	columns := []string{"_realtime_timestamp_", "_monotonic_timestamp_"}
-	values := []string{"", ""}
 	for rawEvent := range sj.Follow(sj.journal, shutdown) {
 		// type JournalEntry struct {
 		// 	Fields             map[string]string
@@ -365,9 +361,12 @@ func (sj *ServiceJournal) run(c pipeline.Collector, shutdown chan struct{}, wg *
 		} else {
 			eventTime = time.Now()
 		}
-		values[0] = strconv.FormatUint(rawEvent.RealtimeTimestamp, 10)
-		values[1] = strconv.FormatUint(rawEvent.MonotonicTimestamp, 10)
-		c.AddDataArray(rawEvent.Fields, columns, values, eventTime)
+		contents := models.NewOrderedLogContents(2)
+		contents.Add("_realtime_timestamp_", strconv.FormatUint(rawEvent.RealtimeTimestamp, 10))
+		contents.Add("_monotonic_timestamp_", strconv.FormatUint(rawEvent.MonotonicTimestamp, 10))
+		event := helper.NewInputLog(rawEvent.Fields, nil, eventTime)
+		event.Contents = contents
+		c.Collect(models.NewGroup(models.NewMetadata(), models.NewTags()), event)
 		sj.SaveCheckpoint(false)
 	}
 	logger.Info(sj.context.GetRuntimeContext(), "service journal sync", "done")

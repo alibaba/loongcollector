@@ -20,13 +20,13 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/test/engine/setup/subscriber"
 )
 
 func TestCountLogsWithFilter(t *testing.T) {
-	groups := []*protocol.LogGroup{
+	groups := []*subscriber.Batch{
 		{
-			Logs: []*protocol.Log{
+			Records: []*subscriber.Record{
 				metricLog("_source_", "stdout", "content", "hello"),
 				metricLog("_source_", "stderr", "content", "warning"),
 				metricLog("_source_", "stdout", "_source_", "stdout"),
@@ -34,7 +34,7 @@ func TestCountLogsWithFilter(t *testing.T) {
 		},
 		nil,
 		{
-			Logs: []*protocol.Log{
+			Records: []*subscriber.Record{
 				nil,
 				metricLog("content", "ignored"),
 			},

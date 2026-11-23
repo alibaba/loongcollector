@@ -15,8 +15,8 @@
 package hostmeta
 
 import (
+	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/plugins/test"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
 
 	"testing"
@@ -39,10 +39,10 @@ func Benchmark_CollectNoProcess(b *testing.B) {
 		b.Errorf("cannot init the mock process plugin: %v", err)
 		return
 	}
-	c := &test.MockMetricCollector{}
+	c := helper.NewNoopPipelineContext()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		if err := p.Collect(c); err != nil {
+		if err := p.Read(c); err != nil {
 			b.Errorf("error in collect process metrics: %v", err)
 			return
 		}
@@ -66,10 +66,10 @@ func Benchmark_CollectWithProcess(b *testing.B) {
 		b.Errorf("cannot init the mock process plugin: %v", err)
 		return
 	}
-	c := &test.MockMetricCollector{}
+	c := helper.NewNoopPipelineContext()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		if err := p.Collect(c); err != nil {
+		if err := p.Read(c); err != nil {
 			b.Errorf("error in collect process metrics: %v", err)
 			return
 		}

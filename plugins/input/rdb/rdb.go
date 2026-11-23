@@ -23,6 +23,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/alibaba/ilogtail/pkg/helper"
+	"github.com/alibaba/ilogtail/pkg/models"
+
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
@@ -148,7 +151,7 @@ func (m *Rdb) CheckPointToString() string {
 }
 
 // Start starts the ServiceInput's service, whatever that may be
-func (m *Rdb) Start(collector pipeline.Collector, connStr string, rdbFunc RdbFunc, columnResolverFuncMap map[string]ColumnResolverFunc) error {
+func (m *Rdb) Start(collector pipeline.PipelineCollector, connStr string, rdbFunc RdbFunc, columnResolverFuncMap map[string]ColumnResolverFunc) error {
 	checkpointAlarmName := selfmonitor.AlarmType(fmt.Sprintf("%s_CHECKPOINT_ALARM", strings.ToUpper(m.Driver)))
 	timeoutAlarmName := selfmonitor.AlarmType(fmt.Sprintf("%s_TIMEOUT_ALARM", strings.ToUpper(m.Driver)))
 	queryAlarmName := selfmonitor.AlarmType(fmt.Sprintf("%s_QUERY_ALARM", strings.ToUpper(m.Driver)))
@@ -194,7 +197,7 @@ func (m *Rdb) Start(collector pipeline.Collector, connStr string, rdbFunc RdbFun
 		select {
 		case <-timer.C:
 			startTime := time.Now()
-			err = m.Collect(collector, columnResolverFuncMap)
+			err = m.collect(collector, columnResolverFuncMap)
 			if err != nil {
 				logger.Warning(m.Context.GetRuntimeContext(), queryAlarmName, "collect err", err)
 			}
@@ -208,14 +211,14 @@ func (m *Rdb) Start(collector pipeline.Collector, connStr string, rdbFunc RdbFun
 			}
 			logger.Debug(m.Context.GetRuntimeContext(), "sql collect done, start", startTime, "end", endTime, "intervalMs", m.IntervalMs)
 		case <-m.Shutdown:
-			m.SaveCheckPoint(collector)
+			m.SaveCheckPoint()
 			logger.Info(m.Context.GetRuntimeContext(), "recv shutdown signal", "start to exit")
 			return nil
 		}
 	}
 }
 
-func (m *Rdb) Collect(collector pipeline.Collector, columnResolverFuncMap map[string]ColumnResolverFunc) error {
+func (m *Rdb) collect(collector pipeline.PipelineCollector, columnResolverFuncMap map[string]ColumnResolverFunc) error {
 	if m.dbStatment == nil {
 		return fmt.Errorf("unknow error, instance not init")
 	}
@@ -240,7 +243,7 @@ func (m *Rdb) Collect(collector pipeline.Collector, columnResolverFuncMap map[st
 			if rowCount > 0 {
 				logger.Info(m.Context.GetRuntimeContext(), "syn sql success, data count", rowCount, "offset", startOffset, "pagesize", m.PageSize)
 				if m.CheckPointSavePerPage {
-					m.SaveCheckPoint(collector)
+					m.SaveCheckPoint()
 				}
 			}
 			if m.MaxSyncSize > 0 && (startOffset+rowCount) >= m.MaxSyncSize {
@@ -259,7 +262,7 @@ func (m *Rdb) Collect(collector pipeline.Collector, columnResolverFuncMap map[st
 			}
 		}
 		if !m.CheckPointSavePerPage && totalRowCount > 0 {
-			m.SaveCheckPoint(collector)
+			m.SaveCheckPoint()
 		}
 		m.collectTotal.Add(int64(totalRowCount))
 	} else {
@@ -270,7 +273,7 @@ func (m *Rdb) Collect(collector pipeline.Collector, columnResolverFuncMap map[st
 		rowCount := m.ParseRows(rows, columnResolverFuncMap, collector)
 		if rowCount > 0 {
 			logger.Debug(m.Context.GetRuntimeContext(), "syn sql success, data count", rowCount)
-			m.SaveCheckPoint(collector)
+			m.SaveCheckPoint()
 		}
 		m.collectTotal.Add(int64(rowCount))
 	}
@@ -278,7 +281,7 @@ func (m *Rdb) Collect(collector pipeline.Collector, columnResolverFuncMap map[st
 	return nil
 }
 
-func (m *Rdb) SaveCheckPoint(collector pipeline.Collector) {
+func (m *Rdb) SaveCheckPoint() {
 	checkpointAlarmName := selfmonitor.AlarmType(fmt.Sprintf("%s_CHECKPOINT_ALARM", strings.ToUpper(m.Driver)))
 	cp := CheckPoint{
 		CheckPointColumn:     m.CheckPointColumn,
@@ -301,7 +304,7 @@ func (m *Rdb) SaveCheckPoint(collector pipeline.Collector) {
 	}
 }
 
-func (m *Rdb) ParseRows(rows *sql.Rows, columnResolverFuncMap map[string]ColumnResolverFunc, collector pipeline.Collector) int {
+func (m *Rdb) ParseRows(rows *sql.Rows, columnResolverFuncMap map[string]ColumnResolverFunc, collector pipeline.PipelineCollector) int {
 	parseAlarmName := selfmonitor.AlarmType(fmt.Sprintf("%s_PARSE_ALARM", strings.ToUpper(m.Driver)))
 	defer rows.Close()
 	rowCount := 0
@@ -367,7 +370,12 @@ func (m *Rdb) ParseRows(rows *sql.Rows, columnResolverFuncMap map[string]ColumnR
 				m.columnStringValues[index] = "null"
 			}
 		}
-		collector.AddDataArray(nil, m.columnsKeyBuffer, m.columnStringValues)
+		event, err := helper.NewInputLogRow(nil, m.columnsKeyBuffer, m.columnStringValues)
+		if err != nil {
+			logger.Warning(m.Context.GetRuntimeContext(), parseAlarmName, "invalid log row", err)
+			return rowCount
+		}
+		collector.Collect(models.NewGroup(models.NewMetadata(), models.NewTags()), event)
 		rowCount++
 	}
 	if rowCount != 0 {

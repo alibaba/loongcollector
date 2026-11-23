@@ -12,7 +12,6 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/alibaba/ilogtail/pkg/doc"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/test/config"
 )
 
@@ -91,23 +90,23 @@ func (s *SLSSubscriber) Description() string {
 	return "this a sls subscriber"
 }
 
-func (s *SLSSubscriber) GetData(query string, startTime int32) ([]*protocol.LogGroup, error) {
+func (s *SLSSubscriber) GetData(query string, startTime int32) ([]*Batch, error) {
 	query = s.getCompleteQuery(query)
 	resp, err := s.getLogFromSLS(query, startTime)
 	if err != nil {
 		return nil, err
 	}
-	var groups []*protocol.LogGroup
-	group := &protocol.LogGroup{}
+	var groups []*Batch
+	group := &Batch{}
 	for _, log := range resp.Body {
-		logPb := &protocol.Log{}
+		logPb := &Record{}
 		for key, value := range log {
-			logPb.Contents = append(logPb.Contents, &protocol.Log_Content{
+			logPb.Fields = append(logPb.Fields, Field{
 				Key:   key,
 				Value: value.(string),
 			})
 		}
-		group.Logs = append(group.Logs, logPb)
+		group.Records = append(group.Records, logPb)
 	}
 	groups = append(groups, group)
 	return groups, nil

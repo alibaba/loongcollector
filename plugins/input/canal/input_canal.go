@@ -23,6 +23,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/alibaba/ilogtail/pkg/helper"
+	"github.com/alibaba/ilogtail/pkg/models"
+
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
@@ -153,7 +156,7 @@ type ServiceCanal struct {
 	canal              *canal.Canal
 	checkpoint         CheckPoint // update checkpoint after data is consumed
 	context            pipeline.Context
-	collector          pipeline.Collector
+	collector          pipeline.PipelineCollector
 	lastCheckPointTime time.Time
 	lastErrorCount     int
 	lastErrorChan      chan error
@@ -221,7 +224,7 @@ var canalOldFieldPrefix = "_old_"
 // - New fields (data): remaining fields.
 func (sc *ServiceCanal) addData(values map[string]string) {
 	if !sc.PackValues {
-		sc.collector.AddData(nil, values)
+		sc.collector.Collect(models.NewGroup(models.NewMetadata(), models.NewTags()), helper.NewInputLog(nil, values))
 		return
 	}
 
@@ -259,7 +262,7 @@ ValueLoop:
 	}
 	marshal("old_data", oldData)
 	marshal("data", newData)
-	sc.collector.AddData(nil, packedData)
+	sc.collector.Collect(models.NewGroup(models.NewMetadata(), models.NewTags()), helper.NewInputLog(nil, packedData))
 }
 
 func (sc *ServiceCanal) OnRotate(_ *replication.EventHeader, r *replication.RotateEvent) error {
@@ -547,12 +550,6 @@ func (sc *ServiceCanal) saveCheckPoint() {
 	_ = sc.context.SaveCheckPointObject("mysql_canal", &sc.checkpoint)
 }
 
-// Collect takes in an accumulator and adds the metrics that the Input
-// gathers. This is called every "interval"
-func (sc *ServiceCanal) Collect(pipeline.Collector) error {
-	return nil
-}
-
 func (sc *ServiceCanal) runCanal(pos mysql.Position) {
 	logger.Infof(sc.context.GetRuntimeContext(), "start canal from %v with binlog-file mode", pos)
 	sc.canal.SetEventHandler(sc)
@@ -686,12 +683,12 @@ func (sc *ServiceCanal) newCanal() (bool, error) {
 }
 
 // Start starts the ServiceInput's service, whatever that may be
-func (sc *ServiceCanal) Start(c pipeline.Collector) error {
+func (sc *ServiceCanal) StartService(ctx pipeline.PipelineContext) error {
 	sc.lastErrorCount = 0
 	sc.shutdown = make(chan struct{}, 1)
 	sc.waitGroup.Add(1)
 	defer sc.waitGroup.Done()
-	sc.collector = c
+	sc.collector = ctx.Collector()
 
 	shouldShutdown, err := sc.newCanal()
 	if err != nil {

@@ -26,7 +26,6 @@ import (
 	"github.com/alibaba/ilogtail/pkg/helper/containercenter"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pkg/util"
 	"github.com/alibaba/ilogtail/plugins/input"
@@ -88,12 +87,8 @@ func NewDockerFileSyner(sds *ServiceDockerStdout,
 		contentTags = tags
 	}
 	processor := NewDockerStdoutProcessor(reg, time.Duration(sds.BeginLineTimeoutMs)*time.Millisecond, sds.BeginLineCheckLength, sds.MaxLogSize, sds.Stdout, sds.Stderr, sds.context, sds.collector, contentTags, source)
-	if !usingOldContentTag && len(tags) > 0 {
-		groupTags := make([]*protocol.LogTag, 0, len(tags))
-		for key, value := range tags {
-			groupTags = append(groupTags, &protocol.LogTag{Key: key, Value: value})
-		}
-		processor.logContext["tags"] = groupTags
+	if !usingOldContentTag {
+		processor.groupTags = tags
 	}
 
 	checkpoint, ok := checkpointMap[info.ContainerInfo.ID]
@@ -190,7 +185,7 @@ type ServiceDockerStdout struct {
 	}
 	waitGroup sync.WaitGroup
 	context   pipeline.Context
-	collector pipeline.Collector
+	collector pipeline.PipelineCollector
 
 	// Last return of GetAllAcceptedInfoV2
 	fullList              map[string]bool
@@ -260,11 +255,7 @@ func (sds *ServiceDockerStdout) Description() string {
 	return "the container stdout input plugin for iLogtail, which supports docker and containerd."
 }
 
-func (sds *ServiceDockerStdout) Collect(pipeline.Collector) error {
-	return nil
-}
-
-func (sds *ServiceDockerStdout) FlushAll(c pipeline.Collector, firstStart bool) error {
+func (sds *ServiceDockerStdout) FlushAll(firstStart bool) error {
 	newUpdateTime := containercenter.GetContainersLastUpdateTime()
 	if sds.lastUpdateTime != 0 {
 		if sds.lastUpdateTime >= newUpdateTime {
@@ -388,9 +379,8 @@ func (sds *ServiceDockerStdout) ClearUselessCheckpoint() {
 	}
 }
 
-// Start starts the ServiceInput's service, whatever that may be
-func (sds *ServiceDockerStdout) Start(c pipeline.Collector) error {
-	sds.collector = c
+func (sds *ServiceDockerStdout) StartService(ctx pipeline.PipelineContext) error {
+	sds.collector = ctx.Collector()
 	sds.shutdown = make(chan struct{})
 	sds.waitGroup.Add(1)
 	defer sds.waitGroup.Done()
@@ -399,7 +389,7 @@ func (sds *ServiceDockerStdout) Start(c pipeline.Collector) error {
 
 	lastSaveCheckPointTime := time.Now()
 
-	_ = sds.FlushAll(c, true)
+	_ = sds.FlushAll(true)
 	for {
 		timer := time.NewTimer(time.Duration(sds.FlushIntervalMs) * time.Millisecond)
 		select {
@@ -416,7 +406,7 @@ func (sds *ServiceDockerStdout) Start(c pipeline.Collector) error {
 				lastSaveCheckPointTime = nowTime
 				sds.ClearUselessCheckpoint()
 			}
-			_ = sds.FlushAll(c, false)
+			_ = sds.FlushAll(false)
 		}
 	}
 }

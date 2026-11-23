@@ -26,7 +26,6 @@ import (
 	"github.com/avast/retry-go/v4"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/test/config"
 	"github.com/alibaba/ilogtail/test/engine/control"
 	"github.com/alibaba/ilogtail/test/engine/setup/subscriber"
@@ -66,7 +65,7 @@ func verifyPartitions(ctx context.Context, expectedStr string, cmp func(int, int
 
 	timeoutCtx, cancel := context.WithTimeout(context.TODO(), config.TestConfig.RetryTimeout)
 	defer cancel()
-	var groups []*protocol.LogGroup
+	var groups []*subscriber.Batch
 	err = retry.Do(
 		func() error {
 			var err2 error
@@ -83,8 +82,8 @@ func verifyPartitions(ctx context.Context, expectedStr string, cmp func(int, int
 
 	parts := make(map[string]struct{})
 	for _, group := range groups {
-		for _, lg := range group.Logs {
-			for _, c := range lg.Contents {
+		for _, lg := range group.Records {
+			for _, c := range lg.Fields {
 				if c.Key == "partition" && c.Value != "" {
 					parts[c.Value] = struct{}{}
 				}
@@ -107,11 +106,11 @@ func KafkaPartitionsConsistentByField(ctx context.Context, field string) (contex
 	m := make(map[string]map[string]struct{}) // key -> set(partitions)
 	total := 0
 	for _, g := range groups {
-		for _, lg := range g.Logs {
+		for _, lg := range g.Records {
 			var content string
 			var partition string
 			var keyField string
-			for _, c := range lg.Contents {
+			for _, c := range lg.Fields {
 				switch c.Key {
 				case "content":
 					content = c.Value
@@ -157,10 +156,10 @@ func KafkaPrintPartitionMappingByField(ctx context.Context, field string) (conte
 	}
 	m := make(map[string]map[string]struct{})
 	for _, g := range groups {
-		for _, lg := range g.Logs {
+		for _, lg := range g.Records {
 			var content string
 			var partition string
-			for _, c := range lg.Contents {
+			for _, c := range lg.Fields {
 				switch c.Key {
 				case "content":
 					content = c.Value
@@ -193,7 +192,7 @@ func KafkaPrintPartitionMappingByField(ctx context.Context, field string) (conte
 	return ctx, nil
 }
 
-func fetchLogs(ctx context.Context) ([]*protocol.LogGroup, error) {
+func fetchLogs(ctx context.Context) ([]*subscriber.Batch, error) {
 	var from int32
 	value := ctx.Value(config.StartTimeContextKey)
 	if value != nil {
@@ -204,7 +203,7 @@ func fetchLogs(ctx context.Context) ([]*protocol.LogGroup, error) {
 
 	timeoutCtx, cancel := context.WithTimeout(context.TODO(), config.TestConfig.RetryTimeout)
 	defer cancel()
-	var groups []*protocol.LogGroup
+	var groups []*subscriber.Batch
 	err := retry.Do(
 		func() error {
 			var err2 error

@@ -91,7 +91,8 @@ func (in *InputNodeMeta) Description() string {
 	return "Collect the host metadata"
 }
 
-func (in *InputNodeMeta) Collect(collector pipeline.Collector) error {
+func (in *InputNodeMeta) Read(ctx pipeline.PipelineContext) error {
+	collector := ctx.Collector()
 	now := time.Now()
 	if len(in.hostCollects) > 0 {
 		node, err := in.collectHostMeta()

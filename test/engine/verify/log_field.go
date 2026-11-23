@@ -26,7 +26,6 @@ import (
 	"github.com/avast/retry-go/v4"
 	"gopkg.in/yaml.v3"
 
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/test/config"
 	"github.com/alibaba/ilogtail/test/engine/control"
 	"github.com/alibaba/ilogtail/test/engine/setup/subscriber"
@@ -45,7 +44,7 @@ func LogField(ctx context.Context, expectFieldStr string) (context.Context, erro
 	timeoutCtx, cancel := context.WithTimeout(context.TODO(), config.TestConfig.RetryTimeout)
 	defer cancel()
 	var err error
-	var groups []*protocol.LogGroup
+	var groups []*subscriber.Batch
 	err = retry.Do(
 		func() error {
 			groups, err = subscriber.TestSubscriber.GetData(control.GetQuery(ctx), from)
@@ -65,14 +64,14 @@ func LogField(ctx context.Context, expectFieldStr string) (context.Context, erro
 		return ctx, err
 	}
 	for _, group := range groups {
-		for _, log := range group.Logs {
+		for _, log := range group.Records {
 			for _, field := range expectFields {
-				for _, content := range log.Contents {
+				for _, content := range log.Fields {
 					if content.Key == field {
 						goto find
 					}
 				}
-				return ctx, fmt.Errorf("want contains field %s, but not found, current: %s", field, log.Contents)
+				return ctx, fmt.Errorf("want contains field %s, but not found, current: %v", field, log.Fields)
 			find:
 			}
 		}
@@ -92,7 +91,7 @@ func LogFieldGreaterThanEqual(ctx context.Context, expectFieldStr string, expect
 	timeoutCtx, cancel := context.WithTimeout(context.TODO(), config.TestConfig.RetryTimeout)
 	defer cancel()
 	var err error
-	var groups []*protocol.LogGroup
+	var groups []*subscriber.Batch
 	err = retry.Do(
 		func() error {
 			groups, err = subscriber.TestSubscriber.GetData(control.GetQuery(ctx), from)
@@ -108,15 +107,15 @@ func LogFieldGreaterThanEqual(ctx context.Context, expectFieldStr string, expect
 	return ctx, logFieldGreaterThanEqual(groups, expectFieldStr, expectValue)
 }
 
-func logFieldGreaterThanEqual(groups []*protocol.LogGroup, expectFieldStr string, expectValue int64) error {
+func logFieldGreaterThanEqual(groups []*subscriber.Batch, expectFieldStr string, expectValue int64) error {
 	var (
 		maxValue      int64
 		hasValidValue bool
 		parseErr      error
 	)
 	for _, group := range groups {
-		for _, log := range group.Logs {
-			for _, content := range log.Contents {
+		for _, log := range group.Records {
+			for _, content := range log.Fields {
 				if content.Key != expectFieldStr {
 					continue
 				}
@@ -159,7 +158,7 @@ func LogFieldKV(ctx context.Context, expectKeyValuesStr string) (context.Context
 	timeoutCtx, cancel := context.WithTimeout(context.TODO(), config.TestConfig.RetryTimeout)
 	defer cancel()
 	var err error
-	var groups []*protocol.LogGroup
+	var groups []*subscriber.Batch
 	err = retry.Do(
 		func() error {
 			groups, err = subscriber.TestSubscriber.GetData(control.GetQuery(ctx), from)
@@ -185,9 +184,9 @@ func LogFieldKV(ctx context.Context, expectKeyValuesStr string) (context.Context
 	}
 
 	for _, group := range groups {
-		for _, log := range group.Logs {
+		for _, log := range group.Records {
 			for k, reg := range kvRegexps {
-				for _, content := range log.Contents {
+				for _, content := range log.Fields {
 					if content.Key == k {
 						if !reg.MatchString(content.Value) {
 							return ctx, fmt.Errorf("want contains KV %s:%s, but got %s:%s", k, reg.String(), content.Key, content.Value)
@@ -223,7 +222,7 @@ func LogFieldExactKV(ctx context.Context, expectRecordsStr string) (context.Cont
 	timeoutCtx, cancel := context.WithTimeout(context.TODO(), config.TestConfig.RetryTimeout)
 	defer cancel()
 	var err error
-	var groups []*protocol.LogGroup
+	var groups []*subscriber.Batch
 	err = retry.Do(
 		func() error {
 			groups, err = subscriber.TestSubscriber.GetData(control.GetQuery(ctx), from)
@@ -245,7 +244,7 @@ func LogFieldExactKV(ctx context.Context, expectRecordsStr string) (context.Cont
 	for _, expect := range expectRecords {
 		matched := false
 		for _, group := range groups {
-			for _, log := range group.Logs {
+			for _, log := range group.Records {
 				if logContainsExactKV(log, expect) {
 					matched = true
 					break
@@ -277,7 +276,7 @@ func LogFieldNoDuplicates(ctx context.Context, field string) (context.Context, e
 	timeoutCtx, cancel := context.WithTimeout(context.TODO(), config.TestConfig.RetryTimeout)
 	defer cancel()
 	var err error
-	var groups []*protocol.LogGroup
+	var groups []*subscriber.Batch
 	err = retry.Do(
 		func() error {
 			groups, err = subscriber.TestSubscriber.GetData(control.GetQuery(ctx), from)
@@ -296,17 +295,17 @@ func LogFieldNoDuplicates(ctx context.Context, field string) (context.Context, e
 	return ctx, nil
 }
 
-func logFieldNoDuplicates(groups []*protocol.LogGroup, field string) error {
+func logFieldNoDuplicates(groups []*subscriber.Batch, field string) error {
 	seen := make(map[string]int)
 	for _, group := range groups {
 		if group == nil {
 			continue
 		}
-		for _, log := range group.Logs {
+		for _, log := range group.Records {
 			if log == nil {
 				continue
 			}
-			for _, content := range log.Contents {
+			for _, content := range log.Fields {
 				if content.Key == field {
 					seen[content.Value]++
 					break
@@ -332,10 +331,10 @@ func logFieldNoDuplicates(groups []*protocol.LogGroup, field string) error {
 
 // logContainsExactKV reports whether the log contains every expected key with
 // exactly the expected value.
-func logContainsExactKV(log *protocol.Log, expect map[string]string) bool {
+func logContainsExactKV(log *subscriber.Record, expect map[string]string) bool {
 	for k, v := range expect {
 		found := false
-		for _, content := range log.Contents {
+		for _, content := range log.Fields {
 			if content.Key == k {
 				if content.Value != v {
 					return false

@@ -18,16 +18,16 @@ import (
 	"context"
 	"testing"
 
+	"github.com/alibaba/ilogtail/pkg/helper"
 	common "github.com/alibaba/ilogtail/plugins/input/skywalkingv3/skywalking/network/common/v3"
 	v3 "github.com/alibaba/ilogtail/plugins/input/skywalkingv3/skywalking/network/language/agent/v3"
-	"github.com/alibaba/ilogtail/plugins/test"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
 )
 
 func TestClrMetrics(t *testing.T) {
 	ctx := mock.NewEmptyContext("p", "l", "c")
 	ctx.InitContext("a", "b", "c")
-	collector := &test.MockCollector{}
+	collector := helper.NewObservePipelineContext(256).Collector()
 	handler := &CLRMetricHandler{
 		ctx,
 		collector,
@@ -35,7 +35,7 @@ func TestClrMetrics(t *testing.T) {
 		-1,
 	}
 	_, _ = handler.Collect(context.Background(), buildMockClrMetricRequest())
-	validate("./testdata/clr_metrics.json", collector.RawLogs, t)
+	validate("./testdata/clr_metrics.json", collector.ToArray(), t)
 }
 
 func buildMockClrMetricRequest() *v3.CLRMetricCollection {

@@ -21,6 +21,7 @@ import (
 	"math"
 	"math/big"
 
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	common "github.com/alibaba/ilogtail/plugins/input/skywalkingv2/skywalking/apm/network/common"
 	v2 "github.com/alibaba/ilogtail/plugins/input/skywalkingv2/skywalking/apm/network/language/agent/v2"
@@ -30,7 +31,7 @@ type JVMMetricReportHandle struct {
 	RegistryInformationCache
 
 	context   pipeline.Context
-	collector pipeline.Collector
+	collector pipeline.PipelineCollector
 }
 
 func (j *JVMMetricReportHandle) Collect(ctx context.Context, metrics *v2.JVMMetricCollection) (*common.Commands, error) {
@@ -50,7 +51,7 @@ func (j *JVMMetricReportHandle) Collect(ctx context.Context, metrics *v2.JVMMetr
 	for _, metric := range metrics.GetMetrics() {
 		logs := toMetricStoreFormat(metric, applicationInstance.application.applicationName, applicationInstance.uuid, applicationInstance.host)
 		for _, log := range logs {
-			j.collector.AddRawLog(log)
+			j.collector.Collect(models.NewGroup(models.NewMetadata(), models.NewTags()), log)
 		}
 	}
 

@@ -29,6 +29,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/plugins/input/skywalkingv2/skywalking/apm/network/common"
@@ -41,7 +42,7 @@ type TraceSegmentReportHandle struct {
 	RegistryInformationCache
 
 	context   pipeline.Context
-	collector pipeline.Collector
+	collector pipeline.PipelineCollector
 
 	compIDMessagingSystemMapping map[int32]string
 }
@@ -127,7 +128,7 @@ func (t *TraceSegmentReportHandle) collectSegment(server v2.TraceSegmentReportSe
 				logger.Warning(t.context.GetRuntimeContext(), selfmonitor.SkywalkingToOtTraceErr, "err", err)
 				return err
 			}
-			t.collector.AddRawLog(log)
+			t.collector.Collect(models.NewGroup(models.NewMetadata(), models.NewTags()), log)
 		}
 	}
 

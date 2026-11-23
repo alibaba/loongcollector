@@ -21,7 +21,6 @@ import (
 
 	"github.com/avast/retry-go/v4"
 
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/test/config"
 	"github.com/alibaba/ilogtail/test/engine/control"
 	"github.com/alibaba/ilogtail/test/engine/setup/subscriber"
@@ -39,7 +38,7 @@ func LogCount(ctx context.Context, expect int) (context.Context, error) {
 	}
 	timeoutCtx, cancel := context.WithTimeout(context.TODO(), config.TestConfig.RetryTimeout)
 	defer cancel()
-	var groups []*protocol.LogGroup
+	var groups []*subscriber.Batch
 	var err error
 	var count int
 	err = retry.Do(
@@ -50,7 +49,7 @@ func LogCount(ctx context.Context, expect int) (context.Context, error) {
 				return err
 			}
 			for _, group := range groups {
-				count += len(group.Logs)
+				count += len(group.Records)
 			}
 			if count != expect {
 				return fmt.Errorf("log count not match, expect %d, got %d, from %d", expect, count, from)
@@ -83,7 +82,7 @@ func LogCountLess(ctx context.Context, expect int) (context.Context, error) {
 	}
 	timeoutCtx, cancel := context.WithTimeout(context.TODO(), config.TestConfig.RetryTimeout)
 	defer cancel()
-	var groups []*protocol.LogGroup
+	var groups []*subscriber.Batch
 	var err error
 	var count int
 	err = retry.Do(
@@ -94,7 +93,7 @@ func LogCountLess(ctx context.Context, expect int) (context.Context, error) {
 				return err
 			}
 			for _, group := range groups {
-				count += len(group.Logs)
+				count += len(group.Records)
 			}
 			if count != expect {
 				return fmt.Errorf("log count not match, expect %d, got %d, from %d", expect, count, from)
@@ -117,10 +116,10 @@ func LogCountLess(ctx context.Context, expect int) (context.Context, error) {
 	return ctx, nil
 }
 
-func MetricCheck(ctx context.Context, expect int, duration int64, checker func([]*protocol.LogGroup) error) (context.Context, error) {
+func MetricCheck(ctx context.Context, expect int, duration int64, checker func([]*subscriber.Batch) error) (context.Context, error) {
 	timeoutCtx, cancel := context.WithTimeout(context.TODO(), config.TestConfig.RetryTimeout)
 	defer cancel()
-	var groups []*protocol.LogGroup
+	var groups []*subscriber.Batch
 	var err error
 	var count int
 	err = retry.Do(
@@ -133,7 +132,7 @@ func MetricCheck(ctx context.Context, expect int, duration int64, checker func([
 				return err
 			}
 			for _, group := range groups {
-				count += len(group.Logs)
+				count += len(group.Records)
 			}
 			if count < expect {
 				return fmt.Errorf("metric count not match, expect %d, got %d, from %d", expect, count, lastScrapeTime)
@@ -160,18 +159,18 @@ func MetricCheck(ctx context.Context, expect int, duration int64, checker func([
 }
 
 func MetricCount(ctx context.Context, expect int, duration int64) (context.Context, error) {
-	return MetricCheck(ctx, expect, duration, func(groups []*protocol.LogGroup) error {
+	return MetricCheck(ctx, expect, duration, func(groups []*subscriber.Batch) error {
 		return nil
 	})
 }
 
 func MetricCountAndValueCompare(ctx context.Context, expect int, duration int64, minValue int64, maxValue int64) (context.Context, error) {
-	return MetricCheck(ctx, expect, duration, func(groups []*protocol.LogGroup) error {
+	return MetricCheck(ctx, expect, duration, func(groups []*subscriber.Batch) error {
 		lessCount := 0
 		greaterCount := 0
 		for _, group := range groups {
-			for _, log := range group.Logs {
-				for _, content := range log.Contents {
+			for _, log := range group.Records {
+				for _, content := range log.Fields {
 					if content.Key == "value" {
 						value, err := strconv.ParseFloat(content.Value, 64)
 						if err != nil {
@@ -195,11 +194,11 @@ func MetricCountAndValueCompare(ctx context.Context, expect int, duration int64,
 }
 
 func MetricCountAndValueEqual(ctx context.Context, expect int, duration int64, expectValue int64) (context.Context, error) {
-	return MetricCheck(ctx, expect, duration, func(groups []*protocol.LogGroup) error {
+	return MetricCheck(ctx, expect, duration, func(groups []*subscriber.Batch) error {
 		notEqualCount := 0
 		for _, group := range groups {
-			for _, log := range group.Logs {
-				for _, content := range log.Contents {
+			for _, log := range group.Records {
+				for _, content := range log.Fields {
 					if content.Key == "value" {
 						value, err := strconv.ParseFloat(content.Value, 64)
 						if err != nil {
@@ -229,7 +228,7 @@ func LogCountAtLeast(ctx context.Context, expect int) (context.Context, error) {
 	}
 	timeoutCtx, cancel := context.WithTimeout(context.TODO(), config.TestConfig.RetryTimeout)
 	defer cancel()
-	var groups []*protocol.LogGroup
+	var groups []*subscriber.Batch
 	var err error
 	var count int
 	err = retry.Do(
@@ -240,7 +239,7 @@ func LogCountAtLeast(ctx context.Context, expect int) (context.Context, error) {
 				return err
 			}
 			for _, group := range groups {
-				count += len(group.Logs)
+				count += len(group.Records)
 			}
 			if count < expect {
 				return fmt.Errorf("log count not match, expect at least %d, got %d", expect, count)
@@ -273,7 +272,7 @@ func LogCountAtLeastWithFilter(ctx context.Context, expect int, filterKey string
 	}
 	timeoutCtx, cancel := context.WithTimeout(context.TODO(), config.TestConfig.RetryTimeout)
 	defer cancel()
-	var groups []*protocol.LogGroup
+	var groups []*subscriber.Batch
 	var err error
 	var count int
 	var zeroObservationStartedAt time.Time
@@ -330,17 +329,17 @@ func observeZeroLogCount(count int, now time.Time, observationStartedAt *time.Ti
 	return now.Sub(*observationStartedAt) >= zeroLogObservationWindow, nil
 }
 
-func countLogsWithFilter(groups []*protocol.LogGroup, filterKey, filterValue string) int {
+func countLogsWithFilter(groups []*subscriber.Batch, filterKey, filterValue string) int {
 	count := 0
 	for _, group := range groups {
 		if group == nil {
 			continue
 		}
-		for _, log := range group.Logs {
+		for _, log := range group.Records {
 			if log == nil {
 				continue
 			}
-			for _, content := range log.Contents {
+			for _, content := range log.Fields {
 				if content.Key == filterKey && content.Value == filterValue {
 					count++
 					break

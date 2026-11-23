@@ -28,6 +28,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/alibaba/ilogtail/pkg/models"
+
 	goping "github.com/go-ping/ping"
 
 	"github.com/alibaba/ilogtail/pkg/helper"
@@ -274,8 +276,9 @@ func (m *NetPing) Description() string {
 	return "a icmp-ping/tcp-ping/http-ping plugin for logtail"
 }
 
-// Collect is called every trigger interval to collect the metrics and send them to the collector.
-func (m *NetPing) Collect(collector pipeline.Collector) error {
+// Read is called every trigger interval to collect the metrics and send them to the collector.
+func (m *NetPing) Read(ctx pipeline.PipelineContext) error {
+	collector := ctx.Collector()
 	if !m.hasConfig {
 		return nil
 	}
@@ -361,8 +364,8 @@ func (m *NetPing) Collect(collector pipeline.Collector) error {
 	return nil
 }
 
-func (m *NetPing) addMetric(collector pipeline.Collector, name string, t *time.Time, labels *helper.MetricLabels, val float64) {
-	collector.AddRawLog(helper.NewMetricLog(name, t.UnixNano(), val, labels))
+func (m *NetPing) addMetric(collector pipeline.PipelineCollector, name string, t *time.Time, labels *helper.MetricLabels, val float64) {
+	collector.Collect(models.NewGroup(models.NewMetadata(), models.NewTags()), helper.NewInputMetric(name, t.UnixNano(), val, labels))
 }
 
 func (m *NetPing) evaluteDNSResolve(host string) {

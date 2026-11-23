@@ -68,7 +68,7 @@ func createManager(agentDirPath string) *Manager {
 		jmxfetchdPath:    path.Join(agentDirPath, scriptsName),
 		jmxfetchConfPath: path.Join(agentDirPath, "conf.d"),
 		allLoadedCfgs:    make(map[string]*Cfg),
-		collectors:       make(map[string]pipeline.Collector),
+		collectors:       make(map[string]pipeline.PipelineCollector),
 		managerMeta:      helper.NewmanagerMeta("jmxfetch"),
 		stopChan:         make(chan struct{}),
 	}
@@ -79,7 +79,7 @@ type Manager struct {
 	jmxfetchdPath    string
 	jmxfetchConfPath string
 	allLoadedCfgs    map[string]*Cfg
-	collectors       map[string]pipeline.Collector
+	collectors       map[string]pipeline.PipelineCollector
 	managerMeta      *helper.ManagerMeta
 	stopChan         chan struct{}
 	uniqueCollectors string
@@ -91,7 +91,7 @@ type Manager struct {
 	sync.Mutex
 }
 
-func (m *Manager) RegisterCollector(ctx pipeline.Context, key string, collector pipeline.Collector, filters []*FilterInner) {
+func (m *Manager) RegisterCollector(ctx pipeline.Context, key string, collector pipeline.PipelineCollector, filters []*FilterInner) {
 	if !m.initSuccess {
 		return
 	}

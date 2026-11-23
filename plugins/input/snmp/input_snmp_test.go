@@ -24,7 +24,8 @@ import (
 	"time"
 
 	// other packages of this project
-	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/helper"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pluginmanager"
 
 	// third party
@@ -36,16 +37,6 @@ type ContextTest struct {
 	pluginmanager.ContextImp
 
 	Logs []string
-}
-
-type mockLog struct {
-	tags   map[string]string
-	fields map[string]string
-}
-
-type mockCollector struct {
-	logs    []mockLog
-	rawLogs []protocol.Log
 }
 
 func ExecCmdWithOption(cmd string, panicErr bool) (string, error) {
@@ -60,33 +51,6 @@ func ExecCmdWithOption(cmd string, panicErr bool) (string, error) {
 	}
 	result := strings.Trim(string(output), "\n")
 	return result, err
-}
-
-func (c *mockCollector) AddData(
-	tags map[string]string, fields map[string]string, t ...time.Time) {
-	c.AddDataWithContext(tags, fields, nil, t...)
-}
-
-func (c *mockCollector) AddDataArray(
-	tags map[string]string, columns []string, values []string, t ...time.Time) {
-	c.AddDataArrayWithContext(tags, columns, values, nil, t...)
-}
-
-func (c *mockCollector) AddRawLog(log *protocol.Log) {
-	c.AddRawLogWithContext(log, nil)
-}
-
-func (c *mockCollector) AddDataWithContext(
-	tags map[string]string, fields map[string]string, ctx map[string]interface{}, t ...time.Time) {
-	c.logs = append(c.logs, mockLog{tags, fields})
-}
-
-func (c *mockCollector) AddDataArrayWithContext(
-	tags map[string]string, columns []string, values []string, ctx map[string]interface{}, t ...time.Time) {
-}
-
-func (c *mockCollector) AddRawLogWithContext(log *protocol.Log, ctx map[string]interface{}) {
-	c.rawLogs = append(c.rawLogs, *log)
 }
 
 func (p *ContextTest) LogWarnf(alarmType string, format string, params ...interface{}) {
@@ -178,16 +142,16 @@ func TestStartAndStop(t *testing.T) {
 	ctx, input := newUDPInputV1()
 	_ = InitGoSNMP(ctx, input)
 
-	collector := &mockCollector{}
+	collector := helper.NewObservePipelineContext(16)
 
 	var err error
 	go func() {
-		err = input.Start(collector)
+		err = input.StartService(collector)
 		require.NoError(t, err)
 	}()
 
 	time.Sleep(time.Duration(1) * time.Second)
-	assert.Equal(t, len(collector.logs), 1)
+	require.Len(t, collector.Collector().ToArray(), 1)
 
 	t1 := time.Now()
 	err = input.Stop()
@@ -199,14 +163,14 @@ func TestStartAndStop(t *testing.T) {
 	ctx, input = newTCPInputV1()
 	_ = InitGoSNMP(ctx, input)
 
-	collector = &mockCollector{}
+	collector = helper.NewObservePipelineContext(16)
 	go func() {
-		err = input.Start(collector)
+		err = input.StartService(collector)
 		require.NoError(t, err)
 	}()
 
 	// time.Sleep(time.Duration(1) * time.Second)
-	// assert.Equal(t, len(collector.logs), 1)
+	// require.Len(t, collector.Collector().ToArray(), 1)
 
 	t2 := time.Now()
 	err = input.Stop()
@@ -231,97 +195,85 @@ func TestGET(t *testing.T) {
 	require.NoError(t, err)
 	err = input.gs[0].Connect()
 	require.NoError(t, err)
-	collector := &mockCollector{}
+	collector := helper.NewObservePipelineContext(16)
 	go func() {
-		err = input.Start(collector)
+		err = input.StartService(collector)
 		require.NoError(t, err)
 	}()
 	time.Sleep(time.Duration(1) * time.Second)
-	assert.Equal(t, len(collector.logs), 1)
-	assert.Equal(
-		t,
-		collector.logs[0],
-		mockLog{nil, map[string]string{
-			"_target_":      "127.0.0.1",
-			"_field_":       "SNMPv2-MIB::sysContact.0",
-			"_oid_":         ".1.3.6.1.2.1.1.4.0",
-			"_conversion_":  "",
-			"_type_":        "OctetString",
-			"_content_":     "Me <me@example.org>",
-			"_targetindex_": "0"}},
-	)
+	assertSNMPFields(t, collector.Collector().ToArray(), map[string]interface{}{
+		"_target_":      "127.0.0.1",
+		"_field_":       "SNMPv2-MIB::sysContact.0",
+		"_oid_":         ".1.3.6.1.2.1.1.4.0",
+		"_conversion_":  "",
+		"_type_":        "OctetString",
+		"_content_":     "Me <me@example.org>",
+		"_targetindex_": "0"})
 	ctx, input = newInputV2()
 	err = InitGoSNMP(ctx, input)
 	require.NoError(t, err)
 	err = input.gs[0].Connect()
 	require.NoError(t, err)
-	collector = &mockCollector{}
+	collector = helper.NewObservePipelineContext(16)
 	go func() {
-		err = input.Start(collector)
+		err = input.StartService(collector)
 		require.NoError(t, err)
 	}()
 	time.Sleep(time.Duration(1) * time.Second)
-	assert.Equal(t, len(collector.logs), 1)
-	assert.Equal(
-		t,
-		collector.logs[0],
-		mockLog{nil, map[string]string{
-			"_target_":      "127.0.0.1",
-			"_field_":       "SNMPv2-MIB::sysContact.0",
-			"_oid_":         ".1.3.6.1.2.1.1.4.0",
-			"_conversion_":  "",
-			"_type_":        "OctetString",
-			"_content_":     "Me <me@example.org>",
-			"_targetindex_": "0"}},
-	)
+	assertSNMPFields(t, collector.Collector().ToArray(), map[string]interface{}{
+		"_target_":      "127.0.0.1",
+		"_field_":       "SNMPv2-MIB::sysContact.0",
+		"_oid_":         ".1.3.6.1.2.1.1.4.0",
+		"_conversion_":  "",
+		"_type_":        "OctetString",
+		"_content_":     "Me <me@example.org>",
+		"_targetindex_": "0"})
 	ctx, input = newTCPInputV1()
 	err = InitGoSNMP(ctx, input)
 	require.NoError(t, err)
 	err = input.gs[0].Connect()
 	require.NoError(t, err)
-	collector = &mockCollector{}
+	collector = helper.NewObservePipelineContext(16)
 	go func() {
-		err = input.Start(collector)
+		err = input.StartService(collector)
 		require.NoError(t, err)
 	}()
 	time.Sleep(time.Duration(1) * time.Second)
-	assert.Equal(t, len(collector.logs), 1)
-	assert.Equal(
-		t,
-		collector.logs[0],
-		mockLog{nil, map[string]string{
-			"_target_":      "127.0.0.1",
-			"_field_":       "SNMPv2-MIB::sysContact.0",
-			"_oid_":         ".1.3.6.1.2.1.1.4.0",
-			"_conversion_":  "",
-			"_type_":        "OctetString",
-			"_content_":     "Me <me@example.org>",
-			"_targetindex_": "0"}},
-	)
+	assertSNMPFields(t, collector.Collector().ToArray(), map[string]interface{}{
+		"_target_":      "127.0.0.1",
+		"_field_":       "SNMPv2-MIB::sysContact.0",
+		"_oid_":         ".1.3.6.1.2.1.1.4.0",
+		"_conversion_":  "",
+		"_type_":        "OctetString",
+		"_content_":     "Me <me@example.org>",
+		"_targetindex_": "0"})
 	ctx, input = newUDPInputV1()
 	err = InitGoSNMP(ctx, input)
 	require.NoError(t, err)
 	err = input.gs[0].Connect()
 	require.NoError(t, err)
-	collector = &mockCollector{}
+	collector = helper.NewObservePipelineContext(16)
 	go func() {
-		err = input.Start(collector)
+		err = input.StartService(collector)
 		require.NoError(t, err)
 	}()
 	time.Sleep(time.Duration(1) * time.Second)
-	assert.Equal(t, len(collector.logs), 1)
-	assert.Equal(
-		t,
-		collector.logs[0],
-		mockLog{nil, map[string]string{
-			"_target_":      "127.0.0.1",
-			"_field_":       "SNMPv2-MIB::sysContact.0",
-			"_oid_":         ".1.3.6.1.2.1.1.4.0",
-			"_conversion_":  "",
-			"_type_":        "OctetString",
-			"_content_":     "Me <me@example.org>",
-			"_targetindex_": "0"}},
-	)
+	assertSNMPFields(t, collector.Collector().ToArray(), map[string]interface{}{
+		"_target_":      "127.0.0.1",
+		"_field_":       "SNMPv2-MIB::sysContact.0",
+		"_oid_":         ".1.3.6.1.2.1.1.4.0",
+		"_conversion_":  "",
+		"_type_":        "OctetString",
+		"_content_":     "Me <me@example.org>",
+		"_targetindex_": "0"})
+}
+
+func assertSNMPFields(t *testing.T, groups []*models.PipelineGroupEvents, fields map[string]interface{}) {
+	t.Helper()
+	require.Len(t, groups, 1)
+	require.Len(t, groups[0].Events, 1)
+	log := groups[0].Events[0].(*models.Log)
+	assert.Equal(t, fields, log.GetIndices().Iterator())
 }
 
 func TestAuth(t *testing.T) {

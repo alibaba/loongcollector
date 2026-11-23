@@ -24,6 +24,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/alibaba/ilogtail/pkg/helper"
+	"github.com/alibaba/ilogtail/pkg/models"
+
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
@@ -62,7 +65,8 @@ func (n *Nginx) Description() string {
 	return "Read Nginx's basic status information (ngx_http_stub_status_module)"
 }
 
-func (n *Nginx) Collect(collector pipeline.Collector) error {
+func (n *Nginx) Read(ctx pipeline.PipelineContext) error {
+	collector := ctx.Collector()
 	var wg sync.WaitGroup
 	logger.Debug(n.context.GetRuntimeContext(), "start collect nginx info", *n)
 	// Create an HTTP client that is re-used for each
@@ -112,7 +116,7 @@ func (n *Nginx) createHTTPClient() (*http.Client, error) {
 	return client, nil
 }
 
-func (n *Nginx) gatherURL(addr *url.URL, collector pipeline.Collector) error {
+func (n *Nginx) gatherURL(addr *url.URL, collector pipeline.PipelineCollector) error {
 	resp, err := n.client.Get(addr.String())
 	if err != nil {
 		return fmt.Errorf("error making HTTP request to %s: %s", addr.String(), err)
@@ -168,7 +172,7 @@ func (n *Nginx) gatherURL(addr *url.URL, collector pipeline.Collector) error {
 		"writing":  writing,
 		"waiting":  waiting,
 	}
-	collector.AddData(tags, fields)
+	collector.Collect(models.NewGroup(models.NewMetadata(), models.NewTags()), helper.NewInputLog(tags, fields))
 	return nil
 }
 

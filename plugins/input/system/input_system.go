@@ -18,6 +18,9 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/alibaba/ilogtail/pkg/helper"
+	"github.com/alibaba/ilogtail/pkg/models"
+
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 
 	"github.com/shirou/gopsutil/cpu"
@@ -67,7 +70,7 @@ func (r *InputSystem) Description() string {
 	return "system metric input plugin for logtail"
 }
 
-func (r *InputSystem) CollectCore(collector pipeline.Collector) {
+func (r *InputSystem) CollectCore(collector pipeline.PipelineCollector) {
 	fields := make(map[string]string)
 	fields["metric_type"] = "core"
 
@@ -110,10 +113,10 @@ func (r *InputSystem) CollectCore(collector pipeline.Collector) {
 		fields["misc_ctxt"] = strconv.Itoa(miscStat.Ctxt)
 	}
 
-	collector.AddData(nil, fields)
+	collector.Collect(models.NewGroup(models.NewMetadata(), models.NewTags()), helper.NewInputLog(nil, fields))
 }
 
-func (r *InputSystem) CollectCPU(collector pipeline.Collector) {
+func (r *InputSystem) CollectCPU(collector pipeline.PipelineCollector) {
 	fields := make(map[string]string)
 	fields["metric_type"] = "cpu"
 	// cpu stat
@@ -156,10 +159,10 @@ func (r *InputSystem) CollectCPU(collector pipeline.Collector) {
 		r.lastCPUBusy = cpuBusy
 		r.lastCPUTotal = cpuTotal
 	}
-	collector.AddData(nil, fields)
+	collector.Collect(models.NewGroup(models.NewMetadata(), models.NewTags()), helper.NewInputLog(nil, fields))
 }
 
-func (r *InputSystem) CollectMem(collector pipeline.Collector) {
+func (r *InputSystem) CollectMem(collector pipeline.PipelineCollector) {
 	fields := make(map[string]string)
 	fields["metric_type"] = "mem"
 	// mem stat
@@ -186,10 +189,10 @@ func (r *InputSystem) CollectMem(collector pipeline.Collector) {
 		fields["mem_swap_used"] = strconv.FormatUint(swapStat.Used, 10)
 		fields["mem_swap_percent"] = strconv.FormatFloat(swapStat.UsedPercent, 'f', 5, 32)
 	}
-	collector.AddData(nil, fields)
+	collector.Collect(models.NewGroup(models.NewMetadata(), models.NewTags()), helper.NewInputLog(nil, fields))
 }
 
-func collectOneDisk(collector pipeline.Collector, name string, timeDeltaSec float64, last, now *disk.IOCountersStat) {
+func collectOneDisk(collector pipeline.PipelineCollector, name string, timeDeltaSec float64, last, now *disk.IOCountersStat) {
 	fields := make(map[string]string)
 	fields["metric_type"] = "disk"
 	fields["name"] = name
@@ -212,10 +215,10 @@ func collectOneDisk(collector pipeline.Collector, name string, timeDeltaSec floa
 	fields["disk_write_time_ps"] = strconv.FormatFloat((float64(now.WriteTime-last.WriteTime) / timeDeltaSec), 'f', 5, 32)
 	fields["disk_iops_inprogress_ps"] = strconv.FormatFloat((float64(now.IopsInProgress-last.IopsInProgress) / timeDeltaSec), 'f', 5, 32)
 	fields["disk_io_time_ps"] = strconv.FormatFloat((float64(now.IoTime-last.IoTime) / timeDeltaSec), 'f', 5, 32)
-	collector.AddData(nil, fields)
+	collector.Collect(models.NewGroup(models.NewMetadata(), models.NewTags()), helper.NewInputLog(nil, fields))
 }
 
-func (r *InputSystem) CollectDisk(collector pipeline.Collector) {
+func (r *InputSystem) CollectDisk(collector pipeline.PipelineCollector) {
 	if allParts, err := disk.Partitions(false); err == nil {
 		for _, part := range allParts {
 			fields := make(map[string]string)
@@ -237,7 +240,7 @@ func (r *InputSystem) CollectDisk(collector pipeline.Collector) {
 				fields["inode_used"] = strconv.FormatUint(usage.InodesUsed, 10)
 				fields["inode_free"] = strconv.FormatUint(usage.InodesFree, 10)
 			}
-			collector.AddData(nil, fields)
+			collector.Collect(models.NewGroup(models.NewMetadata(), models.NewTags()), helper.NewInputLog(nil, fields))
 		}
 	}
 
@@ -275,7 +278,7 @@ func (r *InputSystem) CollectDisk(collector pipeline.Collector) {
 	}
 }
 
-func collectOneNet(collector pipeline.Collector, name string, timeDeltaSec float64, last, now *net.IOCountersStat) {
+func collectOneNet(collector pipeline.PipelineCollector, name string, timeDeltaSec float64, last, now *net.IOCountersStat) {
 	fields := make(map[string]string)
 	fields["metric_type"] = "net"
 	fields["name"] = name
@@ -301,10 +304,10 @@ func collectOneNet(collector pipeline.Collector, name string, timeDeltaSec float
 	fields["net_in_fifo_ps"] = strconv.FormatFloat(float64(now.Fifoin-last.Fifoin)/timeDeltaSec, 'f', 5, 32)
 	fields["net_out_fifo_ps"] = strconv.FormatFloat(float64(now.Fifoout-last.Fifoout)/timeDeltaSec, 'f', 5, 32)
 
-	collector.AddData(nil, fields)
+	collector.Collect(models.NewGroup(models.NewMetadata(), models.NewTags()), helper.NewInputLog(nil, fields))
 }
 
-func (r *InputSystem) CollectNet(collector pipeline.Collector) {
+func (r *InputSystem) CollectNet(collector pipeline.PipelineCollector) {
 	netIoStatAll, err := net.IOCounters(true)
 	if err == nil && len(netIoStatAll) > 0 {
 		netIoStatTotal := net.IOCountersStat{}
@@ -342,7 +345,7 @@ func (r *InputSystem) CollectNet(collector pipeline.Collector) {
 	}
 }
 
-func (r *InputSystem) CollectProtocol(collector pipeline.Collector) {
+func (r *InputSystem) CollectProtocol(collector pipeline.PipelineCollector) {
 	protoCounterStats, err := net.ProtoCounters([]string{})
 	if err == nil && len(protoCounterStats) > 0 {
 
@@ -362,7 +365,7 @@ func (r *InputSystem) CollectProtocol(collector pipeline.Collector) {
 					}
 					fields[field] = strconv.FormatInt(val, 10)
 				}
-				collector.AddData(nil, fields)
+				collector.Collect(models.NewGroup(models.NewMetadata(), models.NewTags()), helper.NewInputLog(nil, fields))
 			}
 		}
 
@@ -371,7 +374,8 @@ func (r *InputSystem) CollectProtocol(collector pipeline.Collector) {
 	}
 }
 
-func (r *InputSystem) Collect(collector pipeline.Collector) error {
+func (r *InputSystem) Read(ctx pipeline.PipelineContext) error {
+	collector := ctx.Collector()
 	if r.Core {
 		r.CollectCore(collector)
 	}

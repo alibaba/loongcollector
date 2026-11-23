@@ -19,6 +19,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/alibaba/ilogtail/pkg/helper"
+	"github.com/alibaba/ilogtail/pkg/models"
+
 	"github.com/mindprince/gonvml"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
@@ -30,7 +33,7 @@ type InputGpuMetric struct {
 	CollectIntervalMs int
 
 	context   pipeline.Context
-	collector pipeline.Collector
+	collector pipeline.PipelineCollector
 
 	waitGroup sync.WaitGroup
 
@@ -51,11 +54,7 @@ func (r *InputGpuMetric) Description() string {
 	return "collect gpu metric plugin for logtail (only linux and nvidia gpu)"
 }
 
-func (r *InputGpuMetric) Collect(collector pipeline.Collector) error {
-	return nil
-}
-
-func (r *InputGpuMetric) Start(collector pipeline.Collector) error {
+func (r *InputGpuMetric) StartService(ctx pipeline.PipelineContext) error {
 	err := gonvml.Initialize()
 	if err != nil {
 		logger.Warning(r.context.GetRuntimeContext(), selfmonitor.GPUNVMLInitAlarm, "Couldn't initialize nvml, error", err)
@@ -63,7 +62,7 @@ func (r *InputGpuMetric) Start(collector pipeline.Collector) error {
 	}
 	defer gonvml.Shutdown()
 
-	r.collector = collector
+	r.collector = ctx.Collector()
 	r.shutdown = make(chan struct{})
 	r.waitGroup.Add(1)
 	defer r.waitGroup.Done()
@@ -115,7 +114,7 @@ func (r *InputGpuMetric) CollectGpuMetric() error {
 		fields["gpu_used_memory"] = strconv.FormatUint(usedMemory/1024/1024, 10)
 		fields["gpu_total_memory"] = strconv.FormatUint(totalMemory/1024/1024, 10)
 		fields["gpu_free_memory"] = strconv.FormatUint((totalMemory-usedMemory)/1024/1024, 10)
-		r.collector.AddData(nil, fields, t)
+		r.collector.Collect(models.NewGroup(models.NewMetadata(), models.NewTags()), helper.NewInputLog(nil, fields, t))
 	}
 	return nil
 }

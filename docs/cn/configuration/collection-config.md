@@ -93,4 +93,4 @@ Go 插件管理器使用 `PipelineGroupEvents`，C++ 输入通过 `PipelineEvent
 
 未配置 aggregator 时，processor 输出直接交给 flusher，不再自动创建透传 aggregator 及其定时器。显式配置的 metadata 分组、攒批等 aggregator 仍有效。
 
-仍使用 `Collector` 的插件在入口转换为事件。处理、聚合和发送使用事件接口，SLS protobuf 留在协议编码和解码边界。
+采集、处理、聚合和发送统一使用事件接口。SLS protobuf 留在协议编码和解码边界。

@@ -147,8 +147,8 @@ func (m *Jmx) Description() string {
 	return "a jmx fetch manger to generate configuration and control jmx fetch process(https://github.com/DataDog/jmxfetch)."
 }
 
-func (m *Jmx) Start(collector pipeline.Collector) error {
-	GetJmxFetchManager(m.jvmHome).RegisterCollector(m.context, m.key, collector, m.filters)
+func (m *Jmx) StartService(ctx pipeline.PipelineContext) error {
+	GetJmxFetchManager(m.jvmHome).RegisterCollector(m.context, m.key, ctx.Collector(), m.filters)
 
 	if !m.DiscoveryMode {
 		logger.Infof(m.context.GetRuntimeContext(), "find %d static jmx configs", len(m.StaticInstances))

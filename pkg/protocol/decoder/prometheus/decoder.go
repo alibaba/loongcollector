@@ -28,18 +28,12 @@ import (
 	"github.com/richardartoul/molecule"
 	"github.com/richardartoul/molecule/src/codec"
 
-	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/models"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/protocol/decoder/common"
 )
 
 const (
 	metricNameKey = "__name__"
-	labelsKey     = "__labels__"
-	timeNanoKey   = "__time_nano__"
-	valueKey      = "__value__"
-	tagDB         = "__tag__:db"
 	metaDBKey     = "db"
 )
 
@@ -67,90 +61,11 @@ type Decoder struct {
 	AllowUnsafeMode bool
 }
 
-// Decode impl
-func (d *Decoder) Decode(data []byte, req *http.Request, tags map[string]string) (logs []*protocol.Log, err error) {
-	if req.Header.Get(contentEncodingKey) == snappyEncoding &&
-		strings.HasPrefix(req.Header.Get(contentTypeKey), pbContentType) {
-		return d.decodeInRemoteWriteFormat(data, req)
-	}
-	return d.decodeInExpFmt(data, req)
-}
-
-func (d *Decoder) decodeInExpFmt(data []byte, _ *http.Request) (logs []*protocol.Log, err error) {
-	decoder := expfmt.NewDecoder(bytes.NewReader(data), expfmt.FmtText)
-	sampleDecoder := expfmt.SampleDecoder{
-		Dec: decoder,
-		Opts: &expfmt.DecodeOptions{
-			Timestamp: model.Now(),
-		},
-	}
-
-	for {
-		s := &model.Vector{}
-		if err = sampleDecoder.Decode(s); err != nil {
-			if err == io.EOF {
-				err = nil
-				break
-			}
-			break
-		}
-		for _, sample := range *s {
-			var name string
-			var labels helper.MetricLabels
-			labelsSet := (model.LabelSet)(sample.Metric)
-			for k, v := range labelsSet {
-				if k == model.MetricNameLabel {
-					name = string(v)
-					continue
-				}
-				labels.Append(string(k), string(v))
-			}
-			metricLog := helper.NewMetricLog(name, sample.Timestamp.UnixNano(), float64(sample.Value), &labels)
-			logs = append(logs, metricLog)
-		}
-	}
-
-	return logs, err
-}
-
 func (d *Decoder) ParseRequest(res http.ResponseWriter, req *http.Request, maxBodySize int64) (data []byte, statusCode int, err error) {
 	return common.CollectBody(res, req, maxBodySize)
 }
 
-func (d *Decoder) decodeInRemoteWriteFormat(data []byte, req *http.Request) (logs []*protocol.Log, err error) {
-	var metrics prompb.WriteRequest
-	err = proto.Unmarshal(data, &metrics)
-	if err != nil {
-		return nil, err
-	}
-
-	db := req.FormValue(metaDBKey)
-	for _, m := range metrics.Timeseries {
-		var metricName string
-		var labels helper.MetricLabels
-		for _, label := range m.Labels {
-			if label.Name == model.MetricNameLabel {
-				metricName = label.Value
-				continue
-			}
-			labels.Append(label.Name, label.Value)
-		}
-		for _, sample := range m.Samples {
-			metricLog := helper.NewMetricLog(metricName, sample.Timestamp, sample.Value, &labels)
-			if len(db) > 0 {
-				metricLog.Contents = append(metricLog.Contents, &protocol.Log_Content{
-					Key:   tagDB,
-					Value: db,
-				})
-			}
-			logs = append(logs, metricLog)
-		}
-	}
-
-	return logs, nil
-}
-
-func (d *Decoder) DecodeV2(data []byte, req *http.Request) (groups []*models.PipelineGroupEvents, err error) {
+func (d *Decoder) Decode(data []byte, req *http.Request) (groups []*models.PipelineGroupEvents, err error) {
 	if len(data) == 0 {
 		return nil, nil
 	}

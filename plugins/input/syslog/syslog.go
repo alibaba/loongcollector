@@ -29,6 +29,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/alibaba/ilogtail/pkg/helper"
+	"github.com/alibaba/ilogtail/pkg/models"
+
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
@@ -110,13 +113,9 @@ func (s *Syslog) Description() string {
 	return "A input plugin for syslog"
 }
 
-// Collect ...
-func (s *Syslog) Collect(collector pipeline.Collector) error {
-	return nil
-}
-
 // Start ...
-func (s *Syslog) Start(collector pipeline.Collector) error {
+func (s *Syslog) StartService(ctx pipeline.PipelineContext) error {
+	collector := ctx.Collector()
 	s.done = make(chan struct{}, 1)
 	scheme, host, err := getAddressParts(s.Address)
 	if err != nil {
@@ -431,7 +430,7 @@ func (s *Syslog) sleepWithChan(duration time.Duration) bool {
 	}
 }
 
-func (s *Syslog) listenStream(collector pipeline.Collector) {
+func (s *Syslog) listenStream(collector pipeline.PipelineCollector) {
 	defer s.wg.Done()
 
 	s.connections = map[string]net.Conn{}
@@ -483,7 +482,7 @@ Loop:
 	s.connectionsMu.Unlock()
 }
 
-func (s *Syslog) handle(conn net.Conn, collector pipeline.Collector) {
+func (s *Syslog) handle(conn net.Conn, collector pipeline.PipelineCollector) {
 	defer func() {
 		s.removeConnection(conn)
 		_ = conn.Close()
@@ -543,7 +542,7 @@ func (s *Syslog) removeConnection(c net.Conn) {
 
 // TODO: There is a problem here, if for loop quit because of i/o timeout, the plugin quits
 // without any notification.
-func (s *Syslog) listenPacket(collector pipeline.Collector) {
+func (s *Syslog) listenPacket(collector pipeline.PipelineCollector) {
 	defer s.wg.Done()
 
 	b := make([]byte, s.MaxMessageSize)
@@ -581,7 +580,7 @@ func (s *Syslog) listenPacket(collector pipeline.Collector) {
 	}
 }
 
-func (s *Syslog) parse(b []byte, clientIP string, collector pipeline.Collector) {
+func (s *Syslog) parse(b []byte, clientIP string, collector pipeline.PipelineCollector) {
 	lines := bytes.Split(b, []byte("\n"))
 	if '\n' == b[len(b)-1] {
 		lines = lines[:len(lines)-1]
@@ -630,7 +629,7 @@ func (s *Syslog) parse(b []byte, clientIP string, collector pipeline.Collector) 
 			fields["_process_id_"] = *rst.procID
 		}
 
-		collector.AddData(nil, fields, rst.time)
+		collector.Collect(models.NewGroup(models.NewMetadata(), models.NewTags()), helper.NewInputLog(nil, fields, rst.time))
 	}
 }
 
