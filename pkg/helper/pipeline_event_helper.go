@@ -81,8 +81,9 @@ func CreateLogEventByLegacyRawLog(log *protocol.Log) (*protocol.LogEvent, error)
 func TransferLogEventToPB(log *models.Log) (*protocol.LogEvent, error) {
 	logEvent := LogEventPool.Get().(*protocol.LogEvent)
 	logEvent.Timestamp = log.GetTimestamp()
-	logEvent.Contents = make([]*protocol.LogEvent_Content, 0, log.Contents.Len())
-	for k, v := range log.Contents.Iterator() {
+	fields := log.GetIndices()
+	logEvent.Contents = make([]*protocol.LogEvent_Content, 0, fields.Len())
+	for k, v := range fields.Iterator() {
 		var val string
 		switch tv := v.(type) {
 		case string:
@@ -152,15 +153,15 @@ func TransferPBToLogEvent(src *protocol.LogEvent) (*models.Log, error) {
 	if len(src.Level) > 0 {
 		log.Level = string(src.Level)
 	}
+	if len(src.Contents) > 0 {
+		log.Contents = models.NewOrderedLogContents(len(src.Contents))
+	}
 	for _, content := range src.Contents {
 		key := string(content.Key)
 		val := string(content.Value)
 		if key == "content" || key == models.BodyKey {
 			log.SetBody(util.ZeroCopyStringToBytes(val))
 		} else {
-			if log.Contents == nil {
-				log.Contents = models.NewLogContents()
-			}
 			log.Contents.Add(key, val)
 		}
 	}
@@ -187,28 +188,6 @@ func TransferPBToMetricEvent(src *protocol.MetricEvent) (*models.Metric, error) 
 	default:
 		return nil, fmt.Errorf("unsupported metric value type")
 	}
-}
-
-// TransferPBLogEventToLegacyLog converts PipelineEventGroup LogEvent to a legacy wire log for protocol encoders.
-func TransferPBLogEventToLegacyLog(src *protocol.LogEvent) (*protocol.Log, error) {
-	if src == nil {
-		return nil, fmt.Errorf("nil log event")
-	}
-	log := &protocol.Log{
-		Contents: make([]*protocol.Log_Content, 0, len(src.Contents)),
-	}
-	ts := src.Timestamp
-	log.Time = uint32(ts / 1e9)
-	if ns := uint32(ts % 1e9); ns != 0 {
-		log.TimeNs = &ns
-	}
-	for _, content := range src.Contents {
-		log.Contents = append(log.Contents, &protocol.Log_Content{
-			Key:   string(content.Key),
-			Value: string(content.Value),
-		})
-	}
-	return log, nil
 }
 
 func TransferPBToPipelineGroupEvents(src *protocol.PipelineEventGroup) (*models.PipelineGroupEvents, error) {

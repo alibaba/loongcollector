@@ -1,4 +1,4 @@
-// Copyright 2021 iLogtail Authors
+// Copyright 2022 iLogtail Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,29 +17,13 @@ package logstorerouter
 import (
 	"fmt"
 	"regexp"
-	"sync"
-	"time"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
-	"github.com/alibaba/ilogtail/pkg/util"
 	"github.com/alibaba/ilogtail/plugins/aggregator/baseagg"
 )
-
-const (
-	MaxLogCount     = 1024
-	MaxLogGroupSize = 3 * 1024 * 1024
-)
-
-// SubAgg uses reg to decide if a log belongs to it or not.
-// Logs are added to agg and will be send to logstore.
-type SubAgg struct {
-	logstore string
-	reg      *regexp.Regexp
-	agg      *baseagg.AggregatorBase
-}
 
 type AggregatorRouter struct {
 	MaxLogGroupCount int
@@ -52,119 +36,118 @@ type AggregatorRouter struct {
 	RouterRegex      []string
 	RouterLogstore   []string
 
-	subAggs    []*SubAgg
-	defaultAgg *baseagg.AggregatorBase
-	Lock       *sync.Mutex
-	context    pipeline.Context
-	queue      pipeline.LogGroupQueue
+	rules   []*regexp.Regexp
+	context pipeline.Context
+	batches baseagg.Batcher
 }
 
-func (p *AggregatorRouter) Init(context pipeline.Context, que pipeline.LogGroupQueue) (int, error) {
-	p.context = context
-	p.queue = que
+func (p *AggregatorRouter) Init(ctx pipeline.Context) (int, error) {
 	if len(p.RouterRegex) != len(p.RouterLogstore) {
 		return 0, fmt.Errorf("router regex count %d, logstore count %d", len(p.RouterRegex), len(p.RouterLogstore))
 	}
-	for i, regStr := range p.RouterRegex {
-		regExp, err := regexp.Compile(regStr)
+	p.rules = make([]*regexp.Regexp, len(p.RouterRegex))
+	for i, expression := range p.RouterRegex {
+		rule, err := regexp.Compile(expression)
 		if err != nil {
-			return 0, fmt.Errorf("compile regex error, regex %s, error %s", regStr, err)
+			return 0, fmt.Errorf("compile router regex %q: %w", expression, err)
 		}
-		subAgg := &SubAgg{
-			logstore: p.RouterLogstore[i],
-			reg:      regExp,
-			agg:      baseagg.NewAggregatorBase(),
-		}
-		if _, err := subAgg.agg.Init(context, que); err != nil {
-			continue
-		}
-		subAgg.agg.InitInner(p.PackFlag, p.context.GetConfigName()+p.RouterLogstore[i]+util.GetIPAddress()+time.Now().String(), p.Lock, p.RouterLogstore[i], p.Topic, p.MaxLogCount, p.MaxLogGroupCount)
-		p.subAggs = append(p.subAggs, subAgg)
+		p.rules[i] = rule
 	}
-	if !p.DropDisMatch {
-		p.defaultAgg = baseagg.NewAggregatorBase()
-		if _, err := p.defaultAgg.Init(context, que); err != nil {
-			return 0, err
-		}
-		p.defaultAgg.InitInner(p.PackFlag, p.context.GetConfigName()+util.GetIPAddress()+time.Now().String(), p.Lock, "", p.Topic, p.MaxLogCount, p.MaxLogGroupCount)
-	}
-	return 0, nil
+	p.context = ctx
+	return 0, p.batches.Init(ctx, p.MaxLogCount, p.MaxLogGroupCount, p.PackFlag)
 }
 
 func (*AggregatorRouter) Description() string {
 	return "aggregator router for logtail"
 }
 
-func (p *AggregatorRouter) route(log *protocol.Log, value string) error {
-	for _, subAgg := range p.subAggs {
-		if indexArray := subAgg.reg.FindStringSubmatchIndex(value); len(indexArray) >= 2 && indexArray[0] == 0 && indexArray[1] == len(value) {
-			return subAgg.agg.Add(log, nil)
+func (p *AggregatorRouter) Record(in *models.PipelineGroupEvents, ctx pipeline.PipelineContext) error {
+	if in == nil {
+		return nil
+	}
+	routes := make(map[string][]models.PipelineEvent)
+	var passThrough []models.PipelineEvent
+	for _, event := range in.Events {
+		logstore, keep, handled := p.route(event)
+		if !handled {
+			passThrough = append(passThrough, event)
+			continue
+		}
+		if keep {
+			routes[logstore] = append(routes[logstore], event)
 		}
 	}
-	// no match
-	if !p.DropDisMatch {
-		return p.defaultAgg.Add(log, nil)
+	for logstore, events := range routes {
+		p.batches.CollectRoute(ctx, in.Group, events, logstore, p.Topic)
 	}
-	if p.NoMatchError {
-		logger.Warning(p.context.GetRuntimeContext(), selfmonitor.NoMatchRouterAlarm, "no match router", "drop this log")
-	}
+	ctx.Collector().Collect(in.Group, passThrough...)
 	return nil
 }
 
-// Add adds @log to aggregator.
-// If @log has a key equal to aggregator.SourceKey (or SourceKey is empty), it passes @log to
-// matched sub aggregator by calling route function.
-// If @log don't have specified key but aggregator.DropDisMatch is not set, it passed @log to
-// default aggregator, otherwise, it returns error when aggregator.NoMatchError is set.
-// Add returns any error encountered, nil means success.
-func (p *AggregatorRouter) Add(log *protocol.Log, ctx map[string]interface{}) error {
-	// logger.Debug("agg add", *log)
-
-	// find log key
-	for _, cont := range log.Contents {
-		if len(p.SourceKey) == 0 || cont.Key == p.SourceKey {
-			return p.route(log, cont.Value)
+func (p *AggregatorRouter) route(event models.PipelineEvent) (logstore string, keep, handled bool) {
+	key := p.SourceKey
+	if key == "" {
+		switch typed := event.(type) {
+		case *models.Log:
+			key = defaultSourceKey(typed)
+		case *models.Metric:
+			key = "__name__"
 		}
 	}
-	// find no key
-	if !p.DropDisMatch {
-		return p.defaultAgg.Add(log, ctx)
+	value, found := baseagg.FindEventField(event, key)
+	if !found && event.GetType() != models.EventTypeLogging {
+		return "", false, false
 	}
-	if p.NoMatchError {
-		logger.Warning(p.context.GetRuntimeContext(), selfmonitor.NoMatchRouterAlarm, "no match router", "drop this log")
+	if found {
+		for i, rule := range p.rules {
+			if match := rule.FindStringIndex(value); match != nil && match[0] == 0 && match[1] == len(value) {
+				return p.RouterLogstore[i], true, true
+			}
+		}
 	}
-	return nil
+	if p.DropDisMatch && p.NoMatchError {
+		logger.Warning(p.context.GetRuntimeContext(), selfmonitor.NoMatchRouterAlarm, "no matching route", "drop this log")
+	}
+	return "", !p.DropDisMatch, true
 }
 
-func (p *AggregatorRouter) Flush() []*protocol.LogGroup {
+func defaultSourceKey(log *models.Log) string {
+	fields := log.GetIndices()
+	if first, ordered := models.FirstLogContentKey(fields); ordered {
+		return first
+	}
+	if fields.Contains(models.BodyKey) {
+		return models.BodyKey
+	}
+	// An unordered native log has no first field. Pick a stable key.
+	var key string
+	first := true
+	for candidate := range fields.Iterator() {
+		if first || candidate < key {
+			key = candidate
+			first = false
+		}
+	}
+	return key
+}
 
-	logGroups := []*protocol.LogGroup{}
-	if !p.DropDisMatch {
-		logGroups = append(logGroups, p.defaultAgg.Flush()...)
-	}
-	for _, subAgg := range p.subAggs {
-		logGroups = append(logGroups, subAgg.agg.Flush()...)
-	}
-	return logGroups
+func (p *AggregatorRouter) GetResult(ctx pipeline.PipelineContext) error {
+	p.batches.CollectPending(ctx)
+	return nil
 }
 
 func (p *AggregatorRouter) Reset() {
-	if !p.DropDisMatch {
-		p.defaultAgg.Reset()
-	}
-	for _, subAgg := range p.subAggs {
-		subAgg.agg.Reset()
-	}
+	p.batches.Reset()
 }
 
 func NewAggregatorRouter() *AggregatorRouter {
 	return &AggregatorRouter{
 		MaxLogGroupCount: 4,
-		MaxLogCount:      MaxLogCount,
+		MaxLogCount:      baseagg.MaxLogCount,
 		PackFlag:         true,
-		Lock:             &sync.Mutex{},
 	}
 }
+
 func init() {
 	pipeline.Aggregators["aggregator_logstore_router"] = func() pipeline.Aggregator {
 		return NewAggregatorRouter()

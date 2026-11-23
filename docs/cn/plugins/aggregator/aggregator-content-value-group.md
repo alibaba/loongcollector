@@ -9,9 +9,9 @@
 
 列含义见 [概览 · 事件能力列说明](../overview.md#事件能力列说明)。
 
-| v1 接口 | v2 接口 | Log | Metric | Span |
-| --- | --- | --- | --- | --- |
-| ✓ | — | v1 | 透传未知 | 透传未知 |
+| Log | Metric | Span |
+| --- | --- | --- |
+| ✓ | 指定指标字段 | 透传 |
 
 ## 版本
 
@@ -27,8 +27,8 @@
 | ---------------- | -------- | -------- | ------------------------------------------------------------------------------------------------------------------ |
 | Type             | string   | 是       | 插件类型，指定为`aggregator_content_value_group`。                                                                               |
 | GroupKeys        | []string | 是       | 指定需要按照其值分组的Key列表                                                                                      |
-| EnablePackID     | bool  | 否       | 是否需要在LogGroup的LogTag中添加__pack_id__字段。如果未添加改参数，则默认在LogGroup的LogTag中添加__pack_id__字段。 |
-| Topic            | string   | 否       | LogGroup的Topic名。如果未添加该参数，则默认每个LogGroup的Topic名为空。                                             |
+| EnablePackID     | bool  | 否       | 是否为事件组添加 `__pack_id__` Tag，默认开启。 |
+| Topic            | string   | 否       | 输出事件组的 `__topic__` Tag，默认沿用输入事件组中的值。                                             |
 | ErrIfKeyNotFound | bool  | 否       | 当指定的Key在Log的Contents中找不到时，是否打印错误日志                                                             |
 
 ## 样例

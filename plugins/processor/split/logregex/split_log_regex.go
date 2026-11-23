@@ -213,11 +213,18 @@ func (p *ProcessorSplitRegex) Process(in *models.PipelineGroupEvents, context pi
 
 		contents := log.GetIndices()
 
-		// Resolve the split key. When SplitKey is empty, v1 uses the first
-		// content field; v2 contents are an (unordered) map, so this is a
-		// best-effort pick via Iterator and the chosen key is not guaranteed to
-		// match v1's slice order when the log has multiple content keys.
 		splitKey := p.SplitKey
+		if splitKey == "" {
+			if first, ordered := models.FirstLogContentKey(contents); ordered {
+				splitKey = first
+			} else {
+				for key := range contents.Iterator() {
+					splitKey = key
+					break
+				}
+			}
+		}
+
 		if len(splitKey) == 0 {
 			for k := range contents.Iterator() {
 				splitKey = k
@@ -237,22 +244,23 @@ func (p *ProcessorSplitRegex) Process(in *models.PipelineGroupEvents, context pi
 			continue
 		}
 
-		valueStr, _ := contents.Get(splitKey).(string)
-		for _, seg := range p.splitValue(valueStr) {
-			newLog := log.Clone().(*models.Log)
-			// Clone shares the source Contents map, so build a fresh content set
-			// for each output log to keep them independent. When PreserveOthers
-			// is set, carry the other keys over just like v1.
-			newContents := models.NewLogContents()
-			if p.PreserveOthers {
-				for k, v := range contents.Iterator() {
-					if k != splitKey {
-						newContents.Add(k, v)
-					}
-				}
+		segments := p.splitValue(pipeline.GetStringValue(contents.Get(splitKey)))
+		if len(segments) == 0 {
+			continue
+		}
+		template := log.Clone().(*models.Log)
+		if p.PreserveOthers {
+			// Split payloads are appended after the preserved fields.
+			template.GetIndices().Delete(splitKey)
+		} else {
+			template.SetIndices(models.NewLogContents())
+		}
+		for i, seg := range segments {
+			newLog := template
+			if i < len(segments)-1 {
+				newLog = template.Clone().(*models.Log)
 			}
-			newContents.Add(splitKey, seg.value)
-			newLog.SetIndices(newContents)
+			newLog.GetIndices().Add(splitKey, seg.value)
 			// v1 revises the __file_offset__ tag of a protocol.Log via
 			// helper.ReviseFileOffset; models.Log has no such tag, so the offset
 			// is replicated through the Offset field instead (same approach as

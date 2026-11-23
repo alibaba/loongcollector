@@ -112,17 +112,12 @@ func normalizeJSONLines(lines [][]byte) []string {
 	return out
 }
 
-func TestFlusherLoki_FlushExportParity(t *testing.T) {
-	v1Groups, v2Groups := makeParityLogGroups()
-
-	flushLines := captureLokiPayloads(t, func(f *FlusherLoki) error {
-		return f.Flush("", "", "", v1Groups)
+func TestFlusherLokiExportLogs(t *testing.T) {
+	wires, groups := makeParityLogGroups()
+	lines := captureLokiEntries(t, func(f *FlusherLoki) error {
+		return f.Export(groups, nil)
 	})
-	exportLines := captureLokiPayloads(t, func(f *FlusherLoki) error {
-		return f.Export(v2Groups, nil)
-	})
-
-	require.Equal(t, flushLines, exportLines)
+	require.Equal(t, expectedLogRecords(t, wires), normalizeJSONLines(toBytes(lines)))
 }
 
 func TestFlusherLoki_ExportMetricExpansion(t *testing.T) {
@@ -299,60 +294,30 @@ func captureLokiEntries(t *testing.T, run func(*FlusherLoki) error) []string {
 	return lines
 }
 
-func captureLokiPayloads(t *testing.T, run func(*FlusherLoki) error) []string {
-	t.Helper()
-	var bodies []string
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		body, _ := io.ReadAll(r.Body)
-		bodies = append(bodies, string(body))
-		w.WriteHeader(http.StatusNoContent)
-	}))
-	defer server.Close()
-
-	f := NewFlusherLoki()
-	f.URL = server.URL + "/loki/api/v1/push"
-	f.StaticLabels = model.LabelSet{"app": "parity-test"}
-	f.DynamicLabels = []string{}
-	f.MaxMessageWait = 10 * time.Millisecond
-	require.NoError(t, f.Init(mock.NewEmptyContext("p", "l", "c")))
-	require.NoError(t, run(f))
-	require.NoError(t, f.Stop())
-	time.Sleep(20 * time.Millisecond)
-
-	var payloads []string
-	for _, body := range bodies {
-		payloads = append(payloads, extractJSONLogLine(body))
-	}
-	return normalizeJSONLines(toBytes(payloads))
-}
-
-func extractJSONLogLine(body string) string {
-	start := strings.Index(body, `{"contents"`)
-	if start < 0 {
-		return body
-	}
-	depth := 0
-	for i := start; i < len(body); i++ {
-		switch body[i] {
-		case '{':
-			depth++
-		case '}':
-			depth--
-			if depth == 0 {
-				candidate := body[start : i+1]
-				if json.Valid([]byte(candidate)) {
-					return candidate
-				}
-			}
-		}
-	}
-	return body[start:]
-}
-
 func toBytes(lines []string) [][]byte {
 	out := make([][]byte, len(lines))
 	for i, line := range lines {
 		out[i] = []byte(line)
 	}
 	return out
+}
+
+// expectedLogRecords describes the external JSON record for the log fixtures.
+func expectedLogRecords(t *testing.T, groups []*protocol.LogGroup) []string {
+	t.Helper()
+	var rows [][]byte
+	for _, group := range groups {
+		for _, log := range group.Logs {
+			fields := make(map[string]string, len(log.Contents))
+			for _, field := range log.Contents {
+				fields[field.Key] = field.Value
+			}
+			data, err := json.Marshal(map[string]any{
+				"contents": fields, "tags": map[string]string{"host.ip": group.Source}, "time": log.Time,
+			})
+			require.NoError(t, err)
+			rows = append(rows, data)
+		}
+	}
+	return normalizeJSONLines(rows)
 }

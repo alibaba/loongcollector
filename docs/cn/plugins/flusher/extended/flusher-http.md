@@ -8,9 +8,9 @@
 
 列含义见 [概览 · 事件能力列说明](../../overview.md#事件能力列说明)。
 
-| v1 接口 | v2 接口 | Log | Metric | Span |
-| --- | --- | --- | --- | --- |
-| ✓ | ✓ | v1&v2 | 透传未知 | 透传未知 |
+| Log | Metric | Span |
+| --- | --- | --- |
+| 按输出协议 | 按输出协议 | 按输出协议 |
 
 ## 版本
 
@@ -26,8 +26,8 @@
 |------------------------------|--------------------|------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | Type                         | string             | 是    | 插件类型，固定为`flusher_http`                                                                                                                                                                     |
 | RemoteURL                    | string             | 是    | 要发送到的URL地址，示例：`http://localhost:8086/write`                                                                                                                                                |
-| Headers                      | Map<string,string> | 否    | 发送时附加的http请求header，如可添加 Authorization、Content-Type等信息，支持动态变量写法，如`{"x-db":"%{tag.db}"}`<p>v2版本支持从Group的Metadata或者Group.Tags中获取动态变量，如`{"x-db":"%{metadata.db}"}`或者`{"x-db":"%{tag.db}"}`</p> |
-| Query                        | Map<string,string> | 否    | 发送时附加到url上的query参数，支持动态变量写法，如`{"db":"%{tag.db}"}`<p>v2版本支持从Group的Metadata或者Group.Tags中获取动态变量，如`{"db":"%{metadata.db}"}`或者`{"db":"%{tag.db}"}`</p>                                          |
+| Headers                      | Map<string,string> | 否    | 发送时附加的http请求header，如可添加 Authorization、Content-Type等信息，支持动态变量写法，如`{"x-db":"%{tag.db}"}`<p>支持从事件组的 Metadata 或 Tags 中获取动态变量，如`{"x-db":"%{metadata.db}"}`或者`{"x-db":"%{tag.db}"}`</p> |
+| Query                        | Map<string,string> | 否    | 发送时附加到url上的query参数，支持动态变量写法，如`{"db":"%{tag.db}"}`<p>支持从事件组的 Metadata 或 Tags 中获取动态变量，如`{"db":"%{metadata.db}"}`或者`{"db":"%{tag.db}"}`</p>                                          |
 | Timeout                      | string             | 否    | 请求的超时时间，默认 `60s`                                                                                                                                                                           |
 | Retry.Enable                 | bool            | 否    | 是否开启失败重试，默认为 `true`                                                                                                                                                                        |
 | Retry.MaxRetryTimes          | int                | 否    | 最大重试次数，默认为 `3`                                                                                                                                                                             |
@@ -37,7 +37,7 @@
 | Encoder.Type                 | string             | 否    | encoder 插件的类型                                                                                                                                                                              |
 | Encoder.Options              | Map<string,Struct> | 否    | encoder 插件的配置                                                                                                                                                                              |
 | Convert                      | Struct             | 否    | LoongCollector 数据转换协议配置                                                                                                                                                                           |
-| Convert.Protocol             | string             | 否    | LoongCollector 数据转换协议，可选值：`custom_single`,`influxdb`, `jsonline`。默认值：`custom_single`<p>v2版本可选值：`raw`</p>                                                                                          |
+| Convert.Protocol             | string             | 否    | LoongCollector 数据转换协议，可选值：`custom_single`、`influxdb`、`jsonline`、`raw`。默认值：`custom_single`。                                                                                          |
 | Convert.Encoding             | string             | 否    | LoongCollector Flusher 数据转换编码，可选值：`json`, `custom`，默认值：`json`                                                                                                                                     |
 | Convert.Separator            | string             | 否    | LoongCollector 数据转换时，PipelineGroupEvents中多个Events之间拼接使用的分隔符。如`\n`。若不设置，则默认不拼接Events，即每个Event作为独立请求向后发送。 默认值为空。<p>当前仅在`Convert.Protocol: raw`有效。</p>                                               |
 | Convert.IgnoreUnExpectedData | bool            | 否    | LoongCollector 数据转换时，遇到非预期的数据的行为，true 跳过，false 报错。默认值 true                                                                                                                                        |

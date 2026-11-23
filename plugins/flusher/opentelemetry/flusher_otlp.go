@@ -34,7 +34,6 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	converter "github.com/alibaba/ilogtail/pkg/protocol/converter"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
@@ -115,21 +114,10 @@ func (f *FlusherOTLP) Init(ctx pipeline.Context) error {
 func (f *FlusherOTLP) getConverter() (*converter.Converter, error) {
 	switch f.Version {
 	case v1:
-		return converter.NewConverter(converter.ProtocolOtlpV1, converter.EncodingNone, nil, nil, f.context.GetPipelineScopeConfig())
+		return converter.NewConverter(converter.ProtocolOtlpV1, converter.EncodingNone, nil, nil)
 	default:
 		return nil, fmt.Errorf("unsupported otlp log protocol version : %s", f.Version)
 	}
-}
-
-func (f *FlusherOTLP) Flush(projectName string, logstoreName string, configName string, logGroupList []*protocol.LogGroup) error {
-	if f.logClient == nil {
-		return nil
-	}
-	request := f.convertLogGroupToRequest(logGroupList)
-	if !f.logClient.grpcConfig.Retry.Enable {
-		return timeoutFlush[plogotlp.ExportRequest, plogotlp.ExportResponse](f.logClient.client, request, f.logClient.metadata, f.logClient.grpcConfig)
-	}
-	return flushWithRetry[plogotlp.ExportRequest, plogotlp.ExportResponse](f.logClient.client, request, f.logClient.metadata, f.logClient.grpcConfig)
 }
 
 // Export data to destination, such as gRPC, console, file, etc.
@@ -190,7 +178,7 @@ func (f *FlusherOTLP) convertPipelinesGroupeEventsToRequest(pipelinegroupeEventS
 	traces := ptrace.NewTraces()
 
 	for _, ps := range pipelinegroupeEventSlice {
-		resourceLog, resourceMetric, resourceTrace, err := converter.ConvertPipelineEventToOtlpEvent(f.converter, ps)
+		resourceLog, resourceMetric, resourceTrace, err := f.converter.ToOTLP(ps)
 		if err != nil {
 			logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherInitAlarm, "init gRPC client options fail, error", err)
 		}
@@ -213,21 +201,6 @@ func (f *FlusherOTLP) convertPipelinesGroupeEventsToRequest(pipelinegroupeEventS
 	return plogotlp.NewExportRequestFromLogs(logs),
 		pmetricotlp.NewExportRequestFromMetrics(metrics),
 		ptraceotlp.NewExportRequestFromTraces(traces)
-}
-
-func (f *FlusherOTLP) convertLogGroupToRequest(logGroupList []*protocol.LogGroup) plogotlp.ExportRequest {
-	logs := plog.NewLogs()
-	for _, logGroup := range logGroupList {
-		c, _ := f.converter.Do(logGroup)
-		if log, ok := c.(plog.ResourceLogs); ok {
-			if log.ScopeLogs().Len() > 0 {
-				newLog := logs.ResourceLogs().AppendEmpty()
-				log.MoveTo(newLog)
-			}
-		}
-	}
-
-	return plogotlp.NewExportRequestFromLogs(logs)
 }
 
 func (f *FlusherOTLP) flushRequests(log plogotlp.ExportRequest, metric pmetricotlp.ExportRequest, trace ptraceotlp.ExportRequest) error {

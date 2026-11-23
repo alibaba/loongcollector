@@ -30,7 +30,7 @@ mkdir example_plugin
 
 ### 4. 编写插件代码
 
-建议明确实现 **`ServiceInputV2`**（`StartService`）；若仍需兼容旧路径，可同时实现 **`ServiceInputV1`**（`Start(Collector)`）。下面示例演示在同一结构体上提供两种启动方式。
+新插件建议实现 `ServiceInputV2`（`StartService`），通过 `PipelineContext.Collector()` 直接提交事件。已有 `ServiceInputV1` 插件可继续使用 `Start(Collector)` 和 `AddRawLog`，采集器会在输入边界将日志转换为事件。下面的示例同时实现两种接口，统一 runner 会优先调用 `StartService`。
 
 ```shell
 cd example_plugin

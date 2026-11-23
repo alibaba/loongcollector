@@ -29,7 +29,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	converter "github.com/alibaba/ilogtail/pkg/protocol/converter"
@@ -288,7 +287,6 @@ func newCustomSingleConverter(t *testing.T) *converter.Converter {
 		converter.EncodingJSON,
 		nil,
 		nil,
-		&config.GlobalConfig{},
 	)
 	require.NoError(t, err)
 	return cvt
@@ -360,22 +358,14 @@ func normalizeDorisPayload(payload string) []string {
 	return normalizeJSONLines(out)
 }
 
-func TestFlusherDoris_FlushExportParity(t *testing.T) {
-	v1Groups, v2Groups := makeParityLogGroups()
-
-	flushCapture := &dorisLoadCapture{}
-	flushServer := httptest.NewServer(http.HandlerFunc(flushCapture.handler))
-	defer flushServer.Close()
-	flushFlusher := newDorisParityFlusher(t, flushServer)
-	require.NoError(t, flushFlusher.Flush("", "", "", v1Groups))
-
-	exportCapture := &dorisLoadCapture{}
-	exportServer := httptest.NewServer(http.HandlerFunc(exportCapture.handler))
-	defer exportServer.Close()
-	exportFlusher := newDorisParityFlusher(t, exportServer)
-	require.NoError(t, exportFlusher.Export(v2Groups, nil))
-
-	require.Equal(t, normalizeDorisPayload(flushCapture.snapshot()), normalizeDorisPayload(exportCapture.snapshot()))
+func TestFlusherDorisExportLogs(t *testing.T) {
+	wires, groups := makeParityLogGroups()
+	capture := &dorisLoadCapture{}
+	server := httptest.NewServer(http.HandlerFunc(capture.handler))
+	defer server.Close()
+	flusher := newDorisParityFlusher(t, server)
+	require.NoError(t, flusher.Export(groups, nil))
+	require.Equal(t, expectedLogRecords(t, wires), normalizeDorisPayload(capture.snapshot()))
 }
 
 // InvalidTestConnectAndWrite is an integration test (disabled by default)
@@ -406,7 +396,7 @@ func InvalidTestConnectAndWrite(t *testing.T) {
 
 	// Verify that we can successfully write data to Doris
 	lgl := makeTestLogGroupList()
-	err = flusher.Flush("projectName", "logstoreName", "configName", lgl.GetLogGroupList())
+	err = flusher.Export(makePipelineGroupEventsFromLogGroups(lgl.GetLogGroupList()), nil)
 	require.NoError(t, err, "Failed to flush data to Doris")
 
 	// Stop the flusher
@@ -414,12 +404,12 @@ func InvalidTestConnectAndWrite(t *testing.T) {
 	require.NoError(t, err, "Failed to stop Doris flusher")
 }
 
-// TestFlusherDoris_FlushWithoutInit tests that flush fails when client is not initialized
-func TestFlusherDoris_FlushWithoutInit(t *testing.T) {
+// TestFlusherDorisExportWithoutInit tests that flush fails when client is not initialized
+func TestFlusherDorisExportWithoutInit(t *testing.T) {
 	flusher := NewFlusherDoris()
 	lgl := makeTestLogGroupList()
 
-	err := flusher.Flush("projectName", "logstoreName", "configName", lgl.GetLogGroupList())
+	err := flusher.Export(makePipelineGroupEventsFromLogGroups(lgl.GetLogGroupList()), nil)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "not initialized")
 }
@@ -558,8 +548,8 @@ func TestFlusherDoris_SetUrgent(t *testing.T) {
 	flusher.SetUrgent(false)
 }
 
-// TestFlusherDoris_FlushEmptyLogGroupList tests flushing empty log group list
-func TestFlusherDoris_FlushEmptyLogGroupList(t *testing.T) {
+// TestFlusherDorisExportEmptyGroups tests flushing empty log group list
+func TestFlusherDorisExportEmptyGroups(t *testing.T) {
 	flusher := NewFlusherDoris()
 	flusher.Addresses = []string{"http://127.0.0.1:8030"}
 	flusher.Table = "test_table"
@@ -574,7 +564,7 @@ func TestFlusherDoris_FlushEmptyLogGroupList(t *testing.T) {
 	_ = flusher.Init(lctx)
 
 	// Flush empty list should return nil
-	err := flusher.Flush("project", "logstore", "config", []*protocol.LogGroup{})
+	err := flusher.Export(nil, nil)
 	assert.NoError(t, err)
 }
 
@@ -767,4 +757,24 @@ func BenchmarkFlusherDoris_BufferPool(b *testing.B) {
 		buf.Reset()
 		flusher.bufferPool.Put(buf)
 	}
+}
+
+// expectedLogRecords describes the external JSON record for the log fixtures.
+func expectedLogRecords(t *testing.T, groups []*protocol.LogGroup) []string {
+	t.Helper()
+	var rows [][]byte
+	for _, group := range groups {
+		for _, log := range group.Logs {
+			fields := make(map[string]string, len(log.Contents))
+			for _, field := range log.Contents {
+				fields[field.Key] = field.Value
+			}
+			data, err := json.Marshal(map[string]any{
+				"contents": fields, "tags": map[string]string{"host.ip": group.Source}, "time": log.Time,
+			})
+			require.NoError(t, err)
+			rows = append(rows, data)
+		}
+	}
+	return normalizeJSONLines(rows)
 }

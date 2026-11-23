@@ -51,8 +51,6 @@ type PluginRunner interface {
 
 	Run()
 
-	RunPlugins(category pluginCategory, control *pipeline.AsyncControl)
-
 	Merge(p PluginRunner)
 
 	Stop(exit bool) error

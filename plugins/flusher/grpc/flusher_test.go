@@ -57,7 +57,7 @@ func (t *TestServerService) Collect(stream protocol.LogReportService_CollectServ
 	}
 }
 
-func TestFlusher_Flush(t *testing.T) {
+func TestFlusherExportStream(t *testing.T) {
 	encoding.RegisterCodec(new(protocol.Codec))
 	server := grpc.NewServer()
 	defer server.Stop()
@@ -83,7 +83,7 @@ func TestFlusher_Flush(t *testing.T) {
 
 	// send logs
 	go func() {
-		assert.NoError(t, p.Flush("p", "l", "c", groupList))
+		assert.NoError(t, p.Export(makePipelineGroupEventsFromLogGroups(groupList), nil))
 		time.Sleep(time.Second)
 		close(receiveChan)
 	}()
@@ -92,7 +92,8 @@ func TestFlusher_Flush(t *testing.T) {
 	for group := range receiveChan {
 		receiveList = append(receiveList, group)
 	}
-	assert.Equal(t, groupList, receiveList)
+	require.Len(t, receiveList, len(groupList))
+	require.Equal(t, normalizedLogGroupsJSON(t, groupList), normalizedLogGroupsJSON(t, receiveList))
 }
 
 func makeTestLogGroupList() *protocol.LogGroupList {
@@ -125,7 +126,6 @@ func makePipelineGroupEventsFromLogGroups(v1Groups []*protocol.LogGroup) []*mode
 	v2Groups := make([]*models.PipelineGroupEvents, 0, len(v1Groups))
 	for _, lg := range v1Groups {
 		groupTags := models.NewTags()
-		groupTags.Add("host.ip", lg.Source)
 		for _, tag := range lg.LogTags {
 			groupTags.Add(tag.Key, tag.Value)
 		}
@@ -147,18 +147,12 @@ func makePipelineGroupEventsFromLogGroups(v1Groups []*protocol.LogGroup) []*mode
 	return v2Groups
 }
 
-func TestFlusherGrpc_FlushExportParity(t *testing.T) {
-	v1Groups, v2Groups := makeParityLogGroups()
-
-	flushLogs := runGrpcCapture(t, func(f *Flusher) error {
-		return f.Flush("", "", "", v1Groups)
+func TestFlusherGrpcExportWireFields(t *testing.T) {
+	wires, groups := makeParityLogGroups()
+	received := runGrpcCapture(t, func(f *Flusher) error {
+		return f.Export(groups, nil)
 	})
-	exportLogs := runGrpcCapture(t, func(f *Flusher) error {
-		return f.Export(v2Groups, nil)
-	})
-
-	require.Equal(t, len(flushLogs), len(exportLogs))
-	require.Equal(t, normalizedLogGroupsJSON(t, flushLogs), normalizedLogGroupsJSON(t, exportLogs))
+	require.Equal(t, normalizedLogGroupsJSON(t, wires), normalizedLogGroupsJSON(t, received))
 }
 
 func normalizedLogGroupsJSON(t testing.TB, groups []*protocol.LogGroup) []string {

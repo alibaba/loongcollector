@@ -15,14 +15,11 @@
 package stdout
 
 import (
-	"encoding/json"
 	"fmt"
-	"strconv"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 
 	"github.com/cihub/seelog"
@@ -89,52 +86,6 @@ func (p *FlusherStdout) Init(context pipeline.Context) error {
 
 func (*FlusherStdout) Description() string {
 	return "stdout flusher for logtail"
-}
-
-// Flush the logGroup list to stdout or files.
-func (p *FlusherStdout) Flush(projectName string, logstoreName string, configName string, logGroupList []*protocol.LogGroup) error {
-	for _, logGroup := range logGroupList {
-		if p.Tags {
-			if p.outLogger != nil {
-				p.outLogger.Infof("[LogGroup] topic %s, logstore %s, logcount %d, tags %v", logGroup.Topic, logGroup.Category, len(logGroup.Logs), logGroup.LogTags)
-			} else {
-				logger.Info(p.context.GetRuntimeContext(), "[LogGroup] topic", logGroup.Topic, "logstore", logGroup.Category, "logcount", len(logGroup.Logs), "tags", logGroup.LogTags)
-			}
-		}
-
-		if p.KeyValuePairs {
-			for _, log := range logGroup.Logs {
-				writer := jsoniter.NewStream(jsoniter.ConfigDefault, nil, 128)
-				writer.WriteObjectStart()
-				for _, c := range log.Contents {
-					writer.WriteObjectField(c.Key)
-					writer.WriteString(c.Value)
-					_, _ = writer.Write([]byte{','})
-				}
-				writer.WriteObjectField("__time__")
-				writer.WriteString(strconv.Itoa(int(log.Time)))
-				writer.WriteObjectEnd()
-
-				if p.outLogger != nil {
-					p.outLogger.Infof("%s", writer.Buffer())
-				} else {
-					logger.Info(p.context.GetRuntimeContext(), string(writer.Buffer()))
-				}
-			}
-
-		} else {
-			for _, log := range logGroup.Logs {
-				buf, _ := json.Marshal(log)
-				if p.outLogger != nil {
-					p.outLogger.Infof("%s", buf)
-				} else {
-					logger.Info(p.context.GetRuntimeContext(), string(buf))
-				}
-			}
-		}
-
-	}
-	return nil
 }
 
 func (p *FlusherStdout) Export(in []*models.PipelineGroupEvents, context pipeline.PipelineContext) error {

@@ -22,17 +22,9 @@ import (
 
 	_ "github.com/alibaba/ilogtail/pkg/logger/test"
 	"github.com/alibaba/ilogtail/pkg/models"
-	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
+	converter "github.com/alibaba/ilogtail/pkg/protocol/converter"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
 )
-
-func TestFlusherOdps(t *testing.T) {
-	flusher := pipeline.Flushers["flusher_aliyun_odps"]()
-	require.Implements(t, (*pipeline.FlusherV2)(nil), flusher)
-	_, supportsV1 := flusher.(pipeline.FlusherV1)
-	require.False(t, supportsV1)
-}
 
 func TestFlusherOdpsExportLogs(t *testing.T) {
 	sender := &mockTunnelSender{}
@@ -53,15 +45,11 @@ func TestFlusherOdpsExportLogs(t *testing.T) {
 	}
 
 	require.NoError(t, flusher.Export(groups, nil))
-	require.Len(t, sender.logs, 2)
-	require.Equal(t, uint32(1733205626), sender.logs[0].Time)
-	require.Equal(t, uint32(123456789), sender.logs[0].GetTimeNs())
-	require.Equal(t, uint32(1733205627), sender.logs[1].Time)
-	require.Equal(t, uint32(987654321), sender.logs[1].GetTimeNs())
-	require.Equal(t, map[string]string{"content": "first"}, odpsLogContents(sender.logs[0]))
-	require.Equal(t, map[string]string{"content": "second"}, odpsLogContents(sender.logs[1]))
-	require.Equal(t, []*protocol.LogTag{{Key: "__path__", Value: "/tmp/first.log"}}, sender.groups[0].LogTags)
-	require.Equal(t, []*protocol.LogTag{{Key: "__path__", Value: "/tmp/second.log"}}, sender.groups[1].LogTags)
+	require.Len(t, sender.rows, 2)
+	require.Equal(t, first.GetTimestamp(), sender.rows[0].Timestamp)
+	require.Equal(t, second.GetTimestamp(), sender.rows[1].Timestamp)
+	require.Equal(t, map[string]string{"content": "first"}, sender.rows[0].Fields)
+	require.Equal(t, map[string]string{"content": "second"}, sender.rows[1].Fields)
 	require.Equal(t, 1, sender.flushCalls)
 }
 
@@ -73,7 +61,7 @@ func TestFlusherOdpsExportEmptyGroups(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			sender := &mockTunnelSender{}
 			require.NoError(t, newTestFlusherOdps(sender).Export(groups, nil))
-			require.Empty(t, sender.logs)
+			require.Empty(t, sender.rows)
 			require.Equal(t, 1, sender.flushCalls)
 		})
 	}
@@ -91,7 +79,7 @@ func TestFlusherOdpsExportConversionError(t *testing.T) {
 
 	err := newTestFlusherOdps(sender).Export(groups, nil)
 	require.ErrorContains(t, err, "unsupported log content type for key unsupported")
-	require.Empty(t, sender.logs)
+	require.Empty(t, sender.rows)
 	require.Zero(t, sender.flushCalls)
 }
 
@@ -115,7 +103,7 @@ func TestFlusherOdpsExportSenderErrors(t *testing.T) {
 				{Events: []models.PipelineEvent{log}},
 			}
 			require.ErrorIs(t, newTestFlusherOdps(tt.sender).Export(groups, nil), tt.wantErr)
-			require.Len(t, tt.sender.logs, tt.wantSends)
+			require.Len(t, tt.sender.rows, tt.wantSends)
 			require.Equal(t, tt.wantFlushes, tt.sender.flushCalls)
 		})
 	}
@@ -129,11 +117,11 @@ func TestFlusherOdpsExportMetricAndSpan(t *testing.T) {
 	}}}
 
 	require.NoError(t, newTestFlusherOdps(sender).Export(groups, nil))
-	require.Len(t, sender.logs, 2)
-	require.Equal(t, "cpu.usage", odpsLogContents(sender.logs[0])["__name__"])
-	require.Equal(t, "0.5", odpsLogContents(sender.logs[0])["__value__"])
-	require.Equal(t, "trace-id", odpsLogContents(sender.logs[1])["traceID"])
-	require.Equal(t, "span-id", odpsLogContents(sender.logs[1])["spanID"])
+	require.Len(t, sender.rows, 2)
+	require.Equal(t, "cpu.usage", sender.rows[0].Fields["__name__"])
+	require.Equal(t, "0.5", sender.rows[0].Fields["__value__"])
+	require.Equal(t, "trace-id", sender.rows[1].Fields["traceID"])
+	require.Equal(t, "span-id", sender.rows[1].Fields["spanID"])
 	require.Equal(t, 1, sender.flushCalls)
 }
 
@@ -144,17 +132,8 @@ func newTestFlusherOdps(sender TunnelSender) *FlusherOdps {
 	}
 }
 
-func odpsLogContents(log *protocol.Log) map[string]string {
-	contents := make(map[string]string, len(log.Contents))
-	for _, content := range log.Contents {
-		contents[content.Key] = content.Value
-	}
-	return contents
-}
-
 type mockTunnelSender struct {
-	groups     []*protocol.LogGroup
-	logs       []*protocol.Log
+	rows       []converter.EventRecord
 	flushCalls int
 	sendErr    error
 	flushErr   error
@@ -162,9 +141,8 @@ type mockTunnelSender struct {
 
 func (*mockTunnelSender) Init() error { return nil }
 
-func (s *mockTunnelSender) Send(group *protocol.LogGroup, log *protocol.Log) error {
-	s.groups = append(s.groups, group)
-	s.logs = append(s.logs, log)
+func (s *mockTunnelSender) Send(row converter.EventRecord) error {
+	s.rows = append(s.rows, row)
 	return s.sendErr
 }
 

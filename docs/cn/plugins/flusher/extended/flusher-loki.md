@@ -8,9 +8,9 @@
 
 列含义见 [概览 · 事件能力列说明](../../overview.md#事件能力列说明)。
 
-| v1 接口 | v2 接口 | Log | Metric | Span |
-| --- | --- | --- | --- | --- |
-| ✓ | ✓ | v1&v2 | 透传未知 | 透传未知 |
+| Log | Metric | Span |
+| --- | --- | --- |
+| ✓ | 日志记录 | 日志记录 |
 
 ## 版本
 
@@ -26,8 +26,8 @@
 |------------------------------|----------|---------------|-----------------------------------------------------------------------------------------------|
 | Type                         | string   | 是             | 插件类型                                                                                          |
 | Convert                      | Struct   | 否             | LoongCollector 数据转换协议配置                                                                              |
-| Convert.Protocol             | string   | 否             | LoongCollector 数据转换协议，可选值：`custom_single`, `custom_single_flatten`,`otlp_log_v1`。默认值：`custom_single` |
-| Convert.Encoding             | string   | 否             | LoongCollector 数据转换编码，可选值：`json`、`none`、`protobuf`，默认值：`json`                                        |
+| Convert.Protocol             | string   | 否             | 数据转换协议。支持 `custom_single` 和 `custom_single_flatten`，默认值为 `custom_single`。 |
+| Convert.Encoding             | string   | 否             | 数据转换编码，使用 `json`。 |
 | Convert.TagFieldsRename      | Map      | 否             | 对日志中tags中的json字段重命名                                                                           |
 | Convert.ProtocolFieldsRename | Map      | 否             | LoongCollector 日志协议字段重命名，可当前可重命名的字段：`contents`,`tags`和`time`                                         |
 | Convert.OnlyContents         | Bool     | 否             | 仅发送contents中的字段，目前只能和`custom_single_flatten`协议一起使用，默认值：`false`                                |

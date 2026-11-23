@@ -25,7 +25,6 @@ import (
 	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
 	"github.com/stretchr/testify/require"
 
-	"github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	converter "github.com/alibaba/ilogtail/pkg/protocol/converter"
@@ -46,7 +45,6 @@ func InvalidTestConnectAndWrite(t *testing.T) {
 	f.Authentication.PlainText.Database = "default"
 	f.Cluster = ""
 	f.Table = "demo"
-	f.flusher = f.BufferFlush
 	// Verify that we can connect to the ClickHouse
 	lctx := mock.NewEmptyContext("p", "l", "c")
 	err := f.Init(lctx)
@@ -54,7 +52,7 @@ func InvalidTestConnectAndWrite(t *testing.T) {
 
 	// Verify that we can successfully write data to the ClickHouse buffer engine table
 	lgl := makeTestLogGroupList()
-	err = f.Flush("projectName", "logstoreName", "configName", lgl.GetLogGroupList())
+	err = f.Export(makePipelineGroupEventsFromLogGroups(lgl.GetLogGroupList()), nil)
 	require.NoError(t, err)
 	_ = f.Stop()
 }
@@ -118,7 +116,6 @@ func newCustomSingleConverter(t *testing.T) *converter.Converter {
 		converter.EncodingJSON,
 		nil,
 		nil,
-		&config.GlobalConfig{},
 	)
 	require.NoError(t, err)
 	return cvt
@@ -198,7 +195,6 @@ func newClickHouseParityFlusher(t *testing.T, conn *captureClickHouseConn) *Flus
 	f.conn = conn
 	f.Table = "demo"
 	f.Authentication.PlainText.Database = "default"
-	f.flusher = f.BufferFlush
 	return f
 }
 
@@ -249,16 +245,32 @@ func TestFlusherClickHouse_ExportMetricStructural(t *testing.T) {
 	}
 }
 
-func TestFlusherClickHouse_FlushExportParity(t *testing.T) {
-	v1Groups, v2Groups := makeParityLogGroups()
+func TestFlusherClickHouseExportLogs(t *testing.T) {
+	wires, groups := makeParityLogGroups()
+	capture := &captureClickHouseConn{}
+	flusher := newClickHouseParityFlusher(t, capture)
+	require.NoError(t, flusher.Export(groups, nil))
 
-	flushConn := &captureClickHouseConn{}
-	flushFlusher := newClickHouseParityFlusher(t, flushConn)
-	require.NoError(t, flushFlusher.Flush("", "", "", v1Groups))
+	expected := expectedLogRecords(t, wires)
+	require.Equal(t, expected, normalizeJSONLines(capture.logs))
+}
 
-	exportConn := &captureClickHouseConn{}
-	exportFlusher := newClickHouseParityFlusher(t, exportConn)
-	require.NoError(t, exportFlusher.Export(v2Groups, nil))
-
-	require.Equal(t, normalizeJSONLines(flushConn.logs), normalizeJSONLines(exportConn.logs))
+// expectedLogRecords describes the external JSON record for the log fixtures.
+func expectedLogRecords(t *testing.T, groups []*protocol.LogGroup) []string {
+	t.Helper()
+	var rows [][]byte
+	for _, group := range groups {
+		for _, log := range group.Logs {
+			fields := make(map[string]string, len(log.Contents))
+			for _, field := range log.Contents {
+				fields[field.Key] = field.Value
+			}
+			data, err := json.Marshal(map[string]any{
+				"contents": fields, "tags": map[string]string{"host.ip": group.Source}, "time": log.Time,
+			})
+			require.NoError(t, err)
+			rows = append(rows, data)
+		}
+	}
+	return normalizeJSONLines(rows)
 }

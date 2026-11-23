@@ -10,9 +10,9 @@
 
 列含义见 [概览 · 事件能力列说明](../../overview.md#事件能力列说明)。
 
-| v1 接口 | v2 接口 | Log | Metric | Span |
-| --- | --- | --- | --- | --- |
-| ✓ | ✓ | v1&v2 | 透传未知 | 透传未知 |
+| Log | Metric | Span |
+| --- | --- | --- |
+| ✓ | 日志记录 | 日志记录 |
 
 ## 版本
 
@@ -36,8 +36,8 @@
 | Authentication.PlainText.Password | String   | 是    | Doris 密码                                                                                                                                                                                |
 | Authentication.PlainText.Database | String   | 否    | 数据库名称（可覆盖顶层 Database 参数）                                                                                                                                                                |
 | Convert                           | Struct   | 否    | LoongCollector 数据转换协议相关配置                                                                                                                                                                       |
-| Convert.Protocol                  | String   | 否    | 数据转换协议，可选值：`custom_single`、`otlp_log_v1`。默认值：`custom_single`                                                                                                                    |
-| Convert.Encoding                  | String   | 否    | Flusher 侧数据编码，可选值：`json`、`none`、`protobuf`，默认值：`json`                                                                                                                          |
+| Convert.Protocol                  | String   | 否    | 数据转换协议，默认值为 `custom_single`。 |
+| Convert.Encoding                  | String   | 否    | 数据转换编码，使用 `json`。 |
 | Convert.TagFieldsRename           | Map      | 否    | 对日志中tags中的json字段重命名                                                                                                                                                                     |
 | Convert.ProtocolFieldsRename      | Map      | 否    | 日志协议字段重命名，可重命名的字段：`contents`、`tags` 和 `time`                                                                                                                                      |
 | LoadProperties                    | Map      | 否    | 额外的 Stream Load 属性（如 `strict_mode`、`max_filter_ratio`、`timeout` 等），将设置在 HTTP 请求头中，参考 [Doris Stream Load 文档](https://doris.apache.org/zh-CN/docs/data-operate/import/stream-load-manual) |
@@ -83,8 +83,8 @@ inputs:
       - /home/test-log/*.log
 aggregators:
   - Type: aggregator_base
-    MaxLogCount: 10000        # 每个 LogGroup 最多 1万条日志
-    MaxLogGroupCount: 4       # Aggregator 最多缓存 4 个 LogGroup
+    MaxLogCount: 10000        # 每个事件组最多 1 万条事件
+    MaxLogGroupCount: 4       # Aggregator 最多缓存 4 个事件组
 flushers:
   - Type: flusher_doris
     Addresses: 

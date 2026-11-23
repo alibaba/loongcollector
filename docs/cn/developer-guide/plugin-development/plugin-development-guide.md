@@ -30,7 +30,7 @@ LoongCollector 插件的开发主要有以下步骤：
 
 在开发时，[Logger 接口](plugin-debug/logger-api.md)和[自监控指标接口](plugin-debug/plugin-self-monitor-guide.md)或许能对您有所帮助。此外，可以使用[纯插件模式启动](plugin-debug/pure-plugin-start.md) LoongCollector，用于对插件进行轻量级测试。
 
-Go 侧插件注册表与 `Add*Creator` 定义见仓库 [`pkg/pipeline/plugin.go`](https://github.com/alibaba/loongcollector/blob/main/pkg/pipeline/plugin.go)；各插件类型的 **V1 / V2** 扩展接口见同目录下的 `input.go`、`processor.go`、`aggregator.go`、`flusher.go`（旧文档仅描述 V1 时，请以源码为准）。
+Go 侧插件注册表与 `Add*Creator` 定义见仓库 [`pkg/pipeline/plugin.go`](https://github.com/alibaba/loongcollector/blob/main/pkg/pipeline/plugin.go)；Input 和 Processor 的兼容接口见同目录下的 `input.go` 和 `processor.go`。Aggregator 和 Flusher 的事件接口分别定义于 `aggregator.go` 和 `flusher.go`。
 
 更详细的开发细节，请参考：
 

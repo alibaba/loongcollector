@@ -101,11 +101,11 @@ func (p *pluginRunner) AddPlugin(pluginMeta *pipeline.PluginMeta, category plugi
 			return p.addProcessor(pluginMeta, processor, config["priority"].(int))
 		}
 	case pluginAggregator:
-		if aggregator, ok := plugin.(pipeline.AggregatorV2); ok {
+		if aggregator, ok := plugin.(pipeline.Aggregator); ok {
 			return p.addAggregator(pluginMeta, aggregator)
 		}
 	case pluginFlusher:
-		if flusher, ok := plugin.(pipeline.FlusherV2); ok {
+		if flusher, ok := plugin.(pipeline.Flusher); ok {
 			return p.addFlusher(pluginMeta, flusher)
 		}
 	case pluginExtension:
@@ -128,14 +128,6 @@ func (p *pluginRunner) Run() {
 	p.runAggregator()
 	p.runProcessor()
 	p.runInput()
-}
-
-func (p *pluginRunner) RunPlugins(category pluginCategory, control *pipeline.AsyncControl) {
-	switch category {
-	case pluginMetricInput:
-		p.runMetricInput(control)
-	default:
-	}
 }
 
 func (p *pluginRunner) IsWithInputPlugin() bool {
@@ -177,7 +169,7 @@ func (p *pluginRunner) addProcessor(pluginMeta *pipeline.PluginMeta, processor p
 	return wrapper.Init(pluginMeta)
 }
 
-func (p *pluginRunner) addAggregator(pluginMeta *pipeline.PluginMeta, aggregator pipeline.AggregatorV2) error {
+func (p *pluginRunner) addAggregator(pluginMeta *pipeline.PluginMeta, aggregator pipeline.Aggregator) error {
 	var wrapper AggregatorPluginWrapper
 	wrapper.Config = p.LogstoreConfig
 	wrapper.Aggregator = aggregator
@@ -196,7 +188,7 @@ func (p *pluginRunner) addAggregator(pluginMeta *pipeline.PluginMeta, aggregator
 	return nil
 }
 
-func (p *pluginRunner) addFlusher(pluginMeta *pipeline.PluginMeta, flusher pipeline.FlusherV2) error {
+func (p *pluginRunner) addFlusher(pluginMeta *pipeline.PluginMeta, flusher pipeline.Flusher) error {
 	var wrapper FlusherPluginWrapper
 	wrapper.Config = p.LogstoreConfig
 	wrapper.Flusher = flusher
@@ -312,7 +304,7 @@ func (p *pluginRunner) runProcessorInternal(cc *pipeline.AsyncControl) {
 func (p *pluginRunner) runAggregator() {
 	p.AggregateControl.Reset()
 	for _, t := range p.TimerRunner {
-		if plugin, ok := t.state.(pipeline.AggregatorV2); ok {
+		if plugin, ok := t.state.(pipeline.Aggregator); ok {
 			aggregator := plugin
 			timer := t
 			p.AggregateControl.Run(func(cc *pipeline.AsyncControl) {

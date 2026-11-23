@@ -17,59 +17,18 @@ package kafkav2
 import (
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/models"
-	"github.com/alibaba/ilogtail/pkg/protocol"
-	"github.com/alibaba/ilogtail/plugins/test"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
 
 	"strconv"
 	"testing"
 
+	"github.com/IBM/sarama"
 	"github.com/stretchr/testify/require"
+
+	converter "github.com/alibaba/ilogtail/pkg/protocol/converter"
 )
 
-func TestConnectAndWriteFlusherV1(t *testing.T) {
-	if testing.Short() {
-		t.Skip("Skipping integration test in short mode")
-	}
-
-	brokers := []string{"tony2c4g:9092"}
-	k := NewFlusherKafka()
-	k.Brokers = brokers
-	k.Topic = "tony_topic"
-	// Verify that we can connect to the Kafka broker
-	lctx := mock.NewEmptyContext("p", "l", "c")
-
-	err := k.Init(lctx)
-	require.NoError(t, err)
-
-	// Verify that we can successfully write data to the kafka broker
-	lgl := makeTestLogGroupList()
-	err = k.Flush("projectName", "logstoreName", "configName", lgl.GetLogGroupList())
-	require.NoError(t, err)
-	_ = k.Stop()
-}
-
-func makeTestLogGroupList() *protocol.LogGroupList {
-	f := map[string]string{}
-	lgl := &protocol.LogGroupList{
-		LogGroupList: make([]*protocol.LogGroup, 0, 10),
-	}
-	for i := 1; i <= 10; i++ {
-		lg := &protocol.LogGroup{
-			Logs: make([]*protocol.Log, 0, 10),
-		}
-		for j := 1; j <= 10; j++ {
-			f["group"] = strconv.Itoa(i)
-			f["message"] = "The message: " + strconv.Itoa(j)
-			l := test.CreateLogByFields(f)
-			lg.Logs = append(lg.Logs, l)
-		}
-		lgl.LogGroupList = append(lgl.LogGroupList, lg)
-	}
-	return lgl
-}
-
-func TestConnectAndWriteFlusherV2(t *testing.T) {
+func TestConnectAndWriteFlusher(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
@@ -112,4 +71,58 @@ func makeTestGroupEventsArray() []*models.PipelineGroupEvents {
 		groupEventsArray = append(groupEventsArray, groupEvents)
 	}
 	return groupEventsArray
+}
+
+type bufferedProducer struct {
+	sarama.AsyncProducer
+	messages chan *sarama.ProducerMessage
+}
+
+func (p *bufferedProducer) Input() chan<- *sarama.ProducerMessage {
+	return p.messages
+}
+
+func TestKafkaExportJSONLineStreamWithoutSelectedFieldValues(t *testing.T) {
+	producer := &bufferedProducer{messages: make(chan *sarama.ProducerMessage, 1)}
+	flusher := NewFlusherKafka()
+	flusher.context = mock.NewEmptyContext("project", "store", "config")
+	flusher.producer = producer
+	flusher.Topic = "events"
+	flusher.selectFields = []string{"tag.absent"}
+	var err error
+	flusher.converter, err = converter.NewConverter(converter.ProtocolJsonline, converter.EncodingJSON, nil, nil)
+	require.NoError(t, err)
+
+	group := &models.PipelineGroupEvents{Events: []models.PipelineEvent{
+		models.NewSimpleLog([]byte("first"), models.NewTags(), 1700000000123456789),
+		models.NewSimpleLog([]byte("second"), models.NewTags(), 1700000000987654321),
+	}}
+	require.NoError(t, flusher.Export([]*models.PipelineGroupEvents{group}, nil))
+	require.Len(t, producer.messages, 1)
+	message := <-producer.messages
+	payload, err := message.Value.Encode()
+	require.NoError(t, err)
+	require.Equal(t, "events", message.Topic)
+	require.Equal(t, `{"content":"first","time":1700000000}`+"\n"+`{"content":"second","time":1700000000}`, string(payload))
+}
+
+func TestKafkaExportContinuesAfterConversionError(t *testing.T) {
+	producer := &bufferedProducer{messages: make(chan *sarama.ProducerMessage, 1)}
+	flusher := NewFlusherKafka()
+	flusher.context = mock.NewEmptyContext("project", "store", "config")
+	flusher.producer = producer
+	flusher.Topic = "events"
+	var err error
+	flusher.converter, err = converter.NewConverter(converter.ProtocolRaw, converter.EncodingCustom, nil, nil)
+	require.NoError(t, err)
+
+	require.NoError(t, flusher.Export([]*models.PipelineGroupEvents{
+		{Events: []models.PipelineEvent{models.NewSimpleLog([]byte("unsupported"), models.NewTags(), 1)}},
+		{Events: []models.PipelineEvent{models.ByteArray("valid")}},
+	}, nil))
+	require.Len(t, producer.messages, 1)
+	message := <-producer.messages
+	payload, err := message.Value.Encode()
+	require.NoError(t, err)
+	require.Equal(t, "valid", string(payload))
 }

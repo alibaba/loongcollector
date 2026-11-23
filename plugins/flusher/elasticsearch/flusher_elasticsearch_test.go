@@ -29,7 +29,6 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 	"github.com/stretchr/testify/require"
 
-	"github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	converter "github.com/alibaba/ilogtail/pkg/protocol/converter"
@@ -96,7 +95,6 @@ func newCustomSingleConverter(t *testing.T) *converter.Converter {
 		converter.EncodingJSON,
 		nil,
 		nil,
-		&config.GlobalConfig{},
 	)
 	require.NoError(t, err)
 	return cvt
@@ -264,20 +262,34 @@ func TestGetIndexKeys(t *testing.T) {
 	})
 }
 
-func TestFlusherElasticSearch_FlushExportParity(t *testing.T) {
-	v1Groups, v2Groups := makeParityLogGroups()
+func TestFlusherElasticSearchExportLogs(t *testing.T) {
+	wires, groups := makeParityLogGroups()
+	capture := &bulkBodyCapture{}
+	server := httptest.NewServer(http.HandlerFunc(capture.handler))
+	defer server.Close()
+	flusher := newElasticSearchParityFlusher(t, server)
+	require.NoError(t, flusher.Export(groups, nil))
+	requests := capture.snapshot()
+	require.Len(t, requests, 1)
+	require.Equal(t, strings.Join(expectedLogRecords(t, wires), "\n"), normalizeBulkBody(requests[0]))
+}
 
-	flushCapture := &bulkBodyCapture{}
-	flushServer := httptest.NewServer(http.HandlerFunc(flushCapture.handler))
-	defer flushServer.Close()
-	flushFlusher := newElasticSearchParityFlusher(t, flushServer)
-	require.NoError(t, flushFlusher.Flush("", "", "", v1Groups))
-
-	exportCapture := &bulkBodyCapture{}
-	exportServer := httptest.NewServer(http.HandlerFunc(exportCapture.handler))
-	defer exportServer.Close()
-	exportFlusher := newElasticSearchParityFlusher(t, exportServer)
-	require.NoError(t, exportFlusher.Export(v2Groups, nil))
-
-	require.Equal(t, normalizeBulkBody(flushCapture.snapshot()[0]), normalizeBulkBody(exportCapture.snapshot()[0]))
+// expectedLogRecords describes the external JSON record for the log fixtures.
+func expectedLogRecords(t *testing.T, groups []*protocol.LogGroup) []string {
+	t.Helper()
+	var rows [][]byte
+	for _, group := range groups {
+		for _, log := range group.Logs {
+			fields := make(map[string]string, len(log.Contents))
+			for _, field := range log.Contents {
+				fields[field.Key] = field.Value
+			}
+			data, err := json.Marshal(map[string]any{
+				"contents": fields, "tags": map[string]string{"host.ip": group.Source}, "time": log.Time,
+			})
+			require.NoError(t, err)
+			rows = append(rows, data)
+		}
+	}
+	return normalizeJSONLines(rows)
 }

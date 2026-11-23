@@ -21,6 +21,8 @@ import (
 	"io"
 	"net/http"
 	"sort"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -157,7 +159,7 @@ func TestHttpFlusherInit(t *testing.T) {
 	})
 }
 
-func TestHttpFlusherFlush(t *testing.T) {
+func TestHttpFlusherExportCompatibility(t *testing.T) {
 	Convey("Given a http flusher with protocol: Influxdb, encoding: custom, query: contains variable '%{tag.db}'", t, func() {
 
 		var actualRequests []string
@@ -236,7 +238,7 @@ func TestHttpFlusherFlush(t *testing.T) {
 				},
 			}
 
-			err := flusher.Flush("", "", "", logGroups)
+			err := flusher.Export(groupsFromWireFixture(logGroups, flusher.Convert.Protocol == converter.ProtocolInfluxdb), nil)
 			flusher.Stop()
 			Convey("Then", func() {
 				Convey("Flush() should not return error", func() {
@@ -337,7 +339,7 @@ func TestHttpFlusherFlush(t *testing.T) {
 				},
 			}
 
-			err := flusher.Flush("", "", "", logGroups)
+			err := flusher.Export(groupsFromWireFixture(logGroups, flusher.Convert.Protocol == converter.ProtocolInfluxdb), nil)
 			flusher.Stop()
 			Convey("Then", func() {
 				Convey("Flush() should not return error", func() {
@@ -362,7 +364,7 @@ func TestHttpFlusherFlush(t *testing.T) {
 	})
 }
 
-func TestHttpFlusherFlushWithAuthenticator(t *testing.T) {
+func TestHttpFlusherExportWithAuthenticator(t *testing.T) {
 	Convey("Given a http flusher with protocol: Influxdb, encoding: custom,with basicauth authenticator, query: contains variable '%{tag.db}'", t, func() {
 
 		var actualRequests []string
@@ -443,7 +445,7 @@ func TestHttpFlusherFlushWithAuthenticator(t *testing.T) {
 				},
 			}
 
-			err := flusher.Flush("", "", "", logGroups)
+			err := flusher.Export(groupsFromWireFixture(logGroups, flusher.Convert.Protocol == converter.ProtocolInfluxdb), nil)
 			flusher.Stop()
 			Convey("Then", func() {
 				Convey("Flush() should not return error", func() {
@@ -701,7 +703,7 @@ func TestGetNextRetryDelay(t *testing.T) {
 	}
 }
 
-func TestHttpFlusherFlushWithInterceptor(t *testing.T) {
+func TestHttpFlusherExportWithInterceptor(t *testing.T) {
 	Convey("Given a http flusher with sync intercepter", t, func() {
 		mockIntercepter := &mockInterceptor{}
 		flusher := &FlusherHTTP{
@@ -714,7 +716,7 @@ func TestHttpFlusherFlushWithInterceptor(t *testing.T) {
 			AsyncIntercept: false,
 			Timeout:        defaultTimeout,
 			Concurrency:    1,
-			queue:          make(chan interface{}, 10),
+			queue:          make(chan *models.PipelineGroupEvents, 10),
 		}
 
 		Convey("should discard all events", func() {
@@ -744,7 +746,7 @@ func TestHttpFlusherFlushWithInterceptor(t *testing.T) {
 			AsyncIntercept: true,
 			Timeout:        defaultTimeout,
 			Concurrency:    1,
-			queue:          make(chan interface{}, 10),
+			queue:          make(chan *models.PipelineGroupEvents, 10),
 		}
 
 		Convey("should discard all events", func() {
@@ -780,7 +782,7 @@ func TestHttpFlusherDropEvents(t *testing.T) {
 			AsyncIntercept:         true,
 			Timeout:                defaultTimeout,
 			Concurrency:            1,
-			queue:                  make(chan interface{}, 1),
+			queue:                  make(chan *models.PipelineGroupEvents, 1),
 			DropEventWhenQueueFull: true,
 		}
 
@@ -892,7 +894,7 @@ func TestFlusherHTTP_GzipCompression(t *testing.T) {
 				},
 			}
 
-			err := flusher.Flush("", "", "", logGroups)
+			err := flusher.Export(groupsFromWireFixture(logGroups, flusher.Convert.Protocol == converter.ProtocolInfluxdb), nil)
 			flusher.Stop()
 			Convey("Then", func() {
 				Convey("Flush() should not return error", func() {
@@ -993,7 +995,7 @@ func TestFlusherHTTP_GzipCompression(t *testing.T) {
 				},
 			}
 
-			err := flusher.Flush("", "", "", logGroups)
+			err := flusher.Export(groupsFromWireFixture(logGroups, flusher.Convert.Protocol == converter.ProtocolInfluxdb), nil)
 			flusher.Stop()
 			Convey("Then", func() {
 				Convey("Flush() should not return error", func() {
@@ -1103,4 +1105,41 @@ func (mi *mockInterceptor) Intercept(group *models.PipelineGroupEvents) *models.
 	}
 	group.Events = group.Events[:0]
 	return group
+}
+
+func groupsFromWireFixture(groups []*protocol.LogGroup, asMetric bool) []*models.PipelineGroupEvents {
+	output := make([]*models.PipelineGroupEvents, 0, len(groups))
+	for _, group := range groups {
+		info := models.NewGroup(models.NewMetadata(), models.NewTags())
+		info.Tags.Add("host.ip", group.Source)
+		for _, tag := range group.LogTags {
+			info.Tags.Add(strings.TrimPrefix(tag.Key, "__tag__:"), tag.Value)
+		}
+		events := make([]models.PipelineEvent, 0, len(group.Logs))
+		for _, log := range group.Logs {
+			event := models.NewSimpleLog(nil, models.NewTags(), uint64(log.Time)*1e9+uint64(log.GetTimeNs()))
+			for _, field := range log.Contents {
+				if key, isTag := strings.CutPrefix(field.Key, "__tag__:"); isTag {
+					event.Tags.Add(key, field.Value)
+				} else {
+					event.Contents.Add(field.Key, field.Value)
+				}
+			}
+			if asMetric {
+				tags := models.NewTags()
+				for _, label := range strings.Split(pipeline.GetStringValue(event.Contents.Get("__labels__")), "|") {
+					if key, value, ok := strings.Cut(label, "#$#"); ok {
+						tags.Add(key, value)
+					}
+				}
+				timestamp, _ := strconv.ParseInt(pipeline.GetStringValue(event.Contents.Get("__time_nano__")), 10, 64)
+				value, _ := strconv.ParseFloat(pipeline.GetStringValue(event.Contents.Get("__value__")), 64)
+				events = append(events, models.NewSingleValueMetric(pipeline.GetStringValue(event.Contents.Get("__name__")), models.MetricTypeGauge, tags, timestamp, value))
+				continue
+			}
+			events = append(events, event)
+		}
+		output = append(output, &models.PipelineGroupEvents{Group: info, Events: events})
+	}
+	return output
 }

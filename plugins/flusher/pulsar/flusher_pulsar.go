@@ -26,7 +26,6 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	converter "github.com/alibaba/ilogtail/pkg/protocol/converter"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pkg/util"
@@ -184,48 +183,6 @@ func (f *FlusherPulsar) Validate() error {
 	return nil
 }
 
-func (f *FlusherPulsar) Flush(projectName string, logstoreName string, configName string, logGroupList []*protocol.LogGroup) error {
-	topic := f.Topic
-	for _, logGroup := range logGroupList {
-		logger.Debug(f.context.GetRuntimeContext(), "[LogGroup] topic", logGroup.Topic, "logstore", logGroup.Category, "logcount", len(logGroup.Logs), "tags", logGroup.LogTags)
-		logs, values, err := f.converter.ToByteStreamWithSelectedFields(logGroup, f.selectFields)
-		if err != nil {
-			logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "flush pulsar convert log fail, error", err)
-		}
-		for index, log := range logs.([][]byte) {
-			valueMap := values[index]
-			if len(f.topicKeys) > 0 {
-				formattedTopic, err := fmtstr.FormatTopic(valueMap, f.Topic)
-				if err != nil {
-					logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "flush pulsar format topic fail, error", err)
-				} else {
-					topic = *formattedTopic
-				}
-			}
-			producer, err := f.producers.GetProducer(topic, f.pulsarClient, f.producerOptions)
-			if err != nil {
-				logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "load pulsar producer fail,topic", topic, "err", err)
-				return err
-			}
-
-			message := &pulsar.ProducerMessage{
-				Payload: log,
-			}
-			if f.PartitionKeys != nil {
-				message.Key = f.hashPartitionKey(valueMap, logstoreName)
-			}
-			producer.SendAsync(f.context.GetRuntimeContext(), message, func(msgId pulsar.MessageID, prodMsg *pulsar.ProducerMessage, err error) {
-				if err != nil {
-					logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "send message to pulsar fail,error", err)
-				} else {
-					logger.Debug(f.context.GetRuntimeContext(), "Pulsar success send events: messageID: %s ", msgId)
-				}
-			})
-		}
-	}
-	return nil
-}
-
 func (f *FlusherPulsar) Description() string {
 	return "Pulsar flusher for logtail"
 }
@@ -238,12 +195,22 @@ func (f *FlusherPulsar) Export(groups []*models.PipelineGroupEvents, _ pipeline.
 	for _, groupEvents := range groups {
 		logger.Debug(f.context.GetRuntimeContext(), "[GroupEvents] events count", len(groupEvents.Events),
 			"tags", groupEvents.Group.GetTags().Iterator())
-		logs, values, err := f.converter.ToByteStreamWithSelectedFieldsV2(groupEvents, f.selectFields)
+		logs, values, err := f.converter.ToByteStreamWithSelectedFields(groupEvents, f.selectFields)
 		if err != nil {
 			logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "flush pulsar convert log fail, error", err)
+			continue
 		}
-		for index, log := range logs.([][]byte) {
-			valueMap := values[index]
+		rows, ok := logs.([][]byte)
+		if !ok {
+			if stream, ok := logs.([]byte); ok && len(stream) > 0 {
+				rows = [][]byte{stream}
+			}
+		}
+		for index, log := range rows {
+			var valueMap map[string]string
+			if index < len(values) {
+				valueMap = values[index]
+			}
 			if len(f.topicKeys) > 0 {
 				formattedTopic, err := fmtstr.FormatTopic(valueMap, f.Topic)
 				if err != nil {
@@ -287,7 +254,7 @@ func (f *FlusherPulsar) Stop() error {
 func (f *FlusherPulsar) getConverter() (*converter.Converter, error) {
 	logger.Debug(f.context.GetRuntimeContext(), "[ilogtail data convert config] Protocol", f.Convert.Protocol,
 		"Encoding", f.Convert.Encoding, "TagFieldsRename", f.Convert.TagFieldsRename, "ProtocolFieldsRename", f.Convert.ProtocolFieldsRename)
-	return converter.NewConverter(f.Convert.Protocol, f.Convert.Encoding, f.Convert.TagFieldsRename, f.Convert.ProtocolFieldsRename, f.context.GetPipelineScopeConfig())
+	return converter.NewConverter(f.Convert.Protocol, f.Convert.Encoding, f.Convert.TagFieldsRename, f.Convert.ProtocolFieldsRename)
 }
 
 func (f *FlusherPulsar) initClientOptions() pulsar.ClientOptions {

@@ -30,7 +30,6 @@ import (
 
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/models"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/plugins/test"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
 )
@@ -60,7 +59,7 @@ func Test_Flusher_Init(t *testing.T) {
 		})
 	})
 	convey.Convey("When init grpc service", t, func() {
-		_, server := newTestGrpcService(t, addr, time.Nanosecond)
+		server := newTestGrpcService(t, addr, time.Nanosecond)
 		defer func() {
 			server.Stop()
 		}()
@@ -79,7 +78,7 @@ func Test_Flusher_Init(t *testing.T) {
 func Test_Flusher_Init_Invalid(t *testing.T) {
 	addr := test.GetAvailableLocalAddress(t)
 	convey.Convey("When init grpc service", t, func() {
-		_, server := newTestGrpcService(t, addr, time.Nanosecond)
+		server := newTestGrpcService(t, addr, time.Nanosecond)
 		defer func() {
 			server.Stop()
 		}()
@@ -89,49 +88,6 @@ func Test_Flusher_Init_Invalid(t *testing.T) {
 			f := &FlusherOTLP{Version: v1}
 			err := f.Init(logCtx)
 			convey.So(err, convey.ShouldNotBeNil)
-		})
-	})
-}
-
-func Test_Flusher_Flush(t *testing.T) {
-	convey.Convey("When init grpc service", t, func() {
-		addr := test.GetAvailableLocalAddress(t)
-		service, server := newTestGrpcService(t, addr, time.Nanosecond*0)
-		defer func() {
-			server.Stop()
-		}()
-		logCtx := mock.NewEmptyContext("p", "l", "c")
-
-		convey.Convey("When FlusherOTLP init", func() {
-			f := &FlusherOTLP{Version: v1, Logs: &helper.GrpcClientConfig{Endpoint: addr, WaitForReady: true}}
-			err := f.Init(logCtx)
-			convey.So(err, convey.ShouldBeNil)
-
-			convey.Convey("When FlusherOTLP flush", func() {
-				groupList := makeTestLogGroupList().GetLogGroupList()
-				err := f.Flush("p", "l", "c", groupList)
-				convey.So(err, convey.ShouldBeNil)
-				r := <-service.ch
-				r2 := f.convertLogGroupToRequest(groupList)
-				convey.So(len(r.ResourceLogs), convey.ShouldEqual, r2.Logs().ResourceLogs().Len())
-				for i := range r.ResourceLogs {
-					for j := range r.ResourceLogs[i].ScopeLogs {
-						for m := range r.ResourceLogs[i].ScopeLogs[j].LogRecords {
-							expected := r.ResourceLogs[i].ScopeLogs[j].LogRecords[m]
-							actual := r2.Logs().ResourceLogs().At(i).ScopeLogs().At(j).LogRecords().At(m)
-							convey.So(expected.Body.GetStringValue(), convey.ShouldEqual, actual.Body().AsString())
-
-							for _, v := range expected.Attributes {
-								value, ok := actual.Attributes().Get(v.Key)
-								convey.So(ok, convey.ShouldBeTrue)
-								convey.So(v.Value.GetStringValue(), convey.ShouldEqual, value.AsString())
-							}
-
-						}
-					}
-				}
-
-			})
 		})
 	})
 }
@@ -435,10 +391,10 @@ func Test_Flusher_Export_All_Disable_Trace(t *testing.T) {
 	})
 }
 
-func Test_Flusher_Flush_Timeout(t *testing.T) {
+func TestFlusherExportTimeout(t *testing.T) {
 	convey.Convey("When init grpc service", t, func() {
 		Addr := test.GetAvailableLocalAddress(t)
-		_, server := newTestGrpcService(t, Addr, time.Second*2)
+		server := newTestGrpcService(t, Addr, time.Second*2)
 		defer func() {
 			server.Stop()
 		}()
@@ -450,8 +406,8 @@ func Test_Flusher_Flush_Timeout(t *testing.T) {
 			convey.So(err, convey.ShouldBeNil)
 
 			convey.Convey("When FlusherOTLP flush timeout", func() {
-				groupList := makeTestLogGroupList().GetLogGroupList()
-				err := f.Flush("p", "l", "c", groupList)
+				event := models.NewSimpleLog([]byte("message"), models.NewTags(), 1700000000e9)
+				err := f.Export([]*models.PipelineGroupEvents{{Group: models.NewGroup(models.NewMetadata(), models.NewTags()), Events: []models.PipelineEvent{event}}}, nil)
 				convey.So(err, convey.ShouldBeError)
 			})
 		})
@@ -479,7 +435,7 @@ func Test_Flusher_GetConverter(t *testing.T) {
 	})
 }
 
-func newTestGrpcService(t *testing.T, address string, pause time.Duration) (*TestOtlpLogService, *grpc.Server) {
+func newTestGrpcService(t *testing.T, address string, pause time.Duration) *grpc.Server {
 	server := grpc.NewServer()
 	listener, err := net.Listen("tcp", address)
 	convey.So(err, convey.ShouldBeNil)
@@ -493,27 +449,7 @@ func newTestGrpcService(t *testing.T, address string, pause time.Duration) (*Tes
 		})
 	}(t)
 	time.Sleep(time.Second)
-	return service, server
-}
-
-func makeTestLogGroupList() *protocol.LogGroupList {
-	f := map[string]string{}
-	lgl := &protocol.LogGroupList{
-		LogGroupList: make([]*protocol.LogGroup, 0, 10),
-	}
-	for i := 1; i <= 10; i++ {
-		lg := &protocol.LogGroup{
-			Logs: make([]*protocol.Log, 0, 10),
-		}
-		for j := 1; j <= 10; j++ {
-			f["group"] = strconv.Itoa(i)
-			f["content"] = "The message: " + strconv.Itoa(j)
-			l := test.CreateLogByFields(f)
-			lg.Logs = append(lg.Logs, l)
-		}
-		lgl.LogGroupList = append(lgl.LogGroupList, lg)
-	}
-	return lgl
+	return server
 }
 
 type TestOtlpLogServiceV2 struct {

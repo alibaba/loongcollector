@@ -22,10 +22,15 @@
 
 - **Log / Metric / Span**：基于 `IsSupportedEvent` 或序列化/路由路径，插件明确支持处理的 `PipelineEvent` 类型。
 
-**扩展 Processor / 扩展 Flusher / Aggregator / Extension**
+**扩展 Processor / Extension**
 
-- **v1 接口 / v2 接口**：是否实现 v1（`ProcessLogs` / `Flush(LogGroup)` / `Aggregator.Add`）或 v2（`Process(PipelineGroupEvents)` / `Export` / `FlushInterceptor.Intercept` 等）处理路径。
-- **Log / Metric / Span**：对该事件类型的支持；`v1`/`v1&v2`/`v2` 表示明确实现，`透传` 表示 v2 `Process` 明确保留该类型事件（不处理但不丢弃），`透传未知` 表示代码中无类型特化信号（可能随 Pipeline 透传）。
+- **v1 接口 / v2 接口**表示插件是否实现对应的兼容接口，例如 `ProcessLogs` / `Process`，或 `FlushInterceptor.Intercept`。
+- **Log / Metric / Span**表示插件支持的事件类型。`v1` / `v1&v2` / `v2` 标明具体接口。`透传` 表示插件明确保留该类型的事件。`透传未知` 表示实现未标明该类型的处理方式。
+
+**扩展 Flusher / Aggregator**
+
+- Aggregator 用 `Record` 接收事件组，经 `Record` 或 `GetResult` 提交结果。扩展 Flusher 用 `Export` 接收一批事件组。
+- **Log / Metric / Span**表示插件对相应事件类型的支持。`日志记录` 表示将事件内容转换为日志格式，`按输出协议` 表示支持范围取决于所选编码，`基本字段` 表示仅输出事件的公共字段。
 
 ## 输入
 
@@ -152,12 +157,12 @@
 
 > 各列含义见 [事件能力列说明](#事件能力列说明)。
 
-| 名称 | 提供方 | v1 接口 | v2 接口 | Log | Metric | Span | 简介 |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| `aggregator_base`<br>[基础聚合](aggregator/aggregator-base.md) | SLS 官方 | ✓ | — | v1 | 透传未知 | 透传未知 | 对单条数据进行聚合 |
-| `aggregator_content_value_group`<br>[按 Key 聚合](aggregator/aggregator-content-value-group.md) | 社区<br>[snakorse](https://github.com/snakorse) | ✓ | — | v1 | 透传未知 | 透传未知 | 按照指定的 Key 对采集到的数据进行分组聚合 |
-| `aggregator_context`<br>[上下文聚合](aggregator/aggregator-context.md) | SLS 官方 | ✓ | — | v1 | 透传未知 | 透传未知 | 根据数据来源对单条数据进行聚合 |
-| `aggregator_metadata_group`<br>[GroupMetadata 聚合](aggregator/aggregator-metadata-group.md) | 社区<br>[urnotsally](https://github.com/urnotsally) | ✓ | — | v1 | 透传未知 | 透传未知 | 按照指定的 Metadata Keys 对采集到的数据进行重新分组聚合 |
+| 名称 | 提供方 | Log | Metric | Span | 简介 |
+| --- | --- | --- | --- | --- | --- |
+| `aggregator_base`<br>[基础聚合](aggregator/aggregator-base.md) | SLS 官方 | ✓ | ✓ | ✓ | 对单条数据进行聚合 |
+| `aggregator_content_value_group`<br>[按 Key 聚合](aggregator/aggregator-content-value-group.md) | 社区<br>[snakorse](https://github.com/snakorse) | ✓ | 指定指标字段 | 透传 | 按照指定的 Key 对采集到的数据进行分组聚合 |
+| `aggregator_context`<br>[上下文聚合](aggregator/aggregator-context.md) | SLS 官方 | ✓ | ✓ | ✓ | 根据数据来源对单条数据进行聚合 |
+| `aggregator_metadata_group`<br>[GroupMetadata 聚合](aggregator/aggregator-metadata-group.md) | 社区<br>[urnotsally](https://github.com/urnotsally) | ✓ | ✓ | ✓ | 按照指定的 Metadata Keys 对采集到的数据进行重新分组聚合 |
 
 ## 输出
 
@@ -177,21 +182,21 @@
 
 > 各列含义见 [事件能力列说明](#事件能力列说明)。
 
-| 名称 | 提供方 | v1 接口 | v2 接口 | Log | Metric | Span | 简介 |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| `flusher_aliyun_datahub`<br>[DataHub](flusher/extended/flusher-aliyun-datahub.md) | 社区<br>[panjx](https://github.com/panjxhhhhh) | — | ✓ | v2 | v2 | v2 | 将采集到的数据，输出到阿里云数据总线 DataHub。 |
-| `flusher_aliyun_odps`<br>[ODPS](flusher/extended/flusher-aliyun-odps.md) | 社区<br>[panjx](https://github.com/panjxhhhhh) | — | ✓ | v2 | v2 | v2 | 将采集到的数据，输出到阿里云大数据计算服务 ODPS。 |
-| `flusher_clickhouse`<br>[ClickHouse](flusher/extended/flusher-clickhouse.md) | 社区<br>[kl7sn](https://github.com/kl7sn) | ✓ | ✓ | v1&v2 | 透传未知 | 透传未知 | 将采集到的数据输出到 ClickHouse。 |
-| `flusher_doris`<br>[Apache Doris](flusher/extended/flusher-doris.md) | 社区 | ✓ | ✓ | v1&v2 | 透传未知 | 透传未知 | 通过 Stream Load 将数据写入 Apache Doris。 |
-| `flusher_elasticsearch`<br>[ElasticSearch](flusher/extended/flusher-elasticsearch.md) | 社区<br>[joeCarf](https://github.com/joeCarf) | ✓ | ✓ | v1&v2 | 透传未知 | 透传未知 | 将采集到的数据输出到 ElasticSearch。 |
-| `flusher_http`<br>[HTTP](flusher/extended/flusher-http.md) | 社区<br>[snakorse](https://github.com/snakorse) | ✓ | ✓ | v1&v2 | 透传未知 | 透传未知 | 将采集到的数据以 http 方式输出到指定的后端。 |
-| `flusher_kafka`<br>[Kafka](flusher/extended/flusher-kafka.md) | 社区 | — | — | — | — | — | Deprecated，代码已移除，请使用下面的 flusher_kafka_v2。 |
-| `flusher_kafka_v2`<br>[Kafka V2](flusher/extended/flusher-kafka-v2.md) | 社区<br>[shalousun](https://github.com/shalousun) | ✓ | ✓ | v1&v2 | 透传未知 | 透传未知 | 将采集到的数据输出到 Kafka。 |
-| `flusher_loki`<br>[Loki](flusher/extended/flusher-loki.md) | 社区<br>[abingcbc](https://github.com/abingcbc) | ✓ | ✓ | v1&v2 | 透传未知 | 透传未知 | 将采集到的数据输出到 Loki。 |
-| `flusher_otlp_log`<br>[OTLP 日志](flusher/extended/flusher-otlp.md) | 社区<br>[liuhaoyang](https://github.com/liuhaoyang) | ✓ | ✓ | v1&v2 | 透传未知 | 透传未知 | 将采集到的数据支持`OpenTelemetry log protocol`的后端。 |
-| `flusher_prometheus`<br>[Prometheus](flusher/extended/flusher-prometheus.md) | 社区<br> | — | ✓ | — | v2 | — | 将采集到的数据，经过处理后，通过 http 格式发送到指定的 Prometheus RemoteWrite 地址。 |
-| `flusher_pulsar`<br>[Pulsar](flusher/extended/flusher-pulsar.md) | 社区<br>[shalousun](https://github.com/shalousun) | ✓ | ✓ | v1&v2 | 透传未知 | 透传未知 | 将采集到的数据输出到 Pulsar。 |
-| `flusher_stdout`<br>[标准输出/文件](flusher/extended/flusher-stdout.md) | SLS 官方 | ✓ | ✓ | v1&v2 | v2 | v2 | 将采集到的数据输出到标准输出或文件。 |
+| 名称 | 提供方 | Log | Metric | Span | 简介 |
+| --- | --- | --- | --- | --- | --- |
+| `flusher_aliyun_datahub`<br>[DataHub](flusher/extended/flusher-aliyun-datahub.md) | 社区<br>[panjx](https://github.com/panjxhhhhh) | ✓ | 日志记录 | 日志记录 | 将采集到的数据，输出到阿里云数据总线 DataHub。 |
+| `flusher_aliyun_odps`<br>[ODPS](flusher/extended/flusher-aliyun-odps.md) | 社区<br>[panjx](https://github.com/panjxhhhhh) | ✓ | 日志记录 | 日志记录 | 将采集到的数据，输出到阿里云大数据计算服务 ODPS。 |
+| `flusher_clickhouse`<br>[ClickHouse](flusher/extended/flusher-clickhouse.md) | 社区<br>[kl7sn](https://github.com/kl7sn) | ✓ | 日志记录 | 日志记录 | 将采集到的数据输出到 ClickHouse。 |
+| `flusher_doris`<br>[Apache Doris](flusher/extended/flusher-doris.md) | 社区 | ✓ | 日志记录 | 日志记录 | 通过 Stream Load 将数据写入 Apache Doris。 |
+| `flusher_elasticsearch`<br>[ElasticSearch](flusher/extended/flusher-elasticsearch.md) | 社区<br>[joeCarf](https://github.com/joeCarf) | ✓ | 日志记录 | 日志记录 | 将采集到的数据输出到 ElasticSearch。 |
+| `flusher_http`<br>[HTTP](flusher/extended/flusher-http.md) | 社区<br>[snakorse](https://github.com/snakorse) | 按输出协议 | 按输出协议 | 按输出协议 | 将采集到的数据以 http 方式输出到指定的后端。 |
+| `flusher_kafka`<br>[Kafka](flusher/extended/flusher-kafka.md) | 社区 | — | — | — | Deprecated，代码已移除，请使用下面的 flusher_kafka_v2。 |
+| `flusher_kafka_v2`<br>[Kafka V2](flusher/extended/flusher-kafka-v2.md) | 社区<br>[shalousun](https://github.com/shalousun) | ✓ | 日志记录 | 日志记录 | 将采集到的数据输出到 Kafka。 |
+| `flusher_loki`<br>[Loki](flusher/extended/flusher-loki.md) | 社区<br>[abingcbc](https://github.com/abingcbc) | ✓ | 日志记录 | 日志记录 | 将采集到的数据输出到 Loki。 |
+| `flusher_otlp`<br>[OTLP](flusher/extended/flusher-otlp.md) | 社区<br>[liuhaoyang](https://github.com/liuhaoyang) | ✓ | ✓ | ✓ | 将日志、指标和链路发送到 OTLP 后端。 |
+| `flusher_prometheus`<br>[Prometheus](flusher/extended/flusher-prometheus.md) | 社区<br> | — | ✓ | — | 将采集到的数据，经过处理后，通过 http 格式发送到指定的 Prometheus RemoteWrite 地址。 |
+| `flusher_pulsar`<br>[Pulsar](flusher/extended/flusher-pulsar.md) | 社区<br>[shalousun](https://github.com/shalousun) | ✓ | 日志记录 | 日志记录 | 将采集到的数据输出到 Pulsar。 |
+| `flusher_stdout`<br>[标准输出/文件](flusher/extended/flusher-stdout.md) | SLS 官方 | ✓ | ✓ | 基本字段 | 将采集到的数据输出到标准输出或文件。 |
 
 ## 扩展
 
@@ -203,6 +208,6 @@
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `ext_basicauth`<br>[Basic 认证](extension/ext-basicauth.md) | 社区<br>[snakorse](https://github.com/snakorse) | — | — | 透传未知 | 透传未知 | 透传未知 | ClientAuthenticator：为 HTTP 类 Flusher 提供 Basic 认证。 |
 | `ext_default_decoder`<br>[默认 decoder](extension/ext-default-decoder.md) | 社区<br>[snakorse](https://github.com/snakorse) | — | — | 透传未知 | 透传未知 | 透传未知 | Decoder：将内置支持的 Format 以 Decoder 扩展形式封装。 |
-| `ext_default_encoder`<br>[默认 encoder](extension/ext-default-encoder.md) | 社区<br>[yuanshuai.1900](https://github.com/aiops1900) | — | — | 透传未知 | 透传未知 | 透传未知 | Encoder：将内置支持的 Format 以 Encoder 扩展形式封装。 |
+| `ext_default_encoder`<br>[默认 encoder](extension/ext-default-encoder.md) | 社区<br>[yuanshuai.1900](https://github.com/aiops1900) | — | — | — | ✓ | — | Encoder：可将 Metric 事件组编码成 Prometheus 格式。 |
 | `ext_groupinfo_filter`<br>[GroupInfo 过滤](extension/ext-groupinfo-filter.md) | 社区<br>[snakorse](https://github.com/snakorse) | — | ✓ | 透传未知 | 透传未知 | 透传未知 | FlushInterceptor：按 GroupInfo 筛选提交数据。 |
 | `ext_request_breaker`<br>[请求熔断](extension/ext-request-breaker.md) | 社区<br>[snakorse](https://github.com/snakorse) | — | — | 透传未知 | 透传未知 | 透传未知 | RequestInterceptor：为 HTTP 类 Flusher 提供熔断能力。 |

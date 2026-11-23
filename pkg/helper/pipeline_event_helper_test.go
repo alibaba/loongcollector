@@ -174,24 +174,6 @@ func TestTransferPBToEvent_Nil(t *testing.T) {
 	assert.Error(t, err)
 }
 
-func TestTransferPBLogEventToLegacyLog(t *testing.T) {
-	ts := uint64(1_700_000_000*1e9 + 123)
-	pbLog := &protocol.LogEvent{
-		Timestamp: ts,
-		Contents: []*protocol.LogEvent_Content{
-			{Key: []byte("content"), Value: []byte("hello")},
-			{Key: []byte("k"), Value: []byte("v")},
-		},
-	}
-	legacy, err := TransferPBLogEventToLegacyLog(pbLog)
-	require.NoError(t, err)
-	assert.Equal(t, uint32(1_700_000_000), legacy.Time)
-	require.NotNil(t, legacy.TimeNs)
-	assert.Equal(t, uint32(123), *legacy.TimeNs)
-	assert.Len(t, legacy.Contents, 2)
-	assert.Equal(t, "hello", legacy.Contents[0].Value)
-}
-
 func TestTransferPBToMetricEvent_UnsupportedValue(t *testing.T) {
 	// A metric event with no value set must be rejected rather than silently
 	// producing an empty metric.

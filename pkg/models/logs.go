@@ -14,7 +14,12 @@
 
 package models
 
-import "github.com/alibaba/ilogtail/pkg/util"
+import (
+	"maps"
+	"slices"
+
+	"github.com/alibaba/ilogtail/pkg/util"
+)
 
 type LogContents KeyValues[interface{}]
 
@@ -171,7 +176,7 @@ func (m *Log) SetIndices(indices LogContents) {
 }
 
 func (m *Log) GetIndices() LogContents {
-	if m != nil {
+	if m != nil && m.Contents != nil {
 		return m.Contents
 	}
 	return NilInterfaceValues
@@ -183,17 +188,48 @@ func (m *Log) GetSize() int64 {
 
 func (m *Log) Clone() PipelineEvent {
 	if m != nil {
+		var tags Tags
+		if m.Tags != nil {
+			tags = NewTagsWithMap(maps.Clone(m.Tags.Iterator()))
+		}
 		return &Log{
 			Name:              m.Name,
 			Level:             m.Level,
 			SpanID:            m.SpanID,
 			TraceID:           m.TraceID,
-			Tags:              m.Tags,
+			Tags:              tags,
 			Timestamp:         m.Timestamp,
 			ObservedTimestamp: m.ObservedTimestamp,
-			Contents:          m.Contents,
+			Contents:          cloneLogContents(m.Contents),
 			Offset:            m.Offset,
+			RawSize:           m.RawSize,
 		}
 	}
 	return nil
+}
+
+func cloneLogContents(contents LogContents) LogContents {
+	switch fields := contents.(type) {
+	case nil:
+		return nil
+	case *orderedLogContents:
+		cloned := NewOrderedLogContents(fields.Len())
+		for _, key := range fields.keys {
+			cloned.Add(key, cloneLogValue(fields.Get(key)))
+		}
+		return cloned
+	default:
+		cloned := &keyValuesImpl[interface{}]{keyValues: make(map[string]interface{}, fields.Len())}
+		for key, value := range fields.Iterator() {
+			cloned.Add(key, cloneLogValue(value))
+		}
+		return cloned
+	}
+}
+
+func cloneLogValue(value any) any {
+	if bytes, ok := value.([]byte); ok {
+		return slices.Clone(bytes)
+	}
+	return value
 }

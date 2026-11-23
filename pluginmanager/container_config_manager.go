@@ -20,7 +20,7 @@ import (
 
 	"github.com/alibaba/ilogtail/pkg/helper/containercenter"
 	"github.com/alibaba/ilogtail/pkg/logger"
-	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/models"
 )
 
 // 12h
@@ -33,34 +33,31 @@ var k8sLabelSet map[string]struct{}
 var cachedFullList map[string]struct{}
 var lastFetchAllTime time.Time
 
-func CollectContainers(logGroup *protocol.LogGroup) {
+func collectContainers(events []models.PipelineEvent) []models.PipelineEvent {
 	if isCollectContainers() {
 		if time.Since(lastFetchAllTime) >= FetchAllInterval {
 			logger.Info(context.Background(), "CollectAllContainers running", time.Since(lastFetchAllTime))
 			refreshEnvAndLabel()
-			collectAllContainers(logGroup)
+			events = collectAllContainers(events)
 			// timer config result
 			containercenter.RecordContainerConfigResult()
 			lastFetchAllTime = time.Now()
 		} else {
 			logger.Debugf(context.Background(), "CollectDiffContainers running", time.Since(lastFetchAllTime))
-			collectDiffContainers(logGroup)
+			events = collectDiffContainers(events)
 		}
 	}
+	return events
 }
 
-func CollectConfigResult(logGroup *protocol.LogGroup) {
-	containercenter.SerializeContainerConfigResultToPb(logGroup)
-}
-
-func collectAllContainers(logGroup *protocol.LogGroup) {
+func collectAllContainers(events []models.PipelineEvent) []models.PipelineEvent {
 	fullList, containerDetailToRecords := getContainersToRecord(make(map[string]struct{}))
 	cachedFullList = fullList
-	containercenter.SerializeContainerToPb(logGroup, containerDetailToRecords)
 	logger.Debugf(context.Background(), "reset cachedFullList")
+	return containercenter.AppendContainerEvents(events, containerDetailToRecords)
 }
 
-func collectDiffContainers(logGroup *protocol.LogGroup) {
+func collectDiffContainers(events []models.PipelineEvent) []models.PipelineEvent {
 	if cachedFullList == nil {
 		cachedFullList = make(map[string]struct{})
 	}
@@ -75,55 +72,40 @@ func collectDiffContainers(logGroup *protocol.LogGroup) {
 			}
 		}
 		if len(shortDeletedIDs) > 0 {
-			recordDeleteContainers(logGroup, shortDeletedIDs)
+			events = append(events, deletedContainersEvent(shortDeletedIDs))
 		}
 	}
 	if len(fullAddedList) > 0 {
-		containerIDs := make(map[string]struct{})
+		containerIDs := make(map[string]struct{}, len(fullAddedList))
 		for _, containerID := range fullAddedList {
 			containerIDs[containerID] = struct{}{}
 		}
-		if len(containerIDs) > 0 {
-			_, containers := getContainersToRecord(containerIDs)
-			if len(containers) > 0 {
-				containercenter.SerializeContainerToPb(logGroup, containers)
-			}
-		}
+		_, containers := getContainersToRecord(containerIDs)
+		events = containercenter.AppendContainerEvents(events, containers)
 	}
-	{
-		containers := compareEnvAndLabelAndRecordContainer()
-		if len(containers) > 0 {
-			containercenter.SerializeContainerToPb(logGroup, containers)
-		}
-	}
+	return containercenter.AppendContainerEvents(events, compareEnvAndLabelAndRecordContainer())
 }
 
-func recordDeleteContainers(logGroup *protocol.LogGroup, containerIDs map[string]struct{}) {
-	if len(containerIDs) > 0 {
-		projectSet := make(map[string]struct{})
+func deletedContainersEvent(containerIDs map[string]struct{}) *models.Log {
+	projectSet := make(map[string]struct{})
 
-		// get project list
-		LogtailConfigLock.RLock()
-		for _, logstoreConfig := range LogtailConfig {
-			projectSet[logstoreConfig.ProjectName] = struct{}{}
-		}
-		LogtailConfigLock.RUnlock()
-		keys := make([]string, 0, len(projectSet))
-		for k := range projectSet {
-			if len(k) > 0 {
-				keys = append(keys, k)
-			}
-		}
-		projectStr := containercenter.GetStringFromList(keys)
-
-		ids := make([]string, 0, len(containerIDs))
-		for id := range containerIDs {
-			if len(id) > 0 {
-				ids = append(ids, id)
-			}
-		}
-		containercenter.SerializeDeleteContainerToPb(logGroup, projectStr, containercenter.GetStringFromList(ids))
+	LogtailConfigLock.RLock()
+	for _, logstoreConfig := range LogtailConfig {
+		projectSet[logstoreConfig.ProjectName] = struct{}{}
 	}
+	LogtailConfigLock.RUnlock()
+
+	projects := make([]string, 0, len(projectSet))
+	for project := range projectSet {
+		if project != "" {
+			projects = append(projects, project)
+		}
+	}
+	ids := make([]string, 0, len(containerIDs))
+	for id := range containerIDs {
+		ids = append(ids, id)
+	}
+	return containercenter.NewDeletedContainersEvent(containercenter.GetStringFromList(projects), containercenter.GetStringFromList(ids))
 }
 
 func refreshEnvAndLabel() {

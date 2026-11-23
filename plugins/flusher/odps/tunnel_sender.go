@@ -22,12 +22,12 @@ import (
 
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
+	converter "github.com/alibaba/ilogtail/pkg/protocol/converter"
 )
 
 type TunnelSender interface {
 	Init() error
-	Send(logGroup *protocol.LogGroup, log *protocol.Log) error
+	Send(row converter.EventRecord) error
 	Flush() error
 }
 
@@ -70,14 +70,14 @@ func (ts *TunnelSenderImpl) Init() error {
 	logger.Infof(ts.context.GetRuntimeContext(), "Init odps tunnel sender success, config:[%s] columns:%v", ts.partitionConfig, ts.partition.columns)
 	return nil
 }
-func (ts *TunnelSenderImpl) Send(logGroup *protocol.LogGroup, log *protocol.Log) error {
-	partitionStr := ts.partition.GenPartition(log)
+func (ts *TunnelSenderImpl) Send(row converter.EventRecord) error {
+	partitionStr := ts.partition.GenPartition(row)
 	session, writer, err := ts.sessionCache.GetWriter(partitionStr)
 	if err != nil {
 		return err
 	}
 
-	record, err := ts.recordBuilder.Log2Record(logGroup, log, session.Schema())
+	record, err := ts.recordBuilder.Build(row, session.Schema())
 	if err != nil {
 		return fmt.Errorf("log to record failed, err: %w", err)
 	}

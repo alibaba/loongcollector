@@ -14,44 +14,21 @@
 
 package pipeline
 
-import (
-	"github.com/alibaba/ilogtail/pkg/models"
-	"github.com/alibaba/ilogtail/pkg/protocol"
-)
+import "github.com/alibaba/ilogtail/pkg/models"
 
-// Aggregator is an interface for implementing an Aggregator plugin.
-// the RunningAggregator wraps this interface and guarantees that
+// TopicTagKey is the group tag carried as Topic by log protocols.
+const TopicTagKey = "__topic__"
+
+// Aggregator groups events before they reach a flusher.
+// Record and GetResult may run concurrently.
 type Aggregator interface {
-	// Init called for init some system resources, like socket, mutex...
-	// return flush interval(ms) and error flag, if interval is 0, use default interval
-	Init(Context, LogGroupQueue) (int, error)
-
-	// Description returns a one-sentence description on the Input.
+	// Init returns the flush interval in milliseconds. Zero uses the pipeline default.
+	Init(Context) (int, error)
 	Description() string
-
-	// Reset resets the aggregators caches and aggregates.
-	Reset()
-}
-
-// AggregatorV1
-// Add, Flush, and Reset can not be called concurrently, so locking is not
-// required when implementing an Aggregator plugin.
-type AggregatorV1 interface {
-	Aggregator
-	// Add the metric to the aggregator.
-	Add(log *protocol.Log, ctx map[string]interface{}) error
-
-	// Flush pushes the current aggregates to the accumulator.
-	Flush() []*protocol.LogGroup
-}
-
-// AggregatorV2
-// Apply, Push, and Reset can not be called concurrently, so locking is not
-// required when implementing an Aggregator plugin.
-type AggregatorV2 interface {
-	Aggregator
-	// Add the metric to the aggregator.
+	// Record accepts a group and may emit complete groups immediately.
 	Record(*models.PipelineGroupEvents, PipelineContext) error
-	// GetResult the current aggregates to the accumulator.
+	// GetResult emits pending groups on the timer and when the pipeline stops.
 	GetResult(PipelineContext) error
+	// Reset clears pending state.
+	Reset()
 }

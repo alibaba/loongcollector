@@ -60,18 +60,7 @@ func (c *inputCollector) AddDataArray(tags map[string]string, keys, values []str
 }
 func (c *inputCollector) AddRawLog(log *protocol.Log) { c.AddRawLogWithContext(log, nil) }
 func (c *inputCollector) AddDataWithContext(tags, fields map[string]string, ctx map[string]interface{}, t ...time.Time) {
-	ts := time.Now()
-	if len(t) > 0 {
-		ts = t[0]
-	}
-	log := &models.Log{Timestamp: uint64(ts.UnixNano()), Tags: models.NewTags(), Contents: models.NewLogContents()}
-	// Tags and log contents stay separate in the unified event pipeline.
-	for key, value := range c.configTags {
-		log.Tags.Add(key, value)
-	}
-	for key, value := range tags {
-		log.Tags.Add(key, value)
-	}
+	log := c.newDataLog(tags, models.NewLogContents(), t)
 	for key, value := range fields {
 		if key == contentKey {
 			log.SetBody([]byte(value))
@@ -81,6 +70,22 @@ func (c *inputCollector) AddDataWithContext(tags, fields map[string]string, ctx 
 	}
 	c.context.Collector().Collect(c.group(ctx), log)
 }
+func (c *inputCollector) newDataLog(tags map[string]string, contents models.LogContents, t []time.Time) *models.Log {
+	ts := time.Now()
+	if len(t) > 0 {
+		ts = t[0]
+	}
+	log := &models.Log{Timestamp: uint64(ts.UnixNano()), Tags: models.NewTags(), Contents: contents}
+	// Tags and log contents stay separate in the unified event pipeline.
+	for key, value := range c.configTags {
+		log.Tags.Add(key, value)
+	}
+	for key, value := range tags {
+		log.Tags.Add(key, value)
+	}
+	return log
+}
+
 func (c *inputCollector) AddDataArrayWithContext(tags map[string]string, keys, values []string, ctx map[string]interface{}, t ...time.Time) {
 	if len(keys) != len(values) {
 		// A malformed row has no reliable key/value pairing.
@@ -92,11 +97,15 @@ func (c *inputCollector) AddDataArrayWithContext(tags map[string]string, keys, v
 			"dropping input log with mismatched key/value counts (keys=%d, values=%d)", len(keys), len(values))
 		return
 	}
-	fields := make(map[string]string, len(keys))
+	log := c.newDataLog(tags, models.NewOrderedLogContents(len(keys)), t)
 	for i, key := range keys {
-		fields[key] = values[i]
+		if key == contentKey {
+			log.SetBody([]byte(values[i]))
+		} else {
+			log.Contents.Add(key, values[i])
+		}
 	}
-	c.AddDataWithContext(tags, fields, ctx, t...)
+	c.context.Collector().Collect(c.group(ctx), log)
 }
 func (c *inputCollector) AddRawLogWithContext(raw *protocol.Log, ctx map[string]interface{}) {
 	if raw == nil {
@@ -143,8 +152,10 @@ func (c *inputCollector) AddRawLogWithContext(raw *protocol.Log, ctx map[string]
 
 // convertInputLog is the public raw-log API boundary, never a runner queue type.
 func convertInputLog(in *protocol.Log) models.PipelineEvent {
-	log := &models.Log{}
-	log.Tags = models.NewTags()
+	log := &models.Log{Tags: models.NewTags()}
+	if len(in.Contents) > 0 {
+		log.Contents = models.NewOrderedLogContents(len(in.Contents))
+	}
 	for _, content := range in.Contents {
 		switch {
 		case content.Key == contentKey:
@@ -156,9 +167,6 @@ func convertInputLog(in *protocol.Log) models.PipelineEvent {
 		case strings.HasPrefix(content.Key, tagPrefix):
 			log.Tags.Add(content.Key[len(tagPrefix):], content.Value)
 		default:
-			if log.Contents == nil {
-				log.Contents = models.NewLogContents()
-			}
 			log.Contents.Add(content.Key, content.Value)
 		}
 	}

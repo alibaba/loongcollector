@@ -1,4 +1,4 @@
-// Copyright 2022 iLogtail Authors
+// Copyright 2021 iLogtail Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,12 +15,27 @@
 package aggregator
 
 import (
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/plugins/aggregator/context"
 )
+
+// defaultAggregator forwards groups already formed by the input or processor.
+type defaultAggregator struct{}
+
+func (*defaultAggregator) Init(pipeline.Context) (int, error)       { return 0, nil }
+func (*defaultAggregator) Description() string                      { return "default event group aggregator" }
+func (*defaultAggregator) Reset()                                   {}
+func (*defaultAggregator) GetResult(pipeline.PipelineContext) error { return nil }
+
+func (*defaultAggregator) Record(group *models.PipelineGroupEvents, ctx pipeline.PipelineContext) error {
+	if group != nil && len(group.Events) > 0 {
+		ctx.Collector().CollectList(group)
+	}
+	return nil
+}
 
 func init() {
 	pipeline.Aggregators["aggregator_default"] = func() pipeline.Aggregator {
-		return context.NewAggregatorContext()
+		return &defaultAggregator{}
 	}
 }

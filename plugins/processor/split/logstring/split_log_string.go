@@ -118,15 +118,7 @@ func (p *ProcessorSplit) Process(in *models.PipelineGroupEvents, context pipelin
 			context.Collector().Collect(in.Group, event)
 			continue
 		}
-		tmpLog := &models.Log{
-			Name:      log.Name,
-			Level:     log.Level,
-			Timestamp: log.Timestamp,
-			SpanID:    log.SpanID,
-			TraceID:   log.TraceID,
-			Contents:  log.Contents,
-		}
-		tmpLog.SetBody(log.GetBody())
+		tmpLog := log.Clone().(*models.Log)
 		tmpLog.Tags = models.NewTags()
 		body := util.ZeroCopyBytesToString(log.GetBody())
 		for k, v := range log.GetTags().Iterator() {
@@ -140,6 +132,8 @@ func (p *ProcessorSplit) Process(in *models.PipelineGroupEvents, context pipelin
 			tmpLog.Timestamp = uint64(time.Now().UnixNano())
 		}
 		if len(body) > 0 {
+			// Append each split payload after the remaining fields.
+			tmpLog.GetIndices().Delete(models.BodyKey)
 			strArray := strings.Split(body, p.SplitSep)
 			if len(strArray) == 0 {
 				continue

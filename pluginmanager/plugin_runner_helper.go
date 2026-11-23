@@ -33,8 +33,9 @@ type timerRunner struct {
 }
 
 func (p *timerRunner) Run(task func(state interface{}) error, cc *pipeline.AsyncControl) {
-	logger.Info(p.context.GetRuntimeContext(), "task run", "start", "interval", p.interval, "max delay", p.initialMaxDelay, "state", fmt.Sprintf("%T", p.state))
-	defer panicRecover(fmt.Sprint(p.state))
+	pluginType := fmt.Sprintf("%T", p.state)
+	logger.Info(p.context.GetRuntimeContext(), "task run", "start", "interval", p.interval, "max delay", p.initialMaxDelay, "state", pluginType)
+	defer panicRecover(pluginType)
 
 	exitFlag := false
 	if p.initialMaxDelay > 0 {

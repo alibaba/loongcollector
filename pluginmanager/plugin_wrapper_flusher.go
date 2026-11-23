@@ -23,7 +23,7 @@ import (
 
 type FlusherPluginWrapper struct {
 	FlusherWrapper
-	Flusher pipeline.FlusherV2
+	Flusher pipeline.Flusher
 }
 
 func (wrapper *FlusherPluginWrapper) Init(pluginMeta *pipeline.PluginMeta) error {

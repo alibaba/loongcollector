@@ -125,7 +125,7 @@ var (
 	GlobalConfig                   = flag.String("global", "./global.json", "global config.")
 	PluginConfig                   = flag.String("plugin", "./plugin.json", "plugin config.")
 	FlusherConfig                  = flag.String("flusher", "./default_flusher.json", "the default flusher configuration is used not only in the plugins without flusher but also to transfer the self telemetry data.")
-	ForceSelfCollect               = flag.Bool("force-statics", false, "force collect self telemetry data before closing.")
+	ForceSelfCollect               = flag.Bool("force-statics", false, "Compatibility flag. Normal shutdown collects the final Go self telemetry.")
 	AutoProfile                    = flag.Bool("prof-auto", true, "auto dump prof file when prof-flag is open.")
 	HTTPProfFlag                   = flag.Bool("prof-flag", false, "http pprof flag.")
 	Cpuprofile                     = flag.String("cpu-profile", "cpu.prof", "write cpu profile to file.")

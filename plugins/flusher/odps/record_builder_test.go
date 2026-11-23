@@ -24,6 +24,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/alibaba/ilogtail/pkg/protocol"
+	converter "github.com/alibaba/ilogtail/pkg/protocol/converter"
 )
 
 func TestGenRecordWithoutParse(t *testing.T) {
@@ -31,15 +32,6 @@ func TestGenRecordWithoutParse(t *testing.T) {
 		hostIP:     "127.0.0.1",
 		hostname:   "hostname",
 		extraLevel: 1,
-	}
-
-	logGroup := &protocol.LogGroup{
-		LogTags: []*protocol.LogTag{
-			{
-				Key:   "__path__",
-				Value: "/tmp/test.log",
-			},
-		},
 	}
 
 	log := &protocol.Log{
@@ -56,7 +48,7 @@ func TestGenRecordWithoutParse(t *testing.T) {
 	schemaBuilder.Column(tableschema.Column{Name: "content", Type: datatype.StringType})
 	schema := schemaBuilder.Build()
 
-	record, err := builder.Log2Record(logGroup, log, &schema)
+	record, err := builder.Build(rowFromLogFixture(log), &schema)
 	assert.Nil(t, err)
 	assert.Equal(t, 1, record.Len())
 	assert.Equal(t, "[value]", record.String())
@@ -66,15 +58,6 @@ func TestGenRecordWithParse(t *testing.T) {
 	builder := RecordBuilderImpl{
 		hostIP:   "127.0.0.1",
 		hostname: "hostname",
-	}
-
-	logGroup := &protocol.LogGroup{
-		LogTags: []*protocol.LogTag{
-			{
-				Key:   "__path__",
-				Value: "/tmp/test.log",
-			},
-		},
 	}
 
 	log := &protocol.Log{
@@ -166,7 +149,7 @@ func TestGenRecordWithParse(t *testing.T) {
 	schemaBuilder.Column(tableschema.Column{Name: "f16", Type: datatype.NewJsonType()})
 	schema := schemaBuilder.Build()
 
-	record, err := builder.Log2Record(logGroup, log, &schema)
+	record, err := builder.Build(rowFromLogFixture(log), &schema)
 	assert.Nil(t, err)
 	assert.Equal(t, 16, record.Len())
 	expect := "[true, 1, 123, 123456, 123456789, 3.140000E+00, 1.234560E+02, 2024-12-04, 2024-12-04 10:00:00, 2024-12-04 10:00:00.000, 2024-12-04 10:00:00.000, aaaa, bbbb, cccc, unhex('64646464'), \"xxxx\"]"
@@ -189,7 +172,7 @@ func TestGenRecordDoublePrecisionAndRange(t *testing.T) {
 	} {
 		t.Run(tt.input, func(t *testing.T) {
 			log := &protocol.Log{Contents: []*protocol.Log_Content{{Key: "value", Value: tt.input}}}
-			record, err := builder.Log2Record(&protocol.LogGroup{}, log, &schema)
+			record, err := builder.Build(rowFromLogFixture(log), &schema)
 			if assert.NoError(t, err) && assert.Len(t, record, 1) {
 				assert.Equal(t, tt.want, record[0])
 			}
@@ -200,52 +183,24 @@ func TestGenRecordDoublePrecisionAndRange(t *testing.T) {
 func TestUnsupportType(t *testing.T) {
 	builder := RecordBuilderImpl{}
 
-	logGroup := &protocol.LogGroup{}
-
-	log := &protocol.Log{}
-	log.Contents = []*protocol.Log_Content{
-		{
-			Key:   "f1",
-			Value: "value",
-		},
-		{
-			Key:   "f2",
-			Value: "value",
-		},
-	}
-
 	schemaBuilder := tableschema.NewSchemaBuilder()
 	schemaBuilder.Column(tableschema.Column{Name: "f1", Type: datatype.StringType})
 	schemaBuilder.Column(tableschema.Column{Name: "f2", Type: datatype.NewArrayType(datatype.StringType)})
 	schema := schemaBuilder.Build()
 
-	_, err := builder.Log2Record(logGroup, log, &schema)
+	_, err := builder.Build(converter.EventRecord{Fields: map[string]string{"f1": "value", "f2": "value"}}, &schema)
 	assert.NotNil(t, err)
 }
 
 func TestTypeMissMatch(t *testing.T) {
 	builder := RecordBuilderImpl{}
 
-	logGroup := &protocol.LogGroup{}
-
-	log := &protocol.Log{}
-	log.Contents = []*protocol.Log_Content{
-		{
-			Key:   "f1",
-			Value: "value",
-		},
-		{
-			Key:   "f2",
-			Value: "value",
-		},
-	}
-
 	schemaBuilder := tableschema.NewSchemaBuilder()
 	schemaBuilder.Column(tableschema.Column{Name: "f1", Type: datatype.StringType})
 	schemaBuilder.Column(tableschema.Column{Name: "f2", Type: datatype.BigIntType})
 	schema := schemaBuilder.Build()
 
-	_, err := builder.Log2Record(logGroup, log, &schema)
+	_, err := builder.Build(converter.EventRecord{Fields: map[string]string{"f1": "value", "f2": "value"}}, &schema)
 	assert.NotNil(t, err)
 }
 
@@ -254,15 +209,6 @@ func TestGenRecordWithExtraInfo(t *testing.T) {
 		hostIP:     "127.0.0.1",
 		hostname:   "hostname",
 		extraLevel: 1,
-	}
-
-	logGroup := &protocol.LogGroup{
-		LogTags: []*protocol.LogTag{
-			{
-				Key:   "__path__",
-				Value: "/tmp/test.log",
-			},
-		},
 	}
 
 	log := &protocol.Log{
@@ -280,15 +226,23 @@ func TestGenRecordWithExtraInfo(t *testing.T) {
 	schemaBuilder.Column(tableschema.Column{Name: "__dwarf_info__", Type: datatype.NewJsonType()})
 	schema := schemaBuilder.Build()
 
-	record, err := builder.Log2Record(logGroup, log, &schema)
+	record, err := builder.Build(rowFromLogFixture(log), &schema)
 	assert.Nil(t, err)
 	assert.Equal(t, 2, record.Len())
 	assert.Equal(t, "[value, {\"host_ip\":\"127.0.0.1\"}]", record.String())
 
 	builder.extraLevel = 2
-	record, err = builder.Log2Record(logGroup, log, &schema)
+	record, err = builder.Build(rowFromLogFixture(log), &schema)
 	assert.Nil(t, err)
 	assert.Equal(t, 2, record.Len())
 	re := regexp.MustCompile(`\[value, \{"host_ip":"127\.0\.0\.1","hostname":"hostname","collect_time":"1733205626","flush_time":"\d+"\}\]`)
 	assert.Truef(t, re.MatchString(record.String()), "regexp match failed, result:%s", record.String())
+}
+
+func rowFromLogFixture(log *protocol.Log) converter.EventRecord {
+	fields := make(map[string]string, len(log.Contents))
+	for _, item := range log.Contents {
+		fields[item.Key] = item.Value
+	}
+	return converter.EventRecord{Fields: fields, Timestamp: uint64(log.Time)*1e9 + uint64(log.GetTimeNs())}
 }

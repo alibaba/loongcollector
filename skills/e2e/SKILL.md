@@ -208,7 +208,7 @@ docker exec <id> ls /usr/local/loongcollector/conf/continuous_pipeline_config/lo
 |------|------|
 | `agent crash` / `agent PID not found` | 确认已合入 test/engine After 钩子与 PID 采集修复；compose 未启动时看 **When** 步骤原始错误 |
 | `compose exited abnormally` + buildx | 确认 `DOCKER_BUILDKIT=0`；侧车 `FROM bash` 需能 `docker pull bash` |
-| `plugin does not implement FlusherV2` | 勿对 `flusher_grpc` 单独设 `StructureType: v2` |
+| `unsupported StructureType` | 检查采集配置的 `global.StructureType`，省略该项或设为 `v2`。 |
 | `cannot unmarshal string ... time.Duration` | 检查 flusher HTTP/Prometheus 的 Retry/Timeout 配置格式 |
 | 0 条日志 | `go_plugin.LOG` 中 CONFIG_LOAD_ALARM；镜像是否含 `ProcessPipelineEventGroup` |
 

@@ -33,7 +33,7 @@ func TestInitMetadataGroupAggregator(t *testing.T) {
 	Convey("Given a metadata group aggregator without GroupMetadataKeys", t, func() {
 		agg := NewAggregatorMetadataGroup()
 		Convey("When Init(), should return error", func() {
-			_, err := agg.Init(nil, nil)
+			_, err := agg.Init(nil)
 			So(err, ShouldBeNil)
 		})
 	})
@@ -42,7 +42,7 @@ func TestInitMetadataGroupAggregator(t *testing.T) {
 		agg := NewAggregatorMetadataGroup()
 		agg.GroupMetadataKeys = []string{"testB", "testA"}
 		Convey("When Init(), should not return error", func() {
-			_, err := agg.Init(nil, nil)
+			_, err := agg.Init(nil)
 			So(err, ShouldBeNil)
 		})
 	})
@@ -51,7 +51,7 @@ func TestInitMetadataGroupAggregator(t *testing.T) {
 		agg := NewAggregatorMetadataGroup()
 		agg.GroupMaxEventLength = -1
 		Convey("When Init(), should return error", func() {
-			_, err := agg.Init(nil, nil)
+			_, err := agg.Init(nil)
 			So(err, ShouldNotBeNil)
 		})
 	})
@@ -60,7 +60,7 @@ func TestInitMetadataGroupAggregator(t *testing.T) {
 		agg := NewAggregatorMetadataGroup()
 		agg.GroupMaxByteLength = -1
 		Convey("When Init(), should return error", func() {
-			_, err := agg.Init(nil, nil)
+			_, err := agg.Init(nil)
 			So(err, ShouldNotBeNil)
 		})
 	})
@@ -69,7 +69,7 @@ func TestInitMetadataGroupAggregator(t *testing.T) {
 		agg := NewAggregatorMetadataGroup()
 		agg.GroupMaxByteLength = -1
 		Convey("When Init(), should return error", func() {
-			_, err := agg.Init(nil, nil)
+			_, err := agg.Init(nil)
 			So(err, ShouldNotBeNil)
 		})
 	})
@@ -264,7 +264,7 @@ func TestMetadataGroupAggregatorGetResult(t *testing.T) {
 }
 
 func TestMetadataGroupGroup_Record_Directly(t *testing.T) {
-	p := new(AggregatorMetadataGroup)
+	p := NewAggregatorMetadataGroup()
 	p.GroupMaxEventLength = 5
 	ctx := helper.NewObservePipelineContext(100)
 
@@ -274,7 +274,7 @@ func TestMetadataGroupGroup_Record_Directly(t *testing.T) {
 }
 
 func TestMetadataGroupGroup_Record_Tag(t *testing.T) {
-	p := new(AggregatorMetadataGroup)
+	p := NewAggregatorMetadataGroup()
 	p.GroupMaxEventLength = 5
 	p.GroupMetadataKeys = []string{"meta"}
 	events := constructEvents(104, map[string]string{
@@ -283,7 +283,7 @@ func TestMetadataGroupGroup_Record_Tag(t *testing.T) {
 		"tag": "tagval",
 	})
 	ctx := helper.NewObservePipelineContext(100)
-	p.Init(mock.NewEmptyContext("a", "b", "c"), nil)
+	p.Init(mock.NewEmptyContext("a", "b", "c"))
 	err := p.Record(events, ctx)
 	require.NoError(t, err)
 	array := ctx.Collector().ToArray()
@@ -293,10 +293,10 @@ func TestMetadataGroupGroup_Record_Tag(t *testing.T) {
 }
 
 func TestMetadataGroupGroup_Record_Timer(t *testing.T) {
-	p := new(AggregatorMetadataGroup)
+	p := NewAggregatorMetadataGroup()
 	p.GroupMaxEventLength = 500
 	ctx := helper.NewObservePipelineContext(100)
-	p.Init(mock.NewEmptyContext("a", "b", "c"), nil)
+	p.Init(mock.NewEmptyContext("a", "b", "c"))
 	err := p.Record(constructEvents(104, map[string]string{}, map[string]string{}), ctx)
 	require.NoError(t, err)
 	require.Equal(t, 0, len(ctx.Collector().ToArray()))
@@ -308,12 +308,12 @@ func TestMetadataGroupGroup_Record_Timer(t *testing.T) {
 
 func TestMetadataGroupGroup_Oversize(t *testing.T) {
 	{
-		p := new(AggregatorMetadataGroup)
+		p := NewAggregatorMetadataGroup()
 		p.GroupMaxEventLength = 500
 		p.GroupMaxByteLength = 1
 		p.DropOversizeEvent = true
 		ctx := helper.NewObservePipelineContext(100)
-		p.Init(mock.NewEmptyContext("a", "b", "c"), nil)
+		p.Init(mock.NewEmptyContext("a", "b", "c"))
 
 		events := generateByteArrayEvents(5, map[string]string{"a": "1", "b": "2", "c": "3"})
 		for _, event := range events {
@@ -324,12 +324,12 @@ func TestMetadataGroupGroup_Oversize(t *testing.T) {
 		require.Equal(t, 0, len(ctx.Collector().ToArray()))
 	}
 	{
-		p := new(AggregatorMetadataGroup)
+		p := NewAggregatorMetadataGroup()
 		p.GroupMaxEventLength = 500
 		p.GroupMaxByteLength = 1
 		p.DropOversizeEvent = false
 		ctx := helper.NewObservePipelineContext(100)
-		p.Init(mock.NewEmptyContext("a", "b", "c"), nil)
+		p.Init(mock.NewEmptyContext("a", "b", "c"))
 
 		events := generateByteArrayEvents(5, map[string]string{"a": "1", "b": "2", "c": "3"})
 		for _, event := range events {
@@ -350,4 +350,68 @@ func constructEvents(num int, meta, tags map[string]string) *models.PipelineGrou
 		e.Events = append(e.Events, &models.Metric{})
 	}
 	return e
+}
+
+func TestMetadataGroupMixedEventsRespectByteLimitAndKeepInput(t *testing.T) {
+	for _, drop := range []bool{true, false} {
+		aggregator := NewAggregatorMetadataGroup()
+		aggregator.GroupMaxByteLength = 3
+		aggregator.DropOversizeEvent = drop
+		_, err := aggregator.Init(mock.NewEmptyContext("project", "store", "config"))
+		require.NoError(t, err)
+		ctx := helper.NewObservePipelineContext(10)
+		info := models.NewGroup(nil, models.NewTagsWithKeyValues("group", "tag"))
+		metric := models.NewSingleValueMetric("cpu", models.MetricTypeGauge, models.NewTags(), 1, 1)
+		log := models.NewSimpleLog([]byte("message"), models.NewTags(), 2)
+		input := &models.PipelineGroupEvents{Group: info, Events: []models.PipelineEvent{models.ByteArray("a"), metric, models.ByteArray("abcd"), log}}
+		require.NoError(t, aggregator.Record(input, ctx))
+		require.NoError(t, aggregator.GetResult(ctx))
+		require.Len(t, input.Events, 4)
+		var events []models.PipelineEvent
+		groups := ctx.Collector().ToArray()
+		if !drop {
+			require.Len(t, groups, 3)
+			require.Equal(t, []models.PipelineEvent{models.ByteArray("abcd")}, groups[1].Events)
+		}
+		for _, group := range groups {
+			require.Equal(t, "tag", group.Group.GetTags().Get("group"))
+			if len(group.Events) == 1 {
+				if raw, ok := group.Events[0].(models.ByteArray); ok {
+					require.Equal(t, "abcd", string(raw))
+				}
+			}
+			events = append(events, group.Events...)
+		}
+		if drop {
+			require.Equal(t, []models.PipelineEvent{models.ByteArray("a"), metric, log}, events)
+		} else {
+			require.Equal(t, input.Events, events)
+		}
+	}
+}
+
+func TestMetadataGroupKeepsDestinationsAndLogFirstByteLimit(t *testing.T) {
+	aggregator := NewAggregatorMetadataGroup()
+	aggregator.GroupMetadataKeys = []string{"source"}
+	aggregator.GroupMaxByteLength = 2
+	_, err := aggregator.Init(mock.NewEmptyContext("project", "store", "config"))
+	require.NoError(t, err)
+	ctx := helper.NewObservePipelineContext(10)
+	for _, store := range []string{"one", "two"} {
+		info := models.NewGroup(models.NewMetadataWithKeyValues("source", "pack"), models.NewTagsWithKeyValues("host", "node"))
+		info.DestinationLogstore = store
+		log := models.NewSimpleLog([]byte(store), models.NewTags(), 1)
+		input := &models.PipelineGroupEvents{Group: info, Events: []models.PipelineEvent{log, models.ByteArray("too large")}}
+		require.NoError(t, aggregator.Record(input, ctx))
+		require.Len(t, input.Events, 2)
+	}
+	require.NoError(t, aggregator.GetResult(ctx))
+	groups := ctx.Collector().ToArray()
+	require.Len(t, groups, 2)
+	for _, group := range groups {
+		require.Len(t, group.Events, 1)
+		require.Equal(t, group.Group.GetDestinationLogstore(), string(group.Events[0].(*models.Log).GetBody()))
+		require.Equal(t, "pack", group.Group.GetMetadata().Get("source"))
+		require.Equal(t, "node", group.Group.GetTags().Get("host"))
+	}
 }

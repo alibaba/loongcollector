@@ -19,7 +19,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alibaba/ilogtail/pkg/protocol"
+	converter "github.com/alibaba/ilogtail/pkg/protocol/converter"
 )
 
 var timeFormatMap = map[string]string{
@@ -200,13 +200,13 @@ func (ph *PartitionHelper) leftAlign(ts uint32) uint32 {
 	return ts - remainder
 }
 
-func (ph *PartitionHelper) GenPartition(log *protocol.Log) string {
+func (ph *PartitionHelper) GenPartition(row converter.EventRecord) string {
 	if len(ph.columns) == 0 {
 		return DefaultPartition
 	}
 
 	str := ""
-	ts := time.Unix(int64(ph.leftAlign(log.Time)), 0)
+	ts := time.Unix(int64(ph.leftAlign(uint32(row.Timestamp/1e9))), 0)
 	for _, col := range ph.columns {
 		switch col.colType {
 		case Default:
@@ -214,12 +214,7 @@ func (ph *PartitionHelper) GenPartition(log *protocol.Log) string {
 		case Time:
 			str += ts.Format(col.format)
 		case Data:
-			for _, content := range log.Contents {
-				if content.Key == col.format {
-					str += content.Value
-					break
-				}
-			}
+			str += row.Fields[col.format]
 		}
 	}
 

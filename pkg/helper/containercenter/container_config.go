@@ -20,7 +20,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
 
@@ -99,82 +99,88 @@ func RecordContainerConfigResultIncrement(message *ContainerConfigResult) {
 	AddedContainerConfigResult = append(AddedContainerConfigResult, message)
 }
 
-func SerializeDeleteContainerToPb(logGroup *protocol.LogGroup, project string, containerIDsStr string) {
+// NewDeletedContainersEvent describes containers removed from the tracked set.
+func NewDeletedContainersEvent(project string, containerIDs string) *models.Log {
 	nowTime := time.Now()
-	log := &protocol.Log{}
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "type", Value: "delete_containers"})
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "project", Value: project})
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "container_ids", Value: containerIDsStr})
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "ip", Value: util.GetIPAddress()})
-	protocol.SetLogTime(log, uint32(nowTime.Unix()))
-	logGroup.Logs = append(logGroup.Logs, log)
+	log := models.NewSimpleLog(nil, models.NewTags(), uint64(nowTime.Truncate(time.Second).UnixNano()))
+	log.Contents.Add("type", "delete_containers")
+	log.Contents.Add("project", project)
+	log.Contents.Add("container_ids", containerIDs)
+	log.Contents.Add("ip", util.GetIPAddress())
+
+	return log
 }
 
-func SerializeContainerToPb(logGroup *protocol.LogGroup, addedContainers []*ContainerDetail) {
+// AppendContainerEvents adds metadata events for the supplied containers.
+func AppendContainerEvents(events []models.PipelineEvent, addedContainers []*ContainerDetail) []models.PipelineEvent {
 	nowTime := time.Now()
 	for _, item := range addedContainers {
-		log := &protocol.Log{}
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "type", Value: item.DataType})
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "project", Value: item.Project})
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "container_id", Value: GetShortID(item.ContainerID)})
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "container_ip", Value: item.ContainerIP})
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "container_name", Value: item.ContainerName})
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "raw_container_name", Value: item.RawContainerName})
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "log_path", Value: item.LogPath})
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "driver", Value: item.Driver})
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "namespace", Value: item.Namespace})
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "image_name", Value: item.ImageName})
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "pod_name", Value: item.PodName})
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "root_path", Value: item.RootPath})
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "hostname", Value: item.Hostname})
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "hosts_path", Value: item.HostsPath})
+		log := models.NewSimpleLog(nil, models.NewTags(), uint64(nowTime.Truncate(time.Second).UnixNano()))
+		log.Contents.Add("type", item.DataType)
+		log.Contents.Add("project", item.Project)
+		log.Contents.Add("container_id", GetShortID(item.ContainerID))
+		log.Contents.Add("container_ip", item.ContainerIP)
+		log.Contents.Add("container_name", item.ContainerName)
+		log.Contents.Add("raw_container_name", item.RawContainerName)
+		log.Contents.Add("log_path", item.LogPath)
+		log.Contents.Add("driver", item.Driver)
+		log.Contents.Add("namespace", item.Namespace)
+		log.Contents.Add("image_name", item.ImageName)
+		log.Contents.Add("pod_name", item.PodName)
+		log.Contents.Add("root_path", item.RootPath)
+		log.Contents.Add("hostname", item.Hostname)
+		log.Contents.Add("hosts_path", item.HostsPath)
 
 		envStr, err := json.Marshal(item.Env)
 		if err == nil {
-			log.Contents = append(log.Contents, &protocol.Log_Content{Key: "env", Value: string(envStr)})
+			log.Contents.Add("env", string(envStr))
 		}
 		labelsStr, err := json.Marshal(item.ContainerLabels)
 		if err == nil {
-			log.Contents = append(log.Contents, &protocol.Log_Content{Key: "labels", Value: string(labelsStr)})
+			log.Contents.Add("labels", string(labelsStr))
 		}
 		k8sLabelsStr, err := json.Marshal(item.K8sLabels)
 		if err == nil {
-			log.Contents = append(log.Contents, &protocol.Log_Content{Key: "k8s_labels", Value: string(k8sLabelsStr)})
+			log.Contents.Add("k8s_labels", string(k8sLabelsStr))
 		}
 
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "ip", Value: util.GetIPAddress()})
-		protocol.SetLogTime(log, uint32(nowTime.Unix()))
-		logGroup.Logs = append(logGroup.Logs, log)
+		log.Contents.Add("ip", util.GetIPAddress())
+
+		events = append(events, log)
 	}
+	return events
 }
 
-func SerializeContainerConfigResultToPb(logGroup *protocol.LogGroup) {
+// AppendContainerConfigResultEvents drains pending container configuration results.
+func AppendContainerConfigResultEvents(events []models.PipelineEvent) []models.PipelineEvent {
 	nowTime := time.Now()
 	addedContainerConfigResultMutex.Lock()
 	defer addedContainerConfigResultMutex.Unlock()
 	for _, item := range AddedContainerConfigResult {
-		log := &protocol.Log{}
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "type", Value: item.DataType})
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "project", Value: item.Project})
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "logstore", Value: item.Logstore})
+		log := models.NewSimpleLog(nil, models.NewTags(), uint64(nowTime.Truncate(time.Second).UnixNano()))
+		log.Contents.Add("type", item.DataType)
+		log.Contents.Add("project", item.Project)
+		log.Contents.Add("logstore", item.Logstore)
 		configName := item.ConfigName
 		splitArrs := strings.Split(configName, "$")
 		if len(splitArrs) == 2 {
 			configName = splitArrs[1]
 		}
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "config_name", Value: configName})
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "input.source_addresses", Value: item.SourceAddress})
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "input.path_exist_container_ids", Value: item.PathExistInputContainerIDs})
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "input.path_not_exist_container_ids", Value: item.PathNotExistInputContainerIDs})
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "input.type", Value: item.InputType})
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "input.container_file", Value: item.InputIsContainerFile})
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "flusher.type", Value: item.FlusherType})
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "flusher.target_addresses", Value: item.FlusherTargetAddress})
-		protocol.SetLogTime(log, uint32(nowTime.Unix()))
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "ip", Value: util.GetIPAddress()})
-		logGroup.Logs = append(logGroup.Logs, log)
+		log.Contents.Add("config_name", configName)
+		log.Contents.Add("input.source_addresses", item.SourceAddress)
+		log.Contents.Add("input.path_exist_container_ids", item.PathExistInputContainerIDs)
+		log.Contents.Add("input.path_not_exist_container_ids", item.PathNotExistInputContainerIDs)
+		log.Contents.Add("input.type", item.InputType)
+		log.Contents.Add("input.container_file", item.InputIsContainerFile)
+		log.Contents.Add("flusher.type", item.FlusherType)
+		log.Contents.Add("flusher.target_addresses", item.FlusherTargetAddress)
+
+		log.Contents.Add("ip", util.GetIPAddress())
+		events = append(events, log)
 	}
+	clear(AddedContainerConfigResult)
 	AddedContainerConfigResult = AddedContainerConfigResult[:0]
+	return events
 }
 
 func GetShortID(fullID string) string {

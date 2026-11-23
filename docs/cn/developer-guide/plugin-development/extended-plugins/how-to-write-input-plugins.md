@@ -9,6 +9,8 @@
 
 实现 **V2** 时，采集数据使用 `PipelineContext` 与 `models` 中的新模型；实现 **V1** 时仍使用 `Collector` 与 `protocol.Log`。新插件建议优先对齐 **V2**，与老代码/示例并存时可继续用 **V1**。
 
+内置 `metric_container` 可作为定时事件采集的参考。`InputContainer.Read(PipelineContext) error` 将容器配置快照构造为 `models.Log`，再通过 `ctx.Collector().Collect` 逐个提交。实现见 [`self_telemetry_container_config.go`](../../../../../pluginmanager/self_telemetry_container_config.go)。
+
 ## MetricInput：公共接口与 V1 / V2
 
 ### 公共部分（`MetricInput`）

@@ -16,34 +16,26 @@ package pluginmanager
 
 import (
 	"github.com/alibaba/ilogtail/pkg/helper/containercenter"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
-type InputContainer struct {
-	context pipeline.Context
-}
+type InputContainer struct{}
 
-func (r *InputContainer) Init(context pipeline.Context) (int, error) {
-	r.context = context
+func (*InputContainer) Init(pipeline.Context) (int, error) {
 	containercenter.InitContainer()
 	return 0, nil
 }
 
-func (r *InputContainer) Description() string {
+func (*InputContainer) Description() string {
 	return "container input plugin for logtail"
 }
 
-func (r *InputContainer) Collect(collector pipeline.Collector) error {
-	loggroup := &protocol.LogGroup{}
-
-	CollectContainers(loggroup)
-	CollectConfigResult(loggroup)
-
-	if len(loggroup.Logs) > 0 && ContainerConfig != nil {
-		for _, log := range loggroup.Logs {
-			ContainerConfig.PluginRunner.ReceiveRawLog(&pipeline.LogWithContext{Log: log})
-		}
+func (*InputContainer) Read(ctx pipeline.PipelineContext) error {
+	events := containercenter.AppendContainerConfigResultEvents(collectContainers(nil))
+	for _, event := range events {
+		// A full container snapshot can exceed the maximum wire group size.
+		ctx.Collector().Collect(models.NewGroup(models.NewMetadata(), models.NewTags()), event)
 	}
 	return nil
 }

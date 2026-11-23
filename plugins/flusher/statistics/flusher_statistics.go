@@ -15,13 +15,11 @@
 package statistics
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 
 	"github.com/paulbellamy/ratecounter"
 )
@@ -61,28 +59,7 @@ func (*FlusherStatistics) Description() string {
 func (*FlusherStatistics) SetUrgent(flag bool) {
 }
 
-// Flush flushes @logGroupList but it only do statistics.
-// It returns any error it encountered.
-func (p *FlusherStatistics) Flush(projectName string, logstoreName string, configName string, logGroupList []*protocol.LogGroup) error {
-	for _, logGroup := range logGroupList {
-		p.loggroupRateCounter.Incr(1)
-		p.logRateCounter.Incr((int64)(len(logGroup.Logs)))
-		if p.GeneratePB {
-			buf, err := logGroup.Marshal()
-			if err != nil {
-				return fmt.Errorf("loggroup marshal err %v", err)
-			}
-			p.byteRateCount.Incr((int64)(len(buf)))
-		}
-		time.Sleep(time.Millisecond * time.Duration(p.SleepMsPerLogGroup))
-	}
-	p.reportRates()
-	return nil
-}
-
-// Export is the v2 pipeline entry point. It accumulates statistics directly from
-// PipelineGroupEvents without converting to protocol.LogGroup or going through
-// Flush, both of which belong to the v1 pipeline and are planned for removal.
+// Export counts events, groups and their sizes.
 func (p *FlusherStatistics) Export(groups []*models.PipelineGroupEvents, _ pipeline.PipelineContext) error {
 	for _, groupEvents := range groups {
 		if groupEvents == nil {
@@ -99,7 +76,7 @@ func (p *FlusherStatistics) Export(groups []*models.PipelineGroupEvents, _ pipel
 	return nil
 }
 
-// reportRates periodically logs the accumulated rates. Shared by Flush and Export.
+// reportRates periodically logs the accumulated rates.
 func (p *FlusherStatistics) reportRates() {
 	nowTime := time.Now()
 	if nowTime.Sub(p.lastOutputTime) >= (time.Duration)(p.RateIntervalMs)*time.Millisecond {

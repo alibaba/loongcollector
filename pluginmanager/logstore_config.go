@@ -114,7 +114,7 @@ func (lc *LogstoreConfig) Start() {
 // 1. SetUrgent to all flushers to indicate them current state.
 // 2. Stop all input plugins, stop generating logs.
 // 3. Stop processor goroutine, pass all existing logs to aggregator.
-// 4. Stop all aggregator plugins, make all logs to LogGroups.
+// 4. Stop the aggregators and emit their pending event groups.
 // 5. Set stopping flag, stop flusher goroutine.
 // 6. If config will be removed and there are remaining data, try to flush once.
 // 7. Stop flusher plugins.
@@ -371,9 +371,9 @@ func createLogstoreConfig(project string, logstore string, configName string, lo
 		logQueueSize = 10
 	}
 
-	logGroupSize := logstoreC.GlobalConfig.DefaultLogGroupQueueSize
+	flushQueueSize := logstoreC.GlobalConfig.DefaultLogGroupQueueSize
 
-	if err = logstoreC.PluginRunner.Init(logQueueSize, logGroupSize); err != nil {
+	if err = logstoreC.PluginRunner.Init(logQueueSize, flushQueueSize); err != nil {
 		return nil, err
 	}
 

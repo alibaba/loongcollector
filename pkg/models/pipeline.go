@@ -37,6 +37,9 @@ type PipelineEvent interface {
 type GroupInfo struct {
 	Metadata Metadata
 	Tags     Tags
+
+	// DestinationLogstore is set by routing aggregators inside the pipeline.
+	DestinationLogstore string
 }
 
 func (g *GroupInfo) GetMetadata() Metadata {
@@ -51,6 +54,13 @@ func (g *GroupInfo) GetTags() Tags {
 		return g.Tags
 	}
 	return NilStringValues
+}
+
+func (g *GroupInfo) GetDestinationLogstore() string {
+	if g == nil {
+		return ""
+	}
+	return g.DestinationLogstore
 }
 
 type PipelineGroupEvents struct {

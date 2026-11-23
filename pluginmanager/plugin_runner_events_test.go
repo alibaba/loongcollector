@@ -50,7 +50,7 @@ func TestEventRunner_ReceiveRawLog(t *testing.T) {
 
 	p.ReceiveRawLog(logCtx)
 
-	logContent := models.NewLogContents()
+	logContent := models.NewOrderedLogContents(1)
 	logContent.Add(models.BodyKey, []byte("test content"))
 	assert.Len(t, ctx.logs, 1)
 	assert.Equal(t, models.PipelineGroupEvents{

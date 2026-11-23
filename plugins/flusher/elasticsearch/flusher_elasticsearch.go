@@ -29,7 +29,6 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	converter "github.com/alibaba/ilogtail/pkg/protocol/converter"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
@@ -151,7 +150,7 @@ func (f *FlusherElasticSearch) Validate() error {
 func (f *FlusherElasticSearch) getConverter() (*converter.Converter, error) {
 	logger.Debug(f.context.GetRuntimeContext(), "[ilogtail data convert config] Protocol", f.Convert.Protocol,
 		"Encoding", f.Convert.Encoding, "TagFieldsRename", f.Convert.TagFieldsRename, "ProtocolFieldsRename", f.Convert.ProtocolFieldsRename)
-	return converter.NewConverter(f.Convert.Protocol, f.Convert.Encoding, f.Convert.TagFieldsRename, f.Convert.ProtocolFieldsRename, f.context.GetPipelineScopeConfig())
+	return converter.NewConverter(f.Convert.Protocol, f.Convert.Encoding, f.Convert.TagFieldsRename, f.Convert.ProtocolFieldsRename)
 }
 
 func (f *FlusherElasticSearch) getIndexKeys() ([]string, bool, error) {
@@ -187,62 +186,10 @@ func (f *FlusherElasticSearch) Stop() error {
 	return nil
 }
 
-func (f *FlusherElasticSearch) Flush(projectName string, logstoreName string, configName string, logGroupList []*protocol.LogGroup) error {
-	nowTime := time.Now().Local()
-	for _, logGroup := range logGroupList {
-		logger.Debug(f.context.GetRuntimeContext(), "[LogGroup] topic", logGroup.Topic, "logstore", logGroup.Category, "logcount", len(logGroup.Logs), "tags", logGroup.LogTags)
-		serializedLogs, values, err := f.converter.ToByteStreamWithSelectedFields(logGroup, f.indexKeys)
-		if err != nil {
-			logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "flush elasticsearch convert log fail, error", err)
-			return err
-		}
-		var buffer []string
-		for index, log := range serializedLogs.([][]byte) {
-			ESIndex := &f.Index
-			if f.isDynamicIndex {
-				valueMap := values[index]
-				ESIndex, err = fmtstr.FormatIndex(valueMap, f.Index, uint32(nowTime.Unix()))
-				if err != nil {
-					logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "flush elasticsearch format index fail, error", err)
-					return err
-				}
-			}
-			var builder strings.Builder
-			builder.WriteString(`{"index": {"_index": "`)
-			builder.WriteString(*ESIndex)
-			builder.WriteString(`"}}`)
-			buffer = append(buffer, builder.String())
-			buffer = append(buffer, string(log))
-		}
-		body := strings.Join(buffer, "\n")
-		req := esapi.BulkRequest{
-			Body: strings.NewReader(body + "\n"),
-		}
-
-		res, err := req.Do(context.Background(), f.esClient)
-		if err != nil {
-			logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "flush elasticsearch request fail, error", err)
-			return err
-		}
-		defer res.Body.Close()
-
-		if res.StatusCode >= 400 && res.StatusCode <= 499 {
-			logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "flush elasticsearch request client error", res)
-			return fmt.Errorf("err status returned: %v", res.Status())
-		} else if res.StatusCode >= 500 && res.StatusCode <= 599 {
-			logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "flush elasticsearch request server error", res)
-			return fmt.Errorf("err status returned: %v", res.Status())
-		}
-		logger.Debug(f.context.GetRuntimeContext(), "elasticsearch success send events: messageID")
-	}
-
-	return nil
-}
-
 func (f *FlusherElasticSearch) Export(groups []*models.PipelineGroupEvents, _ pipeline.PipelineContext) error {
 	nowTime := time.Now().Local()
 	for _, groupEvents := range groups {
-		serializedLogs, values, err := f.converter.ToByteStreamWithSelectedFieldsV2(groupEvents, f.indexKeys)
+		serializedLogs, values, err := f.converter.ToByteStreamWithSelectedFields(groupEvents, f.indexKeys)
 		if err != nil {
 			logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "flush elasticsearch convert log fail, error", err)
 			return err

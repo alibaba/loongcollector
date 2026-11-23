@@ -144,6 +144,6 @@ func TestGenPartition(t *testing.T) {
 		Value: "value3",
 	})
 
-	str := ph.GenPartition(&log)
+	str := ph.GenPartition(rowFromLogFixture(&log))
 	assert.Equal(t, "pt1=test1,pt2=value1,pt3=test_value2,pt4=20250321,pt5=test_1515aaa", str)
 }

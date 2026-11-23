@@ -96,20 +96,14 @@ func (f *Flusher) IsReady(projectName string, logstoreName string, logstoreKey i
 	return f.conn.GetState() == connectivity.Ready
 }
 
-func (f *Flusher) Flush(projectName string, logstoreName string, configName string, logGroupList []*protocol.LogGroup) error {
-	return f.flushLogGroups(logGroupList)
-}
-
-// flushLogGroups sends log groups over the gRPC stream. It is shared by the v1
-// Flush entry point and the v2 Export so that Export does not depend on Flush,
-// which is planned for removal.
+// flushLogGroups writes wire messages to the LogReportService stream.
 func (f *Flusher) flushLogGroups(logGroupList []*protocol.LogGroup) error {
 	stream, err := f.client.Collect(context.Background())
-	defer f.closeStream(stream)
 	if err != nil {
 		logger.Critical(f.ctx.GetRuntimeContext(), selfmonitor.GRPCFlushAlarm, "err", err)
 		return err
 	}
+	defer f.closeStream(stream)
 	for _, group := range logGroupList {
 		if len(group.Logs) == 0 {
 			continue
@@ -122,13 +116,7 @@ func (f *Flusher) flushLogGroups(logGroupList []*protocol.LogGroup) error {
 	return nil
 }
 
-// Export sends v2 PipelineGroupEvents over the gRPC stream. Unlike other
-// flushers, protocol.LogGroup is retained here on purpose: it is the on-wire
-// message type of the LogReportService.Collect RPC
-// (pkg/protocol/proto/sls_logs_transfer.proto, stream.Send(*protocol.LogGroup)).
-// There is no v2 report proto, so LogGroup is the serialization format of this
-// channel rather than a v1 pipeline leftover; converting away from it would
-// require a new gRPC service, which is out of the flusher Export scope.
+// Export serializes event groups for the LogReportService.Collect wire schema.
 func (f *Flusher) Export(groups []*models.PipelineGroupEvents, _ pipeline.PipelineContext) error {
 	for _, groupEvents := range groups {
 		logGroups, err := converter.PipelineGroupEventsToLogGroups(groupEvents)

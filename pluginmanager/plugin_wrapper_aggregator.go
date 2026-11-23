@@ -20,18 +20,13 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
-// AggregatorPluginWrapper wrappers Aggregator.
-// It implements LogGroupQueue interface, and is passed to associated Aggregator.
-// Aggregator uses Add function to pass log groups to wrapper, and then wrapper
-// passes log groups to associated LogstoreConfig through channel the output queue.
-// In fact, the output queue == (associated) LogstoreConfig.the output queue.
+// AggregatorPluginWrapper records metrics for an event aggregator.
 type AggregatorPluginWrapper struct {
 	AggregatorWrapper
-	Aggregator pipeline.AggregatorV2
+	Aggregator pipeline.Aggregator
 
 	totalDelayTimeMs selfmonitor.CounterMetric
 }
@@ -40,7 +35,7 @@ func (wrapper *AggregatorPluginWrapper) Init(pluginMeta *pipeline.PluginMeta) er
 	wrapper.InitMetricRecord(pluginMeta)
 	wrapper.totalDelayTimeMs = selfmonitor.NewCounterMetricAndRegister(wrapper.MetricRecord, selfmonitor.MetricPluginTotalDelayMs)
 
-	interval, err := wrapper.Aggregator.Init(wrapper.Config.Context, wrapper)
+	interval, err := wrapper.Aggregator.Init(wrapper.Config.Context)
 	if err != nil {
 		logger.Error(wrapper.Config.Context.GetRuntimeContext(), selfmonitor.AggregatorInitErrorAlarm, "Aggregator failed to initialize", wrapper.Aggregator.Description(), "error", err)
 		return err
@@ -67,12 +62,4 @@ func (wrapper *AggregatorPluginWrapper) Record(events *models.PipelineGroupEvent
 
 func (wrapper *AggregatorPluginWrapper) GetResult(context pipeline.PipelineContext) error {
 	return wrapper.Aggregator.GetResult(context)
-}
-
-func (wrapper *AggregatorPluginWrapper) Add(loggroup *protocol.LogGroup) error {
-	return nil
-}
-
-func (wrapper *AggregatorPluginWrapper) AddWithWait(loggroup *protocol.LogGroup, duration time.Duration) error {
-	return nil
 }

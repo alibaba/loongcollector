@@ -256,13 +256,15 @@ func (hd *HistogramData) ToMetricLogs(name string, timeMs int64, labels *MetricL
 // NewMetricLog create a metric log, time support unix milliseconds and unix nanoseconds.
 // Note: must pass safe string
 func NewMetricLog(name string, t int64, value float64, labels *MetricLabels) *protocol.Log {
-	var valStr string
+	return NewMetricLogStringVal(name, t, FormatMetricLogValue(value), labels)
+}
+
+// FormatMetricLogValue formats a floating-point value for the SLS metric row schema.
+func FormatMetricLogValue(value float64) string {
 	if math.Float64bits(value) == StaleNaN {
-		valStr = StaleNan
-	} else {
-		valStr = strconv.FormatFloat(value, 'g', -1, 64)
+		return StaleNan
 	}
-	return NewMetricLogStringVal(name, t, valStr, labels)
+	return strconv.FormatFloat(value, 'g', -1, 64)
 }
 
 // NewMetricLogStringVal create a metric log with val string, time support unix milliseconds and unix nanoseconds.
@@ -282,7 +284,7 @@ func NewMetricLogStringVal(name string, t int64, value string, labels *MetricLab
 		protocol.SetLogTimeWithNano(metric, uint32(t/1e9), uint32(t%1e9))
 	}
 	metric.Contents = make([]*protocol.Log_Content, 0, 4)
-	metric.Contents = append(metric.Contents, &protocol.Log_Content{Key: "__name__", Value: formatNewMetricName(name)})
+	metric.Contents = append(metric.Contents, &protocol.Log_Content{Key: "__name__", Value: FormatMetricLogName(name)})
 	metric.Contents = append(metric.Contents, &protocol.Log_Content{Key: "__time_nano__", Value: strTime})
 	metric.Contents = append(metric.Contents, &protocol.Log_Content{Key: "__labels__", Value: labels.String()})
 	metric.Contents = append(metric.Contents, &protocol.Log_Content{Key: "__value__", Value: value})
@@ -336,7 +338,8 @@ func formatLabelValue(value string) string {
 	return util.ZeroCopyBytesToString(newValue)
 }
 
-func formatNewMetricName(name string) string {
+// FormatMetricLogName applies the configured SLS metric name rules.
+func FormatMetricLogName(name string) string {
 	if !config.LoongcollectorGlobalConfig.EnableSlsMetricsFormat {
 		return name
 	}

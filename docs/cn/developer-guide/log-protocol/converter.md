@@ -1,148 +1,66 @@
 # 协议转换
 
-在开发Flusher插件时，用户往往需要将日志数据从sls协议转换成其他协议。在扩展Metric数据模型后，v2版本的Flusher插件还需要支持从PipelineGroupEvents数据转换成其他协议的场景。为了加快开发插件流程，LoongCollector 提供了通用协议转换模块，用户只需要指定目标协议的名称和编码方式即可获得编码后的字节流。
+Flusher 可用 `Converter` 将 `models.PipelineGroupEvents` 转换成目标协议。创建转换器时传入协议、编码方式，以及可选的 Tag 和协议字段重命名表。
 
-## Converter结构
+## 创建 Converter
 
-日志协议转换器的具体实现为`Converter`结构，其定义如下：
-
-```Go
-type Converter struct {
-    Protocol             string
-    Encoding             string
-    TagKeyRenameMap      map[string]string
-    ProtocolKeyRenameMap map[string]string
-}
-```
-
-其中，各字段的含义如下：
-
-- `Protocol`：协议名称
-- `Encoding`：编码方式
-- `TagKeyRenameMap`：tag字段Key重命名表，可用于重命名sls协议中LogTag字段的Key，其中系统保留的LogTag的Key默认值见附录。如果需要删去某个tag，则只需将该tag重命名为空字符串即可。
-- `ProtocolKeyRenameMap`：协议字段Key重命名表，可用于重命名协议字段的Key，仅部分编码模式下可用，详见附录
-
-用户可以使用如下函数创建`Converter`对象实例：
-
-```Go
+```go
 func NewConverter(protocol, encoding string, tagKeyRenameMap, protocolKeyRenameMap map[string]string) (*Converter, error)
+
+func NewConverterWithSep(protocol, encoding, sep string, ignoreUnExpectedData bool, tagKeyRenameMap, protocolKeyRenameMap map[string]string) (*Converter, error)
 ```
 
-其中，`protocol`字段和`encoding`的可选取值为见附录。
+- `tagKeyRenameMap` 使用输入事件或事件组中的 Tag 键。将新键名设置为空字符串可删除对应 Tag。
+- `protocolKeyRenameMap` 用于重命名 JSON 协议的字段，例如将 `custom_single` 的 `time` 改为 `@timestamp`。
+- `NewConverterWithSep` 还可设置分隔符和是否跳过不支持的事件。分隔符用于 `raw` 协议。
 
 ## 转换方法
 
-`Converter`结构支持如下几种方法：
+```go
+func (c *Converter) ToByteStream(groupEvents *models.PipelineGroupEvents) (stream interface{}, err error)
 
-```Go
-func (c *Converter) Do(logGroup *sls.LogGroup) (logs interface{}, err error)
+func (c *Converter) ToByteStreamWithSelectedFields(groupEvents *models.PipelineGroupEvents, targetFields []string) (stream interface{}, values []map[string]string, err error)
 
-func (c *Converter) ToByteStream(logGroup *sls.LogGroup) (stream interface{}, err error)
-
-func (c *Converter) DoWithSelectedFields(logGroup *sls.LogGroup, targetFields []string) (logs interface{}, values []map[string]string, err error)
-
-func (c *Converter) ToByteStreamWithSelectedFields(logGroup *sls.LogGroup, targetFields []string) (stream interface{}, values []map[string]string, err error)
-
-func (c *Converter) ToByteStreamWithSelectedFieldsV2(groupEvents *models.PipelineGroupEvents, targetFields []string) (stream interface{}, values []map[string]string, err error)
+func (c *Converter) ToOTLP(group *models.PipelineGroupEvents) (plog.ResourceLogs, pmetric.ResourceMetrics, ptrace.ResourceSpans, error)
 ```
 
-各方法的用法如下：
-
-- `Do`：给定日志组`logGroup`，根据`Converter`中设定的协议，将sls日志组中的各条日志分别转换为与目标协议相对应的数据结构，并将结果组装在`logs`中；
-- `ToByteStream`：在完成`Do`方法的基础上，根据`Converter`中设定的编码格式，对转换后的日志进行编码形成字节流，并将结果组装在`stream`中；
-- `DoWithSelectedFields`：在完成和`Do`方法一致的日志转换基础上，在各条日志及日志组tag中找到`targetFields`数组中指定字段的值，以map的形式将结果保存于`values`数组中。如果没有找到该字段，则`values`的各个map中将不包括该字段。`targetFields`中各字符串的的格式要求如下：
-  - 如果需要获取某个日志字段的值，则字符串的命名方式为“content.XXX"，其中XXX为该字段的键名；
-  - 如果需要获取某个日志tag的值，则字符串的命名方式为“tag.XXX"，其中XXX为该字段的键名。
-- `ToByteStreamWithSelectedFields`：与`DoWithSelectedFields`方法类似，在完成和`ToByteStream`方法一致的日志转换基础上，在各条日志及日志组tag中找到`targetFields`数组中指定字段的值，以map的形式将结果保存于`values`数组中，`targetFields`中各字符串的的格式要求同上。
-- `ToByteStreamWithSelectedFieldsV2`：作用与`ToByteStreamWithSelectedFields`方法一致，只是作用于v2版本的数据模版的协议转换
-
-## 使用步骤
-
-这里给出使用`Converter`进行日志转换的典型步骤：
-
-1. 在当前文件中引入`protocol`包：
-
-    ```Go
-    import "github.com/alibaba/loongcollector/pkg/protocol"
-    ```
-
-2. 使用选定的转换参数创建`Converter`对象实例：
-
-    ```Go
-    c, err := protocol.NewConverter(...)
-    ```
-
-3. 给定一个日志组,
-
-    - 如果只需要对日志格式进行转换，则调用`Converter`的`Do`方法获得转换后的数据结构：
-
-        ```Go
-        convertedLogs, err := c.Do(logGroup)
-        ```
-
-    - 如果需要对日志格式进行转换并编码，则调用`Converter`的`ToByteStream`方法获得编码后的字节流：
-
-        ```Go
-        serializedLogs, err := c.ToByteStream(logGroup)
-        ```
-
-    - 如果在对日志格式进行转换的同时，还想额外获取日志中某些字段的值，则调用`Converter`的`DoWithSelectedFields`方法同时获得转换后的数据结构与选定日志字段的值：
-
-        ```Go
-        convertedLogs, targetValues, err := c.DoWithSelectedFields(logGroup, selectedFields)
-        ```
-
-    - 如果在对日志格式进行转换并编码的同时，还想额外获取日志中某些字段的值，则调用`Converter`的`ToByteStreamWithSelectedFields`方法同时获得编码后的字节流与选定日志字段的值：
-
-        ```Go
-        serializedLogs, targetValues, err := c.ToByteStreamWithSelectedFields(logGroup, selectedFields)
-        ```
+- `ToByteStream` 按选定协议转换并编码事件组。根据协议，`stream` 的类型为 `[][]byte` 或 `[]byte`。
+- `ToByteStreamWithSelectedFields` 在编码时提取指定字段，支持的字段范围取决于协议。`custom_single` 和 `custom_single_flatten` 使用 `content.XXX` 选择内容字段，`tag.XXX` 选择 Tag。对应键不存在时，结果 map 省略该键。
+- `ToOTLP` 将事件转换为 OTLP 的日志、指标和链路资源。创建转换器时使用 `otlp_v1` 和 `none`，由调用方将资源装入相应的 OTLP 请求。
 
 ## 示例
 
-假设需要将日志从sls协议转换为单条协议，编码方式选择“json”，同时将tag中的host.name键更名为hostname，将协议中的time键更名为@timestamp，则创建`Converter`的代码如下：
+将事件组转换成 `custom_single` JSON。若输入含有 `service.name` Tag，将它改名为 `service`，同时将协议字段 `time` 改名为 `@timestamp`。
 
-```Go
-c, err := protocol.NewConverter("custom_single", "json", map[string]string{"host.name":"hostname"}, map[string]string{"time", "@timestamp"})
+```go
+package example
+
+import (
+	"github.com/alibaba/ilogtail/pkg/models"
+	converter "github.com/alibaba/ilogtail/pkg/protocol/converter"
+)
+
+func encodeGroup(group *models.PipelineGroupEvents) (interface{}, []map[string]string, error) {
+	c, err := converter.NewConverter(
+		converter.ProtocolCustomSingle,
+		converter.EncodingJSON,
+		map[string]string{"service.name": "service"},
+		map[string]string{"time": "@timestamp"},
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+	return c.ToByteStreamWithSelectedFields(group, []string{"tag.service"})
+}
 ```
 
 ## 附录
 
-- 可选协议名
-
-    | 协议名                   | 意义                                       |
-    |------------------------------------------| ------ |
-    | custom_single         | 单条协议                                     |
-    | custom_single_flatten | 单条协议，数据平铺 ，如写入kafka的json消息体              |
-    | influxdb              | Influxdb协议                               |
-    | raw                   | 原始Byte流协议，仅支持v2版本中ByteArray类型的Event的协议转换 |
-
-- 可选编码方式
-
-    | 编码方式 | 意义 |
-    | ------ | ------ |
-    | json | json编码方式 |
-    | protobuf | protobuf编码方式 |
-    | custom | 自定义编码方式  |
-
-- sls协议中系统保留LogTag的Key默认值：
-
-    | 字段名 | 描述 |
-    | ------ | ------ |
-    | host.ip | LoongCollector所属机器或容器的ip地址 |
-    | log.topic | 日志的topic |
-    | log.file.path | 被采集文件的路径 |
-    | host.name | LoongCollector所属机器或容器的主机名 |
-    | k8s.node.ip | LoongCollector容器所处K8s节点的ip |
-    | k8s.node.name | LoongCollector容器所处K8s节点的名称 |
-    | k8s.namespace.name | 业务容器所属的K8s命名空间 |
-    | k8s.pod.name | 业务容器所属的K8s Pod名称 |
-    | k8s.pod.ip | 业务容器所属的K8s Pod ip |
-    | k8s.pod.uid | 业务容器所属的K8s Pod uid |
-    | (k8s.)container.name | 业务容器的名称。如果处于K8s环境中，则增加“k8s”前缀 |
-    | (k8s.)container.ip | 业务容器的ip。如果处于K8s环境中，则增加“k8s”前缀 |
-    | (k8s.)container.image.name | 用于创建业务容器的镜像名称。如果处于K8s环境中，则增加“k8s”前缀 |
-
-- 可用于重命名协议字段Key的编码格式：
-
-    json
+| 协议名 | 编码方式 | 说明 |
+| --- | --- | --- |
+| `custom_single` | `json` | 单条协议，每条记录编码为一个 JSON 对象。 |
+| `custom_single_flatten` | `json` | 平铺的单条协议，内容字段和 Tag 放在同一 JSON 对象中。 |
+| `jsonline` | `json` | 将平铺 JSON 记录用换行符连接。 |
+| `influxdb` | `custom` | 将 Metric 事件转换成 InfluxDB 行协议。 |
+| `raw` | `custom` | 输出 ByteArray 事件的原始字节流。 |
+| `otlp_v1` | `none` | 通过 `ToOTLP` 转换为 OTLP 资源。 |

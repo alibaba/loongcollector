@@ -1,21 +1,10 @@
 # 数据模型（Golang）
 
-LoongCollector Golang 部分目前支持 `SLS Log Protocol` 和 `Pipeline Event` 两种数据模型，两种模型的描述和对比如下：  
-
-|  | SLS Log Protocol | Pipeline Event |
-|  ----  | ----  |  ---- |
-| 描述 | SLS 日志的专用处理结构 | 可扩展的可观测性数据模型，支持Metrics、Trace、Logging、Bytes、Profile等 |
-| 采集配置结构版本 |        v1              |          v2       |
-| Logging 数据结构 |      支持           |        支持         |
-| Metric 数据结构 |      不支持           |      支持           |
-| Trace 数据结构 |      不支持            |       支持          |
-| ByteArray 数据结构 |      不支持            |       支持          |
-| Profile 数据结构 |      不支持          |       支持          |
-| 自定义数据结构 |      不支持          |       支持          |
+LoongCollector Go 侧的采集配置使用 `Pipeline Event` 作为内部数据模型，支持日志、指标、链路和字节流等事件。
 
 ## SLS Log Protocol
 
-参考 [SLS 协议](log-protocol/protocol-spec/sls.md)
+兼容的采集接口（如 `Collector.AddRawLog`）接收 `protocol.Log`，在进入 Pipeline 时转换为事件。Go 的 `flusher_sls` 将 `PipelineEventGroup` PB 传回 C++，由 C++ Flusher 在 SLS 日志出口序列化为 `LogGroup`。Go 的 `flusher_grpc` 在发送时将事件组编码为 `protocol.LogGroup`。协议结构见 [SLS 协议](log-protocol/protocol-spec/sls.md)。
 
 ## Pipeline Event
 
@@ -37,6 +26,8 @@ type PipelineEvent interface {
 
  SetObservedTimestamp(uint64)
 
+ GetSize() int64
+
  Clone() PipelineEvent
 }
 ```  
@@ -50,10 +41,13 @@ type PipelineGroupEvents struct {
 }
 
 type GroupInfo struct {
- Metadata Metadata
- Tags     Tags
+ Metadata            Metadata
+ Tags                Tags
+ DestinationLogstore string
 }
 ```
+
+`DestinationLogstore` 由路由聚合器设置，用于指定目标日志库。
 
 ### Metric 模型
 

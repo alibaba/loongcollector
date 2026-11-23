@@ -127,8 +127,7 @@ func (p *ProcessorRename) processLogEvent(logEvent *models.Log) {
 	contents := logEvent.GetIndices()
 	for oldKey, newKey := range p.keyDictionary {
 		if contents.Contains(oldKey) {
-			contents.Add(newKey, contents.Get(oldKey))
-			contents.Delete(oldKey)
+			models.RenameLogContent(contents, oldKey, newKey)
 		} else if p.NoKeyError {
 			p.noKeyErrorArray = append(p.noKeyErrorArray, oldKey)
 		}

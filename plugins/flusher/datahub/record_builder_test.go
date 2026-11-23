@@ -74,7 +74,7 @@ func TestGenBlobRecord(t *testing.T) {
 			Value: "value",
 		},
 	}
-	record, err := builder.log2BlobRecord(log)
+	record, err := builder.log2BlobRecord(fieldsFromLogFixture(log))
 	assert.Nil(t, err)
 	bRecord, ok := record.(*datahub.BlobRecord)
 	assert.True(t, ok)
@@ -94,7 +94,7 @@ func TestGenBlobRecord(t *testing.T) {
 			Value: "val3",
 		},
 	}
-	record, err = builder.log2BlobRecord(log)
+	record, err = builder.log2BlobRecord(fieldsFromLogFixture(log))
 	assert.Nil(t, err)
 	bRecord, ok = record.(*datahub.BlobRecord)
 	assert.True(t, ok)
@@ -106,14 +106,14 @@ func TestGenBlobRecord(t *testing.T) {
 			Value: "val1",
 		},
 	}
-	record, err = builder.log2BlobRecord(log)
+	record, err = builder.log2BlobRecord(fieldsFromLogFixture(log))
 	assert.Nil(t, err)
 	bRecord, ok = record.(*datahub.BlobRecord)
 	assert.True(t, ok)
 	assert.Equal(t, "{\"key1\":\"val1\"}", string(bRecord.RawData))
 
 	log.Contents = []*protocol.Log_Content{}
-	_, err = builder.log2BlobRecord(log)
+	_, err = builder.log2BlobRecord(fieldsFromLogFixture(log))
 	assert.NotNil(t, err)
 }
 
@@ -177,7 +177,7 @@ func TestGenTupleRecord(t *testing.T) {
 		},
 	}
 
-	record, err := builder.log2TupleRecord(log)
+	record, err := builder.log2TupleRecord(fieldsFromLogFixture(log))
 	assert.Nil(t, err)
 	tRecord, ok := record.(*datahub.TupleRecord)
 	assert.True(t, ok)
@@ -243,7 +243,7 @@ func TestGenTupleRecordWithNull(t *testing.T) {
 		},
 	}
 
-	record, err := builder.log2TupleRecord(log)
+	record, err := builder.log2TupleRecord(fieldsFromLogFixture(log))
 	assert.Nil(t, err)
 	tRecord, ok := record.(*datahub.TupleRecord)
 	assert.True(t, ok)
@@ -258,7 +258,7 @@ func TestGenTupleRecordWithNull(t *testing.T) {
 	builder.schema.AddField(datahub.Field{Name: "f1", Type: datahub.BOOLEAN, AllowNull: true})
 	builder.schema.AddField(datahub.Field{Name: "f2", Type: datahub.TINYINT, AllowNull: false})
 
-	_, err = builder.log2TupleRecord(log)
+	_, err = builder.log2TupleRecord(fieldsFromLogFixture(log))
 	assert.NotNil(t, err)
 }
 
@@ -282,6 +282,14 @@ func TestGenTupleRecordWithTypeMissMatch(t *testing.T) {
 		},
 	}
 
-	_, err := builder.log2TupleRecord(log)
+	_, err := builder.log2TupleRecord(fieldsFromLogFixture(log))
 	assert.NotNil(t, err)
+}
+
+func fieldsFromLogFixture(log *protocol.Log) map[string]string {
+	fields := make(map[string]string, len(log.Contents))
+	for _, item := range log.Contents {
+		fields[item.Key] = item.Value
+	}
+	return fields
 }

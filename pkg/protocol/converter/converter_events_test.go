@@ -20,13 +20,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/models"
 )
 
-func TestConvertToSingleProtocolStreamV2MixedEvents(t *testing.T) {
-	c, err := NewConverter(ProtocolCustomSingle, EncodingJSON, nil, nil, &config.GlobalConfig{})
+func TestConvertToSingleProtocolStreamMixedEvents(t *testing.T) {
+	c, err := NewConverter(ProtocolCustomSingle, EncodingJSON, nil, nil)
 	require.NoError(t, err)
 
 	log := models.NewLog("", []byte("hello"), "info", "", "", models.NewTags(), 1e9)
@@ -37,7 +36,7 @@ func TestConvertToSingleProtocolStreamV2MixedEvents(t *testing.T) {
 		Events: []models.PipelineEvent{log, metric, span},
 	}
 
-	stream, _, err := c.ConvertToSingleProtocolStreamV2(groupEvents, nil)
+	stream, _, err := c.ConvertToSingleProtocolStream(groupEvents, nil)
 	require.NoError(t, err)
 	assert.Len(t, stream, 3)
 	// Metric is converted structurally into a canonical metric log, never a
@@ -158,4 +157,51 @@ func TestPipelineGroupEventsToLogGroupsPreservesReservedTopic(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestEventConverterSelectedFieldsAndRename(t *testing.T) {
+	log := models.NewSimpleLog([]byte("<body>"), models.NewTagsWithKeyValues("tenant", "event", "omit", "private"), 1700000000123456789)
+	log.Contents.Add("method", "PUT")
+	group := &models.PipelineGroupEvents{Group: models.NewGroup(nil, models.NewTagsWithKeyValues("tenant", "group", "region", "cn")), Events: []models.PipelineEvent{log}}
+	for _, protocolName := range []string{ProtocolCustomSingle, ProtocolCustomSingleFlatten, ProtocolJsonline} {
+		t.Run(protocolName, func(t *testing.T) {
+			converter, err := NewConverter(protocolName, EncodingJSON,
+				map[string]string{"tenant": "renamed", "omit": ""},
+				map[string]string{"contents": "fields", "time": "timestamp"})
+			require.NoError(t, err)
+			payload, selected, err := converter.ToByteStreamWithSelectedFields(group, []string{"content.method", "tag.tenant", "tag.region"})
+			require.NoError(t, err)
+			switch protocolName {
+			case ProtocolCustomSingle:
+				rows := payload.([][]byte)
+				require.Len(t, rows, 1)
+				require.JSONEq(t, `{"fields":{"content":"<body>","method":"PUT"},"tags":{"region":"cn","renamed":"group"},"timestamp":1700000000}`, string(rows[0]))
+				require.Contains(t, string(rows[0]), "<body>")
+			case ProtocolCustomSingleFlatten:
+				require.JSONEq(t, `{"content":"<body>","method":"PUT","region":"cn","renamed":"group","timestamp":1700000000}`, string(payload.([][]byte)[0]))
+			case ProtocolJsonline:
+				require.JSONEq(t, `{"content":"<body>","method":"PUT","region":"cn","renamed":"group","timestamp":1700000000}`, string(payload.([]byte)))
+				return
+			}
+			require.Equal(t, []map[string]string{{"content.method": "PUT", "tag.tenant": "group", "tag.region": "cn"}}, selected)
+			_, _, err = converter.ToByteStreamWithSelectedFields(group, []string{"invalid.method"})
+			require.ErrorContains(t, err, "unsupported field")
+		})
+	}
+}
+
+func TestLogGroupWireTimestamp(t *testing.T) {
+	logs := []models.PipelineEvent{
+		models.NewSimpleLog([]byte("seconds"), models.NewTags(), 1700000000000000000),
+		models.NewSimpleLog([]byte("nanos"), models.NewTags(), 1700000000123456789),
+	}
+	group := &models.PipelineGroupEvents{Group: &models.GroupInfo{DestinationLogstore: "routed"}, Events: logs}
+	wire, err := PipelineGroupEventsToLogGroups(group)
+	require.NoError(t, err)
+	require.Len(t, wire, 1)
+	require.Equal(t, "routed", wire[0].Category)
+	require.Equal(t, uint32(1700000000), wire[0].Logs[0].GetTime())
+	require.Nil(t, wire[0].Logs[0].TimeNs)
+	require.Equal(t, uint32(1700000000), wire[0].Logs[1].GetTime())
+	require.Equal(t, uint32(123456789), wire[0].Logs[1].GetTimeNs())
 }
