@@ -50,6 +50,7 @@ type FlusherStdout struct {
 
 	context   pipeline.Context
 	outLogger seelog.LoggerInterface
+	file      *stdoutFileOutput
 }
 
 // Init method would be trigger before working. For the plugin, init method choose the log output
@@ -62,14 +63,19 @@ func (p *FlusherStdout) Init(context pipeline.Context) error {
 		pattern = "<console/>"
 		logger.CloseCatchStdout()
 	} else if p.FileName != "" {
-		pattern = `<rollingfile type="size" filename="%s" maxsize="%d" maxrolls="%d"/>`
 		if p.MaxSize <= 0 {
 			p.MaxSize = 1024 * 1024
 		}
 		if p.MaxRolls <= 0 {
 			p.MaxRolls = 1
 		}
-		pattern = fmt.Sprintf(pattern, p.FileName, p.MaxSize, p.MaxRolls)
+		file, err := newStdoutFileOutput(p.FileName, p.MaxSize, p.MaxRolls, p.reportWriteError)
+		if err != nil {
+			logger.Warning(p.context.GetRuntimeContext(), selfmonitor.FlusherInitAlarm, "init stdout flusher fail, error", err)
+			p.outLogger = seelog.Disabled
+		} else {
+			p.file = file
+		}
 	}
 	if pattern != "" {
 		var err error
@@ -87,12 +93,29 @@ func (*FlusherStdout) Description() string {
 }
 
 func (p *FlusherStdout) Export(in []*models.PipelineGroupEvents, context pipeline.PipelineContext) error {
-	writer := jsoniter.NewStream(jsoniter.ConfigDefault, nil, 128)
+	writer := jsoniter.ConfigDefault.BorrowStream(nil)
+	defer func() {
+		if p.file != nil || cap(writer.Buffer()) > maxStdoutBatchBytes {
+			writer.SetBuffer(nil)
+		}
+		jsoniter.ConfigDefault.ReturnStream(writer)
+	}()
+	var batch *stdoutFileBatch
+	if p.file != nil {
+		batch = p.file.getBatch()
+		defer func() { p.file.enqueue(batch) }()
+	}
+
 	for _, groupEvents := range in {
 		if p.Tags {
 			metadata := fmt.Sprintf("%v", groupEvents.Group.GetMetadata().Iterator())
 			tags := fmt.Sprintf("%v", groupEvents.Group.GetTags().Iterator())
-			if p.outLogger != nil {
+			if batch != nil {
+				message := fmt.Sprintf("[Event] event %d, metadata %s, tags %s", len(groupEvents.Events), metadata, tags)
+				start := batch.beginLine()
+				batch.data = append(batch.data, message...)
+				batch = p.file.finishLine(batch, start)
+			} else if p.outLogger != nil {
 				p.outLogger.Infof("[Event] event %d, metadata %s, tags %s", len(groupEvents.Events), metadata, tags)
 			} else {
 				logger.Info(p.context.GetRuntimeContext(), "[Event] event", len(groupEvents.Events), "metadata", metadata, "tags", tags)
@@ -101,6 +124,11 @@ func (p *FlusherStdout) Export(in []*models.PipelineGroupEvents, context pipelin
 
 		for _, event := range groupEvents.Events {
 			writer.Reset(nil)
+			lineStart := 0
+			if batch != nil {
+				lineStart = batch.beginLine()
+				writer.SetBuffer(batch.data)
+			}
 			writer.WriteObjectStart()
 			writer.WriteObjectField("eventType")
 			eventType := event.GetType()
@@ -127,13 +155,15 @@ func (p *FlusherStdout) Export(in []*models.PipelineGroupEvents, context pipelin
 			writer.WriteObjectField("tags")
 			writer.WriteObjectStart()
 			firstTag := true
-			for k, v := range event.GetTags().Iterator() {
-				if !firstTag {
-					writer.WriteMore()
+			if tags := event.GetTags(); tags != nil && tags.Len() > 0 {
+				for k, v := range tags.Iterator() {
+					if !firstTag {
+						writer.WriteMore()
+					}
+					firstTag = false
+					writer.WriteObjectField(k)
+					writer.WriteString(v)
 				}
-				firstTag = false
-				writer.WriteObjectField(k)
-				writer.WriteString(v)
 			}
 			writer.WriteObjectEnd()
 			writer.WriteMore()
@@ -150,6 +180,12 @@ func (p *FlusherStdout) Export(in []*models.PipelineGroupEvents, context pipelin
 
 			writer.WriteObjectEnd()
 
+			if batch != nil {
+				batch.data = writer.Buffer()
+				writer.SetBuffer(nil)
+				batch = p.file.finishLine(batch, lineStart)
+				continue
+			}
 			// The logger may retain the message after Export reuses the buffer.
 			message := string(writer.Buffer())
 			if p.outLogger != nil {
@@ -220,7 +256,7 @@ func (p *FlusherStdout) writeLogBody(writer *jsoniter.Stream, log *models.Log) {
 	writer.WriteObjectField("spanID")
 	writer.WriteString(log.GetSpanID())
 	contents := log.GetIndices()
-	for key, value := range contents.Iterator() {
+	for key, value := range models.LogContentEntries(contents) {
 		writer.WriteMore()
 		writer.WriteObjectField(key)
 		if field, ok := value.(string); ok {
@@ -248,10 +284,17 @@ func (*FlusherStdout) IsReady(projectName string, logstoreName string, logstoreK
 
 // Stop ...
 func (p *FlusherStdout) Stop() error {
+	if p.file != nil {
+		p.file.close()
+	}
 	if p.outLogger != nil {
 		p.outLogger.Close()
 	}
 	return nil
+}
+
+func (p *FlusherStdout) reportWriteError(err error) {
+	logger.Warning(p.context.GetRuntimeContext(), selfmonitor.PluginAlarm, "stdout file write failed", err)
 }
 
 const stdoutTimestampFormatter = "LoongCollectorStdoutTimestamp"
@@ -261,7 +304,8 @@ var stdoutTimeFormat = "%Date %Time"
 type timestampCacheEntry struct {
 	second   int64
 	location *time.Location
-	text     any
+	text     string
+	boxed    any
 }
 
 // newStdoutTimestampFormatter caches the formatted timestamp per logger.
@@ -269,17 +313,19 @@ type timestampCacheEntry struct {
 func newStdoutTimestampFormatter(_ string) seelog.FormatterFunc {
 	var cached atomic.Pointer[timestampCacheEntry]
 	return func(_ string, _ seelog.LogLevel, ctx seelog.LogContextInterface) any {
-		now := ctx.CallTime()
-		second, location := now.Unix(), now.Location()
-		if entry := cached.Load(); entry != nil && entry.second == second && entry.location == location {
-			return entry.text
-		}
-		entry := &timestampCacheEntry{
-			second: second, location: location, text: now.Format("2006-01-02 15:04:05"),
-		}
-		cached.Store(entry)
-		return entry.text
+		return stdoutTimestamp(&cached, ctx.CallTime()).boxed
 	}
+}
+
+func stdoutTimestamp(cache *atomic.Pointer[timestampCacheEntry], now time.Time) *timestampCacheEntry {
+	second, location := now.Unix(), now.Location()
+	if entry := cache.Load(); entry != nil && entry.second == second && entry.location == location {
+		return entry
+	}
+	text := now.Format("2006-01-02 15:04:05")
+	entry := &timestampCacheEntry{second: second, location: location, text: text, boxed: text}
+	cache.Store(entry)
+	return entry
 }
 
 // Register the plugin to the Flushers array.

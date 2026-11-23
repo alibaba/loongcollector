@@ -16,6 +16,7 @@ package stdout
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -95,4 +96,51 @@ func TestExportPreservesEachQueuedEvent(t *testing.T) {
 		require.Equal(t, messages[i], fields["message"])
 		require.Equal(t, "trace-1", fields["traceID"])
 	}
+}
+
+func TestFileOutputPreservesRotationAtEachRecord(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "events.log")
+	flusher := &FlusherStdout{FileName: path, MaxSize: 1, MaxRolls: 100, Tags: true}
+	require.NoError(t, flusher.Init(mock.NewEmptyContext("p", "l", "c")))
+	group := &models.PipelineGroupEvents{Group: models.NewGroup(nil, models.NewTagsWithKeyValues("source", "test"))}
+	want := make(map[string]bool)
+	for i := 0; i < 65; i++ {
+		message := fmt.Sprintf("line %d", i)
+		if i == 0 {
+			message += strings.Repeat(" content", 9000)
+		}
+		want[message] = true
+		log := &models.Log{Tags: models.NewTags(), Contents: models.NewLogContents()}
+		log.Contents.Add("message", message)
+		group.Events = append(group.Events, log)
+	}
+	require.NoError(t, flusher.Export([]*models.PipelineGroupEvents{group}, nil))
+	require.NoError(t, flusher.Stop())
+	require.NoError(t, flusher.Stop())
+
+	files, err := filepath.Glob(path + "*")
+	require.NoError(t, err)
+	require.Len(t, files, 66)
+	var headings int
+	for _, filename := range files {
+		data, err := os.ReadFile(filename)
+		require.NoError(t, err)
+		require.Equal(t, 1, strings.Count(string(data), "\n"))
+		require.Greater(t, len(data), len("2006-01-02 15:04:05 "))
+		_, err = time.Parse("2006-01-02 15:04:05", string(data[:19]))
+		require.NoError(t, err)
+		payload := data[20:]
+		if strings.HasPrefix(string(payload), "[Event]") {
+			headings++
+			require.Equal(t, "[Event] event 65, metadata map[], tags map[source:test]\n", string(payload))
+			continue
+		}
+		var fields map[string]any
+		require.NoError(t, json.Unmarshal(payload, &fields))
+		message := fields["message"].(string)
+		require.Contains(t, want, message)
+		delete(want, message)
+	}
+	require.Equal(t, 1, headings)
+	require.Empty(t, want)
 }
