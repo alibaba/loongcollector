@@ -33,6 +33,7 @@ public:
     void TestProcess();
     void TestAddAutoMetrics();
     void TestHonorLabels();
+    void TestRenameMetricName();
 
     CollectionPipelineContext mContext;
 };
@@ -297,10 +298,69 @@ test_metric8{k1="v1", k3="v2", } 9.9410452992e+10 1715829785083
     APSARA_TEST_EQUAL("v2", eventGroup.GetEvents().at(7).Cast<MetricEvent>().GetTag(string("exported_k3")).to_string());
 }
 
+void ProcessorPromRelabelMetricNativeUnittest::TestRenameMetricName() {
+    Json::Value config;
+    ProcessorPromRelabelMetricNative processor;
+    processor.SetContext(mContext);
+
+    string configStr = R"JSON(
+        {
+            "job_name": "test_job",
+            "metric_relabel_configs": [
+                {
+                    "source_labels": ["tenant"],
+                    "target_label": "tenant_id",
+                    "regex": ".(.*)",
+                    "replacement": "$1",
+                    "action": "replace"
+                },
+                {
+                    "source_labels": ["__name__"],
+                    "regex": "koordlet_lrn_(.*)",
+                    "target_label": "__name__",
+                    "replacement": "${1}",
+                    "action": "replace"
+                },
+                {
+                    "source_labels": ["__name__"],
+                    "regex": "to_be_removed",
+                    "target_label": "__name__",
+                    "replacement": "",
+                    "action": "replace"
+                }
+            ]
+        }
+    )JSON";
+    string errorMsg;
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, config, errorMsg));
+    APSARA_TEST_TRUE(processor.Init(config));
+
+    auto parser = TextParser();
+    string rawData = R"""(
+koordlet_lrn_cpu_usage{tenant="x123"} 1.0
+other_metric{tenant="x123"} 2.0
+to_be_removed{tenant="x123"} 3.0
+)""";
+    auto eventGroup = parser.Parse(rawData, 0, 0);
+    APSARA_TEST_EQUAL((size_t)3, eventGroup.GetEvents().size());
+    processor.Process(eventGroup);
+
+    // metric whose __name__ is relabeled to empty is dropped
+    APSARA_TEST_EQUAL((size_t)2, eventGroup.GetEvents().size());
+    const auto& renamed = eventGroup.GetEvents().at(0).Cast<MetricEvent>();
+    APSARA_TEST_EQUAL("cpu_usage", renamed.GetName().to_string());
+    APSARA_TEST_EQUAL("123", renamed.GetTag(string("tenant_id")).to_string());
+    APSARA_TEST_FALSE(renamed.HasTag(string(prometheus::NAME)));
+    const auto& untouched = eventGroup.GetEvents().at(1).Cast<MetricEvent>();
+    APSARA_TEST_EQUAL("other_metric", untouched.GetName().to_string());
+    APSARA_TEST_FALSE(untouched.HasTag(string(prometheus::NAME)));
+}
+
 UNIT_TEST_CASE(ProcessorPromRelabelMetricNativeUnittest, TestInit)
 UNIT_TEST_CASE(ProcessorPromRelabelMetricNativeUnittest, TestProcess)
 UNIT_TEST_CASE(ProcessorPromRelabelMetricNativeUnittest, TestAddAutoMetrics)
 UNIT_TEST_CASE(ProcessorPromRelabelMetricNativeUnittest, TestHonorLabels)
+UNIT_TEST_CASE(ProcessorPromRelabelMetricNativeUnittest, TestRenameMetricName)
 
 
 } // namespace logtail

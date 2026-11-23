@@ -37,6 +37,7 @@ class RelabelConfigUnittest : public testing::Test {
 public:
     void TestRelabelConfig();
     void TestReplace();
+    void TestReplaceFullMatch();
     void TestKeep();
     void TestDrop();
     void TestDropMetric();
@@ -142,6 +143,74 @@ void RelabelConfigUnittest::TestReplace() {
     APSARA_TEST_EQUAL("172.17.0.3:9100", result.Get("__address__"));
     APSARA_TEST_EQUAL("node-exporter", result.Get("__meta_kubernetes_pod_label_app"));
     APSARA_TEST_EQUAL("172.17.0.3", result.Get("__meta_kubernetes_pod_ip"));
+}
+
+void RelabelConfigUnittest::TestReplaceFullMatch() {
+    auto process = [](const string& rule, Labels& labels) {
+        Json::Value configJson;
+        string errorMsg;
+        APSARA_TEST_TRUE(ParseJsonTable("[" + rule + "]", configJson, errorMsg));
+        RelabelConfigList configList;
+        APSARA_TEST_TRUE(configList.Init(configJson));
+        APSARA_TEST_TRUE(configList.Process(labels));
+    };
+
+    // partial match must not take effect
+    {
+        Labels labels;
+        labels.Set("pod", "web-1");
+        process(R"({"action": "replace", "source_labels": ["pod"], "regex": "web",
+                    "target_label": "app", "replacement": "frontend"})",
+                labels);
+        APSARA_TEST_EQUAL((size_t)1, labels.Size());
+        APSARA_TEST_EQUAL("", labels.Get("app"));
+        APSARA_TEST_EQUAL("", labels.Get("app-1"));
+    }
+    {
+        Labels labels;
+        labels.Set("pod", "web");
+        process(R"({"action": "replace", "source_labels": ["pod"], "regex": "web",
+                    "target_label": "app", "replacement": "frontend"})",
+                labels);
+        APSARA_TEST_EQUAL("frontend", labels.Get("app"));
+    }
+    // unmatched prefix must not be copied into target label or value
+    {
+        Labels labels;
+        labels.Set("__name__", "go_koordlet_lrn_cpu");
+        process(R"({"action": "replace", "source_labels": ["__name__"], "regex": "koordlet_lrn_(.*)",
+                    "target_label": "__name__", "replacement": "${1}"})",
+                labels);
+        APSARA_TEST_EQUAL((size_t)1, labels.Size());
+        APSARA_TEST_EQUAL("go_koordlet_lrn_cpu", labels.Get("__name__"));
+    }
+    {
+        Labels labels;
+        labels.Set("__name__", "koordlet_lrn_cpu");
+        process(R"({"action": "replace", "source_labels": ["__name__"], "regex": "koordlet_lrn_(.*)",
+                    "target_label": "__name__", "replacement": "${1}"})",
+                labels);
+        APSARA_TEST_EQUAL("cpu", labels.Get("__name__"));
+    }
+    {
+        Labels labels;
+        labels.Set("q1", "quota-a");
+        process(R"({"action": "replace", "source_labels": ["q1", "q2"], "separator": ".",
+                    "regex": "([\\w\\.]+)", "target_label": "tmp", "replacement": "$1"})",
+                labels);
+        APSARA_TEST_EQUAL((size_t)1, labels.Size());
+        APSARA_TEST_EQUAL("", labels.Get("tmp"));
+    }
+    // target label expanded to empty is skipped
+    {
+        Labels labels;
+        labels.Set("k", "v");
+        process(R"({"action": "replace", "source_labels": ["k"], "regex": "(v)(.*)",
+                    "target_label": "$2", "replacement": "x"})",
+                labels);
+        APSARA_TEST_EQUAL((size_t)1, labels.Size());
+        APSARA_TEST_EQUAL("v", labels.Get("k"));
+    }
 }
 void RelabelConfigUnittest::TestKeep() {
     Json::Value configJson;
@@ -516,6 +585,7 @@ UNIT_TEST_CASE(ActionConverterUnittest, TestActionToString)
 
 UNIT_TEST_CASE(RelabelConfigUnittest, TestRelabelConfig)
 UNIT_TEST_CASE(RelabelConfigUnittest, TestReplace)
+UNIT_TEST_CASE(RelabelConfigUnittest, TestReplaceFullMatch)
 UNIT_TEST_CASE(RelabelConfigUnittest, TestDrop)
 UNIT_TEST_CASE(RelabelConfigUnittest, TestDropMetric)
 UNIT_TEST_CASE(RelabelConfigUnittest, TestKeep)

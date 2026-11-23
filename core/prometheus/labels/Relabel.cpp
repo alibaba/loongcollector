@@ -170,14 +170,17 @@ bool RelabelConfig::Process(Labels& l) const {
             break;
         }
         case Action::REPLACE: {
-            bool indexes = boost::regex_search(val, mRegex);
-            // If there is no match no replacement must take place.
-            if (!indexes) {
+            // Prometheus anchors the regex on both ends and only expands the templates
+            boost::smatch match;
+            if (!boost::regex_match(val, match, mRegex)) {
                 break;
             }
-            string target = string(boost::regex_replace(val, mRegex, mTargetLabel, boost::format_first_only));
-            string res = boost::regex_replace(val, mRegex, mReplacement, boost::format_first_only);
-            if (res.size() == 0) {
+            string target = match.format(mTargetLabel);
+            if (target.empty()) {
+                break;
+            }
+            string res = match.format(mReplacement);
+            if (res.empty()) {
                 l.Del(target);
                 break;
             }
@@ -279,7 +282,19 @@ bool RelabelConfigList::Process(Labels& l) const {
 bool RelabelConfigList::Process(MetricEvent& event) const {
     Labels labels;
     labels.Reset(&event);
-    return Process(labels);
+    if (!Process(labels)) {
+        return false;
+    }
+    // relabel only mutates the __name__ tag, which is stripped later, so sync it back to the event name
+    auto name = event.GetTag(prometheus::NAME);
+    if (name.empty()) {
+        // align with Prometheus: samples without __name__ are invalid
+        return false;
+    }
+    if (name != event.GetName()) {
+        event.SetName(name.to_string());
+    }
+    return true;
 }
 
 bool RelabelConfigList::Empty() const {
