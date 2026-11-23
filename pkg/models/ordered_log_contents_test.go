@@ -59,3 +59,12 @@ func TestLogCloneKeepsIndependentBodyFieldsAndTags(t *testing.T) {
 	require.False(t, log.Contents.Contains("added"))
 	require.Equal(t, "a", log.GetTags().Get("log"))
 }
+
+func TestLogSizeKeepsBodyOwnership(t *testing.T) {
+	log := &Log{Contents: NewOrderedLogContents(1)}
+	SetOwnedLogBody(log, []byte("test"))
+	require.EqualValues(t, 4, log.GetSize())
+	_, found, reusable := LookupLogContentForReplacement(log.GetIndices(), BodyKey)
+	require.True(t, found)
+	require.True(t, reusable)
+}

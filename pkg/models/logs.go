@@ -183,7 +183,23 @@ func (m *Log) GetIndices() LogContents {
 }
 
 func (m *Log) GetSize() int64 {
-	return int64(len(m.GetBody()))
+	if m == nil || m.Contents == nil {
+		return 0
+	}
+	var body any
+	if ordered, ok := m.Contents.(*orderedLogContents); ok {
+		// Measuring the body does not expose its mutable byte slice.
+		body = ordered.keyValuesImpl.Get(BodyKey)
+	} else {
+		body = m.Contents.Get(BodyKey)
+	}
+	switch value := body.(type) {
+	case []byte:
+		return int64(len(value))
+	case string:
+		return int64(len(value))
+	}
+	return 0
 }
 
 func (m *Log) Clone() PipelineEvent {
