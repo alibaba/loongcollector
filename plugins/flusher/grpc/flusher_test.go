@@ -61,30 +61,29 @@ func TestFlusher_Flush(t *testing.T) {
 	encoding.RegisterCodec(new(protocol.Codec))
 	server := grpc.NewServer()
 	defer server.Stop()
-	listener, err := net.Listen("tcp", ":8000")
-	assert.NoError(t, err)
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
 	receiveChan := make(chan *protocol.LogGroup)
 	service := &TestServerService{ch: receiveChan}
 	protocol.RegisterLogReportServiceServer(server, service)
 	go func() {
-		err = server.Serve(listener)
-		assert.NoError(t, err)
+		assert.NoError(t, server.Serve(listener))
 	}()
 
 	time.Sleep(time.Second)
 
 	p := pipeline.Flushers["flusher_grpc"]().(*Flusher)
+	p.Address = listener.Addr().String()
 	lctx := mock.NewEmptyContext("p", "l", "c")
-	err = p.Init(lctx)
-	assert.NoError(t, err)
+	require.NoError(t, p.Init(lctx))
+	defer p.Stop()
 
 	groupList := makeTestLogGroupList().GetLogGroupList()
 	receiveList := make([]*protocol.LogGroup, 0, 10)
 
 	// send logs
 	go func() {
-		err = p.Flush("p", "l", "c", groupList)
-		assert.NoError(t, err)
+		assert.NoError(t, p.Flush("p", "l", "c", groupList))
 		time.Sleep(time.Second)
 		close(receiveChan)
 	}()
@@ -213,4 +212,27 @@ func runGrpcCapture(t *testing.T, run func(*Flusher) error) []*protocol.LogGroup
 		}
 	}
 	return groups
+}
+
+func TestFlusherGrpc_ExportKeepsTagsSeparate(t *testing.T) {
+	group := &models.PipelineGroupEvents{Group: models.NewGroup(models.NewMetadata(), models.NewTagsWithKeyValues("host", "test"))}
+	for _, container := range []string{"a", "a", "b"} {
+		group.Events = append(group.Events, models.NewSimpleLog([]byte(container), models.NewTagsWithKeyValues("container", container), 1))
+	}
+	wires := runGrpcCapture(t, func(flusher *Flusher) error { return flusher.Export([]*models.PipelineGroupEvents{group}, nil) })
+	require.Len(t, wires, 2)
+	for i, wire := range wires {
+		tags := map[string]string{}
+		for _, tag := range wire.LogTags {
+			tags[tag.Key] = tag.Value
+		}
+		require.Equal(t, []string{"a", "b"}[i], tags["container"])
+		require.Equal(t, "test", tags["host"])
+		require.Len(t, wire.Logs, []int{2, 1}[i])
+		for _, log := range wire.Logs {
+			for _, field := range log.Contents {
+				require.NotEqual(t, "container", field.Key)
+			}
+		}
+	}
 }

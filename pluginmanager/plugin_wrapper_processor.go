@@ -22,7 +22,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
-type ProcessorWrapperV2 struct {
+type ProcessorPluginWrapper struct {
 	ProcessorWrapper
 	Processor pipeline.ProcessorV2
 
@@ -30,7 +30,7 @@ type ProcessorWrapperV2 struct {
 	outEventGroupsTotal selfmonitor.CounterMetric
 }
 
-func (wrapper *ProcessorWrapperV2) Init(pluginMeta *pipeline.PluginMeta) error {
+func (wrapper *ProcessorPluginWrapper) Init(pluginMeta *pipeline.PluginMeta) error {
 	wrapper.InitMetricRecord(pluginMeta)
 	wrapper.inEventGroupsTotal = selfmonitor.NewCounterMetricAndRegister(wrapper.MetricRecord, selfmonitor.MetricPluginInEventGroupsTotal)
 	wrapper.outEventGroupsTotal = selfmonitor.NewCounterMetricAndRegister(wrapper.MetricRecord, selfmonitor.MetricPluginOutEventGroupsTotal)
@@ -38,7 +38,7 @@ func (wrapper *ProcessorWrapperV2) Init(pluginMeta *pipeline.PluginMeta) error {
 	return wrapper.Processor.Init(wrapper.Config.Context)
 }
 
-func (wrapper *ProcessorWrapperV2) Process(in *models.PipelineGroupEvents, context pipeline.PipelineContext) {
+func (wrapper *ProcessorPluginWrapper) Process(in *models.PipelineGroupEvents, context pipeline.PipelineContext) {
 	startTime := time.Now().UnixMilli()
 
 	wrapper.inEventGroupsTotal.Add(1)

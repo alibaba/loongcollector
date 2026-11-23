@@ -25,8 +25,8 @@ import (
 
 	"github.com/alibaba/ilogtail/pkg/logger"
 	_ "github.com/alibaba/ilogtail/pkg/logger/test"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pluginmanager"
 
 	"github.com/stretchr/testify/require"
@@ -52,7 +52,7 @@ func (f *BadFlusher) IsReady(projectName string, logstoreName string, logstoreKe
 	return true
 }
 
-func (f *BadFlusher) Flush(projectName string, logstoreName string, configName string, logGroupList []*protocol.LogGroup) error {
+func (f *BadFlusher) Export(groups []*models.PipelineGroupEvents, context pipeline.PipelineContext) error {
 	return nil
 }
 

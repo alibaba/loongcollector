@@ -213,3 +213,22 @@ func TestDecodeV2(t *testing.T) {
 	}
 	assert.Equal(t, want, groups[0])
 }
+
+func TestDecodeExtendedFieldsIntoEvents(t *testing.T) {
+	decoder := &Decoder{FieldsExtend: true}
+	request := &http.Request{Form: map[string][]string{"db": {"mydb"}}}
+	groups, err := decoder.DecodeV2([]byte("weather,city=hz value=32"), request)
+	assert.NoError(t, err)
+	if !assert.Len(t, groups, 1) || !assert.Len(t, groups[0].Events, 1) {
+		return
+	}
+	log, ok := groups[0].Events[0].(*models.Log)
+	if !assert.True(t, ok) {
+		return
+	}
+	assert.Equal(t, "weather", log.Contents.Get("__name__"))
+	assert.Equal(t, "32", log.Contents.Get("__value__"))
+	assert.Equal(t, "float", log.Contents.Get("__type__"))
+	assert.Equal(t, "mydb", log.Contents.Get("__tag__:db"))
+	assert.Equal(t, "city#$#hz", log.Contents.Get("__labels__"))
+}

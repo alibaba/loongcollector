@@ -32,8 +32,6 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
-	"github.com/alibaba/ilogtail/pkg/util"
 	"github.com/alibaba/ilogtail/plugins/extension/basicauth"
 	"github.com/alibaba/ilogtail/plugins/input"
 	"github.com/alibaba/ilogtail/plugins/processor/regex"
@@ -117,9 +115,9 @@ func (s *logstoreConfigTestSuite) TestPluginGlobalConfig() {
 	s.Equal(config.GlobalConfig.DefaultLogQueueSize, 21)
 	s.Equal(config.GlobalConfig.InputIntervalMs, 9999)
 	s.Equal(config.GlobalConfig.FlushIntervalMs, 323)
-	s.Equal(config.PluginRunner.(*pluginv1Runner).MetricPlugins[0].Interval, time.Duration(9999)*time.Millisecond)
-	s.Equal(config.PluginRunner.(*pluginv1Runner).AggregatorPlugins[0].Interval, time.Duration(369)*time.Millisecond)
-	s.Equal(config.PluginRunner.(*pluginv1Runner).FlusherPlugins[0].Interval, time.Duration(323)*time.Millisecond)
+	s.Equal(config.PluginRunner.(*pluginRunner).MetricPlugins[0].Interval, time.Duration(9999)*time.Millisecond)
+	s.Empty(config.PluginRunner.(*pluginRunner).AggregatorPlugins)
+	s.Equal(config.PluginRunner.(*pluginRunner).FlusherPlugins[0].Interval, time.Duration(323)*time.Millisecond)
 }
 
 func (s *logstoreConfigTestSuite) TestLoadConfig() {
@@ -135,16 +133,16 @@ func (s *logstoreConfigTestSuite) TestLoadConfig() {
 		s.Equal(config.ProjectName, "project")
 		s.Equal(config.LogstoreName, "logstore")
 		s.Equal(config.LogstoreKey, int64(666))
-		s.Equal(len(config.PluginRunner.(*pluginv1Runner).MetricPlugins), 0)
-		s.Equal(len(config.PluginRunner.(*pluginv1Runner).ServicePlugins), 1)
-		s.Equal(len(config.PluginRunner.(*pluginv1Runner).ProcessorPlugins), 1)
-		s.Equal(len(config.PluginRunner.(*pluginv1Runner).AggregatorPlugins), 1)
-		s.Equal(len(config.PluginRunner.(*pluginv1Runner).FlusherPlugins), 2)
+		s.Equal(len(config.PluginRunner.(*pluginRunner).MetricPlugins), 0)
+		s.Equal(len(config.PluginRunner.(*pluginRunner).ServicePlugins), 1)
+		s.Equal(len(config.PluginRunner.(*pluginRunner).ProcessorPlugins), 1)
+		s.Equal(len(config.PluginRunner.(*pluginRunner).AggregatorPlugins), 1)
+		s.Equal(len(config.PluginRunner.(*pluginRunner).FlusherPlugins), 2)
 		// global config
 		s.Equal(config.GlobalConfig, &global_config.LoongcollectorGlobalConfig)
 
 		// check plugin inner info
-		reg, ok := config.PluginRunner.(*pluginv1Runner).ProcessorPlugins[0].Processor.(*regex.ProcessorRegex)
+		reg, ok := config.PluginRunner.(*pluginRunner).ProcessorPlugins[0].Processor.(*regex.ProcessorRegex)
 		s.True(ok)
 		// "SourceKey": "content",
 		// "Regex": "Active connections: (\\d+)\\s+server accepts handled requests\\s+(\\d+)\\s+(\\d+)\\s+(\\d+)\\s+Reading: (\\d+) Writing: (\\d+) Waiting: (\\d+).*",
@@ -250,19 +248,19 @@ func (s *logstoreConfigTestSuite) TestLoadConfigWithExtension() {
 	s.Equal(config.LogstoreName, "logstore")
 	s.Equal(config.ConfigName, "test")
 	s.Equal(config.LogstoreKey, int64(666))
-	s.Equal(len(config.PluginRunner.(*pluginv1Runner).MetricPlugins), 0)
-	s.Equal(len(config.PluginRunner.(*pluginv1Runner).ServicePlugins), 1)
-	s.Equal(len(config.PluginRunner.(*pluginv1Runner).ProcessorPlugins), 1)
-	s.Equal(len(config.PluginRunner.(*pluginv1Runner).AggregatorPlugins), 1)
-	s.Equal(len(config.PluginRunner.(*pluginv1Runner).FlusherPlugins), 2)
-	s.Equal(len(config.PluginRunner.(*pluginv1Runner).ExtensionPlugins), 1)
+	s.Equal(len(config.PluginRunner.(*pluginRunner).MetricPlugins), 0)
+	s.Equal(len(config.PluginRunner.(*pluginRunner).ServicePlugins), 1)
+	s.Equal(len(config.PluginRunner.(*pluginRunner).ProcessorPlugins), 1)
+	s.Equal(len(config.PluginRunner.(*pluginRunner).AggregatorPlugins), 1)
+	s.Equal(len(config.PluginRunner.(*pluginRunner).FlusherPlugins), 2)
+	s.Equal(len(config.PluginRunner.(*pluginRunner).ExtensionPlugins), 1)
 	// global config
 	s.Equal(config.GlobalConfig, &global_config.LoongcollectorGlobalConfig)
 
 	// check plugin inner info
-	_, ok := config.PluginRunner.(*pluginv1Runner).ProcessorPlugins[0].Processor.(*regex.ProcessorRegex)
+	_, ok := config.PluginRunner.(*pluginRunner).ProcessorPlugins[0].Processor.(*regex.ProcessorRegex)
 	s.True(ok)
-	_, ok = config.PluginRunner.(*pluginv1Runner).ExtensionPlugins["ext_basicauth/basicauth_user1"].(*basicauth.ExtensionBasicAuth)
+	_, ok = config.PluginRunner.(*pluginRunner).ExtensionPlugins["ext_basicauth/basicauth_user1"].(*basicauth.ExtensionBasicAuth)
 	s.True(ok)
 }
 
@@ -337,19 +335,19 @@ func (s *logstoreConfigTestSuite) TestGetExtension() {
 	s.Equal(config.LogstoreName, "logstore")
 	s.Equal(config.ConfigName, "test")
 	s.Equal(config.LogstoreKey, int64(666))
-	s.Equal(len(config.PluginRunner.(*pluginv1Runner).MetricPlugins), 0)
-	s.Equal(len(config.PluginRunner.(*pluginv1Runner).ServicePlugins), 1)
-	s.Equal(len(config.PluginRunner.(*pluginv1Runner).ProcessorPlugins), 1)
-	s.Equal(len(config.PluginRunner.(*pluginv1Runner).AggregatorPlugins), 1)
-	s.Equal(len(config.PluginRunner.(*pluginv1Runner).FlusherPlugins), 2)
-	s.Equal(len(config.PluginRunner.(*pluginv1Runner).ExtensionPlugins), 1)
+	s.Equal(len(config.PluginRunner.(*pluginRunner).MetricPlugins), 0)
+	s.Equal(len(config.PluginRunner.(*pluginRunner).ServicePlugins), 1)
+	s.Equal(len(config.PluginRunner.(*pluginRunner).ProcessorPlugins), 1)
+	s.Equal(len(config.PluginRunner.(*pluginRunner).AggregatorPlugins), 1)
+	s.Equal(len(config.PluginRunner.(*pluginRunner).FlusherPlugins), 2)
+	s.Equal(len(config.PluginRunner.(*pluginRunner).ExtensionPlugins), 1)
 	// global config
 	s.Equal(config.GlobalConfig, &global_config.LoongcollectorGlobalConfig)
 
 	// check plugin inner info
-	_, ok := config.PluginRunner.(*pluginv1Runner).ProcessorPlugins[0].Processor.(*regex.ProcessorRegex)
+	_, ok := config.PluginRunner.(*pluginRunner).ProcessorPlugins[0].Processor.(*regex.ProcessorRegex)
 	s.True(ok)
-	_, ok = config.PluginRunner.(*pluginv1Runner).ExtensionPlugins["ext_basicauth/basicauth_user1"].(*basicauth.ExtensionBasicAuth)
+	_, ok = config.PluginRunner.(*pluginRunner).ExtensionPlugins["ext_basicauth/basicauth_user1"].(*basicauth.ExtensionBasicAuth)
 	s.True(ok)
 
 	ext, err := config.Context.GetExtension("ext_basicauth/basicauth_user1", nil)
@@ -399,25 +397,6 @@ func Test_hasDockerStdoutInput(t *testing.T) {
 	}
 }
 
-func Test_extractTags(t *testing.T) {
-	l := &protocol.Log{}
-	extractTags([]byte("k1~=~v1^^^k2~=~v2"), l)
-	assert.Equal(t, l.Contents[0].Key, "k1")
-	assert.Equal(t, l.Contents[0].Value, "v1")
-	assert.Equal(t, l.Contents[1].Key, "k2")
-	assert.Equal(t, l.Contents[1].Value, "v2")
-
-	l = &protocol.Log{}
-	extractTags([]byte("^^^k2~=~v2"), l)
-	assert.Equal(t, l.Contents[0].Key, "k2")
-	assert.Equal(t, l.Contents[0].Value, "v2")
-
-	l = &protocol.Log{}
-	extractTags([]byte("^^^k2"), l)
-	assert.Equal(t, l.Contents[0].Key, "__tag__:__prefix__0")
-	assert.Equal(t, l.Contents[0].Value, "k2")
-}
-
 func Test_extractTagsToLogTags(t *testing.T) {
 	logTag := extractTagsToLogTags([]byte("k1~=~v1^^^k2~=~v2"))
 	assert.Equal(t, logTag[0].Key, "k1")
@@ -434,229 +413,20 @@ func Test_extractTagsToLogTags(t *testing.T) {
 	assert.Equal(t, logTag[0].Value, "k2")
 }
 
-func TestLogstoreConfig_ProcessPipelineEventGroup_V1Logs(t *testing.T) {
-	groupInfo := models.NewGroup(models.NewMetadata(), models.NewTags())
-	log := models.NewLog("", []byte("hello"), "", "", "", models.NewTags(), 1_000_000_000)
-	pbGroup, err := helper.TransferPipelineEventGroupToPB(groupInfo, []models.PipelineEvent{log})
-	require.NoError(t, err)
-	pbBytes, err := pbGroup.Marshal()
-	require.NoError(t, err)
-
-	l := &LogstoreConfig{
-		ConfigName: "test-v1-ppeg",
-		Version:    v1,
-		Context:    &ContextImp{},
-		GlobalConfig: &global_config.GlobalConfig{
-			UsingOldContentTag: false,
-		},
-	}
-	l.Context.InitContext("", "", l.ConfigName)
-	l.PluginRunner = &pluginv1Runner{
-		LogstoreConfig: l,
-		LogsChan:       make(chan *pipeline.LogWithContext, 4),
-	}
-	assert.Equal(t, 0, l.ProcessPipelineEventGroup(pbBytes, "pack-1"))
-	require.Equal(t, 1, len(l.PluginRunner.(*pluginv1Runner).LogsChan))
-	logCtx := <-l.PluginRunner.(*pluginv1Runner).LogsChan
-	assert.Equal(t, "hello", logCtx.Log.Contents[0].Value)
-	assert.Equal(t, "pack-1", logCtx.Context["source"])
-}
-
-func TestLogstoreConfig_ProcessPipelineEventGroup_V1Topic(t *testing.T) {
-	for _, usingOldContentTag := range []bool{false, true} {
-		t.Run("UsingOldContentTag="+strconv.FormatBool(usingOldContentTag), func(t *testing.T) {
-			groupInfo := models.NewGroup(models.NewMetadata(), models.NewTagsWithKeyValues("__topic__", "access", "host", "h1"))
-			log := models.NewLog("", []byte("hello"), "", "", "", models.NewTags(), 1_000_000_000)
-			pbGroup, err := helper.TransferPipelineEventGroupToPB(groupInfo, []models.PipelineEvent{log})
-			require.NoError(t, err)
-			pbBytes, err := pbGroup.Marshal()
-			require.NoError(t, err)
-
-			l := &LogstoreConfig{
-				ConfigName: "test-v1-topic",
-				Version:    v1,
-				Context:    &ContextImp{},
-				GlobalConfig: &global_config.GlobalConfig{
-					UsingOldContentTag: usingOldContentTag,
-				},
-			}
-			l.Context.InitContext("", "", l.ConfigName)
-			runner := &pluginv1Runner{
-				LogstoreConfig: l,
-				LogsChan:       make(chan *pipeline.LogWithContext, 1),
-			}
-			l.PluginRunner = runner
-			require.Equal(t, 0, l.ProcessPipelineEventGroup(pbBytes, "pack-1"))
-			require.Len(t, runner.LogsChan, 1)
-			logCtx := <-runner.LogsChan
-			assert.Equal(t, "access", logCtx.Context[ctxKeyTopic])
-			assert.Equal(t, "pack-1", logCtx.Context[ctxKeySource])
-			contents := make(map[string]string)
-			for _, content := range logCtx.Log.Contents {
-				contents[content.Key] = content.Value
-			}
-			assert.Equal(t, "hello", contents["content"])
-			assert.Equal(t, "access", contents[tagKeyLogTopic])
-			assert.NotContains(t, contents, "__tag__:__topic__")
-			if usingOldContentTag {
-				assert.Equal(t, "h1", contents["__tag__:host"])
-			} else {
-				assert.Equal(t, []*protocol.LogTag{{Key: "host", Value: "h1"}}, logCtx.Context[ctxKeyTags])
-			}
-		})
-	}
-}
-
-func TestLogstoreConfig_ProcessPipelineEventGroup_V2Topic(t *testing.T) {
-	tests := []struct {
-		name string
-		tags map[string]string
-	}{
-		{name: "absent topic", tags: map[string]string{"host": "h1"}},
-		{name: "empty topic", tags: map[string]string{"__topic__": "", "host": "h1"}},
-		{name: "nonempty topic", tags: map[string]string{"__topic__": "access", "host": "h1"}},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			groupInfo := models.NewGroup(models.NewMetadata(), models.NewTagsWithMap(tt.tags))
-			log := models.NewLog("", []byte("hello"), "", "", "", models.NewTags(), 1_000_000_000)
-			pbGroup, err := helper.TransferPipelineEventGroupToPB(groupInfo, []models.PipelineEvent{log})
-			require.NoError(t, err)
-			pbBytes, err := pbGroup.Marshal()
-			require.NoError(t, err)
-
-			ctx := &mockContect{}
-			l := &LogstoreConfig{ConfigName: "test-v2-topic", Version: v2, Context: &ContextImp{}}
-			l.Context.InitContext("", "", l.ConfigName)
-			l.PluginRunner = &pluginv2Runner{LogstoreConfig: l, InputPipeContext: ctx}
-			require.Equal(t, 0, l.ProcessPipelineEventGroup(pbBytes, "pack-1"))
-			require.Len(t, ctx.logs, 1)
-			// The v2 typed protocol retains the reserved topic for native SLS serialization.
-			tags := make(map[string]string)
-			for k, v := range ctx.logs[0].Group.Tags.Iterator() {
-				tags[k] = v
-			}
-			assert.Equal(t, tt.tags, tags)
-			assert.Equal(t, "pack-1", ctx.logs[0].Group.Metadata.Get(ctxKeySource))
-			require.Len(t, ctx.logs[0].Events, 1)
-			assert.IsType(t, &models.Log{}, ctx.logs[0].Events[0])
-		})
-	}
-}
-
-func TestLogstoreConfig_ProcessPipelineEventGroup_V1DiscardMetric(t *testing.T) {
-	groupInfo := models.NewGroup(models.NewMetadata(), models.NewTags())
-	metric := models.NewSingleValueMetric("cpu", models.MetricTypeGauge, models.NewTags(), 0, 1.0)
-	pbGroup, err := helper.TransferPipelineEventGroupToPB(groupInfo, []models.PipelineEvent{metric})
-	require.NoError(t, err)
-	pbBytes, err := pbGroup.Marshal()
-	require.NoError(t, err)
-
-	l := &LogstoreConfig{
-		ConfigName:   "test-v1-metric",
-		Version:      v1,
-		Context:      &ContextImp{},
-		GlobalConfig: &global_config.GlobalConfig{},
-	}
-	l.Context.InitContext("", "", l.ConfigName)
-	l.PluginRunner = &pluginv1Runner{
-		LogstoreConfig: l,
-		LogsChan:       make(chan *pipeline.LogWithContext, 1),
-	}
-	assert.Equal(t, 0, l.ProcessPipelineEventGroup(pbBytes, "pack-1"))
-	assert.Equal(t, 0, len(l.PluginRunner.(*pluginv1Runner).LogsChan))
-}
-
 func TestLogstoreConfig_ProcessRawLogV2(t *testing.T) {
-	rawLogs := []byte("12345")
-	topic := "topic"
-	tags := []byte("")
-	str := util.ZeroCopyBytesToString(rawLogs)
-	l := new(LogstoreConfig)
-	l.PluginRunner = &pluginv1Runner{
-		LogsChan: make(chan *pipeline.LogWithContext, 10),
-	}
-	l.GlobalConfig = &global_config.LoongcollectorGlobalConfig
-	l.GlobalConfig.UsingOldContentTag = true
-	{
-		assert.Equal(t, 0, l.ProcessRawLogV2(rawLogs, "", topic, tags))
-		assert.Equal(t, 1, len(l.PluginRunner.(*pluginv1Runner).LogsChan))
-		log := <-l.PluginRunner.(*pluginv1Runner).LogsChan
-		assert.Equal(t, log.Log.Contents[0].GetValue(), str)
-		assert.Equal(t, log.Log.Contents[1].GetValue(), topic)
-		assert.True(t, util.IsSafeString(log.Log.Contents[0].GetValue(), str))
-		assert.False(t, util.IsSafeString(log.Log.Contents[1].GetValue(), topic))
-	}
-
-	{
-		tags = []byte("k1~=~v1^^^k2~=~v2")
-		tagsStr := util.ZeroCopyBytesToString(tags)
-		assert.Equal(t, 0, l.ProcessRawLogV2(rawLogs, "", topic, tags))
-		assert.Equal(t, 1, len(l.PluginRunner.(*pluginv1Runner).LogsChan))
-		log := <-l.PluginRunner.(*pluginv1Runner).LogsChan
-		assert.Equal(t, log.Log.Contents[0].GetValue(), str)
-		assert.Equal(t, log.Log.Contents[1].GetValue(), topic)
-		assert.Equal(t, 4, len(log.Log.Contents))
-
-		assert.Equal(t, log.Log.Contents[0].GetValue(), str)
-		assert.Equal(t, log.Log.Contents[1].GetValue(), topic)
-		assert.Equal(t, log.Log.Contents[2].GetKey(), "k1")
-		assert.Equal(t, log.Log.Contents[2].GetValue(), "v1")
-		assert.Equal(t, log.Log.Contents[3].GetKey(), "k2")
-		assert.Equal(t, log.Log.Contents[3].GetValue(), "v2")
-
-		assert.True(t, util.IsSafeString(log.Log.Contents[0].GetValue(), str))
-		assert.False(t, util.IsSafeString(log.Log.Contents[1].GetValue(), topic))
-		assert.True(t, util.IsSafeString(log.Log.Contents[2].GetKey(), tagsStr))
-		assert.True(t, util.IsSafeString(log.Log.Contents[2].GetValue(), tagsStr))
-		assert.True(t, util.IsSafeString(log.Log.Contents[3].GetKey(), tagsStr))
-		assert.True(t, util.IsSafeString(log.Log.Contents[3].GetValue(), tagsStr))
-	}
-
-	{
-		tags = []byte("^^^k2~=~v2")
-		tagsStr := util.ZeroCopyBytesToString(tags)
-		assert.Equal(t, 0, l.ProcessRawLogV2(rawLogs, "", topic, tags))
-		assert.Equal(t, 1, len(l.PluginRunner.(*pluginv1Runner).LogsChan))
-		log := <-l.PluginRunner.(*pluginv1Runner).LogsChan
-		assert.Equal(t, log.Log.Contents[0].GetValue(), str)
-		assert.Equal(t, log.Log.Contents[1].GetValue(), topic)
-		assert.Equal(t, 3, len(log.Log.Contents))
-
-		assert.Equal(t, log.Log.Contents[0].GetValue(), str)
-		assert.Equal(t, log.Log.Contents[1].GetValue(), topic)
-		assert.Equal(t, log.Log.Contents[2].GetKey(), "k2")
-		assert.Equal(t, log.Log.Contents[2].GetValue(), "v2")
-
-		assert.True(t, util.IsSafeString(log.Log.Contents[0].GetValue(), str))
-		assert.False(t, util.IsSafeString(log.Log.Contents[1].GetValue(), topic))
-		assert.True(t, util.IsSafeString(log.Log.Contents[2].GetKey(), tagsStr))
-		assert.True(t, util.IsSafeString(log.Log.Contents[2].GetValue(), tagsStr))
-	}
-
-	{
-		tags = []byte("^^^k2^^^k3")
-		tagsStr := util.ZeroCopyBytesToString(tags)
-		assert.Equal(t, 0, l.ProcessRawLogV2(rawLogs, "", topic, tags))
-		assert.Equal(t, 1, len(l.PluginRunner.(*pluginv1Runner).LogsChan))
-		log := <-l.PluginRunner.(*pluginv1Runner).LogsChan
-		assert.Equal(t, log.Log.Contents[0].GetValue(), str)
-		assert.Equal(t, log.Log.Contents[1].GetValue(), topic)
-		assert.Equal(t, 4, len(log.Log.Contents))
-
-		assert.Equal(t, log.Log.Contents[0].GetValue(), str)
-		assert.Equal(t, log.Log.Contents[1].GetValue(), topic)
-		assert.Equal(t, log.Log.Contents[2].GetKey(), "__tag__:__prefix__0")
-		assert.Equal(t, log.Log.Contents[2].GetValue(), "k2")
-		assert.Equal(t, log.Log.Contents[3].GetKey(), "__tag__:__prefix__1")
-		assert.Equal(t, log.Log.Contents[3].GetValue(), "k3")
-
-		assert.True(t, util.IsSafeString(log.Log.Contents[0].GetValue(), str))
-		assert.False(t, util.IsSafeString(log.Log.Contents[1].GetValue(), topic))
-		assert.True(t, util.IsSafeString(log.Log.Contents[2].GetKey(), tagsStr))
-		assert.True(t, util.IsSafeString(log.Log.Contents[2].GetValue(), tagsStr))
-		assert.True(t, util.IsSafeString(log.Log.Contents[3].GetKey(), tagsStr))
-		assert.True(t, util.IsSafeString(log.Log.Contents[3].GetValue(), tagsStr))
+	for _, rawTags := range []string{"", "k1~=~v1^^^k2~=~v2", "^^^k2~=~v2", "^^^k2^^^k3"} {
+		t.Run(rawTags, func(t *testing.T) {
+			runner := &rawLogCaptureRunner{LogsChan: make(chan *pipeline.LogWithContext, 1)}
+			config := &LogstoreConfig{PluginRunner: runner}
+			assert.Equal(t, 0, config.ProcessRawLogV2([]byte("12345"), "pack", "topic", []byte(rawTags)))
+			in := <-runner.LogsChan
+			require.Len(t, in.Log.Contents, 2)
+			assert.Equal(t, "12345", in.Log.Contents[0].Value)
+			assert.Equal(t, "topic", in.Log.Contents[1].Value)
+			assert.Equal(t, "pack", in.Context["source"])
+			assert.Equal(t, "topic", in.Context["topic"])
+			assert.Equal(t, extractTagsToLogTags([]byte(rawTags)), in.Context["tags"])
+		})
 	}
 }
 
@@ -703,5 +473,51 @@ func Test_genPluginMeta(t *testing.T) {
 		assert.Equal(t, "testPlugin", result.PluginType)
 		assert.Equal(t, "testPlugin/customID", result.PluginTypeWithID)
 		assert.Equal(t, "customID", result.PluginID)
+	}
+}
+
+// Capture the public raw-log input boundary independently of its runtime.
+type rawLogCaptureRunner struct {
+	PluginRunner
+	LogstoreConfig *LogstoreConfig
+	LogsChan       chan *pipeline.LogWithContext
+}
+
+func (r *rawLogCaptureRunner) ReceiveRawLog(log *pipeline.LogWithContext) { r.LogsChan <- log }
+
+func TestLogstoreConfig_ProcessPipelineEventGroup_Topic(t *testing.T) {
+	tests := []struct {
+		name string
+		tags map[string]string
+	}{
+		{name: "absent topic", tags: map[string]string{"host": "h1"}},
+		{name: "empty topic", tags: map[string]string{"__topic__": "", "host": "h1"}},
+		{name: "nonempty topic", tags: map[string]string{"__topic__": "access", "host": "h1"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			groupInfo := models.NewGroup(models.NewMetadata(), models.NewTagsWithMap(tt.tags))
+			log := models.NewLog("", []byte("hello"), "", "", "", models.NewTags(), 1_000_000_000)
+			pbGroup, err := helper.TransferPipelineEventGroupToPB(groupInfo, []models.PipelineEvent{log})
+			require.NoError(t, err)
+			pbBytes, err := pbGroup.Marshal()
+			require.NoError(t, err)
+
+			ctx := &mockContect{}
+			l := &LogstoreConfig{ConfigName: "test-topic", Context: &ContextImp{}}
+			l.Context.InitContext("", "", l.ConfigName)
+			l.PluginRunner = &pluginRunner{LogstoreConfig: l, InputPipeContext: ctx}
+			require.Equal(t, 0, l.ProcessPipelineEventGroup(pbBytes, "pack-1"))
+			require.Len(t, ctx.logs, 1)
+			// The typed protocol retains the reserved topic for native SLS serialization.
+			tags := make(map[string]string)
+			for k, v := range ctx.logs[0].Group.Tags.Iterator() {
+				tags[k] = v
+			}
+			assert.Equal(t, tt.tags, tags)
+			assert.Equal(t, "pack-1", ctx.logs[0].Group.Metadata.Get(ctxKeySource))
+			require.Len(t, ctx.logs[0].Events, 1)
+			assert.IsType(t, &models.Log{}, ctx.logs[0].Events[0])
+		})
 	}
 }

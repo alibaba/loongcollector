@@ -15,6 +15,13 @@
 cmake_minimum_required(VERSION 3.22)
 project(unittest_base)
 
+# Discover cases when CTest runs, after parallel compilation/linking finishes.
+# Loading sanitizer-enabled binaries under build load can exceed GoogleTest's
+# default 5 s discovery timeout. run_core_ut.sh executes the binaries directly.
+if (NOT DEFINED CMAKE_GTEST_DISCOVER_TESTS_DISCOVERY_MODE)
+    set(CMAKE_GTEST_DISCOVER_TESTS_DISCOVERY_MODE PRE_TEST)
+endif ()
+
 if (LINUX)
     # Unittest should be able to visit private members
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-access-control")

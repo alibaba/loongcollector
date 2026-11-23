@@ -13,8 +13,6 @@ Feature: input internal metrics to prometheus
     Given {input-internal-metrics-prometheus-case} local config as below
     """
     enable: true
-    global:
-      StructureType: v2
     inputs:
       - Type: input_internal_metrics
         Agent:
@@ -59,7 +57,6 @@ Feature: input internal metrics to prometheus
     """
     enable: true
     global:
-      StructureType: v2
       InputIntervalMs: 100
     inputs:
       - Type: metric_mock
@@ -70,8 +67,6 @@ Feature: input internal metrics to prometheus
     Given {go-self-monitor-metrics} local config as below
     """
     enable: true
-    global:
-      StructureType: v2
     inputs:
       - Type: input_internal_metrics
         Agent:

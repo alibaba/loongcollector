@@ -15,37 +15,36 @@
 package pluginmanager
 
 import (
-	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
-
 	"time"
+
+	"github.com/alibaba/ilogtail/pkg/models"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 )
 
-type FlusherWrapperV1 struct {
+type FlusherPluginWrapper struct {
 	FlusherWrapper
-	LogGroupsChan chan *protocol.LogGroup
-	Flusher       pipeline.FlusherV1
+	Flusher pipeline.FlusherV2
 }
 
-func (wrapper *FlusherWrapperV1) Init(pluginMeta *pipeline.PluginMeta) error {
+func (wrapper *FlusherPluginWrapper) Init(pluginMeta *pipeline.PluginMeta) error {
 	wrapper.InitMetricRecord(pluginMeta)
 
 	return wrapper.Flusher.Init(wrapper.Config.Context)
 }
 
-func (wrapper *FlusherWrapperV1) IsReady(projectName string, logstoreName string, logstoreKey int64) bool {
+func (wrapper *FlusherPluginWrapper) IsReady(projectName string, logstoreName string, logstoreKey int64) bool {
 	return wrapper.Flusher.IsReady(projectName, logstoreName, logstoreKey)
 }
 
-func (wrapper *FlusherWrapperV1) Flush(projectName string, logstoreName string, configName string, logGroupList []*protocol.LogGroup) error {
+func (wrapper *FlusherPluginWrapper) Export(pipelineGroupEvents []*models.PipelineGroupEvents, pipelineContext pipeline.PipelineContext) error {
 	startTime := time.Now()
-	for _, logGroup := range logGroupList {
-		wrapper.inEventsTotal.Add(int64(len(logGroup.Logs)))
+	for _, groups := range pipelineGroupEvents {
+		wrapper.inEventsTotal.Add(groups.GetEventCount())
 		wrapper.inEventGroupsTotal.Add(1)
-		wrapper.inSizeBytes.Add(int64(logGroup.Size()))
+		wrapper.inSizeBytes.Add(groups.GetSize())
 	}
 
-	err := wrapper.Flusher.Flush(projectName, logstoreName, configName, logGroupList)
+	err := wrapper.Flusher.Export(pipelineGroupEvents, pipelineContext)
 
 	wrapper.totalDelayTimeMs.Add(time.Since(startTime).Milliseconds())
 	return err

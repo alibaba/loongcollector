@@ -17,8 +17,6 @@ package pluginmanager
 import (
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/models"
-	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
 type TagKey int
@@ -47,47 +45,11 @@ func NewProcessorTag(pipelineMetaTagKey map[string]string, appendingAllEnvMetaTa
 	return processorTag
 }
 
-func (p *ProcessorTag) ProcessV1(logCtx *pipeline.LogWithContext) {
-	tagsMap := make(map[string]string)
-	if logCtx.Context == nil {
-		logCtx.Context = make(map[string]interface{})
-	}
-	if tags, ok := logCtx.Context["tags"]; ok {
-		tagsArray, ok := tags.([]*protocol.LogTag)
-		if !ok {
-			return
-		}
-		for _, tag := range tagsArray {
-			tagsMap[tag.Key] = tag.Value
-		}
-	}
-	p.addAllConfigurableTags(tagsMap)
-	// env tags
-	for i := 0; i < len(helper.EnvTags); i += 2 {
-		if len(p.agentEnvMetaTagKey) == 0 && p.appendingAllEnvMetaTag {
-			tagsMap[helper.EnvTags[i]] = helper.EnvTags[i+1]
-		} else {
-			if customKey, ok := p.agentEnvMetaTagKey[helper.EnvTags[i]]; ok {
-				if customKey != "" {
-					tagsMap[customKey] = helper.EnvTags[i+1]
-				}
-			}
-		}
-	}
-	newTags := make([]*protocol.LogTag, len(tagsMap))
-	i := 0
-	for key, value := range tagsMap {
-		newTags[i] = &protocol.LogTag{Key: key, Value: value}
-		i++
-	}
-	logCtx.Context["tags"] = newTags
-}
-
-func (p *ProcessorTag) ProcessV2(in *models.PipelineGroupEvents) {
+func (p *ProcessorTag) Process(in *models.PipelineGroupEvents) {
 	if in == nil || in.Group == nil {
 		return
 	}
-	// A v2 input may emit a group whose Tags is a nil interface or the shared
+	// An input may emit a group whose Tags is a nil interface or the shared
 	// Nil sentinel (e.g. a bare &models.GroupInfo{}). Add would panic on the
 	// former and silently drop on the latter, so ensure a writable Tags first.
 	// The `== nil` check must come first to short-circuit before IsNil() is

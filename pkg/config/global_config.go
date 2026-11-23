@@ -55,7 +55,6 @@ type GlobalConfig struct {
 	DelayStopSec int
 
 	EnableTimestampNanosecond bool
-	UsingOldContentTag        bool
 	EnableSlsMetricsFormat    bool
 	EnableProcessorTag        bool
 
