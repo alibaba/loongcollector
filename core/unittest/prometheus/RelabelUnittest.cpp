@@ -159,8 +159,8 @@ void RelabelConfigUnittest::TestReplaceFullMatch() {
     {
         Labels labels;
         labels.Set("pod", "web-1");
-        process(R"({"action": "replace", "source_labels": ["pod"], "regex": "web",
-                    "target_label": "app", "replacement": "frontend"})",
+        process(R"JSON({"action": "replace", "source_labels": ["pod"], "regex": "web",
+                    "target_label": "app", "replacement": "frontend"})JSON",
                 labels);
         APSARA_TEST_EQUAL((size_t)1, labels.Size());
         APSARA_TEST_EQUAL("", labels.Get("app"));
@@ -169,8 +169,8 @@ void RelabelConfigUnittest::TestReplaceFullMatch() {
     {
         Labels labels;
         labels.Set("pod", "web");
-        process(R"({"action": "replace", "source_labels": ["pod"], "regex": "web",
-                    "target_label": "app", "replacement": "frontend"})",
+        process(R"JSON({"action": "replace", "source_labels": ["pod"], "regex": "web",
+                    "target_label": "app", "replacement": "frontend"})JSON",
                 labels);
         APSARA_TEST_EQUAL("frontend", labels.Get("app"));
     }
@@ -178,8 +178,8 @@ void RelabelConfigUnittest::TestReplaceFullMatch() {
     {
         Labels labels;
         labels.Set("__name__", "go_koordlet_lrn_cpu");
-        process(R"({"action": "replace", "source_labels": ["__name__"], "regex": "koordlet_lrn_(.*)",
-                    "target_label": "__name__", "replacement": "${1}"})",
+        process(R"JSON({"action": "replace", "source_labels": ["__name__"], "regex": "koordlet_lrn_(.*)",
+                    "target_label": "__name__", "replacement": "${1}"})JSON",
                 labels);
         APSARA_TEST_EQUAL((size_t)1, labels.Size());
         APSARA_TEST_EQUAL("go_koordlet_lrn_cpu", labels.Get("__name__"));
@@ -187,16 +187,16 @@ void RelabelConfigUnittest::TestReplaceFullMatch() {
     {
         Labels labels;
         labels.Set("__name__", "koordlet_lrn_cpu");
-        process(R"({"action": "replace", "source_labels": ["__name__"], "regex": "koordlet_lrn_(.*)",
-                    "target_label": "__name__", "replacement": "${1}"})",
+        process(R"JSON({"action": "replace", "source_labels": ["__name__"], "regex": "koordlet_lrn_(.*)",
+                    "target_label": "__name__", "replacement": "${1}"})JSON",
                 labels);
         APSARA_TEST_EQUAL("cpu", labels.Get("__name__"));
     }
     {
         Labels labels;
         labels.Set("q1", "quota-a");
-        process(R"({"action": "replace", "source_labels": ["q1", "q2"], "separator": ".",
-                    "regex": "([\\w\\.]+)", "target_label": "tmp", "replacement": "$1"})",
+        process(R"JSON({"action": "replace", "source_labels": ["q1", "q2"], "separator": ".",
+                    "regex": "([\\w\\.]+)", "target_label": "tmp", "replacement": "$1"})JSON",
                 labels);
         APSARA_TEST_EQUAL((size_t)1, labels.Size());
         APSARA_TEST_EQUAL("", labels.Get("tmp"));
@@ -205,8 +205,8 @@ void RelabelConfigUnittest::TestReplaceFullMatch() {
     {
         Labels labels;
         labels.Set("k", "v");
-        process(R"({"action": "replace", "source_labels": ["k"], "regex": "(v)(.*)",
-                    "target_label": "$2", "replacement": "x"})",
+        process(R"JSON({"action": "replace", "source_labels": ["k"], "regex": "(v)(.*)",
+                    "target_label": "$2", "replacement": "x"})JSON",
                 labels);
         APSARA_TEST_EQUAL((size_t)1, labels.Size());
         APSARA_TEST_EQUAL("v", labels.Get("k"));
