@@ -361,3 +361,44 @@ func TestProcessorRegex_ProcessPassesThroughMetric(t *testing.T) {
 	_, ok := results[0].Events[0].(*models.Metric)
 	assert.True(t, ok, "metric event must pass through unchanged")
 }
+
+func TestProcessorRegexOptionalCaptures(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		keys []string
+		want models.KeyValueSlice[any]
+	}{
+		{
+			name: "unmatched source capture",
+			keys: []string{"content", "empty", "last"},
+			want: models.KeyValueSlice[any]{{Key: "before", Value: "before"}, {Key: "empty", Value: ""}, {Key: "last", Value: "kept"}},
+		},
+		{
+			name: "empty source capture",
+			keys: []string{"missing", "content", "last"},
+			want: models.KeyValueSlice[any]{{Key: "content", Value: ""}, {Key: "before", Value: "before"}, {Key: "last", Value: "kept"}},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			processor := &ProcessorRegex{
+				Regex:                  `^(x)?()(kept)$`,
+				Keys:                   tc.keys,
+				SourceKey:              "content",
+				KeepSourceIfParseError: true,
+			}
+			require.NoError(t, processor.Init(mock.NewEmptyContext("p", "l", "c")))
+			contents := models.NewOrderedLogContents(2)
+			contents.Add("content", "kept")
+			contents.Add("before", "before")
+			log := &models.Log{Contents: contents}
+			outLogs := processortest.Apply(processor, log)
+			require.Len(t, outLogs, 1)
+
+			var got models.KeyValueSlice[any]
+			for key, value := range models.LogContentEntries(outLogs[0].GetIndices()) {
+				got = append(got, models.KeyValue[any]{Key: key, Value: value})
+			}
+			require.Equal(t, tc.want, got)
+		})
+	}
+}

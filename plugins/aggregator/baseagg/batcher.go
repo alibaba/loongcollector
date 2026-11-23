@@ -54,7 +54,7 @@ type sourcePack struct {
 }
 
 type eventBatch struct {
-	group *models.PipelineGroupEvents
+	group models.PipelineGroupEvents
 	size  int64
 }
 
@@ -110,13 +110,13 @@ func (b *Batcher) CollectPartition(ctx pipeline.PipelineContext, key string, inf
 		}
 		if batch == nil || len(batch.group.Events) >= b.maxEvents || batch.size+size > MaxLogGroupSize {
 			if len(pending) >= b.maxGroups {
-				b.emit(collector, key, pending[0].group)
+				b.emit(collector, key, &pending[0].group)
 				b.pendingBytes -= pending[0].size
 				copy(pending, pending[1:])
 				pending[len(pending)-1] = nil
 				pending = pending[:len(pending)-1]
 			}
-			batch = &eventBatch{group: &models.PipelineGroupEvents{Group: info}}
+			batch = &eventBatch{group: models.PipelineGroupEvents{Group: info}}
 			pending = append(pending, batch)
 			b.pending[key] = pending
 		}
@@ -135,7 +135,7 @@ func (b *Batcher) CollectPending(ctx pipeline.PipelineContext) {
 func (b *Batcher) collectPending(collector pipeline.PipelineCollector) {
 	for key, pending := range b.pending {
 		for _, batch := range pending {
-			b.emit(collector, key, batch.group)
+			b.emit(collector, key, &batch.group)
 		}
 		delete(b.pending, key)
 	}
@@ -206,7 +206,15 @@ func eventSize(event models.PipelineEvent) int64 {
 	// enforcing the batch limit.
 	size := int64(6)
 	for key, value := range log.GetIndices().Iterator() {
-		size += int64(5 + len(key) + len(pipeline.GetStringValue(value)))
+		size += int64(5 + len(key))
+		switch value := value.(type) {
+		case string:
+			size += int64(len(value))
+		case []byte:
+			size += int64(len(value))
+		default:
+			size += int64(len(pipeline.GetStringValue(value)))
+		}
 	}
 	return size
 }

@@ -73,34 +73,25 @@ func (p *ProcessorRegex) shouldKeepSource(parseResult bool) bool {
 	return p.KeepSource || (p.KeepSourceIfParseError && !parseResult)
 }
 
-// matchRegex returns the configured captures in Keys order and reports whether matching succeeded.
-func (p *ProcessorRegex) matchRegex(val string) (keys []string, values []string, ok bool) {
-	indexArray := p.re.FindStringSubmatchIndex(val)
-	if len(indexArray) < 2 || (p.FullMatch && (indexArray[0] != 0 || indexArray[1] != len(val))) {
+// matchCaptures returns the offsets for the configured captures or nil on failure.
+func (p *ProcessorRegex) matchCaptures(val string) []int {
+	indices := p.re.FindStringSubmatchIndex(val)
+	if len(indices) < 2 || (p.FullMatch && (indices[0] != 0 || indices[1] != len(val))) {
 		if p.NoMatchError {
 			logger.Warning(p.context.GetRuntimeContext(), selfmonitor.RegexUnmatchedAlarm, "unmatch this log content", util.CutString(val, 512))
 		}
-		return nil, nil, false
+		return nil
 	}
 
-	// Use bitwise operations to ignore first two values in indexArray.
-	if (len(indexArray)>>1 - 1) < len(p.Keys) {
+	const matchOffsets = 2
+	captureCount := (len(indices) - matchOffsets) / 2
+	if captureCount < len(p.Keys) {
 		if p.NoMatchError {
-			logger.Warning(p.context.GetRuntimeContext(), selfmonitor.RegexUnmatchedAlarm, "match result count less than key count, result count", len(indexArray)>>1-1, "key count", len(p.Keys))
+			logger.Warning(p.context.GetRuntimeContext(), selfmonitor.RegexUnmatchedAlarm, "match result count less than key count, result count", captureCount, "key count", len(p.Keys))
 		}
-		return nil, nil, false
+		return nil
 	}
-	keys = make([]string, 0, len(p.Keys))
-	values = make([]string, 0, len(p.Keys))
-	for i := 0; i < len(p.Keys); i++ {
-		leftIndex := indexArray[i<<1+2]
-		rightIndex := indexArray[i<<1+3]
-		if leftIndex >= 0 && rightIndex >= leftIndex {
-			keys = append(keys, p.Keys[i])
-			values = append(values, val[leftIndex:rightIndex])
-		}
-	}
-	return keys, values, true
+	return indices[matchOffsets : matchOffsets+2*len(p.Keys)]
 }
 
 func init() {
@@ -145,15 +136,20 @@ func (p *ProcessorRegex) processLogEvent(log *models.Log) {
 	}
 
 	val := pipeline.GetStringValue(contents.Get(sourceKey))
-	keys, values, parseResult := p.matchRegex(val)
+	captures := p.matchCaptures(val)
 	sourceOverwritten := false
-	for i := range keys {
-		contents.Add(keys[i], values[i])
-		if keys[i] == sourceKey {
+	for i := 0; i < len(captures); i += 2 {
+		start, end := captures[i], captures[i+1]
+		if start < 0 || end < start {
+			continue
+		}
+		key := p.Keys[i/2]
+		contents.Add(key, val[start:end])
+		if key == sourceKey {
 			sourceOverwritten = true
 		}
 	}
-	if !p.shouldKeepSource(parseResult) && !sourceOverwritten {
+	if !p.shouldKeepSource(captures != nil) && !sourceOverwritten {
 		contents.Delete(sourceKey)
 	}
 }

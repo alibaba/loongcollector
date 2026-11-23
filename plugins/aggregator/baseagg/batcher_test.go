@@ -31,10 +31,11 @@ func TestBaseAggregatorEmitsOnEventAndByteLimits(t *testing.T) {
 	for _, tt := range []struct {
 		name      string
 		maxEvents int
-		field     string
+		field     any
 	}{
 		{name: "count", maxEvents: 1, field: "payload"},
-		{name: "bytes", maxEvents: MaxLogCount, field: strings.Repeat("a", MaxLogGroupSize/2+1)},
+		{name: "string field size", maxEvents: MaxLogCount, field: strings.Repeat("a", MaxLogGroupSize/2+1)},
+		{name: "byte field size", maxEvents: MaxLogCount, field: []byte(strings.Repeat("a", MaxLogGroupSize/2+1))},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			aggregator := NewAggregatorBase()
@@ -65,4 +66,16 @@ func TestBaseAggregatorEmitsOnEventAndByteLimits(t *testing.T) {
 			require.False(t, info.GetTags().Contains(pipeline.TopicTagKey))
 		})
 	}
+}
+
+func TestEventSizeCountsStructuredFields(t *testing.T) {
+	log := models.NewSimpleLog(nil, nil, 0)
+	log.Contents.Add("text", "é")
+	log.Contents.Add("bytes", []byte{0xff, 0x00})
+	log.Contents.Add("int", 123)
+	log.Contents.Add("nil", nil)
+
+	const want = 6 + (5 + len("text") + len("é")) + (5 + len("bytes") + 2) +
+		(5 + len("int") + len("123")) + (5 + len("nil") + len("<nil>"))
+	require.EqualValues(t, want, eventSize(log))
 }
