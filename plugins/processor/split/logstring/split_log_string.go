@@ -90,6 +90,13 @@ func (p *ProcessorSplit) Process(in *models.PipelineGroupEvents, context pipelin
 			continue
 		}
 
+		if payload == "" {
+			if p.PreserveOthers {
+				context.Collector().Collect(in.Group, log)
+			}
+			continue
+		}
+
 		template := log.Clone().(*models.Log)
 		if p.PreserveOthers {
 			if splitTag {

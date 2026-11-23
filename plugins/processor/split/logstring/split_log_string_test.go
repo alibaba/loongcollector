@@ -260,6 +260,20 @@ func TestProcessorSplitLogStringSplitsConfiguredField(t *testing.T) {
 	assert.Equal(t, "first|second", log.GetIndices().Get("payload"))
 }
 
+func TestProcessorSplitLogStringKeepsLogWithEmptySplitField(t *testing.T) {
+	processor := &ProcessorSplit{SplitKey: "payload", SplitSep: "|", PreserveOthers: true}
+	require.NoError(t, processor.Init(mock.NewEmptyContext("p", "l", "c")))
+
+	log := processortest.Log("payload", "", "other", "keep")
+	log.SetBody([]byte("original body"))
+	logs := processortest.Apply(processor, log)
+	require.Len(t, logs, 1)
+	require.Same(t, log, logs[0])
+
+	processor.PreserveOthers = false
+	require.Empty(t, processortest.Apply(processor, log))
+}
+
 func TestProcessorSplitLogString_ProcessPassesThroughMetric(t *testing.T) {
 	processor := newSplitLogString(t)
 
