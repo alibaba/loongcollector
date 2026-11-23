@@ -2151,6 +2151,10 @@ void FlusherSLSUnittest::OnGoPipelineSend() {
 
 
 void FlusherSLSUnittest::TestSendPipelineEventGroup() {
+    Json::Value globals, extendedParams;
+    globals["EnableTimestampNanosecond"] = true;
+    ASSERT_TRUE(ctx.InitGlobalConfig(globals, extendedParams));
+
     Json::Value config, optionalGoPipeline;
     config["Type"] = "flusher_sls";
     config["Project"] = "test_project";
@@ -2163,6 +2167,8 @@ void FlusherSLSUnittest::TestSendPipelineEventGroup() {
     ASSERT_TRUE(flusher.Init(config, optionalGoPipeline));
     flusher.CommitMetricsRecordRef();
     flusher.mShardHashKeys = {"route"};
+    const string replacement(4096, 'x');
+    const string binaryValue("left\0right", 10);
     for (int type = 0; type < 3; ++type) {
         PipelineEventGroup group(make_shared<SourceBuffer>());
         group.SetMetadata(EventGroupMetaKey::SOURCE_ID, string("source-id"));
@@ -2173,7 +2179,8 @@ void FlusherSLSUnittest::TestSendPipelineEventGroup() {
         if (type == 0) {
             auto* log = group.AddLogEvent();
             log->SetTimestamp(1700000000, 123);
-            log->SetContent(string("content"), string("go-log"));
+            log->SetContent(string("content"), string("original"));
+            log->SetContent(string("binary"), binaryValue);
         } else if (type == 1) {
             auto* metric = group.AddMetricEvent();
             metric->SetTimestamp(1700000000);
@@ -2186,11 +2193,18 @@ void FlusherSLSUnittest::TestSendPipelineEventGroup() {
             span->SetTraceId("trace-id");
             span->SetSpanId("span-id");
         }
-        models::PipelineEventGroup pb;
         string error;
-        ASSERT_TRUE(TransferPipelineEventGroupToPB(group, pb, error)) << error;
-        // A per-call override must not leak into the next request.
-        ASSERT_TRUE(flusher.Send(pb, type == 0 ? "explicit-hash" : "", type == 0 ? "override" : ""));
+        {
+            models::PipelineEventGroup pb;
+            ASSERT_TRUE(TransferPipelineEventGroupToPB(group, pb, error)) << error;
+            if (type == 0) {
+                auto* duplicate = pb.mutable_logs()->mutable_events(0)->add_contents();
+                duplicate->set_key("content");
+                duplicate->set_value(replacement);
+            }
+            // A per-call override must not leak into the next request.
+            ASSERT_TRUE(flusher.Send(pb, type == 0 ? "explicit-hash" : "", type == 0 ? "override" : ""));
+        }
         vector<SenderQueueItem*> items;
         SenderQueueManager::GetInstance()->GetAvailableItems(items, 80);
         ASSERT_EQ(1U, items.size());
@@ -2214,7 +2228,15 @@ void FlusherSLSUnittest::TestSendPipelineEventGroup() {
             contents[content.key()] = content.value();
         }
         if (type == 0) {
-            EXPECT_EQ("go-log", contents["content"]);
+            const auto& log = result.logs(0);
+            EXPECT_EQ(1700000000U, log.time());
+            ASSERT_TRUE(log.has_time_ns());
+            EXPECT_EQ(123U, log.time_ns());
+            ASSERT_EQ(2, log.contents_size());
+            EXPECT_EQ("content", log.contents(0).key());
+            EXPECT_EQ(replacement, log.contents(0).value());
+            EXPECT_EQ("binary", log.contents(1).key());
+            EXPECT_EQ(binaryValue, log.contents(1).value());
         } else if (type == 1) {
             EXPECT_EQ("go_counter", contents["__name__"]);
             EXPECT_EQ("42", contents["__value__"]);

@@ -30,6 +30,11 @@ namespace logtail {
 bool TransferPBToPipelineEventGroup(const models::PipelineEventGroup& src,
                                     PipelineEventGroup& dst,
                                     std::string& errMsg);
+// The resulting log contents borrow immutable key and value storage from src.
+// Keep src alive until all use of dst finishes.
+bool TransferPBToPipelineLogGroupBorrowingContents(const models::PipelineEventGroup& src,
+                                                   PipelineEventGroup& dst,
+                                                   std::string& errMsg);
 bool TransferPBToLogEvent(const models::LogEvent& src, LogEvent& dst, std::string& errMsg);
 bool TransferPBToMetricEvent(const models::MetricEvent& src, MetricEvent& dst, std::string& errMsg);
 bool TransferPBToSpanEvent(const models::SpanEvent& src, SpanEvent& dst, std::string& errMsg);

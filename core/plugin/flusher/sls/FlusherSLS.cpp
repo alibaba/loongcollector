@@ -961,7 +961,11 @@ bool FlusherSLS::InitForProfile(CollectionPipelineContext& context) {
 bool FlusherSLS::Send(const models::PipelineEventGroup& pbGroup, const string& shardHashKey, const string& logstore) {
     PipelineEventGroup group(make_shared<SourceBuffer>());
     string errorMsg;
-    if (!TransferPBToPipelineEventGroup(pbGroup, group, errorMsg)) {
+    // Only the serialized SLS bytes enter the sender queue. Log contents can
+    // borrow from pbGroup through the synchronous serialization below.
+    bool converted = pbGroup.has_logs() ? TransferPBToPipelineLogGroupBorrowingContents(pbGroup, group, errorMsg)
+                                        : TransferPBToPipelineEventGroup(pbGroup, group, errorMsg);
+    if (!converted) {
         LOG_WARNING(sLogger, ("failed to convert PipelineEventGroup PB", errorMsg));
         return false;
     }

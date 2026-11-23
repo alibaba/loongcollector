@@ -176,8 +176,8 @@ bool SLSEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, stri
 
     // caculate serialized logGroup size first, where some critical results can be cached
     vector<size_t> logSZ(group.mEvents.size());
-    vector<MetricEventContentCacheItem> metricEventContentCache(group.mEvents.size());
-    vector<array<string, 6>> spanEventContentCache(group.mEvents.size());
+    vector<MetricEventContentCacheItem> metricEventContentCache;
+    vector<array<string, 6>> spanEventContentCache;
     size_t logGroupSZ = 0;
     switch (eventType) {
         case PipelineEvent::Type::LOG: {
@@ -185,10 +185,12 @@ bool SLSEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, stri
             break;
         }
         case PipelineEvent::Type::METRIC: {
+            metricEventContentCache.resize(group.mEvents.size());
             CalculateMetricEventSize(group, logGroupSZ, metricEventContentCache, logSZ);
             break;
         }
         case PipelineEvent::Type::SPAN:
+            spanEventContentCache.resize(group.mEvents.size());
             CalculateSpanEventSize(group, logGroupSZ, spanEventContentCache, logSZ);
             break;
         case PipelineEvent::Type::RAW:
