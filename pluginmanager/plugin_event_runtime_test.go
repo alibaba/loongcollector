@@ -122,21 +122,55 @@ func TestMetricInputUsesEventCounters(t *testing.T) {
 func TestNativeInputPreservesFieldsAndGroupTags(t *testing.T) {
 	ctx := &ContextImp{}
 	ctx.InitContext("project", "store", "native")
-	runner := &pluginRunner{LogstoreConfig: &LogstoreConfig{Context: ctx, GlobalConfig: &config.GlobalConfig{}}, FlushOutStore: NewFlushOutStore[models.PipelineGroupEvents]()}
+	lc := &LogstoreConfig{Context: ctx, GlobalConfig: &config.GlobalConfig{}}
+	runner := &pluginRunner{LogstoreConfig: lc, FlushOutStore: NewFlushOutStore[models.PipelineGroupEvents]()}
+	lc.PluginRunner = runner
 	require.NoError(t, runner.Init(1, 1))
-	runner.ReceivePipelineEventGroup(&protocol.PipelineEventGroup{
-		Tags: map[string][]byte{"path": []byte("/logs/app.log")},
-		PipelineEvents: &protocol.PipelineEventGroup_Logs{Logs: &protocol.PipelineEventGroup_LogEvents{Events: []*protocol.LogEvent{{
-			Contents: []*protocol.LogEvent_Content{{Key: []byte("named"), Value: []byte("first")}, {Key: []byte("content"), Value: []byte("body")}},
-		}}}},
-	}, map[string]interface{}{"source": "pack"})
+	pb := &protocol.PipelineEventGroup{
+		Metadata: map[string][]byte{"source": []byte("original-source"), "scope": []byte("app")},
+		Tags:     map[string][]byte{"path": []byte("/logs/app.log")},
+		PipelineEvents: &protocol.PipelineEventGroup_Logs{Logs: &protocol.PipelineEventGroup_LogEvents{
+			Events: []*protocol.LogEvent{
+				{Timestamp: 1700000000123456789, FileOffset: 42, RawSize: 15, Level: []byte("info"),
+					Contents: []*protocol.LogEvent_Content{
+						{Key: []byte("content")},
+						{Key: []byte("named"), Value: []byte("first")},
+						{Key: []byte("content"), Value: []byte("old")},
+						{Key: []byte("last"), Value: []byte("tail")},
+						{Key: []byte("content"), Value: []byte("body\x00")},
+						{Key: []byte("content")},
+					},
+				},
+				{Contents: []*protocol.LogEvent_Content{{Key: []byte("content")}}},
+			},
+		}},
+	}
+	wire, err := pb.Marshal()
+	require.NoError(t, err)
+	require.Equal(t, 0, lc.ProcessPipelineEventGroup(wire, "pack"))
+	// The C++ caller can reuse its protobuf buffer once ingress returns.
+	clear(wire)
+
 	group := <-runner.InputPipeContext.Collector().Observe()
+	require.Len(t, group.Events, 2)
 	log := group.Events[0].(*models.Log)
 	require.Equal(t, "first", log.Contents.Get("named"))
-	require.Equal(t, []byte("body"), log.GetBody())
+	require.Equal(t, []byte("body\x00"), log.GetBody())
+	require.Equal(t, uint64(1700000000123456789), log.GetTimestamp())
+	require.Equal(t, uint64(42), log.GetOffset())
+	require.Equal(t, uint64(15), log.GetRawSize())
+	require.Equal(t, "info", log.GetLevel())
+
+	var keys []string
+	for key := range models.LogContentEntries(log.Contents) {
+		keys = append(keys, key)
+	}
+	require.Equal(t, []string{"named", "content", "last"}, keys)
+	require.False(t, group.Events[1].(*models.Log).GetIndices().Contains("content"))
 	require.Equal(t, "/logs/app.log", group.Group.Tags.Get("path"))
 	require.False(t, log.Contents.Contains("__tag__:path"))
 	require.Equal(t, "pack", group.Group.Metadata.Get("source"))
+	require.Equal(t, "app", group.Group.Metadata.Get("scope"))
 }
 
 // Input tags stay separate from contents in memory and on the output wire.

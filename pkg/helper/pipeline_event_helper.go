@@ -1,7 +1,9 @@
 package helper
 
 import (
+	"errors"
 	"fmt"
+	"slices"
 	"sync"
 	"time"
 
@@ -144,6 +146,10 @@ func toPBMetricType(metricType models.MetricType) protocol.UntypedValueMetricTyp
 }
 
 func TransferPBToLogEvent(src *protocol.LogEvent) (*models.Log, error) {
+	return transferPBToLogEvent(src, false)
+}
+
+func transferPBToLogEvent(src *protocol.LogEvent, takeBody bool) (*models.Log, error) {
 	if src == nil {
 		return nil, fmt.Errorf("nil log event")
 	}
@@ -161,12 +167,19 @@ func TransferPBToLogEvent(src *protocol.LogEvent) (*models.Log, error) {
 	}
 	for _, content := range src.Contents {
 		key := string(content.Key)
-		val := string(content.Value)
-		if key == "content" || key == models.BodyKey {
-			log.SetBody(util.ZeroCopyStringToBytes(val))
-		} else {
-			log.Contents.Add(key, val)
+		if key != models.BodyKey {
+			log.Contents.Add(key, string(content.Value))
+			continue
 		}
+		body := content.Value
+		// Empty protobuf values do not insert or overwrite the body field.
+		if len(body) == 0 {
+			continue
+		}
+		if !takeBody {
+			body = slices.Clone(body)
+		}
+		log.SetBody(body)
 	}
 	return log, nil
 }
@@ -193,7 +206,24 @@ func TransferPBToMetricEvent(src *protocol.MetricEvent) (*models.Metric, error) 
 	}
 }
 
+// ErrInvalidPipelineEventGroupWire indicates a protobuf unmarshal failure.
+var ErrInvalidPipelineEventGroupWire = errors.New("invalid pipeline event group wire data")
+
+// DecodePipelineGroupEvents converts wire data to events. The events outlive
+// wire because the generated decoder copies protobuf bytes into its own slices.
+func DecodePipelineGroupEvents(wire []byte) (*models.PipelineGroupEvents, error) {
+	var group protocol.PipelineEventGroup
+	if err := group.Unmarshal(wire); err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrInvalidPipelineEventGroupWire, err)
+	}
+	return transferPBToPipelineGroupEvents(&group, true)
+}
+
 func TransferPBToPipelineGroupEvents(src *protocol.PipelineEventGroup) (*models.PipelineGroupEvents, error) {
+	return transferPBToPipelineGroupEvents(src, false)
+}
+
+func transferPBToPipelineGroupEvents(src *protocol.PipelineEventGroup, takeLogBodies bool) (*models.PipelineGroupEvents, error) {
 	if src == nil {
 		return nil, fmt.Errorf("nil pipeline event group")
 	}
@@ -210,7 +240,7 @@ func TransferPBToPipelineGroupEvents(src *protocol.PipelineEventGroup) (*models.
 	case *protocol.PipelineEventGroup_Logs:
 		events = make([]models.PipelineEvent, 0, len(pipelineEvents.Logs.Events))
 		for _, logEvent := range pipelineEvents.Logs.Events {
-			log, err := TransferPBToLogEvent(logEvent)
+			log, err := transferPBToLogEvent(logEvent, takeLogBodies)
 			if err != nil {
 				return nil, err
 			}

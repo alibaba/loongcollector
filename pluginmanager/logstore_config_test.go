@@ -479,3 +479,15 @@ func TestLogstoreConfig_ProcessPipelineEventGroup_Topic(t *testing.T) {
 		})
 	}
 }
+
+func TestLogstoreConfigProcessPipelineEventGroupErrorStatus(t *testing.T) {
+	ctx := &mockContect{}
+	lc := &LogstoreConfig{Context: &ContextImp{}}
+	lc.Context.InitContext("", "", "native-errors")
+	lc.PluginRunner = &pluginRunner{LogstoreConfig: lc, InputPipeContext: ctx}
+	// A truncated protobuf varint must be reported to the native caller.
+	require.Equal(t, -1, lc.ProcessPipelineEventGroup([]byte{0x80}, "pack"))
+	// An empty message decodes but has no supported event type.
+	require.Equal(t, 0, lc.ProcessPipelineEventGroup(nil, "pack"))
+	require.Empty(t, ctx.logs)
+}

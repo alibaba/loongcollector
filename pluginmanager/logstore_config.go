@@ -18,16 +18,17 @@ import (
 	"context"
 	"crypto/md5" //nolint:gosec
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
 	"sync/atomic"
 
 	"github.com/alibaba/ilogtail/pkg/config"
+	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/plugins/input"
 )
@@ -127,13 +128,20 @@ func (lc *LogstoreConfig) Stop(removedFlag bool) error {
 	return nil
 }
 
+const ctxKeySource = "source"
+
 func (lc *LogstoreConfig) ProcessPipelineEventGroup(pbBytes []byte, packID string) int {
-	pbGroup := &protocol.PipelineEventGroup{}
-	if err := pbGroup.Unmarshal(pbBytes); err != nil {
-		logger.Error(lc.Context.GetRuntimeContext(), selfmonitor.WrongProtobufAlarm, "cannot process pipeline event group passed by core, err", err)
-		return -1
+	group, err := helper.DecodePipelineGroupEvents(pbBytes)
+	if err != nil {
+		if errors.Is(err, helper.ErrInvalidPipelineEventGroupWire) {
+			logger.Error(lc.Context.GetRuntimeContext(), selfmonitor.WrongProtobufAlarm, "cannot process pipeline event group passed by core, err", err)
+			return -1
+		}
+		logger.Warningf(lc.Context.GetRuntimeContext(), selfmonitor.ReceiveLogGroupAlarm, "transfer pipeline event group failed, err: %s", err.Error())
+		return 0
 	}
-	lc.PluginRunner.ReceivePipelineEventGroup(pbGroup, map[string]interface{}{ctxKeySource: packID})
+	group.Group.Metadata.Add(ctxKeySource, packID)
+	lc.PluginRunner.receivePipelineEventGroup(group)
 	return 0
 }
 

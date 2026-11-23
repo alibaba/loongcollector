@@ -23,7 +23,6 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/plugins/aggregator"
 )
@@ -433,22 +432,8 @@ func (p *pluginRunner) Stop(exit bool) error {
 	return nil
 }
 
-func (p *pluginRunner) ReceivePipelineEventGroup(pbGroup *protocol.PipelineEventGroup, ctx map[string]interface{}) {
-	groupEvents, err := helper.TransferPBToPipelineGroupEvents(pbGroup)
-	if err != nil {
-		logger.Warningf(p.LogstoreConfig.Context.GetRuntimeContext(), selfmonitor.ReceiveLogGroupAlarm, "transfer pipeline event group failed, err: %s", err.Error())
-		return
-	}
-	for k, v := range ctx {
-		value, ok := v.(string)
-		if !ok {
-			logger.Warningf(p.LogstoreConfig.Context.GetRuntimeContext(), selfmonitor.ReceiveLogGroupAlarm, "unknown values found in context, type is %T", v)
-			continue
-		}
-		groupEvents.Group.Metadata.Add(k, value)
-	}
-
-	p.InputPipeContext.Collector().Collect(groupEvents.Group, groupEvents.Events...)
+func (p *pluginRunner) receivePipelineEventGroup(group *models.PipelineGroupEvents) {
+	p.InputPipeContext.Collector().Collect(group.Group, group.Events...)
 }
 
 func (p *pluginRunner) Merge(r PluginRunner) {

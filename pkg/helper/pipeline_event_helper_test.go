@@ -45,6 +45,31 @@ func TestTransferLogEventRoundTrip(t *testing.T) {
 	assert.Equal(t, "hello", string(restored.GetBody()))
 }
 
+func TestTransferPBToLogEventsKeepBodyIndependent(t *testing.T) {
+	body := []byte("original")
+	pb := &protocol.LogEvent{Contents: []*protocol.LogEvent_Content{
+		{Key: []byte(models.BodyKey), Value: body},
+		{Key: []byte(models.BodyKey), Value: []byte{}},
+	}}
+
+	log, err := TransferPBToLogEvent(pb)
+	require.NoError(t, err)
+	group, err := TransferPBToPipelineGroupEvents(&protocol.PipelineEventGroup{
+		PipelineEvents: &protocol.PipelineEventGroup_Logs{Logs: &protocol.PipelineEventGroup_LogEvents{
+			Events: []*protocol.LogEvent{pb},
+		}},
+	})
+	require.NoError(t, err)
+	groupLog := group.Events[0].(*models.Log)
+
+	body[0] = 'O'
+	require.Equal(t, []byte("original"), log.GetBody())
+	require.Equal(t, []byte("original"), groupLog.GetBody())
+	log.GetBody()[1] = 'R'
+	require.Equal(t, []byte("Original"), body)
+	require.Equal(t, []byte("original"), groupLog.GetBody())
+}
+
 func TestTransferLogEventToPBPreservesContentOrderAndOwnership(t *testing.T) {
 	body := []byte("body")
 	contents := models.NewOrderedLogContents(3)

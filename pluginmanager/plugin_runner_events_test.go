@@ -25,6 +25,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
+	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
@@ -45,18 +46,28 @@ func (m *mockPipelineCollector) Collect(groupInfo *models.GroupInfo, eventList .
 	m.ctx.logs = append(m.ctx.logs, models.PipelineGroupEvents{Group: groupInfo, Events: eventList})
 }
 
-func TestEventRunner_ReceivePipelineEventGroup_MetricMultiValue(t *testing.T) {
-	ctx := &mockContect{}
-	p := &pluginRunner{InputPipeContext: ctx}
+func capturePipelineEventGroup(t *testing.T, pbGroup *protocol.PipelineEventGroup, packID string) *mockContect {
+	t.Helper()
+	wire, err := pbGroup.Marshal()
+	require.NoError(t, err)
 
+	ctx := &mockContect{}
+	config := &LogstoreConfig{Context: &ContextImp{}}
+	config.Context.InitContext("", "", "native-test")
+	config.PluginRunner = &pluginRunner{LogstoreConfig: config, InputPipeContext: ctx}
+	require.Equal(t, 0, config.ProcessPipelineEventGroup(wire, packID))
+	return ctx
+}
+
+func TestEventRunner_ProcessPipelineEventGroup_MetricMultiValue(t *testing.T) {
 	multiValue := models.NewMetricMultiValueWithMap(map[string]float64{"cpu": 0.5, "mem": 10})
 	metric := models.NewMultiValuesMetric("agent", models.MetricTypeUntyped, models.NewTags(), 123, multiValue.Values)
 	groupInfo := models.NewGroup(models.NewMetadata(), models.NewTagsWithKeyValues("env", "prod"))
 	pbGroup, err := helper.TransferPipelineEventGroupToPB(groupInfo, []models.PipelineEvent{metric})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
-	p.ReceivePipelineEventGroup(pbGroup, map[string]interface{}{"source": "pack-1"})
-	assert.Len(t, ctx.logs, 1)
+	ctx := capturePipelineEventGroup(t, pbGroup, "pack-1")
+	require.Len(t, ctx.logs, 1)
 	m, ok := ctx.logs[0].Events[0].(*models.Metric)
 	assert.True(t, ok)
 	assert.True(t, m.GetValue().IsMultiValues())
@@ -64,31 +75,25 @@ func TestEventRunner_ReceivePipelineEventGroup_MetricMultiValue(t *testing.T) {
 	assert.Equal(t, "pack-1", ctx.logs[0].Group.Metadata.Get("source"))
 }
 
-func TestEventRunner_ReceivePipelineEventGroup_Span(t *testing.T) {
-	ctx := &mockContect{}
-	p := &pluginRunner{InputPipeContext: ctx}
-
+func TestEventRunner_ProcessPipelineEventGroup_Span(t *testing.T) {
 	span := models.NewSpan("op", "trace", "span", models.SpanKindServer, 1, 2, models.NewTagsWithKeyValues("k", "v"), nil, nil)
 	pbGroup, err := helper.TransferPipelineEventGroupToPB(models.NewGroup(models.NewMetadata(), models.NewTags()), []models.PipelineEvent{span})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
-	p.ReceivePipelineEventGroup(pbGroup, nil)
-	assert.Len(t, ctx.logs, 1)
+	ctx := capturePipelineEventGroup(t, pbGroup, "")
+	require.Len(t, ctx.logs, 1)
 	s, ok := ctx.logs[0].Events[0].(*models.Span)
 	assert.True(t, ok)
 	assert.Equal(t, "op", s.GetName())
 }
 
-func TestEventRunner_ReceivePipelineEventGroup_Log(t *testing.T) {
-	ctx := &mockContect{}
-	p := &pluginRunner{InputPipeContext: ctx}
-
+func TestEventRunner_ProcessPipelineEventGroup_Log(t *testing.T) {
 	log := models.NewLog("", []byte("alarm"), "", "", "", models.NewTags(), 200)
 	pbGroup, err := helper.TransferPipelineEventGroupToPB(models.NewGroup(models.NewMetadata(), models.NewTags()), []models.PipelineEvent{log})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
-	p.ReceivePipelineEventGroup(pbGroup, map[string]interface{}{"source": "alarm-pack"})
-	assert.Len(t, ctx.logs, 1)
+	ctx := capturePipelineEventGroup(t, pbGroup, "alarm-pack")
+	require.Len(t, ctx.logs, 1)
 	_, ok := ctx.logs[0].Events[0].(*models.Log)
 	assert.True(t, ok)
 }
