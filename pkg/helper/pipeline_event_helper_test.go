@@ -45,6 +45,24 @@ func TestTransferLogEventRoundTrip(t *testing.T) {
 	assert.Equal(t, "hello", string(restored.GetBody()))
 }
 
+func TestTransferLogEventToPBPreservesContentOrderAndOwnership(t *testing.T) {
+	body := []byte("body")
+	contents := models.NewOrderedLogContents(3)
+	contents.Add("prefix", "first")
+	contents.Add(models.BodyKey, body)
+	contents.Add("suffix", "last")
+
+	pbLog, err := TransferLogEventToPB(&models.Log{Contents: contents})
+	require.NoError(t, err)
+
+	body[0] = 'B'
+	require.Equal(t, []*protocol.LogEvent_Content{
+		{Key: []byte("prefix"), Value: []byte("first")},
+		{Key: []byte(models.BodyKey), Value: []byte("body")},
+		{Key: []byte("suffix"), Value: []byte("last")},
+	}, pbLog.Contents)
+}
+
 func TestTransferSpanEventRoundTrip(t *testing.T) {
 	tags := models.NewTagsWithKeyValues("service", "svc")
 	innerEvents := []*models.SpanEvent{{

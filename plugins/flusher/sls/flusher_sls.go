@@ -106,7 +106,9 @@ func (p *SlsFlusher) sendPipelineEvents(group *models.GroupInfo, events []models
 	eventCount := len(events)
 	switch events[0].GetType() {
 	case models.EventTypeLogging:
-		logs := &protocol.PipelineEventGroup_LogEvents{}
+		logs := &protocol.PipelineEventGroup_LogEvents{
+			Events: make([]*protocol.LogEvent, 0, len(events)),
+		}
 		for _, event := range events {
 			log, ok := event.(*models.Log)
 			if !ok || log == nil {
@@ -128,7 +130,9 @@ func (p *SlsFlusher) sendPipelineEvents(group *models.GroupInfo, events []models
 		}
 		pb.PipelineEvents = &protocol.PipelineEventGroup_Logs{Logs: logs}
 	case models.EventTypeMetric:
-		metrics := &protocol.PipelineEventGroup_MetricEvents{}
+		metrics := &protocol.PipelineEventGroup_MetricEvents{
+			Events: make([]*protocol.MetricEvent, 0, len(events)),
+		}
 		for _, event := range events {
 			metric, ok := event.(*models.Metric)
 			if !ok || metric == nil {
@@ -142,7 +146,9 @@ func (p *SlsFlusher) sendPipelineEvents(group *models.GroupInfo, events []models
 		}
 		pb.PipelineEvents = &protocol.PipelineEventGroup_Metrics{Metrics: metrics}
 	case models.EventTypeSpan:
-		spans := &protocol.PipelineEventGroup_SpanEvents{}
+		spans := &protocol.PipelineEventGroup_SpanEvents{
+			Events: make([]*protocol.SpanEvent, 0, len(events)),
+		}
 		for _, event := range events {
 			span, ok := event.(*models.Span)
 			if !ok || span == nil {

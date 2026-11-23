@@ -82,7 +82,7 @@ func TransferLogEventToPB(log *models.Log) (*protocol.LogEvent, error) {
 	logEvent := LogEventPool.Get().(*protocol.LogEvent)
 	logEvent.Timestamp = log.GetTimestamp()
 	fields := log.GetIndices()
-	logEvent.Contents = make([]*protocol.LogEvent_Content, 0, fields.Len())
+	contents := make([]protocol.LogEvent_Content, 0, fields.Len())
 	for k, v := range models.LogContentEntries(fields) {
 		var val string
 		switch tv := v.(type) {
@@ -93,11 +93,14 @@ func TransferLogEventToPB(log *models.Log) (*protocol.LogEvent, error) {
 		default:
 			return nil, fmt.Errorf("unsupported log content type for key %s: %T", k, v)
 		}
-		cont := &protocol.LogEvent_Content{
+		contents = append(contents, protocol.LogEvent_Content{
 			Key:   util.ZeroCopyStringToBytes(k),
 			Value: util.ZeroCopyStringToBytes(val),
-		}
-		logEvent.Contents = append(logEvent.Contents, cont)
+		})
+	}
+	logEvent.Contents = make([]*protocol.LogEvent_Content, len(contents))
+	for i := range contents {
+		logEvent.Contents[i] = &contents[i]
 	}
 	logEvent.Level = util.ZeroCopyStringToBytes(log.GetLevel())
 	logEvent.FileOffset = log.GetOffset()

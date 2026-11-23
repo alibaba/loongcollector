@@ -29,10 +29,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alibaba/ilogtail/pkg/helper"
-	"github.com/alibaba/ilogtail/pkg/models"
-
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pkg/util"
@@ -596,40 +594,45 @@ func (s *Syslog) parse(b []byte, clientIP string, collector pipeline.PipelineCol
 			continue
 		}
 
-		fields := map[string]string{}
-		fields["_program_"] = rst.program
-		fields["_priority_"] = strconv.Itoa(rst.priority)
-		fields["_facility_"] = strconv.Itoa(rst.facility)
-		fields["_severity_"] = strconv.Itoa(rst.severity)
+		fields := models.NewLogContents()
+		fields.Add("_program_", rst.program)
+		fields.Add("_priority_", strconv.Itoa(rst.priority))
+		fields.Add("_facility_", strconv.Itoa(rst.facility))
+		fields.Add("_severity_", strconv.Itoa(rst.severity))
 		// use nano timestamp because RFC5424's timestamp is [RFC3339]
 		// eg: 2003-08-24T05:14:15.000003-07:00, 2003-10-11T22:14:15.003Z
-		fields["_unixtimestamp_"] = strconv.FormatInt(rst.time.UnixNano(), 10)
+		fields.Add("_unixtimestamp_", strconv.FormatInt(rst.time.UnixNano(), 10))
 		if rst.hostname == "" {
-			fields["_hostname_"] = util.GetHostName()
+			fields.Add("_hostname_", util.GetHostName())
 		} else {
-			fields["_hostname_"] = rst.hostname
+			fields.Add("_hostname_", rst.hostname)
 		}
 		if len(clientIP) > 0 {
-			fields["_client_ip_"] = strings.Split(clientIP, ":")[0]
+			fields.Add("_client_ip_", strings.Split(clientIP, ":")[0])
 		} else {
-			fields["_client_ip_"] = ""
+			fields.Add("_client_ip_", "")
 		}
 
-		fields["_ip_"] = util.GetIPAddress()
-		fields["_content_"] = rst.content
+		fields.Add("_ip_", util.GetIPAddress())
+		fields.Add("_content_", rst.content)
 
 		if rst.structuredData != nil {
 			structuredData, _ := json.Marshal(*rst.structuredData)
-			fields["_structured_data_"] = string(structuredData)
+			fields.Add("_structured_data_", string(structuredData))
 		}
 		if rst.msgID != nil {
-			fields["_message_id_"] = *rst.msgID
+			fields.Add("_message_id_", *rst.msgID)
 		}
 		if rst.procID != nil {
-			fields["_process_id_"] = *rst.procID
+			fields.Add("_process_id_", *rst.procID)
 		}
 
-		collector.Collect(models.NewGroup(models.NewMetadata(), models.NewTags()), helper.NewInputLog(nil, fields, rst.time))
+		log := &models.Log{
+			Contents:  fields,
+			Tags:      models.NewTags(),
+			Timestamp: uint64(rst.time.UnixNano()),
+		}
+		collector.Collect(models.NewGroup(models.NewMetadata(), models.NewTags()), log)
 	}
 }
 

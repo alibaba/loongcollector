@@ -225,7 +225,11 @@ func (p *FlusherStdout) writeLogBody(writer *jsoniter.Stream, log *models.Log) {
 	for key, value := range contents.Iterator() {
 		_, _ = writer.Write([]byte{','})
 		writer.WriteObjectField(key)
-		_, _ = writer.Write([]byte(fmt.Sprintf("%#v", value)))
+		if field, ok := value.(string); ok {
+			writer.WriteString(field)
+		} else {
+			_, _ = writer.Write([]byte(fmt.Sprintf("%#v", value)))
+		}
 	}
 }
 
