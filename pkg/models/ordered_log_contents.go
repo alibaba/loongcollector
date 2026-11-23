@@ -21,19 +21,78 @@ import (
 	"sync/atomic"
 )
 
+const smallLogFieldCount = 4
+
+type orderedLogMap struct {
+	values map[string]any
+	keys   []string
+}
+
+func (m *orderedLogMap) init(capacity int) {
+	m.values = make(map[string]any, capacity)
+	m.keys = make([]string, 0, capacity)
+}
+
 type orderedLogContents struct {
-	keyValuesImpl[interface{}]
-	keys      []string
+	packed    []KeyValue[any]
+	mapped    atomic.Pointer[orderedLogMap]
 	bodyOwned atomic.Bool
 }
 
+type smallLogFields struct {
+	contents orderedLogContents
+	storage  [smallLogFieldCount]KeyValue[any]
+}
+
+func (f *smallLogFields) init() *orderedLogContents {
+	f.contents.packed = f.storage[:0]
+	return &f.contents
+}
+
 // NewOrderedLogContents preserves field order for inputs with an ordered row
-// or a protobuf list of fields. The other log contents implementation is a map.
+// or a protobuf list of fields. Small rows keep fields together in one allocation.
 func NewOrderedLogContents(capacity int) LogContents {
-	return &orderedLogContents{
-		keyValuesImpl: keyValuesImpl[interface{}]{keyValues: make(map[string]interface{}, capacity)},
-		keys:          make([]string, 0, capacity),
+	if capacity <= smallLogFieldCount {
+		return new(smallLogFields).init()
 	}
+	entry := new(struct {
+		fields orderedLogContents
+		mapped orderedLogMap
+	})
+	entry.mapped.init(capacity)
+	entry.fields.mapped.Store(&entry.mapped)
+	return &entry.fields
+}
+
+// NewLogWithOrderedContents builds a writable log. Flat input rows can
+// allocate the log, its ordered fields, and its tag container together.
+func NewLogWithOrderedContents(fieldCount int) *Log {
+	if fieldCount > 0 && fieldCount <= smallLogFieldCount {
+		entry := new(struct {
+			log    Log
+			fields smallLogFields
+			tags   keyValuesImpl[string]
+		})
+		entry.tags.keyValues = make(map[string]string)
+		entry.log.Tags = &entry.tags
+		entry.log.Contents = entry.fields.init()
+		return &entry.log
+	}
+	if fieldCount == 0 {
+		return &Log{Tags: NewTags()}
+	}
+	entry := new(struct {
+		log    Log
+		fields orderedLogContents
+		mapped orderedLogMap
+		tags   keyValuesImpl[string]
+	})
+	entry.mapped.init(fieldCount)
+	entry.fields.mapped.Store(&entry.mapped)
+	entry.tags.keyValues = make(map[string]string)
+	entry.log.Tags = &entry.tags
+	entry.log.Contents = &entry.fields
+	return &entry.log
 }
 
 // SetOwnedLogBody stores a freshly allocated body in ordered contents. A
@@ -50,7 +109,7 @@ func SetOwnedLogBody(log *Log, body []byte) {
 // The caller must remove or replace the body before publishing the text.
 func LookupLogContentForReplacement(contents LogContents, key string) (value any, found, owned bool) {
 	if ordered, ok := contents.(*orderedLogContents); ok {
-		value, found = ordered.keyValues[key]
+		value, found = ordered.lookup(key)
 		if key == BodyKey {
 			owned = ordered.bodyOwned.Swap(false)
 		}
@@ -63,14 +122,22 @@ func LookupLogContentForReplacement(contents LogContents, key string) (value any
 // field when a processor has determined how many fields it will add.
 func ReserveLogContentKeys(contents LogContents, count int) {
 	if ordered, ok := contents.(*orderedLogContents); ok {
-		ordered.keys = slices.Grow(ordered.keys, count)
+		if mapped := ordered.mapped.Load(); mapped != nil {
+			mapped.keys = slices.Grow(mapped.keys, count)
+		}
 	}
 }
 
 // FirstLogContentKey reports the first remaining field in ordered contents.
 func FirstLogContentKey(contents LogContents) (string, bool) {
-	if ordered, ok := contents.(*orderedLogContents); ok && len(ordered.keys) > 0 {
-		return ordered.keys[0], true
+	if c, ok := contents.(*orderedLogContents); ok {
+		if mapped := c.mapped.Load(); mapped != nil {
+			if len(mapped.keys) > 0 {
+				return mapped.keys[0], true
+			}
+		} else if len(c.packed) > 0 {
+			return c.packed[0].Key, true
+		}
 	}
 	return "", false
 }
@@ -78,12 +145,8 @@ func FirstLogContentKey(contents LogContents) (string, bool) {
 // LogContentEntries iterates fields in input order when the log preserves it.
 func LogContentEntries(contents LogContents) iter.Seq2[string, any] {
 	return func(yield func(string, any) bool) {
-		if ordered, ok := contents.(*orderedLogContents); ok {
-			for _, key := range ordered.keys {
-				if !yield(key, ordered.Get(key)) {
-					return
-				}
-			}
+		if c, ok := contents.(*orderedLogContents); ok {
+			c.entries(yield)
 			return
 		}
 		for key, value := range contents.Iterator() {
@@ -94,18 +157,39 @@ func LogContentEntries(contents LogContents) iter.Seq2[string, any] {
 	}
 }
 
+func (c *orderedLogContents) entries(yield func(string, any) bool) {
+	c.releaseBodyOwnership()
+	if mapped := c.mapped.Load(); mapped != nil {
+		for _, key := range mapped.keys {
+			if !yield(key, mapped.values[key]) {
+				return
+			}
+		}
+		return
+	}
+	for _, field := range c.packed {
+		if !yield(field.Key, field.Value) {
+			return
+		}
+	}
+}
+
 // RenameLogContent changes a field name while keeping its position in ordered contents.
 func RenameLogContent(contents LogContents, source, destination string) {
 	if source == destination || !contents.Contains(source) {
 		return
 	}
 	value := contents.Get(source)
-	if ordered, ok := contents.(*orderedLogContents); ok {
-		ordered.Delete(destination)
-		if index := slices.Index(ordered.keys, source); index >= 0 {
-			ordered.keys[index] = destination
-			ordered.keyValuesImpl.Add(destination, value)
-			ordered.keyValuesImpl.Delete(source)
+	if c, ok := contents.(*orderedLogContents); ok {
+		c.Delete(destination)
+		if mapped := c.mapped.Load(); mapped != nil {
+			if index := slices.Index(mapped.keys, source); index >= 0 {
+				mapped.keys[index] = destination
+				mapped.values[destination] = value
+				delete(mapped.values, source)
+			}
+		} else if index := c.packedIndex(source); index >= 0 {
+			c.packed[index].Key = destination
 		}
 		return
 	}
@@ -119,34 +203,121 @@ func (c *orderedLogContents) releaseBodyOwnership() {
 	}
 }
 
+func (c *orderedLogContents) packedIndex(key string) int {
+	for i := range c.packed {
+		if c.packed[i].Key == key {
+			return i
+		}
+	}
+	return -1
+}
+
+func (c *orderedLogContents) lookup(key string) (any, bool) {
+	if mapped := c.mapped.Load(); mapped != nil {
+		value, found := mapped.values[key]
+		return value, found
+	}
+	if index := c.packedIndex(key); index >= 0 {
+		return c.packed[index].Value, true
+	}
+	return nil, false
+}
+
 func (c *orderedLogContents) Get(key string) any {
 	if key == BodyKey {
 		c.releaseBodyOwnership()
 	}
-	return c.keyValuesImpl.Get(key)
+	value, _ := c.lookup(key)
+	return value
+}
+
+func (c *orderedLogContents) Contains(key string) bool {
+	_, found := c.lookup(key)
+	return found
+}
+
+func (c *orderedLogContents) Len() int {
+	if mapped := c.mapped.Load(); mapped != nil {
+		return len(mapped.values)
+	}
+	return len(c.packed)
+}
+
+func (*orderedLogContents) IsNil() bool { return false }
+
+// materializeMap also serves Iterator, whose callers may retain and modify
+// the returned map. Concurrent readers must see the same first map.
+func (c *orderedLogContents) materializeMap(capacity int) *orderedLogMap {
+	if mapped := c.mapped.Load(); mapped != nil {
+		return mapped
+	}
+	mapped := new(orderedLogMap)
+	mapped.init(capacity)
+	for _, field := range c.packed {
+		mapped.keys = append(mapped.keys, field.Key)
+		mapped.values[field.Key] = field.Value
+	}
+	if c.mapped.CompareAndSwap(nil, mapped) {
+		return mapped
+	}
+	return c.mapped.Load()
 }
 
 func (c *orderedLogContents) Iterator() map[string]any {
 	c.releaseBodyOwnership()
-	return c.keyValuesImpl.Iterator()
+	return c.materializeMap(len(c.packed)).values
 }
 
 func (c *orderedLogContents) SortTo(buf []KeyValue[any]) []KeyValue[any] {
 	c.releaseBodyOwnership()
-	return c.keyValuesImpl.SortTo(buf)
+	if buf == nil {
+		buf = make([]KeyValue[any], 0, c.Len())
+	} else {
+		buf = buf[:0]
+	}
+	if mapped := c.mapped.Load(); mapped != nil {
+		buf = slices.Grow(buf, len(mapped.values))
+		for key, value := range mapped.values {
+			buf = append(buf, KeyValue[any]{Key: key, Value: value})
+		}
+	} else {
+		buf = append(buf, c.packed...)
+	}
+	sort.Sort(KeyValueSlice[any](buf))
+	return buf
 }
 
-func (c *orderedLogContents) Add(key string, value interface{}) {
+func (c *orderedLogContents) Add(key string, value any) {
 	if key == BodyKey {
 		c.releaseBodyOwnership()
 	}
-	if !c.Contains(key) {
-		c.keys = append(c.keys, key)
+	mapped := c.mapped.Load()
+	if mapped == nil {
+		if index := c.packedIndex(key); index >= 0 {
+			c.packed[index].Value = value
+			return
+		}
+		if len(c.packed) < cap(c.packed) {
+			c.packed = append(c.packed, KeyValue[any]{Key: key, Value: value})
+			return
+		}
+		mapped = c.materializeMap(len(c.packed) + 1)
 	}
-	c.keyValuesImpl.Add(key, value)
+	c.clearPacked()
+	if _, found := mapped.values[key]; !found {
+		mapped.keys = append(mapped.keys, key)
+	}
+	mapped.values[key] = value
 }
 
-func (c *orderedLogContents) AddAll(items map[string]interface{}) {
+func (c *orderedLogContents) clearPacked() {
+	// Iterator may have published the map during a read. Clear the old
+	// references on the next mutation, when there are no concurrent readers.
+	clear(c.packed)
+	c.packed = nil
+}
+
+func (c *orderedLogContents) AddAll(items map[string]any) {
 	keys := make([]string, 0, len(items))
 	for key := range items {
 		keys = append(keys, key)
@@ -157,11 +328,12 @@ func (c *orderedLogContents) AddAll(items map[string]interface{}) {
 	}
 }
 
-func (c *orderedLogContents) Merge(other KeyValues[interface{}]) {
+func (c *orderedLogContents) Merge(other KeyValues[any]) {
 	if ordered, ok := other.(*orderedLogContents); ok {
-		for _, key := range ordered.keys {
-			c.Add(key, ordered.Get(key))
-		}
+		ordered.entries(func(key string, value any) bool {
+			c.Add(key, value)
+			return true
+		})
 		return
 	}
 	c.AddAll(other.Iterator())
@@ -171,8 +343,13 @@ func (c *orderedLogContents) Delete(key string) {
 	if key == BodyKey {
 		c.releaseBodyOwnership()
 	}
-	if index := slices.Index(c.keys, key); index >= 0 {
-		c.keys = slices.Delete(c.keys, index, index+1)
+	if mapped := c.mapped.Load(); mapped != nil {
+		c.clearPacked()
+		if index := slices.Index(mapped.keys, key); index >= 0 {
+			mapped.keys = slices.Delete(mapped.keys, index, index+1)
+		}
+		delete(mapped.values, key)
+	} else if index := c.packedIndex(key); index >= 0 {
+		c.packed = slices.Delete(c.packed, index, index+1)
 	}
-	c.keyValuesImpl.Delete(key)
 }

@@ -68,3 +68,38 @@ func TestLogSizeKeepsBodyOwnership(t *testing.T) {
 	require.True(t, found)
 	require.True(t, reusable)
 }
+
+func TestCompactLogFieldsPreserveOrderAfterMaterializing(t *testing.T) {
+	log := NewLogWithOrderedContents(1)
+	for _, key := range []string{"z", "b", "c", "a"} {
+		log.Contents.Add(key, key)
+	}
+	// Growing beyond the embedded capacity preserves field order and allows
+	// Iterator callers to update the live values.
+	log.Contents.Add("e", "e")
+	fields := log.Contents.Iterator()
+	fields["c"] = "updated"
+	log.Contents.Delete("b")
+	RenameLogContent(log.Contents, "z", "e")
+	var keys []string
+	for key := range LogContentEntries(log.Contents) {
+		keys = append(keys, key)
+	}
+	require.Equal(t, []string{"e", "c", "a"}, keys)
+	require.Equal(t, "updated", log.Contents.Get("c"))
+	require.Equal(t, "z", fields["e"])
+	require.False(t, log.Contents.Contains("b"))
+}
+
+func TestCompactLogContentsPublishesOneLiveMap(t *testing.T) {
+	fields := NewOrderedLogContents(1)
+	fields.Add("key", "old")
+	results := make(chan map[string]any, 2)
+	for i := 0; i < 2; i++ {
+		go func() { results <- fields.Iterator() }()
+	}
+	first, second := <-results, <-results
+	first["key"] = "new"
+	require.Equal(t, "new", second["key"])
+	require.Equal(t, "new", fields.Get("key"))
+}

@@ -101,7 +101,13 @@ func TestDecodePipelineGroupEventsOwnsLogData(t *testing.T) {
 	require.NoError(t, err)
 	clear(wire)
 
-	require.Equal(t, want, got)
+	// Compare the decoded event data and field order independently of the
+	// storage used for ordered fields.
+	wantPB, err := TransferPipelineEventGroupToPB(want.Group, want.Events)
+	require.NoError(t, err)
+	gotPB, err := TransferPipelineEventGroupToPB(got.Group, got.Events)
+	require.NoError(t, err)
+	require.Equal(t, wantPB, gotPB)
 	log := got.Events[0].(*models.Log)
 	require.Equal(t, []byte{0xff, 0xfe, 0}, log.GetBody())
 	require.Equal(t, "updated", log.GetIndices().Get("before"))

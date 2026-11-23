@@ -215,7 +215,7 @@ func eventSize(event models.PipelineEvent) int64 {
 	// Log.GetSize counts only the raw body. Include structured fields when
 	// enforcing the batch limit.
 	size := int64(6)
-	for key, value := range log.GetIndices().Iterator() {
+	for key, value := range models.LogContentEntries(log.GetIndices()) {
 		size += int64(5 + len(key))
 		switch value := value.(type) {
 		case string:

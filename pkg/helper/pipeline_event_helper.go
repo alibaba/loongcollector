@@ -278,9 +278,10 @@ func decodePipelineLogGroup(wire []byte) *models.PipelineGroupEvents {
 	}
 	events := make([]models.PipelineEvent, count)
 	var fields [8]pipelineLogWireField
+	var names nativeLogNames
 	for i := range events {
 		data, n := protowire.ConsumeBytes(logs[1:])
-		log := decodePipelineLog(data, fields[:0])
+		log := decodePipelineLog(data, fields[:0], &names)
 		if log == nil {
 			return nil
 		}
@@ -309,7 +310,7 @@ func decodePipelineLogGroup(wire []byte) *models.PipelineGroupEvents {
 	return &models.PipelineGroupEvents{Group: group, Events: events}
 }
 
-func decodePipelineLog(wire []byte, fields []pipelineLogWireField) *models.Log {
+func decodePipelineLog(wire []byte, fields []pipelineLogWireField, names *nativeLogNames) *models.Log {
 	const (
 		timestampTag  = 1<<3 | byte(protowire.VarintType)
 		contentsTag   = 2<<3 | byte(protowire.BytesType)
@@ -318,7 +319,7 @@ func decodePipelineLog(wire []byte, fields []pipelineLogWireField) *models.Log {
 		rawSizeTag    = 5<<3 | byte(protowire.VarintType)
 	)
 
-	var log models.Log
+	var timestamp, offset, rawSize uint64
 	var level []byte
 	for len(wire) > 0 {
 		tag := wire[0]
@@ -331,11 +332,11 @@ func decodePipelineLog(wire []byte, fields []pipelineLogWireField) *models.Log {
 			}
 			switch tag {
 			case timestampTag:
-				log.Timestamp = value
+				timestamp = value
 			case fileOffsetTag:
-				log.Offset = value
+				offset = value
 			case rawSizeTag:
-				log.RawSize = value
+				rawSize = value
 			}
 			wire = wire[n:]
 		case contentsTag, levelTag:
@@ -358,26 +359,74 @@ func decodePipelineLog(wire []byte, fields []pipelineLogWireField) *models.Log {
 		}
 	}
 
-	log.Level = string(level)
-	log.Tags = models.NewTags()
-	if len(fields) > 0 {
-		log.Contents = models.NewOrderedLogContents(len(fields))
-		if len(fields) == 1 {
-			addPipelineLogContent(&log, fields[0].key, fields[0].value, false)
-		} else {
-			addOwnedNativeLogContents(&log, fields)
-		}
+	log := models.NewLogWithOrderedContents(len(fields))
+	log.Level = names.levelName(level)
+	log.Timestamp = timestamp
+	log.Offset = offset
+	log.RawSize = rawSize
+	switch len(fields) {
+	case 0:
+	case 1:
+		addPipelineLogContent(log, fields[0].key, fields[0].value, false)
+	default:
+		addOwnedNativeLogContents(log, fields, names)
 	}
-	return &log
+	return log
 }
 
-// Small immutable fields from the same native log can share Go-owned string
+// Cache the first small row schema and level of a native group. A log with
+// different keys still packs its own strings, so dynamic fields do not expand
+// the cache or create a per-key allocation.
+type nativeLogNames struct {
+	keys  [8]string
+	count int
+	level string
+}
+
+func (n *nativeLogNames) levelName(value []byte) string {
+	if n.level == string(value) {
+		return n.level
+	}
+	text := string(value)
+	if n.level == "" {
+		n.level = text
+	}
+	return text
+}
+
+func (n *nativeLogNames) matchingKeys(fields []pipelineLogWireField) []string {
+	if len(fields) > len(n.keys) {
+		return nil
+	}
+	if n.count == 0 {
+		n.count = len(fields)
+		for i, field := range fields {
+			n.keys[i] = string(field.key)
+		}
+	} else {
+		if n.count != len(fields) {
+			return nil
+		}
+		for i, field := range fields {
+			if n.keys[i] != string(field.key) {
+				return nil
+			}
+		}
+	}
+	return n.keys[:n.count]
+}
+
+// Small immutable values from the same native log can share Go-owned string
 // storage. Keep the mutable body separate so dropping it releases its buffer.
-func addOwnedNativeLogContents(log *models.Log, fields []pipelineLogWireField) {
+func addOwnedNativeLogContents(log *models.Log, fields []pipelineLogWireField, names *nativeLogNames) {
+	keys := names.matchingKeys(fields)
 	immutableSize := 0
 	for _, field := range fields {
 		if string(field.key) != models.BodyKey {
-			immutableSize += len(field.key) + len(field.value)
+			immutableSize += len(field.value)
+			if keys == nil {
+				immutableSize += len(field.key)
+			}
 		}
 	}
 	// A surviving small field should not pin a large deleted value.
@@ -392,20 +441,27 @@ func addOwnedNativeLogContents(log *models.Log, fields []pipelineLogWireField) {
 	packed.Grow(immutableSize)
 	for _, field := range fields {
 		if string(field.key) != models.BodyKey {
-			packed.Write(field.key)
+			if keys == nil {
+				packed.Write(field.key)
+			}
 			packed.Write(field.value)
 		}
 	}
 	owned := packed.String()
-	for _, field := range fields {
+	for i, field := range fields {
 		if string(field.key) == models.BodyKey {
 			addPipelineLogContent(log, field.key, field.value, false)
 			continue
 		}
-		keyEnd := len(field.key)
-		valueEnd := keyEnd + len(field.value)
-		log.Contents.Add(owned[:keyEnd], owned[keyEnd:valueEnd])
-		owned = owned[valueEnd:]
+		var key string
+		if keys == nil {
+			key = owned[:len(field.key)]
+			owned = owned[len(field.key):]
+		} else {
+			key = keys[i]
+		}
+		log.Contents.Add(key, owned[:len(field.value)])
+		owned = owned[len(field.value):]
 	}
 }
 

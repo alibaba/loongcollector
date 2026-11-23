@@ -189,7 +189,7 @@ func (m *Log) GetSize() int64 {
 	var body any
 	if ordered, ok := m.Contents.(*orderedLogContents); ok {
 		// Measuring the body does not expose its mutable byte slice.
-		body = ordered.keyValuesImpl.Get(BodyKey)
+		body, _ = ordered.lookup(BodyKey)
 	} else {
 		body = m.Contents.Get(BodyKey)
 	}
@@ -230,8 +230,8 @@ func cloneLogContents(contents LogContents) LogContents {
 		return nil
 	case *orderedLogContents:
 		cloned := NewOrderedLogContents(fields.Len())
-		for _, key := range fields.keys {
-			cloned.Add(key, cloneLogValue(fields.Get(key)))
+		for key, value := range LogContentEntries(fields) {
+			cloned.Add(key, cloneLogValue(value))
 		}
 		return cloned
 	default:
