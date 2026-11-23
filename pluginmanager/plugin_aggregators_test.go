@@ -27,8 +27,9 @@ import (
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/util"
 	_ "github.com/alibaba/ilogtail/plugins/aggregator"
+	"github.com/alibaba/ilogtail/plugins/aggregator/baseagg"
 	_ "github.com/alibaba/ilogtail/plugins/aggregator/contentvaluegroup"
-	_ "github.com/alibaba/ilogtail/plugins/aggregator/context"
+	contextagg "github.com/alibaba/ilogtail/plugins/aggregator/context"
 	_ "github.com/alibaba/ilogtail/plugins/aggregator/logstorerouter"
 	_ "github.com/alibaba/ilogtail/plugins/aggregator/metadatagroup"
 	_ "github.com/alibaba/ilogtail/plugins/aggregator/opentelemetry"
@@ -55,6 +56,134 @@ func newAggregatorTestConfig(t *testing.T, name, aggregator, detail, processors 
 
 func aggregatorTestFlusher(cfg *LogstoreConfig) *checker.FlusherChecker {
 	return GetConfigFlushers(cfg.PluginRunner)[0].(*checker.FlusherChecker)
+}
+
+func TestDefaultAggregatorSelection(t *testing.T) {
+	for _, tt := range []struct {
+		name      string
+		config    string
+		maxEvents int
+		interval  time.Duration
+		impl      pipeline.Aggregator
+	}{
+		{name: "omitted", maxEvents: 1024, interval: 3 * time.Second, impl: &contextagg.AggregatorContext{}},
+		{name: "empty", config: `"aggregators":[],`, maxEvents: 1024, interval: 3 * time.Second, impl: &contextagg.AggregatorContext{}},
+		{name: "explicit", config: `"aggregators":[{"type":"aggregator_base","detail":{"MaxLogCount":17}}],`, maxEvents: 17, interval: 3 * time.Second, impl: &baseagg.AggregatorBase{}},
+		{name: "injected by native pipeline", config: `"global":{"AggregatIntervalMs":250},"aggregators":[{"type":"aggregator_default/4"}],`, maxEvents: 1024, interval: 250 * time.Millisecond, impl: &contextagg.AggregatorContext{}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg, err := createLogstoreConfig("project", "logstore", "default-selection", 0, `{`+tt.config+`"flushers":[{"type":"flusher_checker"}]}`)
+			require.NoError(t, err)
+			runner := cfg.PluginRunner.(*pluginRunner)
+			require.Len(t, runner.AggregatorPlugins, 1)
+			require.Len(t, runner.TimerRunner, 1)
+			wrapper := runner.AggregatorPlugins[0]
+			require.IsType(t, tt.impl, wrapper.Aggregator)
+			require.Equal(t, tt.interval, wrapper.Interval)
+			require.Same(t, wrapper.Aggregator, runner.TimerRunner[0].state)
+			switch plugin := wrapper.Aggregator.(type) {
+			case *baseagg.AggregatorBase:
+				require.Equal(t, tt.maxEvents, plugin.MaxLogCount)
+			case *contextagg.AggregatorContext:
+				require.Equal(t, tt.maxEvents, plugin.MaxLogCount)
+				require.Equal(t, 2, plugin.MaxLogGroupCount)
+				require.True(t, plugin.PackFlag)
+			}
+		})
+	}
+
+	_, err := createLogstoreConfig("project", "logstore", "invalid-aggregator", 0,
+		`{"aggregators":[{"type":"aggregator_default","detail":{"MaxLogCount":0}}],"flushers":[{"type":"flusher_checker"}]}`)
+	require.ErrorContains(t, err, "MaxLogCount and MaxLogGroupCount must be positive")
+}
+
+func TestDefaultAggregatorBatchesAndFlushesOnStop(t *testing.T) {
+	cfg, err := createLogstoreConfig("project", "logstore", "default-batches", 0,
+		`{"global":{"AggregatIntervalMs":86400000},"flushers":[{"type":"flusher_checker"}]}`)
+	require.NoError(t, err)
+	runner := cfg.PluginRunner.(*pluginRunner)
+	flusher := aggregatorTestFlusher(cfg)
+	cfg.Start()
+	stopped := false
+	t.Cleanup(func() {
+		if !stopped {
+			require.NoError(t, cfg.Stop(true))
+		}
+	})
+
+	const count = 2*baseagg.MaxLogCount + 3
+	for i := range count {
+		info := models.NewGroup(models.NewMetadataWithKeyValues("source", "docker"), models.NewTagsWithKeyValues("container", "test"))
+		log := models.NewSimpleLog([]byte("message"), models.NewTagsWithKeyValues("stream", "stderr"), uint64(i)+1)
+		runner.InputPipeContext.Collector().Collect(info, log)
+	}
+
+	// A full third group forces the first batch out without a timer tick.
+	require.Eventually(t, func() bool { return flusher.GetLogCount() == baseagg.MaxLogCount }, 3*time.Second, time.Millisecond)
+	require.NoError(t, cfg.Stop(true))
+	stopped = true
+
+	require.Len(t, flusher.GroupEvents, 3)
+	want := []int{baseagg.MaxLogCount, baseagg.MaxLogCount, 3}
+	index := 0
+	for i, group := range flusher.GroupEvents {
+		require.Len(t, group.Events, want[i])
+		require.Equal(t, "docker", group.Group.GetMetadata().Get("source"))
+		require.Equal(t, "test", group.Group.GetTags().Get("container"))
+		require.Equal(t, fmt.Sprintf("docker-%d", i+1), group.Group.GetTags().Get(util.PackIDTagKey))
+		for _, log := range group.Events {
+			index++
+			require.Equal(t, uint64(index), log.GetTimestamp())
+			require.Equal(t, "stderr", log.GetTags().Get("stream"))
+		}
+	}
+}
+
+func TestDefaultAggregatorFlushesOnTimer(t *testing.T) {
+	cfg, err := createLogstoreConfig("project", "logstore", "default-timer", 0,
+		`{"global":{"AggregatIntervalMs":20},"flushers":[{"type":"flusher_checker"}]}`)
+	require.NoError(t, err)
+	cfg.Start()
+	t.Cleanup(func() { require.NoError(t, cfg.Stop(true)) })
+
+	event := models.NewSingleValueMetric("metric", models.MetricTypeGauge, models.NewTagsWithKeyValues("unit", "count"), 42, 1)
+	runner := cfg.PluginRunner.(*pluginRunner)
+	runner.InputPipeContext.Collector().Collect(models.NewGroup(nil, nil), event)
+	require.Eventually(t, func() bool { return aggregatorTestFlusher(cfg).GetLogCount() == 1 }, 3*time.Second, time.Millisecond)
+}
+
+func TestDefaultAggregatorRetainsBatchAcrossReload(t *testing.T) {
+	const configName = "default-pending-reload"
+	const pipelineConfig = `{"global":{"AggregatIntervalMs":86400000},"flushers":[{"type":"flusher_checker"}]}`
+	old, err := createLogstoreConfig("project", "logstore", configName, 0, pipelineConfig)
+	require.NoError(t, err)
+	flusher := aggregatorTestFlusher(old)
+	flusher.Ready = false
+	old.Start()
+	collector := old.PluginRunner.(*pluginRunner).InputPipeContext.Collector()
+	info := models.NewGroup(models.NewMetadataWithKeyValues("source", "reload"), models.NewTagsWithKeyValues("host", "agent", util.PackIDTagKey, "input-pack"))
+	log := models.NewSimpleLog([]byte("first"), models.NewTagsWithKeyValues("tag", "a"), 1700000000000000001)
+	span := models.NewSpan("trace", "trace-id", "span-id", models.SpanKindServer, 1700000000000000002, 1700000000000000003, models.NewTagsWithKeyValues("tag", "b"), nil, nil)
+	collector.Collect(info, log)
+	collector.Collect(info, span)
+	require.NoError(t, old.Stop(false))
+	require.Equal(t, 1, GetFlushStoreLen(old.PluginRunner))
+	require.Zero(t, flusher.GetLogCount())
+
+	LastUnsendBuffer[configName] = old.PluginRunner
+	t.Cleanup(func() { delete(LastUnsendBuffer, configName) })
+	current, err := createLogstoreConfig("project", "logstore", configName, 0, pipelineConfig)
+	require.NoError(t, err)
+	current.Start()
+	require.NoError(t, current.Stop(true))
+
+	groups := aggregatorTestFlusher(current).GroupEvents
+	require.Len(t, groups, 1)
+	require.Equal(t, "input-pack", groups[0].Group.GetTags().Get(util.PackIDTagKey))
+	require.Equal(t, "agent", groups[0].Group.GetTags().Get("host"))
+	require.Equal(t, "reload", groups[0].Group.GetMetadata().Get("source"))
+	require.Equal(t, []models.PipelineEvent{log, span}, groups[0].Events)
+	require.Zero(t, GetFlushStoreLen(current.PluginRunner))
 }
 
 func TestExplicitAggregatorsDeliverTypedEvents(t *testing.T) {

@@ -15,6 +15,7 @@
 package pluginmanager
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/alibaba/ilogtail/pkg/flags"
@@ -24,6 +25,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
+	"github.com/alibaba/ilogtail/plugins/aggregator"
 )
 
 type pluginRunner struct {
@@ -70,6 +72,18 @@ func (p *pluginRunner) Init(inputQueueSize int, flushQueueSize int) error {
 	p.FlushPipeContext = helper.NewNoopPipelineContext()
 	p.FlushOutStore.Write(p.AggregatePipeContext.Collector().Observe())
 	return nil
+}
+
+func (p *pluginRunner) addDefaultAggregatorIfEmpty() error {
+	if len(p.AggregatorPlugins) != 0 {
+		return nil
+	}
+
+	name := aggregator.DefaultPluginType
+	if pipeline.Aggregators[name] == nil {
+		return fmt.Errorf("can't find plugin %s", name)
+	}
+	return loadAggregator(p.LogstoreConfig.genPluginMeta(name), p.LogstoreConfig, nil)
 }
 
 func (p *pluginRunner) AddDefaultFlusherIfEmpty() error {
@@ -264,8 +278,8 @@ func (p *pluginRunner) runProcessorInternal(cc *pipeline.AsyncControl) {
 				break
 			}
 			if len(p.AggregatorPlugins) == 0 {
-				// Input groups are already formed. Deliver directly without a
-				// default pass-through aggregator or its idle flush timer.
+				// A runner initialized without a pipeline configuration can
+				// receive groups directly.
 				for _, group := range pipeEvents {
 					if len(group.Events) > 0 {
 						p.AggregatePipeContext.Collector().CollectList(group)

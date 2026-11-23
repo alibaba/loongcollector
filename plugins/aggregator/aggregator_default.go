@@ -15,27 +15,15 @@
 package aggregator
 
 import (
-	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
+	"github.com/alibaba/ilogtail/plugins/aggregator/context"
 )
 
-// defaultAggregator forwards groups already formed by the input or processor.
-type defaultAggregator struct{}
-
-func (*defaultAggregator) Init(pipeline.Context) (int, error)       { return 0, nil }
-func (*defaultAggregator) Description() string                      { return "default event group aggregator" }
-func (*defaultAggregator) Reset()                                   {}
-func (*defaultAggregator) GetResult(pipeline.PipelineContext) error { return nil }
-
-func (*defaultAggregator) Record(group *models.PipelineGroupEvents, ctx pipeline.PipelineContext) error {
-	if group != nil && len(group.Events) > 0 {
-		ctx.Collector().CollectList(group)
-	}
-	return nil
-}
+// DefaultPluginType names the context aggregator used by pipelines without an explicit aggregator.
+const DefaultPluginType = "aggregator_default"
 
 func init() {
-	pipeline.Aggregators["aggregator_default"] = func() pipeline.Aggregator {
-		return &defaultAggregator{}
+	pipeline.Aggregators[DefaultPluginType] = func() pipeline.Aggregator {
+		return context.NewAggregatorContext()
 	}
 }

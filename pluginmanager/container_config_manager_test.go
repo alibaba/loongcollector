@@ -29,6 +29,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/helper/containercenter"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
+	"github.com/alibaba/ilogtail/plugins/aggregator/baseagg"
 	"github.com/alibaba/ilogtail/plugins/flusher/checker"
 	_ "github.com/alibaba/ilogtail/plugins/flusher/sls"
 	_ "github.com/alibaba/ilogtail/plugins/input/docker/stdout"
@@ -195,8 +196,10 @@ func (s *containerConfigTestSuite) TestStopCollectsPendingConfigResults() {
 		flusher.Lock.RLock()
 		defer flusher.Lock.RUnlock()
 		for _, group := range flusher.GroupEvents {
-			if log, ok := group.Events[0].(*models.Log); ok && log.GetIndices().Get("config_name") == "initial-read" {
-				return true
+			for _, event := range group.Events {
+				if log, ok := event.(*models.Log); ok && log.GetIndices().Get("config_name") == "initial-read" {
+					return true
+				}
 			}
 		}
 		return false
@@ -215,15 +218,17 @@ func (s *containerConfigTestSuite) TestStopCollectsPendingConfigResults() {
 	var first *models.Log
 	var configResults, finalMarkers int
 	for _, group := range flusher.GroupEvents {
-		s.Require().Len(group.Events, 1)
-		log := group.Events[0].(*models.Log)
-		switch log.GetIndices().Get("config_name") {
-		case "final-read":
-			finalMarkers++
-		case "application":
-			configResults++
-			if first == nil {
-				first = log
+		s.Require().LessOrEqual(len(group.Events), baseagg.MaxLogCount)
+		for _, event := range group.Events {
+			log := event.(*models.Log)
+			switch log.GetIndices().Get("config_name") {
+			case "final-read":
+				finalMarkers++
+			case "application":
+				configResults++
+				if first == nil {
+					first = log
+				}
 			}
 		}
 	}

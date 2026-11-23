@@ -54,7 +54,7 @@ Feature: Docker stdout tag placement
     """
     Then the log group tags match exactly
     """
-    {}
+    __pack_id__: '[^\s]+-[0-9A-F]+'
     """
     Then the log event tags match exactly
     """
@@ -107,6 +107,7 @@ Feature: Docker stdout tag placement
     """
     Then the log group tags match exactly
     """
+    __pack_id__: '[^\s]+-[0-9A-F]+'
     _container_name_: '.*[-_]container[-_]1'
     _container_ip_: '([0-9]{1,3}\.){3}[0-9]{1,3}'
     _image_name_: 'overridden-image'
@@ -168,7 +169,7 @@ Feature: Docker stdout tag placement
     """
     Then the log group tags match exactly
     """
-    {}
+    __pack_id__: '[^\s]+-[0-9A-F]+'
     """
     Then the log event tags match exactly
     """
@@ -221,6 +222,7 @@ Feature: Docker stdout tag placement
     """
     Then the log group tags match exactly
     """
+    __pack_id__: '[^\s]+-[0-9A-F]+'
     _container_name_: '.*[-_]container[-_]1'
     _container_ip_: '([0-9]{1,3}\.){3}[0-9]{1,3}'
     _image_name_: 'overridden-image'
@@ -277,6 +279,7 @@ Feature: Docker stdout tag placement
     """
     Then the log group tags match exactly
     """
+    __pack_id__: '[^\s]+-[0-9A-F]+'
     _container_name_: '.*[-_]container[-_]1'
     _container_ip_: '([0-9]{1,3}\.){3}[0-9]{1,3}'
     _image_name_: 'overridden-image'

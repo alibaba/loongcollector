@@ -190,7 +190,8 @@ func createLogstoreConfig(project string, logstore string, configName string, lo
 	if err = validateStructureType(plugins); err != nil {
 		return nil, err
 	}
-	logstoreC.PluginRunner = initPluginRunner(logstoreC)
+	runner := initPluginRunner(logstoreC)
+	logstoreC.PluginRunner = runner
 	if lastConfigRunner, hasLastConfig := LastUnsendBuffer[configName]; hasLastConfig {
 		// Move unsent event groups from last config to new config.
 		logstoreC.PluginRunner.Merge(lastConfigRunner)
@@ -426,6 +427,10 @@ func createLogstoreConfig(project string, logstore string, configName string, lo
 		}
 	}
 
+	if err = runner.addDefaultAggregatorIfEmpty(); err != nil {
+		return nil, err
+	}
+
 	pluginConfig, flushersFound := plugins["flushers"]
 	if flushersFound {
 		flushers, ok := pluginConfig.([]interface{})
@@ -480,7 +485,7 @@ func validateStructureType(plugins map[string]interface{}) error {
 	return nil
 }
 
-func initPluginRunner(lc *LogstoreConfig) PluginRunner {
+func initPluginRunner(lc *LogstoreConfig) *pluginRunner {
 	return &pluginRunner{
 		LogstoreConfig: lc,
 		FlushOutStore:  NewFlushOutStore[models.PipelineGroupEvents](),

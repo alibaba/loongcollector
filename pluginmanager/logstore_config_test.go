@@ -115,7 +115,8 @@ func (s *logstoreConfigTestSuite) TestPluginGlobalConfig() {
 	s.Equal(config.GlobalConfig.InputIntervalMs, 9999)
 	s.Equal(config.GlobalConfig.FlushIntervalMs, 323)
 	s.Equal(config.PluginRunner.(*pluginRunner).MetricPlugins[0].Interval, time.Duration(9999)*time.Millisecond)
-	s.Empty(config.PluginRunner.(*pluginRunner).AggregatorPlugins)
+	s.Len(config.PluginRunner.(*pluginRunner).AggregatorPlugins, 1)
+	s.Equal(369*time.Millisecond, config.PluginRunner.(*pluginRunner).AggregatorPlugins[0].Interval)
 	s.Equal(config.PluginRunner.(*pluginRunner).FlusherPlugins[0].Interval, time.Duration(323)*time.Millisecond)
 }
 
