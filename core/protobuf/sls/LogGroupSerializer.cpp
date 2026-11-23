@@ -14,6 +14,10 @@
 
 #include "protobuf/sls/LogGroupSerializer.h"
 
+#include <algorithm>
+
+#include "google/protobuf/io/coded_stream.h"
+
 #include "common/TimeUtil.h"
 
 using namespace std;
@@ -51,51 +55,43 @@ static inline size_t uint32_size(uint32_t v) {
     }
 }
 
-/**
- * Pack an unsigned 32-bit integer in base-128 varint encoding and return the
- * number of bytes written, which must be 5 or less.
- *
- * \param value
- *      Value to encode.
- * \param[out] out
- *      Packed value.
- * \return
- *      Number of bytes written to `out`.
- */
-static inline size_t uint32_pack(uint32_t value, string& output) {
-    unsigned rv = 1;
+namespace {
 
-    if (value >= 0x80) {
-        output.push_back(value | 0x80);
-        ++rv;
-        value >>= 7;
-        if (value >= 0x80) {
-            output.push_back(value | 0x80);
-            ++rv;
-            value >>= 7;
-            if (value >= 0x80) {
-                output.push_back(value | 0x80);
-                ++rv;
-                value >>= 7;
-                if (value >= 0x80) {
-                    output.push_back(value | 0x80);
-                    ++rv;
-                    value >>= 7;
-                }
-            }
-        }
-    }
-    /* assert: value<128 */
-    output.push_back(value);
-    return rv;
+using google::protobuf::io::CodedOutputStream;
+
+// Each protobuf field tag here fits in a byte, followed by up to five varint bytes.
+constexpr size_t kMaxTaggedVarintSize = 6;
+
+inline uint8_t* WriteTaggedVarint(uint8_t* out, uint8_t tag, uint32_t value) {
+    *out++ = tag;
+    return CodedOutputStream::WriteVarint32ToArray(value, out);
 }
 
-static inline void fixed32_pack(uint32_t value, string& output) {
-    for (size_t i = 0; i < 4; ++i) {
-        output.push_back(value & 0xFF);
-        value >>= 8;
-    }
+inline void AppendTaggedVarint(string& output, uint8_t tag, uint32_t value) {
+    uint8_t prefix[kMaxTaggedVarintSize];
+    const auto* end = WriteTaggedVarint(prefix, tag, value);
+    output.append(reinterpret_cast<const char*>(prefix), end - prefix);
 }
+
+inline void AppendKeyPrefix(string& output, uint8_t tag, uint32_t messageSize, uint32_t keySize) {
+    uint8_t prefix[2 * kMaxTaggedVarintSize];
+    auto* end = WriteTaggedVarint(prefix, tag, messageSize);
+    end = WriteTaggedVarint(end, 0x0A, keySize);
+    output.append(reinterpret_cast<const char*>(prefix), end - prefix);
+}
+
+inline void AppendStringField(string& output, uint8_t tag, StringView value) {
+    AppendTaggedVarint(output, tag, value.size());
+    output.append(value.data(), value.size());
+}
+
+inline void AppendKeyValue(string& output, uint8_t tag, StringView key, StringView value) {
+    AppendKeyPrefix(output, tag, GetStringSize(key.size()) + GetStringSize(value.size()), key.size());
+    output.append(key.data(), key.size());
+    AppendStringField(output, 0x12, value);
+}
+
+} // namespace
 
 void LogGroupSerializer::Prepare(size_t size) {
     mRes.clear();
@@ -103,96 +99,46 @@ void LogGroupSerializer::Prepare(size_t size) {
 }
 
 void LogGroupSerializer::StartToAddLog(size_t size) {
-    // field = 1, wire_type = 2
-    mRes.push_back(0x0A);
-    uint32_pack(size, mRes);
+    AppendTaggedVarint(mRes, 0x0A, size);
 }
 
 void LogGroupSerializer::AddLogTime(uint32_t logTime) {
-    // limit logTime's min value, ensure varint size is 5, which is 1978-07-05 05:24:16
-    static uint32_t minLogTime = (uint32_t)1 << 28;
-    if (logTime < minLogTime) {
-        logTime = minLogTime;
-    }
-    // field = 1, wire_type = 0
-    mRes.push_back(0x08);
-    uint32_pack(logTime, mRes);
+    // Keep the timestamp varint at five bytes for the precomputed log size.
+    constexpr uint32_t kMinLogTime = uint32_t{1} << 28;
+    AppendTaggedVarint(mRes, 0x08, max(logTime, kMinLogTime));
 }
 
 void LogGroupSerializer::AddLogContent(StringView key, StringView value) {
-    // Contents
-    // field = 2, wire_type = 2
-    mRes.push_back(0x12);
-    uint32_pack(GetStringSize(key.size()) + GetStringSize(value.size()), mRes);
-    // Key
-    // field = 1, wire_type = 2
-    mRes.push_back(0x0A);
-    uint32_pack(key.size(), mRes);
-    mRes.append(key.data(), key.size());
-    // Value
-    // field = 2, wire_type = 2
-    mRes.push_back(0x12);
-    uint32_pack(value.size(), mRes);
-    mRes.append(value.data(), value.size());
+    AppendKeyValue(mRes, 0x12, key, value);
 }
 
 void LogGroupSerializer::AddLogTimeNs(uint32_t logTimeNs) {
-    // field = 4, wire_type = 5
-    mRes.push_back(0x25);
-    fixed32_pack(logTimeNs, mRes);
+    uint8_t field[5] = {0x25};
+    CodedOutputStream::WriteLittleEndian32ToArray(logTimeNs, field + 1);
+    mRes.append(reinterpret_cast<const char*>(field), sizeof(field));
 }
 
 void LogGroupSerializer::AddTopic(StringView topic) {
-    // field = 3, wire_type = 2
-    mRes.push_back(0x1A);
-    AddString(topic);
+    AppendStringField(mRes, 0x1A, topic);
 }
 
 void LogGroupSerializer::AddSource(StringView source) {
-    // field = 4, wire_type = 2
-    mRes.push_back(0x22);
-    AddString(source);
+    AppendStringField(mRes, 0x22, source);
 }
 
 void LogGroupSerializer::AddMachineUUID(StringView machineUUID) {
-    // field = 5, wire_type = 2
-    mRes.push_back(0x2A);
-    AddString(machineUUID);
+    AppendStringField(mRes, 0x2A, machineUUID);
 }
 
 void LogGroupSerializer::AddLogTag(StringView key, StringView value) {
-    // LogTags
-    // field = 6, wire_type = 2
-    mRes.push_back(0x32);
-    uint32_pack(GetStringSize(key.size()) + GetStringSize(value.size()), mRes);
-    // Key
-    // field = 1, wire_type = 2
-    mRes.push_back(0x0A);
-    uint32_pack(key.size(), mRes);
-    mRes.append(key.data(), key.size());
-    // Value
-    // field = 2, wire_type = 2
-    mRes.push_back(0x12);
-    uint32_pack(value.size(), mRes);
-    mRes.append(value.data(), value.size());
-}
-
-void LogGroupSerializer::AddString(StringView value) {
-    uint32_pack(value.size(), mRes);
-    mRes.append(value.data(), value.size());
+    AppendKeyValue(mRes, 0x32, key, value);
 }
 
 void LogGroupSerializer::AddLogContentMetricLabel(const MetricEvent& e, size_t valueSZ) {
-    // Contents
-    mRes.push_back(0x12);
-    uint32_pack(GetStringSize(METRIC_RESERVED_KEY_LABELS.size()) + GetStringSize(valueSZ), mRes);
-    // Key
-    mRes.push_back(0x0A);
-    uint32_pack(METRIC_RESERVED_KEY_LABELS.size(), mRes);
+    AppendKeyPrefix(mRes, 0x12, GetStringSize(METRIC_RESERVED_KEY_LABELS.size()) + GetStringSize(valueSZ),
+                    METRIC_RESERVED_KEY_LABELS.size());
     mRes.append(METRIC_RESERVED_KEY_LABELS);
-    // Value
-    mRes.push_back(0x12);
-    uint32_pack(valueSZ, mRes);
+    AppendTaggedVarint(mRes, 0x12, valueSZ);
     bool hasPrev = false;
     for (auto it = e.TagsBegin(); it != e.TagsEnd(); ++it) {
         if (hasPrev) {
@@ -207,16 +153,10 @@ void LogGroupSerializer::AddLogContentMetricLabel(const MetricEvent& e, size_t v
 
 void LogGroupSerializer::AddLogContentMetricTimeNano(const MetricEvent& e) {
     size_t valueSZ = e.GetTimestampNanosecond() ? 19U : 10U;
-    // Contents
-    mRes.push_back(0x12);
-    uint32_pack(GetStringSize(METRIC_RESERVED_KEY_TIME_NANO.size()) + GetStringSize(valueSZ), mRes);
-    // Key
-    mRes.push_back(0x0A);
-    uint32_pack(METRIC_RESERVED_KEY_TIME_NANO.size(), mRes);
+    AppendKeyPrefix(mRes, 0x12, GetStringSize(METRIC_RESERVED_KEY_TIME_NANO.size()) + GetStringSize(valueSZ),
+                    METRIC_RESERVED_KEY_TIME_NANO.size());
     mRes.append(METRIC_RESERVED_KEY_TIME_NANO);
-    // Value
-    mRes.push_back(0x12);
-    uint32_pack(valueSZ, mRes);
+    AppendTaggedVarint(mRes, 0x12, valueSZ);
     // TODO: avoid copy
     mRes.append(to_string(e.GetTimestamp()));
     if (e.GetTimestampNanosecond()) {
