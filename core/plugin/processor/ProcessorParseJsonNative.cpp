@@ -26,6 +26,8 @@
 #include <cstring>
 
 #include <memory>
+#include <new>
+#include <optional>
 #include <string>
 
 #include "simdjson/simdjson.h"
@@ -268,19 +270,27 @@ bool ProcessorParseJsonNative::JsonLogLineParserSimdJson(LogEvent& sourceEvent,
     static constexpr size_t kSimdJsonReuseMaxSize = 64 * 1024;
     thread_local simdjson::ondemand::parser sParser;
     thread_local std::string sPaddedBuffer;
-    std::unique_ptr<simdjson::ondemand::parser> largeParser;
-    std::string largeBuffer;
+    std::optional<simdjson::ondemand::parser> localParser;
+    simdjson::padded_string localBuffer;
     simdjson::ondemand::parser* parser = &sParser;
-    std::string* paddedBuffer = &sPaddedBuffer;
-    if (buffer.size() > kSimdJsonReuseMaxSize) {
-        largeParser = std::make_unique<simdjson::ondemand::parser>();
-        parser = largeParser.get();
-        paddedBuffer = &largeBuffer;
+    simdjson::padded_string_view bufStr;
+    bool useLocal = buffer.size() > kSimdJsonReuseMaxSize;
+    if (!useLocal) {
+        try {
+            sPaddedBuffer.resize(buffer.size() + simdjson::SIMDJSON_PADDING);
+            memcpy(sPaddedBuffer.data(), buffer.data(), buffer.size());
+            memset(sPaddedBuffer.data() + buffer.size(), 0, simdjson::SIMDJSON_PADDING);
+            bufStr = simdjson::padded_string_view(sPaddedBuffer.data(), buffer.size(), sPaddedBuffer.size());
+        } catch (const std::bad_alloc&) {
+            useLocal = true;
+        }
     }
-    paddedBuffer->resize(buffer.size() + simdjson::SIMDJSON_PADDING);
-    memcpy(paddedBuffer->data(), buffer.data(), buffer.size());
-    memset(paddedBuffer->data() + buffer.size(), 0, simdjson::SIMDJSON_PADDING);
-    simdjson::padded_string_view bufStr(paddedBuffer->data(), buffer.size(), paddedBuffer->size());
+    if (useLocal) {
+        localParser.emplace();
+        parser = &*localParser;
+        localBuffer = simdjson::padded_string(buffer.data(), buffer.size());
+        bufStr = localBuffer;
+    }
     simdjson::ondemand::document doc;
     simdjson::ondemand::object object;
 
