@@ -16,6 +16,7 @@ package regex
 
 import (
 	"context"
+	"regexp"
 	"testing"
 
 	"github.com/alibaba/ilogtail/plugins/processor/internal/processortest"
@@ -416,4 +417,59 @@ func TestByteBackedRegexCapturesOwnTheirText(t *testing.T) {
 	clear(body)
 	require.Equal(t, "INFO", log.Contents.Get("level"))
 	require.Equal(t, "非 ASCII", log.Contents.Get("message"))
+}
+
+func TestTrailingCapturePrefixMatchesOriginal(t *testing.T) {
+	inputs := []string{
+		"id=load,7 level=INFO msg=", "id=load,7 level=INFO msg=line1\nline2",
+		"id=load,7 level=INFO msg=\xff", "id=load,7 level=WARN msg=x",
+		"aaa", "a", "ab-tail", "含中文",
+	}
+	expressions := []string{
+		`^id=(\w+,\d+) level=(INFO) msg=(.*)$`,
+		`^(a+?)(b)?(.*)$`,
+		`^(?P<prefix>[a-z]+)(?P<tail>.*)\z`,
+	}
+	for _, expression := range expressions {
+		t.Run(expression, func(t *testing.T) {
+			pattern := "(?s)" + expression
+			original := regexp.MustCompile(pattern)
+			prefix := compileTrailingCapturePrefix(pattern, original.NumSubexp())
+			require.NotNil(t, prefix)
+			keys := make([]string, original.NumSubexp())
+			p := ProcessorRegex{Keys: keys, FullMatch: true, trailingCapturePrefix: prefix}
+			for _, input := range inputs {
+				want := original.FindStringSubmatchIndex(input)
+				if want != nil {
+					want = want[2:]
+				}
+				var offsets [16]int
+				got := p.configuredCaptures(prefix.FindStringSubmatchIndex(input), len(input), offsets[:0], func() string {
+					t.Fatal("unexpected alarm preview")
+					return ""
+				})
+				require.Equal(t, want, got, "input %q", input)
+			}
+		})
+	}
+}
+
+func TestRegexDoesNotReuseExposedBody(t *testing.T) {
+	p := ProcessorRegex{
+		Regex: `^text=(.*)$`, Keys: []string{"message"}, SourceKey: models.BodyKey,
+	}
+	require.NoError(t, p.Init(mock.NewEmptyContext("p", "l", "c")))
+	for _, access := range []func(*models.Log) []byte{
+		func(log *models.Log) []byte { return log.GetBody() },
+		func(log *models.Log) []byte { return log.GetIndices().Iterator()[models.BodyKey].([]byte) },
+		func(log *models.Log) []byte { return log.GetIndices().SortTo(nil)[0].Value.([]byte) },
+	} {
+		log := &models.Log{Contents: models.NewOrderedLogContents(1)}
+		models.SetOwnedLogBody(log, []byte("text=original message"))
+		exposed := access(log)
+		p.processLogEvent(log)
+		clear(exposed)
+		require.False(t, log.Contents.Contains(models.BodyKey))
+		require.Equal(t, "original message", log.Contents.Get("message"))
+	}
 }

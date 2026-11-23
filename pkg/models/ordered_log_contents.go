@@ -18,11 +18,13 @@ import (
 	"iter"
 	"slices"
 	"sort"
+	"sync/atomic"
 )
 
 type orderedLogContents struct {
 	keyValuesImpl[interface{}]
-	keys []string
+	keys      []string
+	bodyOwned atomic.Bool
 }
 
 // NewOrderedLogContents preserves field order for inputs with an ordered row
@@ -31,6 +33,37 @@ func NewOrderedLogContents(capacity int) LogContents {
 	return &orderedLogContents{
 		keyValuesImpl: keyValuesImpl[interface{}]{keyValues: make(map[string]interface{}, capacity)},
 		keys:          make([]string, 0, capacity),
+	}
+}
+
+// SetOwnedLogBody stores a freshly allocated body in ordered contents. A
+// processor can reuse the buffer as immutable text until an API exposes it.
+func SetOwnedLogBody(log *Log, body []byte) {
+	log.SetBody(body)
+	if ordered, ok := log.Contents.(*orderedLogContents); ok {
+		ordered.bodyOwned.Store(true)
+	}
+}
+
+// LookupLogContentForReplacement acquires the value and reports whether an
+// unread body buffer may be reused as immutable text after replacing it.
+// The caller must remove or replace the body before publishing the text.
+func LookupLogContentForReplacement(contents LogContents, key string) (value any, found, owned bool) {
+	if ordered, ok := contents.(*orderedLogContents); ok {
+		value, found = ordered.keyValues[key]
+		if key == BodyKey {
+			owned = ordered.bodyOwned.Swap(false)
+		}
+		return
+	}
+	return contents.Get(key), contents.Contains(key), false
+}
+
+// ReserveLogContentKeys avoids growing the ordered key slice for each new
+// field when a processor has determined how many fields it will add.
+func ReserveLogContentKeys(contents LogContents, count int) {
+	if ordered, ok := contents.(*orderedLogContents); ok {
+		ordered.keys = slices.Grow(ordered.keys, count)
 	}
 }
 
@@ -80,7 +113,33 @@ func RenameLogContent(contents LogContents, source, destination string) {
 	contents.Delete(source)
 }
 
+func (c *orderedLogContents) releaseBodyOwnership() {
+	if c.bodyOwned.Load() {
+		c.bodyOwned.Store(false)
+	}
+}
+
+func (c *orderedLogContents) Get(key string) any {
+	if key == BodyKey {
+		c.releaseBodyOwnership()
+	}
+	return c.keyValuesImpl.Get(key)
+}
+
+func (c *orderedLogContents) Iterator() map[string]any {
+	c.releaseBodyOwnership()
+	return c.keyValuesImpl.Iterator()
+}
+
+func (c *orderedLogContents) SortTo(buf []KeyValue[any]) []KeyValue[any] {
+	c.releaseBodyOwnership()
+	return c.keyValuesImpl.SortTo(buf)
+}
+
 func (c *orderedLogContents) Add(key string, value interface{}) {
+	if key == BodyKey {
+		c.releaseBodyOwnership()
+	}
 	if !c.Contains(key) {
 		c.keys = append(c.keys, key)
 	}
@@ -109,6 +168,9 @@ func (c *orderedLogContents) Merge(other KeyValues[interface{}]) {
 }
 
 func (c *orderedLogContents) Delete(key string) {
+	if key == BodyKey {
+		c.releaseBodyOwnership()
+	}
 	if index := slices.Index(c.keys, key); index >= 0 {
 		c.keys = slices.Delete(c.keys, index, index+1)
 	}

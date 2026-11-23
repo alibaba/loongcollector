@@ -186,7 +186,7 @@ func addPipelineLogContent(log *models.Log, key, value []byte, takeBody bool) {
 	if !takeBody {
 		value = slices.Clone(value)
 	}
-	log.SetBody(value)
+	models.SetOwnedLogBody(log, value)
 }
 
 func TransferPBToMetricEvent(src *protocol.MetricEvent) (*models.Metric, error) {
