@@ -20,14 +20,19 @@ import (
 	"io"
 	"net"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/mitchellh/mapstructure"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/encoding"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/alibaba/ilogtail/pkg/doc"
+	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/models"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
@@ -39,32 +44,105 @@ type GrpcSubscriber struct {
 	Network    string `mapstructure:"network" comment:"the gRPC server network, default value is tcp"`
 	DelayStart string `mapstructure:"delay_start" comment:"the delay start time duration for fault injection, such as 5s"`
 
-	channel chan *protocol.LogGroup
-	cache   []*protocol.LogGroup
-	server  *grpc.Server
+	channel     chan grpcBatch
+	mu          sync.Mutex
+	logGroups   []*protocol.LogGroup
+	eventGroups []*models.PipelineGroupEvents
+	server      *grpc.Server
 }
 
 func (g *GrpcSubscriber) Description() string {
-	return "this a gRPC subscriber, which is the default mock backend for loongcollector."
+	return "gRPC subscriber for the default LoongCollector mock backend"
 }
 
-type GRPCService struct {
-	ch chan *protocol.LogGroup
+type grpcBatch struct {
+	legacy *protocol.LogGroup
+	events *models.PipelineGroupEvents
+}
+
+type legacyGRPCService struct {
+	ch chan grpcBatch
 	protocol.UnimplementedLogReportServiceServer
 }
 
+type eventGRPCService struct {
+	ch chan grpcBatch
+	protocol.UnimplementedPipelineEventGroupReportServiceServer
+}
+
+// GetData projects received events into the existing E2E view used by the
+// other subscribers. This projection is not part of either gRPC wire path.
 func (g *GrpcSubscriber) GetData(string, int32) ([]*protocol.LogGroup, error) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if err := g.drain(); err != nil {
+		return nil, err
+	}
+	return g.logGroups, nil
+}
+
+// GetEventData exposes the native view for assertions on contents and tags.
+func (g *GrpcSubscriber) GetEventData() ([]*models.PipelineGroupEvents, error) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if err := g.drain(); err != nil {
+		return nil, err
+	}
+	return g.eventGroups, nil
+}
+
+func (g *GrpcSubscriber) drain() error {
 	for {
 		select {
-		case logGroup, ok := <-g.channel:
-			if !ok {
-				return g.cache, nil
+		case batch := <-g.channel:
+			if batch.legacy != nil {
+				g.logGroups = append(g.logGroups, batch.legacy)
+				continue
 			}
-			g.cache = append(g.cache, logGroup)
+			logGroups, err := projectEventReport(batch.events)
+			if err != nil {
+				return err
+			}
+			g.eventGroups = append(g.eventGroups, batch.events)
+			g.logGroups = append(g.logGroups, logGroups...)
 		default:
-			return g.cache, nil
+			return nil
 		}
 	}
+}
+
+func projectEventReport(input *models.PipelineGroupEvents) ([]*protocol.LogGroup, error) {
+	var groups []*protocol.LogGroup
+	err := helper.ForEachLogTagGroup(input, func(group *models.PipelineGroupEvents) error {
+		rows, err := helper.EncodeEventRecords(group)
+		if err != nil {
+			return err
+		}
+		out := &protocol.LogGroup{
+			Category: group.Group.GetDestinationLogstore(),
+			Logs:     make([]*protocol.Log, 0, len(rows)),
+		}
+		for key, value := range group.Group.GetTags().Iterator() {
+			if key == pipeline.TopicTagKey {
+				out.Topic = value
+			} else {
+				out.LogTags = append(out.LogTags, &protocol.LogTag{Key: key, Value: value})
+			}
+		}
+		for _, row := range rows {
+			log := &protocol.Log{Time: uint32(row.Timestamp / 1e9), Contents: make([]*protocol.Log_Content, 0, len(row.Fields))}
+			if ns := uint32(row.Timestamp % 1e9); ns != 0 {
+				log.TimeNs = &ns
+			}
+			for key, value := range row.Fields {
+				log.Contents = append(log.Contents, &protocol.Log_Content{Key: key, Value: value})
+			}
+			out.Logs = append(out.Logs, log)
+		}
+		groups = append(groups, out)
+		return nil
+	})
+	return groups, err
 }
 
 func (g *GrpcSubscriber) Start() error {
@@ -72,19 +150,17 @@ func (g *GrpcSubscriber) Start() error {
 	if err != nil {
 		return err
 	}
-	encoding.RegisterCodec(new(protocol.Codec))
-	g.server = grpc.NewServer()
+	g.server = grpc.NewServer(grpc.ForceServerCodec(protocol.Codec{}))
 	listener, err := net.Listen(g.Network, g.Address)
 	if err != nil {
 		return err
 	}
-	serv := &GRPCService{ch: g.channel}
-	protocol.RegisterLogReportServiceServer(g.server, serv)
+	protocol.RegisterPipelineEventGroupReportServiceServer(g.server, &eventGRPCService{ch: g.channel})
+	protocol.RegisterLogReportServiceServer(g.server, &legacyGRPCService{ch: g.channel})
 	go func() {
 		logger.Infof(context.Background(), "the grpc server would start in %s", g.DelayStart)
 		time.Sleep(delayDuration)
-		err = g.server.Serve(listener)
-		if err != nil {
+		if err := g.server.Serve(listener); err != nil {
 			logger.Error(context.Background(), selfmonitor.GRPCServerAlarm, "err", err)
 		}
 	}()
@@ -95,17 +171,12 @@ func (g *GrpcSubscriber) Stop() error {
 	if g.server != nil {
 		g.server.Stop()
 	}
-	close(g.channel)
 	return nil
 }
 
-func (g *GrpcSubscriber) SubscribeChan() <-chan *protocol.LogGroup {
-	return g.channel
-}
-
-func (t *GRPCService) Collect(stream protocol.LogReportService_CollectServer) error {
+func (t *legacyGRPCService) Collect(stream protocol.LogReportService_CollectServer) error {
 	for {
-		logGroup, err := stream.Recv()
+		group, err := stream.Recv()
 		if err == io.EOF {
 			return stream.SendAndClose(&protocol.Response{
 				Code:    protocol.ResponseCode_Success,
@@ -115,7 +186,32 @@ func (t *GRPCService) Collect(stream protocol.LogReportService_CollectServer) er
 		if err != nil {
 			return err
 		}
-		t.ch <- logGroup
+		select {
+		case t.ch <- grpcBatch{legacy: group}:
+		case <-stream.Context().Done():
+			return stream.Context().Err()
+		}
+	}
+}
+
+func (t *eventGRPCService) Collect(stream protocol.PipelineEventGroupReportService_CollectServer) error {
+	for {
+		report, err := stream.Recv()
+		if err == io.EOF {
+			return stream.SendAndClose(&protocol.PipelineEventGroupReportResponse{})
+		}
+		if err != nil {
+			return err
+		}
+		group, err := helper.DecodePipelineEventReport(report)
+		if err != nil {
+			return status.Errorf(codes.InvalidArgument, "decode event report: %v", err)
+		}
+		select {
+		case t.ch <- grpcBatch{events: group}:
+		case <-stream.Context().Done():
+			return stream.Context().Err()
+		}
 	}
 }
 
@@ -146,7 +242,7 @@ func init() {
 		if g.DelayStart == "" {
 			g.DelayStart = "0s"
 		}
-		g.channel = make(chan *protocol.LogGroup, 1000)
+		g.channel = make(chan grpcBatch, 1000)
 		err := g.Start()
 		return g, err
 	})

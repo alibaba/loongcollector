@@ -16,18 +16,10 @@ package protocol
 
 import (
 	"fmt"
-	"sort"
-	"strconv"
 
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/models"
-	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 )
-
-// byteArrayContentKey carries the raw ByteArray payload, which has no
-// structured fields of its own, so it is never silently dropped.
-const byteArrayContentKey = "content"
 
 // protocolRecord is one flushable record extracted from a pipeline event. A Log
 // maps to a single record; a Metric may expand into several records (one per
@@ -132,7 +124,7 @@ func (c *Converter) pipelineEventToRecords(event models.PipelineEvent, group *mo
 		}}, nil
 	}
 
-	rows, err := encodeNonLogRecords(event)
+	rows, err := helper.EncodeEventRecordsForEvent(event)
 	if err != nil {
 		return nil, err
 	}
@@ -236,235 +228,10 @@ func marshalSingleProtocolEntry(entry map[string]interface{}) ([]byte, error) {
 	return marshalWithoutHTMLEscaped(entry)
 }
 
-// PipelineGroupEventsToLogGroups serializes native events using the existing
-// LogGroup wire schema. Per-log tags stay in LogTags; distinct tag sets are
-// emitted in separate groups rather than flattened into log contents.
-func PipelineGroupEventsToLogGroups(events *models.PipelineGroupEvents) ([]*protocol.LogGroup, error) {
-	var groups []*protocol.LogGroup
-	err := helper.ForEachLogTagGroup(events, func(group *models.PipelineGroupEvents) error {
-		converted, err := pipelineGroupEventsToLogGroup(group)
-		if err != nil {
-			return err
-		}
-		groups = append(groups, converted)
-		return nil
-	})
-	return groups, err
-}
-
-func pipelineGroupEventsToLogGroup(groupEvents *models.PipelineGroupEvents) (*protocol.LogGroup, error) {
-	logGroup := &protocol.LogGroup{
-		Category: groupEvents.Group.GetDestinationLogstore(),
-		Logs:     make([]*protocol.Log, 0, len(groupEvents.Events)),
-	}
-	for k, v := range groupEvents.Group.GetTags().Iterator() {
-		if k == pipeline.TopicTagKey {
-			logGroup.Topic = v
-			continue
-		}
-		logGroup.LogTags = append(logGroup.LogTags, &protocol.LogTag{Key: k, Value: v})
-	}
-	for _, event := range groupEvents.Events {
-		if log, ok := event.(*models.Log); ok && log != nil {
-			wireLog, err := newWireLog(log)
-			if err != nil {
-				return nil, err
-			}
-			logGroup.Logs = append(logGroup.Logs, wireLog)
-			continue
-		}
-		rows, err := encodeNonLogRecords(event)
-		if err != nil {
-			return nil, err
-		}
-		for _, row := range rows {
-			log := &protocol.Log{Contents: make([]*protocol.Log_Content, 0, len(row.Fields))}
-			setWireTimestamp(log, row.Timestamp)
-			for key, value := range row.Fields {
-				log.Contents = append(log.Contents, &protocol.Log_Content{Key: key, Value: value})
-			}
-			logGroup.Logs = append(logGroup.Logs, log)
-		}
-	}
-	return logGroup, nil
-}
-
-func newWireLog(event *models.Log) (*protocol.Log, error) {
-	fields := event.GetIndices()
-	log := &protocol.Log{Contents: make([]*protocol.Log_Content, 0, fields.Len())}
-	setWireTimestamp(log, event.GetTimestamp())
-	for key, value := range fields.Iterator() {
-		text, err := stringLogField(key, value)
-		if err != nil {
-			return nil, err
-		}
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: key, Value: text})
-	}
-	return log, nil
-}
-
-func setWireTimestamp(log *protocol.Log, timestamp uint64) {
-	log.Time = uint32(timestamp / 1e9)
-	if nanos := uint32(timestamp % 1e9); nanos != 0 {
-		log.TimeNs = &nanos
-	}
-}
-
-func stringLogField(key string, value any) (string, error) {
-	switch typed := value.(type) {
-	case string:
-		return typed, nil
-	case []byte:
-		return string(typed), nil
-	default:
-		return "", fmt.Errorf("unsupported log content type for key %s: %T", key, value)
-	}
-}
-
 // EventRecord is a string-valued output row with a Unix timestamp in nanoseconds.
-type EventRecord struct {
-	Fields    map[string]string
-	Timestamp uint64
-}
+type EventRecord = helper.EventRecord
 
 // EncodeEventRecords prepares rows for sinks that accept string-valued fields.
 func EncodeEventRecords(group *models.PipelineGroupEvents) ([]EventRecord, error) {
-	if group == nil || len(group.Events) == 0 {
-		return nil, nil
-	}
-	rows := make([]EventRecord, 0, len(group.Events))
-	for _, event := range group.Events {
-		records, err := encodeEventRecords(event)
-		if err != nil {
-			return nil, err
-		}
-		rows = append(rows, records...)
-	}
-	return rows, nil
-}
-
-func encodeEventRecords(event models.PipelineEvent) ([]EventRecord, error) {
-	if log, ok := event.(*models.Log); ok && log != nil {
-		fields := make(map[string]string, log.GetIndices().Len())
-		for key, value := range log.GetIndices().Iterator() {
-			text, err := stringLogField(key, value)
-			if err != nil {
-				return nil, err
-			}
-			fields[key] = text
-		}
-		return []EventRecord{{Fields: fields, Timestamp: log.GetTimestamp()}}, nil
-	}
-	return encodeNonLogRecords(event)
-}
-
-func encodeNonLogRecords(event models.PipelineEvent) ([]EventRecord, error) {
-	switch typed := event.(type) {
-	case *models.Metric:
-		return encodeMetricRecords(typed), nil
-	case *models.Span:
-		fields := map[string]string{
-			"traceID":      typed.GetTraceID(),
-			"spanID":       typed.GetSpanID(),
-			"parentSpanID": typed.GetParentSpanID(),
-			"name":         typed.GetName(),
-			"kind":         spanKindText(typed.GetKind()),
-			"startTime":    strconv.FormatUint(typed.GetStartTime(), 10),
-			"endTime":      strconv.FormatUint(typed.GetEndTime(), 10),
-			"statusCode":   strconv.FormatInt(int64(typed.GetStatus()), 10),
-		}
-		for k, v := range typed.GetTags().Iterator() {
-			fields[k] = v
-		}
-		return []EventRecord{{Fields: fields, Timestamp: typed.GetTimestamp()}}, nil
-	case models.ByteArray:
-		return []EventRecord{{Fields: map[string]string{byteArrayContentKey: string(typed)}, Timestamp: typed.GetTimestamp()}}, nil
-	default:
-		return nil, fmt.Errorf("unsupported event type %T", event)
-	}
-}
-
-func encodeMetricRecords(metric *models.Metric) []EventRecord {
-	labels := &helper.MetricLabels{}
-	for k, v := range metric.GetTags().Iterator() {
-		labels.Append(k, v)
-	}
-	timeText := strconv.FormatUint(metric.GetTimestamp(), 10)
-	labelText := labels.String()
-	newRecord := func(name, value string) EventRecord {
-		return EventRecord{
-			Timestamp: metric.GetTimestamp(),
-			Fields: map[string]string{
-				metricNameKey:     helper.FormatMetricLogName(name),
-				metricLabelsKey:   labelText,
-				metricTimeNanoKey: timeText,
-				metricValueKey:    value,
-			},
-		}
-	}
-
-	name := metric.GetName()
-	records := make([]EventRecord, 0, 1)
-	if value := metric.GetValue(); value != nil {
-		if value.IsSingleValue() {
-			records = append(records, newRecord(name, helper.FormatMetricLogValue(value.GetSingleValue())))
-		} else if value.IsMultiValues() {
-			multiValues := value.GetMultiValues().Iterator()
-			for _, field := range sortedFloatKeys(multiValues) {
-				records = append(records, newRecord(name+"_"+field, helper.FormatMetricLogValue(multiValues[field])))
-			}
-		}
-	}
-	if typedValues := metric.GetTypedValue(); typedValues.Len() > 0 {
-		iter := typedValues.Iterator()
-		for _, field := range sortedTypedKeys(iter) {
-			records = append(records, newRecord(name+"_"+field, typedValueToString(iter[field])))
-		}
-	}
-	if len(records) == 0 {
-		records = append(records, newRecord(name, ""))
-	}
-	return records
-}
-
-func typedValueToString(tv *models.TypedValue) string {
-	if tv == nil {
-		return ""
-	}
-	return fmt.Sprint(tv.Value)
-}
-
-func sortedFloatKeys(m map[string]float64) []string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	return keys
-}
-
-func sortedTypedKeys(m map[string]*models.TypedValue) []string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	return keys
-}
-
-func spanKindText(kind models.SpanKind) string {
-	switch kind {
-	case models.SpanKindInternal:
-		return models.SpanKindTextInternal
-	case models.SpanKindServer:
-		return models.SpanKindTextServer
-	case models.SpanKindClient:
-		return models.SpanKindTextClient
-	case models.SpanKindProducer:
-		return models.SpanKindTextProducer
-	case models.SpanKindConsumer:
-		return models.SpanKindTextConsumer
-	default:
-		return models.SpanKindTextInternal
-	}
+	return helper.EncodeEventRecords(group)
 }

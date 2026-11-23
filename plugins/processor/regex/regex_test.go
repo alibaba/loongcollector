@@ -18,6 +18,8 @@ import (
 	"context"
 	"testing"
 
+	"github.com/alibaba/ilogtail/plugins/processor/internal/processortest"
+
 	"github.com/pingcap/check"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -26,8 +28,6 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
-	"github.com/alibaba/ilogtail/plugins/test"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
 )
 
@@ -39,11 +39,11 @@ func Test(t *testing.T) {
 }
 
 type processorTestSuite struct {
-	processor pipeline.ProcessorV1
+	processor pipeline.Processor
 }
 
 func (s *processorTestSuite) SetUpTest(c *check.C) {
-	s.processor = pipeline.Processors["processor_regex"]().(pipeline.ProcessorV1)
+	s.processor = pipeline.Processors["processor_regex"]()
 	require.Error(c, s.processor.Init(mock.NewEmptyContext("p", "l", "c")))
 	logger.Info(context.Background(), "set up", s.processor.Description())
 }
@@ -64,24 +64,21 @@ func (s *processorTestSuite) TestDefault(c *check.C) {
 	// Case: catch all content as a field.
 	{
 		log := `2021-08-27 13:04:14.920 77711773 [ThreadName] INFO  content detail`
-		logPb := test.CreateLogs("content", log)
+		logEvent := processortest.Log("content", log)
 		processor, _ := s.processor.(*ProcessorRegex)
 		processor.Keys = []string{"content", "time", "level"}
 		processor.Regex = "((\\d{4}[-]\\d{2}[-]\\d{2}\\s\\d{2}[:]\\d{2}[:]\\d{2}[.]\\d{3})[\\S\\s]*(INFO|WARN|ERROR|DEBUG)[\\s\\S]*)"
 		processor.KeepSource = false
 		require.NoError(c, s.processor.Init(mock.NewEmptyContext("p", "l", "c")))
-		logArray := make([]*protocol.Log, 1)
-		logArray[0] = logPb
+		logArray := make([]*models.Log, 1)
+		logArray[0] = logEvent
 
-		outLogs := s.processor.ProcessLogs(logArray)
+		outLogs := processortest.Apply(s.processor, logArray...)
 		c.Assert(len(outLogs), check.Equals, 1)
-		c.Assert(len(outLogs[0].Contents), check.Equals, 3)
-		c.Assert(outLogs[0].Contents[0].GetValue(), check.Equals, log)
-		c.Assert(outLogs[0].Contents[1].GetValue(), check.Equals, "2021-08-27 13:04:14.920")
-		c.Assert(outLogs[0].Contents[2].GetValue(), check.Equals, "INFO")
-		c.Assert(outLogs[0].Contents[0].GetKey(), check.Equals, "content")
-		c.Assert(outLogs[0].Contents[1].GetKey(), check.Equals, "time")
-		c.Assert(outLogs[0].Contents[2].GetKey(), check.Equals, "level")
+		c.Assert(outLogs[0].Contents.Len(), check.Equals, 3)
+		c.Assert(pipeline.GetStringValue(outLogs[0].Contents.Get("content")), check.Equals, log)
+		c.Assert(pipeline.GetStringValue(outLogs[0].Contents.Get("time")), check.Equals, "2021-08-27 13:04:14.920")
+		c.Assert(pipeline.GetStringValue(outLogs[0].Contents.Get("level")), check.Equals, "INFO")
 	}
 	// Case: end with line feed, must use [\s\S]* if line feed needs to be included.
 	{
@@ -92,113 +89,90 @@ func (s *processorTestSuite) TestDefault(c *check.C) {
 		{
 			processor.Regex = "^[^,]+,(.*)$"
 			require.NoError(c, s.processor.Init(mock.NewEmptyContext("p", "l", "c")))
-			logArray := make([]*protocol.Log, 1)
-			logArray[0] = test.CreateLogs("content", log)
-			outLogs := s.processor.ProcessLogs(logArray)
+			outLogs := processortest.Apply(s.processor, processortest.Log("content", log))
 			c.Assert(len(outLogs), check.Equals, 1)
-			c.Assert(outLogs[0].Contents[0].GetValue(), check.Equals, "json\nnextline")
+			c.Assert(pipeline.GetStringValue(outLogs[0].Contents.Get("jsonlog")), check.Equals, "json\nnextline")
 		}
 		{
 			processor.Regex = "^[^,]+,([\\s\\S]*)$"
 			require.NoError(c, s.processor.Init(mock.NewEmptyContext("p", "l", "c")))
-			logArray := make([]*protocol.Log, 1)
-			logArray[0] = test.CreateLogs("content", log)
-			outLogs := s.processor.ProcessLogs(logArray)
+			outLogs := processortest.Apply(s.processor, processortest.Log("content", log))
 			c.Assert(len(outLogs), check.Equals, 1)
-			c.Assert(outLogs[0].Contents[0].GetValue(), check.Equals, "json\nnextline")
+			c.Assert(pipeline.GetStringValue(outLogs[0].Contents.Get("jsonlog")), check.Equals, "json\nnextline")
 		}
 		{
 			// Does not include line feed.
 			processor.Regex = "^[^,]+,(.*)"
 			require.NoError(c, s.processor.Init(mock.NewEmptyContext("p", "l", "c")))
-			logArray := make([]*protocol.Log, 1)
-			logArray[0] = test.CreateLogs("content", log)
-			outLogs := s.processor.ProcessLogs(logArray)
+			outLogs := processortest.Apply(s.processor, processortest.Log("content", log))
 			c.Assert(len(outLogs), check.Equals, 1)
-			c.Assert(outLogs[0].Contents[0].GetValue(), check.Equals, "json\nnextline")
+			c.Assert(pipeline.GetStringValue(outLogs[0].Contents.Get("jsonlog")), check.Equals, "json\nnextline")
 		}
 	}
 	{
 		var log = "xxxx\nyyyy\nzzzz"
-		logPb := test.CreateLogs("content", log)
+		logEvent := processortest.Log("content", log)
 		processor, _ := s.processor.(*ProcessorRegex)
 		processor.Keys = []string{"key1", "key2", "key3"}
 		processor.Regex = `(\w+)\s(\w+)\s(\w+)`
 		require.NoError(c, s.processor.Init(mock.NewEmptyContext("p", "l", "c")))
-		logArray := make([]*protocol.Log, 1)
-		logArray[0] = logPb
-		outLogs := s.processor.ProcessLogs(logArray)
+		outLogs := processortest.Apply(s.processor, logEvent)
 		c.Assert(len(outLogs), check.Equals, 1)
-		c.Assert(len(outLogs[0].Contents), check.Equals, 3)
-		c.Assert(outLogs[0].Contents[0].GetValue(), check.Equals, "xxxx")
-		c.Assert(outLogs[0].Contents[1].GetValue(), check.Equals, "yyyy")
-		c.Assert(outLogs[0].Contents[2].GetValue(), check.Equals, "zzzz")
-
-		c.Assert(outLogs[0].Contents[0].GetKey(), check.Equals, "key1")
-		c.Assert(outLogs[0].Contents[1].GetKey(), check.Equals, "key2")
-		c.Assert(outLogs[0].Contents[2].GetKey(), check.Equals, "key3")
+		c.Assert(outLogs[0].Contents.Len(), check.Equals, 3)
+		c.Assert(pipeline.GetStringValue(outLogs[0].Contents.Get("key1")), check.Equals, "xxxx")
+		c.Assert(pipeline.GetStringValue(outLogs[0].Contents.Get("key2")), check.Equals, "yyyy")
+		c.Assert(pipeline.GetStringValue(outLogs[0].Contents.Get("key3")), check.Equals, "zzzz")
 	}
 	{
 		var log = `10.200.98.220 - - [26/Jun/2017:13:45:41 +0800] "POST /PutData?Category=YunOsAccountOpLog&AccessKeyId=U0UjpekFQOVJW45A&Date=Fri%2C%2028%20Jun%202013%2006%3A53%3A30%20GMT&Topic=raw&Signature=pD12XYLmGxKQ%2Bmkd6x7hAgQ7b1c%3D HTTP/1.1" 0.024 18204 200 37 "-" "aliyun-sdk-java" 215519025`
-		logPb := test.CreateLogs("content", log)
+		logEvent := processortest.Log("content", log)
 		processor, _ := s.processor.(*ProcessorRegex)
 		processor.Keys = []string{"ip", "time", "method", "url", "request_time", "length", "status", "length", "url", "browser", "seqNo"}
 		values := []string{"10.200.98.220", "26/Jun/2017:13:45:41", "POST", "/PutData?Category=YunOsAccountOpLog&AccessKeyId=U0UjpekFQOVJW45A&Date=Fri%2C%2028%20Jun%202013%2006%3A53%3A30%20GMT&Topic=raw&Signature=pD12XYLmGxKQ%2Bmkd6x7hAgQ7b1c%3D HTTP/1.1", "0.024", "18204", "200", "37", "-", "aliyun-sdk-java", "215519025"}
 		processor.Regex = `([\d\.]+) \S+ \S+ \[(\S+) \S+\] "(\w+) ([^\"]*)" ([\d\.]+) (\d+) (\d+) (\d+|-) "([^\"]*)" "([^\"]*)".* (\d+)`
 		require.NoError(c, s.processor.Init(mock.NewEmptyContext("p", "l", "c")))
-		logArray := make([]*protocol.Log, 1)
-		logArray[0] = logPb
-		outLogs := s.processor.ProcessLogs(logArray)
+		outLogs := processortest.Apply(s.processor, logEvent)
 		c.Assert(len(outLogs), check.Equals, 1)
-		c.Assert(len(outLogs[0].Contents), check.Equals, len(values))
+		expected := make(map[string]interface{}, len(values))
 		for i, value := range values {
-			c.Assert(outLogs[0].Contents[i].GetKey(), check.Equals, processor.Keys[i])
-			c.Assert(outLogs[0].Contents[i].GetValue(), check.Equals, value)
+			expected[processor.Keys[i]] = value
 		}
+		c.Assert(outLogs[0].Contents.Iterator(), check.DeepEquals, expected)
 	}
 	{
 		var log = `123dsafsfdf10.200.98.220 - - [26/Jun/2017:13:45:41 +0800] "POST /PutData?Category=YunOsAccountOpLog&AccessKeyId=U0UjpekFQOVJW45A&Date=Fri%2C%2028%20Jun%202013%2006%3A53%3A30%20GMT&Topic=raw&Signature=pD12XYLmGxKQ%2Bmkd6x7hAgQ7b1c%3D HTTP/1.1" 0.024 18204 200 37 "-" "aliyun-sdk-java" 215519025AAAA`
-		logPb := test.CreateLogs("content", log)
+		logEvent := processortest.Log("content", log)
 		processor, _ := s.processor.(*ProcessorRegex)
 		processor.FullMatch = false
 		processor.Keys = []string{"ip", "time", "method", "url", "request_time", "length", "status", "length", "url", "browser", "seqNo"}
 		values := []string{"10.200.98.220", "26/Jun/2017:13:45:41", "POST", "/PutData?Category=YunOsAccountOpLog&AccessKeyId=U0UjpekFQOVJW45A&Date=Fri%2C%2028%20Jun%202013%2006%3A53%3A30%20GMT&Topic=raw&Signature=pD12XYLmGxKQ%2Bmkd6x7hAgQ7b1c%3D HTTP/1.1", "0.024", "18204", "200", "37", "-", "aliyun-sdk-java", "215519025"}
 		processor.Regex = `([\d\.]+) \S+ \S+ \[(\S+) \S+\] "(\w+) ([^\"]*)" ([\d\.]+) (\d+) (\d+) (\d+|-) "([^\"]*)" "([^\"]*)".* (\d+)`
 		require.NoError(c, s.processor.Init(mock.NewEmptyContext("p", "l", "c")))
-		logArray := make([]*protocol.Log, 1)
-		logArray[0] = logPb
-		outLogs := s.processor.ProcessLogs(logArray)
+		outLogs := processortest.Apply(s.processor, logEvent)
 		c.Assert(len(outLogs), check.Equals, 1)
-		c.Assert(len(outLogs[0].Contents), check.Equals, len(values))
+		expected := make(map[string]interface{}, len(values))
 		for i, value := range values {
-			c.Assert(outLogs[0].Contents[i].GetKey(), check.Equals, processor.Keys[i])
-			c.Assert(outLogs[0].Contents[i].GetValue(), check.Equals, value)
+			expected[processor.Keys[i]] = value
 		}
+		c.Assert(outLogs[0].Contents.Iterator(), check.DeepEquals, expected)
 	}
 	{
 		// not match
 		var log = "xxxx\nyyyy\nzzzz"
-		logPb := test.CreateLogs("content", log)
+		logEvent := processortest.Log("content", log)
 		processor, _ := s.processor.(*ProcessorRegex)
 		processor.Keys = []string{"key1", "key2", "key3"}
 		processor.Regex = `(\w+)\s(\w+)\s(\w+)`
 		processor.SourceKey = "content"
 		processor.KeepSource = true
 		require.NoError(c, s.processor.Init(mock.NewEmptyContext("p", "l", "c")))
-		logArray := make([]*protocol.Log, 1)
-		logArray[0] = logPb
-		outLogs := s.processor.ProcessLogs(logArray)
+		outLogs := processortest.Apply(s.processor, logEvent)
 		c.Assert(len(outLogs), check.Equals, 1)
-		c.Assert(len(outLogs[0].Contents), check.Equals, 4)
-		c.Assert(outLogs[0].Contents[0].GetValue(), check.Equals, log)
-		c.Assert(outLogs[0].Contents[1].GetValue(), check.Equals, "xxxx")
-		c.Assert(outLogs[0].Contents[2].GetValue(), check.Equals, "yyyy")
-		c.Assert(outLogs[0].Contents[3].GetValue(), check.Equals, "zzzz")
-
-		c.Assert(outLogs[0].Contents[0].GetKey(), check.Equals, "content")
-		c.Assert(outLogs[0].Contents[1].GetKey(), check.Equals, "key1")
-		c.Assert(outLogs[0].Contents[2].GetKey(), check.Equals, "key2")
-		c.Assert(outLogs[0].Contents[3].GetKey(), check.Equals, "key3")
+		c.Assert(outLogs[0].Contents.Len(), check.Equals, 4)
+		c.Assert(pipeline.GetStringValue(outLogs[0].Contents.Get("content")), check.Equals, log)
+		c.Assert(pipeline.GetStringValue(outLogs[0].Contents.Get("key1")), check.Equals, "xxxx")
+		c.Assert(pipeline.GetStringValue(outLogs[0].Contents.Get("key2")), check.Equals, "yyyy")
+		c.Assert(pipeline.GetStringValue(outLogs[0].Contents.Get("key3")), check.Equals, "zzzz")
 	}
 }
 
@@ -206,25 +180,22 @@ func (s *processorTestSuite) TestNotMatch(c *check.C) {
 	{
 		// not match key
 		var log = "xxxx\nyyyy\nzzzz"
-		logPb := test.CreateLogs("content", log)
+		logEvent := processortest.Log("content", log)
 		processor, _ := s.processor.(*ProcessorRegex)
 		processor.Keys = []string{"key1", "key2", "key3", "key4"}
 		processor.Regex = `(\w+)\s(\w+)\s(\w+)`
 		processor.SourceKey = "content"
 		processor.KeepSource = true
 		require.NoError(c, s.processor.Init(mock.NewEmptyContext("p", "l", "c")))
-		logArray := make([]*protocol.Log, 1)
-		logArray[0] = logPb
-		outLogs := s.processor.ProcessLogs(logArray)
+		outLogs := processortest.Apply(s.processor, logEvent)
 		c.Assert(len(outLogs), check.Equals, 1)
-		c.Assert(len(outLogs[0].Contents), check.Equals, 1)
-		c.Assert(outLogs[0].Contents[0].GetKey(), check.Equals, "content")
-		c.Assert(outLogs[0].Contents[0].GetValue(), check.Equals, log)
+		c.Assert(outLogs[0].Contents.Len(), check.Equals, 1)
+		c.Assert(pipeline.GetStringValue(outLogs[0].Contents.Get("content")), check.Equals, log)
 	}
 	{
 		// not match key
 		var log = "xxxx\nyyyy\nzzzz"
-		logPb := test.CreateLogs("content", log)
+		logEvent := processortest.Log("content", log)
 		processor, _ := s.processor.(*ProcessorRegex)
 		processor.Keys = []string{"key1", "key2", "key3", "keyx"}
 		processor.Regex = `(\w+)\s(\w+)\s(\w+)`
@@ -232,13 +203,10 @@ func (s *processorTestSuite) TestNotMatch(c *check.C) {
 		processor.KeepSource = true
 		processor.NoMatchError = true
 		require.NoError(c, s.processor.Init(mock.NewEmptyContext("p", "l", "c")))
-		logArray := make([]*protocol.Log, 1)
-		logArray[0] = logPb
-		outLogs := s.processor.ProcessLogs(logArray)
+		outLogs := processortest.Apply(s.processor, logEvent)
 		c.Assert(len(outLogs), check.Equals, 1)
-		c.Assert(len(outLogs[0].Contents), check.Equals, 1)
-		c.Assert(outLogs[0].Contents[0].GetKey(), check.Equals, "content")
-		c.Assert(outLogs[0].Contents[0].GetValue(), check.Equals, log)
+		c.Assert(outLogs[0].Contents.Len(), check.Equals, 1)
+		c.Assert(pipeline.GetStringValue(outLogs[0].Contents.Get("content")), check.Equals, log)
 	}
 }
 
@@ -246,35 +214,30 @@ func (s *processorTestSuite) TestNoKeyAlarmAndPreserve(c *check.C) {
 	{
 		// no key
 		var log = "xxxx\nyyyy\nzzzz"
-		logPb := test.CreateLogs("content", log)
+		logEvent := processortest.Log("content", log)
 		processor, _ := s.processor.(*ProcessorRegex)
 		processor.Keys = []string{"key1", "key2", "key3"}
 		processor.Regex = `(\w+)\s(\w+)\s(\w+)`
 		processor.SourceKey = "xxxx"
 		processor.NoMatchError = true
 		require.NoError(c, s.processor.Init(mock.NewEmptyContext("p", "l", "c")))
-		logArray := make([]*protocol.Log, 1)
-		logArray[0] = logPb
-		outLogs := s.processor.ProcessLogs(logArray)
+		outLogs := processortest.Apply(s.processor, logEvent)
 		c.Assert(len(outLogs), check.Equals, 1)
-		c.Assert(len(outLogs[0].Contents), check.Equals, 1)
+		c.Assert(outLogs[0].Contents.Len(), check.Equals, 1)
 	}
 	{
 		var log = "xxxx\nyyyy\nzzzz"
-		logPb := test.CreateLogs("content", log)
+		logEvent := processortest.Log("content", log)
 		processor, _ := s.processor.(*ProcessorRegex)
 		processor.Keys = []string{"key1", "key2", "key3"}
 		processor.Regex = `(\d+)\s(\w+)\s(\w+)`
 		processor.SourceKey = "content"
 		processor.KeepSource = true
 		require.NoError(c, s.processor.Init(mock.NewEmptyContext("p", "l", "c")))
-		logArray := make([]*protocol.Log, 1)
-		logArray[0] = logPb
-		outLogs := s.processor.ProcessLogs(logArray)
+		outLogs := processortest.Apply(s.processor, logEvent)
 		c.Assert(len(outLogs), check.Equals, 1)
-		c.Assert(len(outLogs[0].Contents), check.Equals, 1)
-		c.Assert(outLogs[0].Contents[0].GetKey(), check.Equals, "content")
-		c.Assert(outLogs[0].Contents[0].GetValue(), check.Equals, log)
+		c.Assert(outLogs[0].Contents.Len(), check.Equals, 1)
+		c.Assert(pipeline.GetStringValue(outLogs[0].Contents.Get("content")), check.Equals, log)
 	}
 }
 
@@ -292,30 +255,24 @@ func (s *processorTestSuite) TestKeepSourceIfParseError(c *check.C) {
 
 	processor.KeepSourceIfParseError = false
 	{
-		logArray := make([]*protocol.Log, 1)
-		logArray[0] = test.CreateLogs(sourceKeyName, sourceValue)
-		outLogs := s.processor.ProcessLogs(logArray)
+		outLogs := processortest.Apply(s.processor, processortest.Log(sourceKeyName, sourceValue))
 		c.Assert(len(outLogs), check.Equals, 1)
-		c.Assert(len(outLogs[0].Contents), check.Equals, 0)
+		c.Assert(outLogs[0].Contents.Len(), check.Equals, 0)
 	}
 
 	processor.KeepSourceIfParseError = true
 	{
-		logArray := make([]*protocol.Log, 1)
-		logArray[0] = test.CreateLogs(sourceKeyName, sourceValue)
-		outLogs := s.processor.ProcessLogs(logArray)
+		outLogs := processortest.Apply(s.processor, processortest.Log(sourceKeyName, sourceValue))
 		c.Assert(len(outLogs), check.Equals, 1)
-		c.Assert(len(outLogs[0].Contents), check.Equals, 1)
-		c.Assert(outLogs[0].Contents[0].GetKey(), check.Equals, sourceKeyName)
-		c.Assert(outLogs[0].Contents[0].GetValue(), check.Equals, sourceValue)
+		c.Assert(outLogs[0].Contents.Len(), check.Equals, 1)
+		c.Assert(outLogs[0].Contents.Contains(sourceKeyName), check.IsTrue)
+		c.Assert(outLogs[0].Contents.Get(sourceKeyName), check.Equals, sourceValue)
 	}
 }
 
-// ---- v2 (PipelineEvent / SendPb) Process path tests ----
-
-// TestProcessorRegex_ProcessV2Parse verifies the v2 Process path extracts the
+// TestProcessorRegex_ProcessParse verifies that Process extracts the
 // configured capture groups from the SourceKey value into new keys.
-func TestProcessorRegex_ProcessV2Parse(t *testing.T) {
+func TestProcessorRegex_ProcessParse(t *testing.T) {
 	processor := &ProcessorRegex{
 		Regex:      `(\w+)\s(\w+)\s(\w+)`,
 		Keys:       []string{"key1", "key2", "key3"},
@@ -338,9 +295,9 @@ func TestProcessorRegex_ProcessV2Parse(t *testing.T) {
 	assert.Equal(t, "xxxx yyyy zzzz", contents.Get("content"))
 }
 
-// TestProcessorRegex_ProcessV2KeepSourceFalse verifies the source field is
+// TestProcessorRegex_ProcessKeepSourceFalse verifies the source field is
 // dropped on a successful parse when KeepSource is false.
-func TestProcessorRegex_ProcessV2KeepSourceFalse(t *testing.T) {
+func TestProcessorRegex_ProcessKeepSourceFalse(t *testing.T) {
 	processor := &ProcessorRegex{
 		Regex:      `(\w+)\s(\w+)\s(\w+)`,
 		Keys:       []string{"key1", "key2", "key3"},
@@ -361,9 +318,9 @@ func TestProcessorRegex_ProcessV2KeepSourceFalse(t *testing.T) {
 	assert.Equal(t, "zzzz", contents.Get("key3"))
 }
 
-// TestProcessorRegex_ProcessV2NoMatchKeepsSource verifies that on a parse
+// TestProcessorRegex_ProcessNoMatchKeepsSource verifies that on a parse
 // failure the source is kept (KeepSourceIfParseError) and no keys are added.
-func TestProcessorRegex_ProcessV2NoMatchKeepsSource(t *testing.T) {
+func TestProcessorRegex_ProcessNoMatchKeepsSource(t *testing.T) {
 	processor := &ProcessorRegex{
 		Regex:                  `(\d+)\s(\w+)\s(\w+)`,
 		Keys:                   []string{"key1", "key2", "key3"},
@@ -384,9 +341,9 @@ func TestProcessorRegex_ProcessV2NoMatchKeepsSource(t *testing.T) {
 	assert.False(t, contents.Contains("key1"), "no keys extracted on no-match")
 }
 
-// TestProcessorRegex_ProcessV2PassesThroughMetric verifies a Metric event is
+// TestProcessorRegex_ProcessPassesThroughMetric verifies a Metric event is
 // emitted unchanged (not dropped) by the log-only processor.
-func TestProcessorRegex_ProcessV2PassesThroughMetric(t *testing.T) {
+func TestProcessorRegex_ProcessPassesThroughMetric(t *testing.T) {
 	processor := &ProcessorRegex{
 		Regex:     `(\w+)`,
 		Keys:      []string{"key1"},

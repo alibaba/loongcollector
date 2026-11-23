@@ -2,7 +2,7 @@
 
 ## 简介
 
-`service_kafka` `input`插件实现了`ServiceInputV1`和`ServiceInputV2`接口，插件用于采集Kafka的消息。
+`service_kafka` 消费 Kafka 消息，按 `Format` 解码并提交事件。
 
 
 ## 事件能力
@@ -26,7 +26,7 @@
 | 参数                        | 类型      | 是否必选 | 说明                                                                                                                                          |
 |---------------------------|---------|------|---------------------------------------------------------------------------------------------------------------------------------------------|
 | Type                      | string  | 是    | 插件类型，指定为`service_kafka`。                                                                                                                    |
-| Format                    | string  | 否    | 自 **1.6.0** 起新增（同仓历史版本号，旧文档常写作 ilogtail），仅 ServiceInputV2 支持。v2 版本支持格式：`raw`、`prometheus`、`otlp_metricv1`、`otlp_tracev1`</p><p>说明：`raw` 格式以原始请求字节流传输数据，默认值：`raw`</p> |
+| Format | string | 否 | 消息格式，如 `raw`、`sls`、`prometheus`、`otlp_metricv1`、`otlp_tracev1`。默认为 `raw`，提交消息的原始字节。 |
 | Version                   | string  | 是    | Kafka集群版本号。                                                                                                                                 |
 | Brokers                   | Array   | 是    | Kafka服务器地址列表。                                                                                                                               |
 | ConsumerGroup             | string  | 是    | Kafka消费组名称。                                                                                                                                 |
@@ -37,8 +37,10 @@
 | SASLUsername              | string  | 否    | SASL用户名。                                                                                                                                    |
 | SASLPassword              | string  | 否    | SASL密码。  |
 | Assignor                  | string  | 否    | 消费组消费分区分配策略。可以设置选项：range, roundrobin, sticky，默认值：range                                                                                      |
-| DisableUncompress         | bool | 否    | 自 **1.6.0** 起新增（旧文档常写作 ilogtail），禁用对请求数据的解压缩，默认 `false`。<p>目前仅针对 Raw Format 有效。</p><p>仅 v2 版本有效。</p>                                                          |
-| FieldsExtend              | bool | 否    | <p>是否支持非integer以外的数据类型(如String)</p><p>目前仅针对有 string、Bool 等额外类型的 influxdb Format 有效，仅v2版本有效</p>                                              |
+| DisableUncompress         | bool | 否    | 自 **1.6.0** 起新增（旧文档常写作 ilogtail），禁用对请求数据的解压缩，默认 `false`。<p>目前仅针对 Raw Format 有效。</p>                                                          |
+| FieldsExtend              | bool | 否    | <p>是否支持非integer以外的数据类型(如String)</p><p>目前仅针对有 string、Bool 等额外类型的 influxdb Format 有效</p>                                              |
+
+Kafka 消息头可传入解码器要求的元数据。OTLP 消息默认使用 protobuf，JSON 消息需设置 `Content-Type: application/json`。
 
 ## 样例
 

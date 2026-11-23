@@ -24,17 +24,13 @@ import (
 	"github.com/alibaba/ilogtail/pkg/models"
 )
 
-// ---- v2 (PipelineEvent / SendPb) Process path tests ----
-
 // The plugin ships no GeoIP database, so a db-backed transform cannot be
-// exercised in a unit test (the v1 geoip_test.go is empty for the same reason).
-// These tests cover the observable v2 behaviors that do not require a database:
-// the p.db == nil no-op guard (mirroring the v1 ProcessLogs guard) and the
+// exercised without a database fixture.
+// the p.db == nil no-op guard and the
 // mandatory Metric pass-through.
 
-func TestProcessorGeoIP_ProcessV2NilDBIsNoOp(t *testing.T) {
-	// db is nil: the v1 path returns logArray unchanged; the v2 path must
-	// likewise leave the log untouched while still emitting it.
+func TestProcessorGeoIP_ProcessNilDBIsNoOp(t *testing.T) {
+	// A missing database leaves the log unchanged.
 	processor := &ProcessorGeoIP{SourceKey: "ip", KeepSource: true, Language: "zh-CN"}
 
 	log := models.NewLog("", nil, "", "", "", models.NewTags(), 0)
@@ -54,7 +50,7 @@ func TestProcessorGeoIP_ProcessV2NilDBIsNoOp(t *testing.T) {
 	assert.True(t, ok, "log event must pass through even when db is nil")
 }
 
-func TestProcessorGeoIP_ProcessV2PassesThroughMetric(t *testing.T) {
+func TestProcessorGeoIP_ProcessPassesThroughMetric(t *testing.T) {
 	processor := &ProcessorGeoIP{SourceKey: "ip", KeepSource: true, Language: "zh-CN"}
 
 	metric := models.NewSingleValueMetric("m", models.MetricTypeGauge, models.NewTags(), 0, 1.0)

@@ -17,7 +17,6 @@ package pickkey
 import (
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
@@ -65,63 +64,14 @@ func (*ProcessorPickKey) Description() string {
 	return "regex filter for logtail"
 }
 
-func (p *ProcessorPickKey) process(log *protocol.Log) bool {
-	beginLen := len(log.Contents)
-	if p.includeLen > 0 {
-		tmpContent := log.Contents
-		log.Contents = make([]*protocol.Log_Content, 0, p.includeLen)
-		for _, cont := range tmpContent {
-			if _, ok := p.includeMap[cont.Key]; ok {
-				log.Contents = append(log.Contents, cont)
-			}
-		}
-	}
-
-	if p.excludeLen > 0 {
-		tmpContent := log.Contents
-		deltaLen := len(tmpContent) - p.excludeLen
-		if deltaLen <= 4 {
-			deltaLen = 4
-		}
-		log.Contents = make([]*protocol.Log_Content, 0, deltaLen)
-		for _, cont := range tmpContent {
-			if _, ok := p.excludeMap[cont.Key]; !ok {
-				log.Contents = append(log.Contents, cont)
-			}
-		}
-	}
-
-	p.filterMetric.Add(int64(beginLen - len(log.Contents)))
-
-	return len(log.Contents) != 0
-}
-
-func (p *ProcessorPickKey) ProcessLogs(logArray []*protocol.Log) []*protocol.Log {
-	totalLen := len(logArray)
-	nextIdx := 0
-	for idx := 0; idx < totalLen; idx++ {
-		if p.process(logArray[idx]) {
-			if nextIdx != idx {
-				logArray[nextIdx] = logArray[idx]
-			}
-			nextIdx++
-		}
-	}
-	logArray = logArray[:nextIdx]
-	return logArray
-}
-
 func init() {
 	pipeline.Processors[pluginType] = func() pipeline.Processor {
 		return &ProcessorPickKey{}
 	}
 }
 
-// Process implements the v2 ProcessorV2 interface: it filters the fields of
-// each Log event, keeping only Include keys and dropping Exclude keys (same
-// field-level semantics as the v1 path). A Log whose fields are all removed is
-// dropped, matching v1 process's return value. Metric/Span events pass through
-// unchanged.
+// Process keeps or removes log fields according to the configured keys and drops empty logs.
+// Other event types pass through unchanged.
 func (p *ProcessorPickKey) Process(in *models.PipelineGroupEvents, context pipeline.PipelineContext) {
 	if in == nil {
 		return
@@ -140,9 +90,7 @@ func (p *ProcessorPickKey) Process(in *models.PipelineGroupEvents, context pipel
 	context.Collector().Collect(in.Group, events...)
 }
 
-// processLogEvent filters the log contents per Include/Exclude and reports
-// whether the log should be kept (still has at least one field), matching the
-// v1 process return value.
+// processLogEvent applies the configured field selectors and reports whether fields remain.
 func (p *ProcessorPickKey) processLogEvent(log *models.Log) bool {
 	contents := log.GetIndices()
 	beginLen := contents.Len()

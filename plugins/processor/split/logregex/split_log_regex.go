@@ -15,14 +15,11 @@
 package logregex
 
 import (
-	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 
 	"regexp"
-	"time"
 
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
@@ -57,109 +54,19 @@ func fullMatch(reg *regexp.Regexp, str string) bool {
 	return len(rst) >= 2 && rst[0] == 0 && rst[1] == len(str)
 }
 
-func (p *ProcessorSplitRegex) SplitLog(logArray []*protocol.Log, rawLog *protocol.Log, cont *protocol.Log_Content) []*protocol.Log {
-	valueStr := cont.GetValue()
-	lastLineIndex := 0
-	lastCheckIndex := 0
-
-	for i := 0; i < len(valueStr); i++ {
-		if valueStr[i] == '\n' {
-			// Case 1: current line matches, combine lines before as log content.
-			if fullMatch(p.regex, valueStr[lastCheckIndex:i]) && (lastLineIndex != 0 || lastCheckIndex != 0) {
-				copyLog := protocol.CloneLog(rawLog)
-				copyLog.Contents = append(copyLog.Contents, &protocol.Log_Content{
-					Key: cont.GetKey(), Value: valueStr[lastLineIndex : lastCheckIndex-1]})
-				helper.ReviseFileOffset(copyLog, int64(lastLineIndex), p.EnableLogPositionMeta)
-				logArray = append(logArray, copyLog)
-				lastLineIndex = lastCheckIndex
-			}
-			lastCheckIndex = i + 1
-		}
-	}
-
-	// Case 2: the last line does not end with \n, check if it matches, if so,
-	//   combine lines before as log content.
-	// Special case: only one line without \n, should skip and be handled by case 3.
-	if lastCheckIndex != 0 && lastCheckIndex < len(valueStr) {
-		if fullMatch(p.regex, valueStr[lastCheckIndex:]) {
-			copyLog := protocol.CloneLog(rawLog)
-			copyLog.Contents = append(copyLog.Contents, &protocol.Log_Content{
-				Key: cont.GetKey(), Value: valueStr[lastLineIndex : lastCheckIndex-1]})
-			helper.ReviseFileOffset(copyLog, int64(lastLineIndex), p.EnableLogPositionMeta)
-			logArray = append(logArray, copyLog)
-			lastLineIndex = lastCheckIndex
-		}
-	}
-
-	// Case 3: still has content, combine remainder lines as log content.
-	if lastLineIndex < len(valueStr) {
-		rawLog.Contents = append(rawLog.Contents, &protocol.Log_Content{
-			Key: cont.GetKey(), Value: valueStr[lastLineIndex:]})
-		helper.ReviseFileOffset(rawLog, int64(lastLineIndex), p.EnableLogPositionMeta)
-		logArray = append(logArray, rawLog)
-	}
-	return logArray
-}
-
-func (p *ProcessorSplitRegex) ProcessLogs(logArray []*protocol.Log) []*protocol.Log {
-	destArray := make([]*protocol.Log, 0, len(logArray))
-
-	for _, log := range logArray {
-		newLog := &protocol.Log{}
-		var destCont *protocol.Log_Content
-		for _, cont := range log.Contents {
-			if destCont == nil && (len(p.SplitKey) == 0 || cont.Key == p.SplitKey) {
-				destCont = cont
-			} else if p.PreserveOthers {
-				newLog.Contents = append(newLog.Contents, cont)
-			}
-		}
-		if log.Time != uint32(0) {
-			if log.TimeNs != nil {
-				protocol.SetLogTimeWithNano(newLog, log.Time, *log.TimeNs)
-			} else {
-				protocol.SetLogTime(newLog, log.Time)
-			}
-		} else {
-			nowTime := time.Now()
-			protocol.SetLogTime(newLog, uint32(nowTime.Unix()))
-		}
-		if destCont != nil {
-			destArray = p.SplitLog(destArray, newLog, destCont)
-		} else {
-			if p.NoKeyError {
-				logger.Warning(p.context.GetRuntimeContext(), selfmonitor.LogRegexFindAlarm, "can't find split key", p.SplitKey)
-			}
-			if p.PreserveOthers {
-				destArray = append(destArray, newLog)
-			}
-		}
-	}
-
-	return destArray
-}
-
 func init() {
 	pipeline.Processors["processor_split_log_regex"] = func() pipeline.Processor {
 		return &ProcessorSplitRegex{SplitRegex: ".*", PreserveOthers: false}
 	}
 }
 
-// splitSegment holds one split result: the segment value together with the
-// byte offset of its first character within the original SplitKey value. The
-// offset mirrors v1 SplitLog's lastLineIndex and is used to revise the file
-// offset of the produced log.
+// splitSegment holds the text of a record and its byte offset in the input.
 type splitSegment struct {
 	value  string
 	offset int64
 }
 
-// splitValue reproduces the exact line-grouping algorithm of the v1 SplitLog,
-// operating purely on the raw string instead of protocol.Log. Given the
-// SplitKey value it returns the ordered list of segments, where each segment
-// groups the lines that belong to a single output log. Keeping this identical
-// to SplitLog guarantees v1 and v2 split the same input into the same number of
-// logs with the same content values.
+// splitValue groups lines into log segments using SplitRegex to identify record starts.
 func (p *ProcessorSplitRegex) splitValue(valueStr string) []splitSegment {
 	segments := make([]splitSegment, 0)
 	lastLineIndex := 0
@@ -192,12 +99,7 @@ func (p *ProcessorSplitRegex) splitValue(valueStr string) []splitSegment {
 	return segments
 }
 
-// Process implements the v2 ProcessorV2 interface. It performs the same
-// line-start-regex multiline split as v1 ProcessLogs, but on models.Log events:
-// one input Log can yield several output Logs. Non-Log events (Metric/Span) are
-// passed through unchanged so they are never dropped. Because the number of Log
-// events changes (1->N), the output slice is built manually rather than via
-// ProcessLogEventsOnly, and all events are collected in original group order.
+// Process emits one log per multiline segment and passes other event types through.
 func (p *ProcessorSplitRegex) Process(in *models.PipelineGroupEvents, context pipeline.PipelineContext) {
 	if in == nil {
 		return
@@ -225,16 +127,8 @@ func (p *ProcessorSplitRegex) Process(in *models.PipelineGroupEvents, context pi
 			}
 		}
 
-		if len(splitKey) == 0 {
-			for k := range contents.Iterator() {
-				splitKey = k
-				break
-			}
-		}
-
-		if len(splitKey) == 0 || !contents.Contains(splitKey) {
-			// Split key not found: mirror v1 -- warn (NoKeyError) and keep the
-			// whole log only when PreserveOthers is set, otherwise drop it.
+		if !contents.Contains(splitKey) {
+			// Keep logs without the split key only when PreserveOthers is set.
 			if p.NoKeyError {
 				logger.Warning(p.context.GetRuntimeContext(), selfmonitor.LogRegexFindAlarm, "can't find split key", p.SplitKey)
 			}
@@ -261,10 +155,6 @@ func (p *ProcessorSplitRegex) Process(in *models.PipelineGroupEvents, context pi
 				newLog = template.Clone().(*models.Log)
 			}
 			newLog.GetIndices().Add(splitKey, seg.value)
-			// v1 revises the __file_offset__ tag of a protocol.Log via
-			// helper.ReviseFileOffset; models.Log has no such tag, so the offset
-			// is replicated through the Offset field instead (same approach as
-			// split_log_string v2).
 			newLog.SetOffset(log.GetOffset() + uint64(seg.offset))
 			outEvents = append(outEvents, newLog)
 		}

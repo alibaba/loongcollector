@@ -30,7 +30,7 @@ mkdir example_plugin
 
 ### 4. 编写插件代码
 
-新插件建议实现 `ServiceInputV2`（`StartService`），通过 `PipelineContext.Collector()` 直接提交事件。已有 `ServiceInputV1` 插件可继续使用 `Start(Collector)` 和 `AddRawLog`，采集器会在输入边界将日志转换为事件。下面的示例同时实现两种接口，统一 runner 会优先调用 `StartService`。
+新插件建议实现 `ServiceInputV2`（`StartService`），通过 `PipelineContext.Collector()` 直接提交事件。已有 `ServiceInputV1` 插件可继续使用 `Start(Collector)` 和 `AddRawLog`，采集器会在输入边界将日志转换为事件。下面的示例通过 `StartService` 提交指标事件。
 
 ```shell
 cd example_plugin
@@ -45,19 +45,17 @@ import (
 
  "github.com/alibaba/ilogtail/pkg/models"
  "github.com/alibaba/ilogtail/pkg/pipeline"
- "github.com/alibaba/ilogtail/pkg/protocol"
 )
 
 type MyServiceInput struct {
  Interval time.Duration `json:"interval" mapstructure:"interval"`
 
- collector   pipeline.Collector
- collectorV2 pipeline.PipelineCollector
- stopCh      chan struct{}
+ collector pipeline.PipelineCollector
+ stopCh    chan struct{}
 }
 
 func (m *MyServiceInput) StartService(context pipeline.PipelineContext) error {
- m.collectorV2 = context.Collector()
+ m.collector = context.Collector()
  go m.loop()
  return nil
 }
@@ -77,30 +75,13 @@ func (m *MyServiceInput) Stop() error {
  return nil
 }
 
-func (m *MyServiceInput) Start(collector pipeline.Collector) error {
- m.collector = collector
- go m.loop()
- return nil
-}
-
 func (m *MyServiceInput) loop() {
  for {
   select {
   case <-m.stopCh:
    return
   case <-time.After(m.Interval):
-   if m.collector != nil {
-    m.collector.AddRawLog(&protocol.Log{
-     Time: uint32(time.Now().Unix()),
-     Contents: []*protocol.Log_Content{
-      {Key: "host", Value: "1.1.1.1"},
-     },
-    })
-   }
-   if m.collectorV2 == nil {
-    continue
-   }
-   m.collectorV2.Collect(&models.GroupInfo{},
+   m.collector.Collect(&models.GroupInfo{},
     models.NewSingleValueMetric("test_metric",
      models.MetricTypeCounter,
      models.NewTagsWithMap(map[string]string{"hello": "world"}),

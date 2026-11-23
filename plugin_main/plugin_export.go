@@ -165,8 +165,7 @@ func UnloadPipeline(configName string) int {
 }
 
 // ProcessPipelineEventGroup is the C++ → Go PipelineEventGroup PB ingress.
-// The reverse Go → C++ PEG PB path is logtail.SendPipelineEventGroup (adapter
-// callback, sibling of SendPb); it is not a Go export.
+// Go sends events back to C++ through the logtail.SendPipelineEventGroup adapter.
 //
 //export ProcessPipelineEventGroup
 func ProcessPipelineEventGroup(configName string, pbBytes []byte, packID string) int {

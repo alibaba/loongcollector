@@ -26,6 +26,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/helper/containercenter"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
+	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pkg/util"
 	"github.com/alibaba/ilogtail/plugins/input"
@@ -79,11 +80,21 @@ func NewDockerFileSyner(sds *ServiceDockerStdout,
 	}
 
 	source := util.NewPackIDPrefix(info.ContainerInfo.ID + sds.context.GetConfigName())
-	tags := info.GetExternalTags(sds.ExternalEnvTag, sds.ExternalK8sLabelTag)
-	for k, v := range info.ContainerNameTag {
-		tags[k] = v
+	settings := sds.context.GetPipelineScopeConfig()
+	usingOldContentTag := settings != nil && settings.UsingOldContentTag
+	tags := info.GetStdoutTags(sds.ExternalEnvTag, sds.ExternalK8sLabelTag, usingOldContentTag)
+	var contentTags map[string]string
+	if usingOldContentTag {
+		contentTags = tags
 	}
-	processor := NewDockerStdoutProcessor(reg, time.Duration(sds.BeginLineTimeoutMs)*time.Millisecond, sds.BeginLineCheckLength, sds.MaxLogSize, sds.Stdout, sds.Stderr, sds.context, sds.collector, tags, source)
+	processor := NewDockerStdoutProcessor(reg, time.Duration(sds.BeginLineTimeoutMs)*time.Millisecond, sds.BeginLineCheckLength, sds.MaxLogSize, sds.Stdout, sds.Stderr, sds.context, sds.collector, contentTags, source)
+	if !usingOldContentTag && len(tags) > 0 {
+		groupTags := make([]*protocol.LogTag, 0, len(tags))
+		for key, value := range tags {
+			groupTags = append(groupTags, &protocol.LogTag{Key: key, Value: value})
+		}
+		processor.logContext["tags"] = groupTags
+	}
 
 	checkpoint, ok := checkpointMap[info.ContainerInfo.ID]
 	if !ok {

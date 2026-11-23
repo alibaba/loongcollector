@@ -20,18 +20,16 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
 type ProcessorRename struct {
-	NoKeyError         bool
-	SourceKeys         []string
-	DestKeys           []string
-	keyDictionary      map[string]string // use map to eliminate duplicate keys and invalid renames
-	existKeyDictionary map[string]bool   // not necessary in v2 pipeline
-	noKeyErrorArray    []string
-	context            pipeline.Context
+	NoKeyError      bool
+	SourceKeys      []string
+	DestKeys        []string
+	keyDictionary   map[string]string // use map to eliminate duplicate keys and invalid renames
+	noKeyErrorArray []string
+	context         pipeline.Context
 }
 
 const pluginType = "processor_rename"
@@ -55,12 +53,6 @@ func (p *ProcessorRename) Init(context pipeline.Context) error {
 		}
 	}
 	if p.NoKeyError {
-		p.existKeyDictionary = make(map[string]bool)
-		for i, source := range p.SourceKeys {
-			if source != p.DestKeys[i] {
-				p.existKeyDictionary[source] = false
-			}
-		}
 		p.noKeyErrorArray = make([]string, len(p.SourceKeys))
 	}
 	return nil
@@ -68,41 +60,6 @@ func (p *ProcessorRename) Init(context pipeline.Context) error {
 
 func (*ProcessorRename) Description() string {
 	return "rename processor for logtail"
-}
-
-func (p *ProcessorRename) ProcessLogs(logArray []*protocol.Log) []*protocol.Log {
-	for _, log := range logArray {
-		p.processLog(log)
-	}
-	return logArray
-}
-
-func (p *ProcessorRename) processLog(log *protocol.Log) {
-	if p.NoKeyError {
-		p.noKeyErrorArray = p.noKeyErrorArray[:0]
-		for k := range p.existKeyDictionary {
-			p.existKeyDictionary[k] = false
-		}
-	}
-	for _, content := range log.Contents {
-		oldKey := content.Key
-		if newKey, exists := p.keyDictionary[oldKey]; exists {
-			content.Key = newKey
-			if p.NoKeyError {
-				p.existKeyDictionary[oldKey] = true
-			}
-		}
-	}
-	if p.NoKeyError {
-		for k, v := range p.existKeyDictionary {
-			if !v {
-				p.noKeyErrorArray = append(p.noKeyErrorArray, k)
-			}
-		}
-		if len(p.noKeyErrorArray) != 0 {
-			logger.Warningf(p.context.GetRuntimeContext(), selfmonitor.RenameFindAlarm, "cannot find key %v", p.noKeyErrorArray)
-		}
-	}
 }
 
 func (p *ProcessorRename) Process(in *models.PipelineGroupEvents, context pipeline.PipelineContext) {

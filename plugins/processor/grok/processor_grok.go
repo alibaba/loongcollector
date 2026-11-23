@@ -30,7 +30,6 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
@@ -106,62 +105,7 @@ func (*ProcessorGrok) Description() string {
 	return "grok processor for logtail"
 }
 
-func (p *ProcessorGrok) ProcessLogs(logArray []*protocol.Log) []*protocol.Log {
-	for _, log := range logArray {
-		p.processLog(log)
-	}
-	return logArray
-}
-
-func (p *ProcessorGrok) processLog(log *protocol.Log) {
-	findKey := false
-	for i, cont := range log.Contents {
-		if len(p.SourceKey) == 0 || p.SourceKey == cont.Key {
-			findKey = true
-			parseResult := p.processGrok(log, &cont.Value)
-
-			// no match error
-			if parseResult == matchFail && p.NoMatchError {
-				logger.Warning(p.context.GetRuntimeContext(), selfmonitor.GrokFindAlarm, "error", "all match fail",
-					"source_key", p.SourceKey, "content", cont.Value)
-			}
-
-			// tome out error
-			if parseResult == matchTimeOut && p.TimeoutError {
-				logger.Warning(p.context.GetRuntimeContext(), selfmonitor.GrokFindAlarm, "error", "match time out",
-					"source_key", p.SourceKey, "content", cont.Value)
-			}
-
-			// keep source
-			if (parseResult == matchSuccess && !p.KeepSource) || (parseResult != matchSuccess && !p.IgnoreParseFailure) {
-				log.Contents = append(log.Contents[:i], log.Contents[i+1:]...)
-			}
-		}
-	}
-
-	// no key err
-	if !findKey && p.NoKeyError {
-		logger.Warning(p.context.GetRuntimeContext(), selfmonitor.GrokFindAlarm, "error", "anchor cannot find key",
-			"source_key", p.SourceKey)
-	}
-}
-
-func (p *ProcessorGrok) processGrok(log *protocol.Log, val *string) MatchResult {
-	names, captures, result := p.matchGrok(*val)
-	if result == matchSuccess {
-		for i := 0; i < len(captures); i++ {
-			log.Contents = append(log.Contents, &protocol.Log_Content{Key: names[i], Value: captures[i]})
-		}
-	}
-	return result
-}
-
-// matchGrok tries the configured patterns in order against val and, on the
-// first pattern that matches, returns the extracted field names and captures
-// plus matchSuccess; it returns matchTimeOut on timeout/regex error and
-// matchFail when nothing matches. This is the shared match logic reused by both
-// the v1 (ProcessLogs) and v2 (Process) code paths so their semantics stay
-// identical.
+// matchGrok matches the input against the compiled patterns and returns the named captures.
 func (p *ProcessorGrok) matchGrok(val string) ([]string, []string, MatchResult) {
 	deadline := time.Now().Add(time.Duration(p.TimeoutMilliSeconds) * time.Millisecond)
 
@@ -457,11 +401,7 @@ func sortGraph(g graph) ([]string, []string) {
 	return order, nil
 }
 
-// Process implements the v2 ProcessorV2 interface: it matches the SourceKey
-// value of each Log event against the configured grok patterns and writes the
-// extracted fields into the log, faithfully reproducing the v1 transform
-// (KeepSource / IgnoreParseFailure / NoKeyError / NoMatchError / TimeoutError).
-// Metric and Span events pass through unchanged.
+// Process extracts named Grok captures from logs. Other event types pass through.
 func (p *ProcessorGrok) Process(in *models.PipelineGroupEvents, context pipeline.PipelineContext) {
 	pipeline.ProcessLogEventsOnly(in, context, p.processLogEvent)
 }
@@ -469,7 +409,7 @@ func (p *ProcessorGrok) Process(in *models.PipelineGroupEvents, context pipeline
 func (p *ProcessorGrok) processLogEvent(log *models.Log) {
 	contents := log.GetIndices()
 
-	// v1 parses the field named by SourceKey, or every field when SourceKey is
+	// Parse the field named by SourceKey, or every field when SourceKey is
 	// not configured. Snapshot the keys first so we do not mutate the map while
 	// iterating it.
 	var keys []string

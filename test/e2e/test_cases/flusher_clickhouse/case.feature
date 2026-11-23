@@ -11,27 +11,12 @@ Feature: flusher clickhouse
     database: default
     table: demo
     """
-    # Pipeline version switch: global.StructureType=v2 routes metric_mock through
-    # FlusherV2.Export instead of the v1 Flush path. Structures at the flusher boundary:
-    #   v1 pipeline (StructureType absent/v1):
-    #     - input  to flusher: []*protocol.LogGroup. metric_mock.Collect() emits Log
-    #       events via AddData, contents = {Index, _name, _value}.
-    #     - output of flusher: converter.ToByteStream(LogGroup) -> 1 clickhouse row per
-    #       Log, contents = {Index, _name, _value}.
-    #   v2 pipeline (StructureType=v2, this case):
-    #     - input  to flusher: []*models.PipelineGroupEvents. metric_mock.Read() emits
-    #       2 Metric events/cycle: single_metrics_mock (counter, single value) and
-    #       multi_values_metrics_mock (untyped; values{Index} + typedValues{_name,_value}).
-    #     - output of flusher: converter.ToByteStreamV2 converts each Metric structurally
-    #       into canonical metric-log rows {__name__, __labels__, __value__, __time_nano__}
-    #       (one row per value / typed-value), never an opaque pass-through blob and never
-    #       silently dropped. single_metrics_mock -> __name__=single_metrics_mock;
-    #       multi_values_metrics_mock -> __name__=multi_values_metrics_mock_{Index,_name,_value}.
+    # metric_mock emits single- and multi-value Metric events. The flusher
+    # writes one row per value with the canonical metric fields.
     Given {flusher-clickhouse-case} local config as below
     """
     enable: true
     global:
-      StructureType: v2
       InputIntervalMs: 100
     inputs:
       - Type: metric_mock

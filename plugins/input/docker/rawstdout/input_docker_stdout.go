@@ -31,6 +31,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/helper/containercenter"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
+	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
@@ -103,11 +104,40 @@ type stdoutSyner struct {
 }
 
 func (ss *stdoutSyner) newContainerPump(c pipeline.Collector, stdout, stderr *io.PipeReader) {
+	settings := ss.context.GetPipelineScopeConfig()
+	usingOldContentTag := settings != nil && settings.UsingOldContentTag
+	tags := ss.info.GetStdoutTags(ss.ExternalEnvTag, ss.ExternalK8sLabelTag, usingOldContentTag)
+	var logContext map[string]interface{}
+	if !usingOldContentTag && len(tags) > 0 {
+		groupTags := make([]*protocol.LogTag, 0, len(tags))
+		for key, value := range tags {
+			groupTags = append(groupTags, &protocol.LogTag{Key: key, Value: value})
+		}
+		logContext = map[string]interface{}{"tags": groupTags}
+	}
 	pump := func(source string, tags map[string]string, input io.Reader) {
 		ss.wg.Add(1)
 		defer ss.wg.Done()
 		keys := []string{"_time_", "_source_", "content"}
 		values := []string{"", source, ""}
+		emit := func() {
+			c.AddDataArrayWithContext(nil, keys, values, logContext)
+		}
+		if usingOldContentTag {
+			// Legacy Collector rows put the container tags before the log fields.
+			legacyKeys := make([]string, 0, len(tags)+len(keys))
+			legacyValues := make([]string, 0, len(tags)+len(values))
+			for key, value := range tags {
+				legacyKeys = append(legacyKeys, key)
+				legacyValues = append(legacyValues, value)
+			}
+			legacyKeys = append(legacyKeys, keys...)
+			legacyValues = append(legacyValues, values...)
+			emit = func() {
+				copy(legacyValues[len(tags):], values)
+				c.AddDataArray(nil, legacyKeys, legacyValues, time.Now().Truncate(time.Second))
+			}
+		}
 
 		if ss.beginLineReg == nil {
 			buf := bufio.NewReader(input)
@@ -132,7 +162,7 @@ func (ss *stdoutSyner) newContainerPump(c pipeline.Collector, stdout, stderr *io
 					values[0] = ""
 					values[2] = line
 				}
-				c.AddDataArray(tags, keys, values)
+				emit()
 			}
 		} else {
 			buf := bufio.NewReader(util.NewTimeoutReader(input, ss.beginLineTimeout))
@@ -142,7 +172,7 @@ func (ss *stdoutSyner) newContainerPump(c pipeline.Collector, stdout, stderr *io
 					// process timeout
 					if len(values[2]) > 0 {
 						logger.Debug(ss.context.GetRuntimeContext(), "log time out, treat as full log", util.CutString(values[2], 512))
-						c.AddDataArray(tags, keys, values)
+						emit()
 						values[2] = line
 					} else {
 						values[2] += line
@@ -157,7 +187,7 @@ func (ss *stdoutSyner) newContainerPump(c pipeline.Collector, stdout, stderr *io
 					logger.Debug(ss.context.GetRuntimeContext(), "docker source stop", source, "name", ss.info.ContainerInfo.Name, "error", err)
 					if len(values[2]) > 0 {
 						logger.Info(ss.context.GetRuntimeContext(), "flush out last line", util.CutString(values[2], 512))
-						c.AddDataArray(tags, keys, values)
+						emit()
 					}
 					return
 				}
@@ -183,7 +213,7 @@ func (ss *stdoutSyner) newContainerPump(c pipeline.Collector, stdout, stderr *io
 					// match begin line
 					if len(values[2]) > 0 {
 						// new line
-						c.AddDataArray(tags, keys, values)
+						emit()
 					}
 					values[2] = logLine
 				} else {
@@ -193,16 +223,12 @@ func (ss *stdoutSyner) newContainerPump(c pipeline.Collector, stdout, stderr *io
 					// check very big line
 					if len(values[2]) >= ss.maxLogSize {
 						logger.Warning(ss.context.GetRuntimeContext(), selfmonitor.DockerStdoutStopAlarm, "log line is too long, force flush out", len(values[2]), "log prefix", util.CutString(values[2], 4096))
-						c.AddDataArray(tags, keys, values)
+						emit()
 						values[2] = ""
 					}
 				}
 			}
 		}
-	}
-	tags := ss.info.GetExternalTags(ss.ExternalEnvTag, ss.ExternalK8sLabelTag)
-	for k, v := range ss.info.ContainerNameTag {
-		tags[k] = v
 	}
 	if stdout != nil {
 		go pump("stdout", tags, stdout)

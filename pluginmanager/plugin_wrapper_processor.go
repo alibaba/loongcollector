@@ -24,7 +24,7 @@ import (
 
 type ProcessorPluginWrapper struct {
 	ProcessorWrapper
-	Processor pipeline.ProcessorV2
+	Processor pipeline.Processor
 
 	inEventGroupsTotal  selfmonitor.CounterMetric
 	outEventGroupsTotal selfmonitor.CounterMetric

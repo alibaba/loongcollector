@@ -125,7 +125,7 @@ cd output
   * Prometheus Exporter 指标抓取能力完善
 * 通过可编程性，提升通用计算能力。
   * Tag 处理能力
-  * Golang 插件 V2 Pipeline 补齐
+  * Go 插件事件 Pipeline 支持
   * 通用 logtometric 插件
   * SPL 支持 Agg 等更多通用算子
 * 通过管控与可观测能力，提升易用性。

@@ -22,57 +22,8 @@ import (
 
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/models"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
 )
-
-func newProcessor() (*ProcessorAddFields, error) {
-	ctx := mock.NewEmptyContext("p", "l", "c")
-	processor := &ProcessorAddFields{
-		Fields: map[string]string{
-			"a": "1",
-		},
-		IgnoreIfExist: true,
-	}
-	err := processor.Init(ctx)
-	return processor, err
-}
-
-func TestSourceKey(t *testing.T) {
-	processor, err := newProcessor()
-	require.NoError(t, err)
-	log := &protocol.Log{Time: 0}
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "test_key", Value: "test_value"})
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "a", Value: "6"})
-	processor.processLog(log)
-	assert.Equal(t, "test_value", log.Contents[0].Value)
-	assert.Equal(t, "6", log.Contents[1].Value)
-}
-
-func TestIgnoreIfExistFalse(t *testing.T) {
-	processor, err := newProcessor()
-	processor.IgnoreIfExist = false
-	require.NoError(t, err)
-	log := &protocol.Log{Time: 0}
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "test_key", Value: "test_value"})
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "a", Value: "6"})
-	processor.processLog(log)
-	assert.Equal(t, "test_value", log.Contents[0].Value)
-	assert.Equal(t, "6", log.Contents[1].Value)
-	assert.Equal(t, "1", log.Contents[2].Value)
-}
-
-func TestIgnoreIfExistTrue(t *testing.T) {
-	processor, err := newProcessor()
-	processor.IgnoreIfExist = true
-	require.NoError(t, err)
-	log := &protocol.Log{Time: 0}
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "test_key", Value: "test_value"})
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "a", Value: "6"})
-	processor.processLog(log)
-	assert.Equal(t, "test_value", log.Contents[0].Value)
-	assert.Equal(t, "6", log.Contents[1].Value)
-}
 
 func TestParameterCheck(t *testing.T) {
 	ctx := mock.NewEmptyContext("p", "l", "c")
@@ -81,9 +32,7 @@ func TestParameterCheck(t *testing.T) {
 	assert.Error(t, err)
 }
 
-// ---- v2 (PipelineEvent / SendPb) Process path tests ----
-
-func TestProcessorAddFields_ProcessV2AddsFields(t *testing.T) {
+func TestProcessorAddFields_ProcessAddsFields(t *testing.T) {
 	processor := &ProcessorAddFields{Fields: map[string]string{"new_key": "new_value"}}
 	require.NoError(t, processor.Init(mock.NewEmptyContext("p", "l", "c")))
 
@@ -98,7 +47,7 @@ func TestProcessorAddFields_ProcessV2AddsFields(t *testing.T) {
 	assert.Equal(t, "v", log.GetIndices().Get("existing"))
 }
 
-func TestProcessorAddFields_ProcessV2IgnoreIfExist(t *testing.T) {
+func TestProcessorAddFields_ProcessIgnoreIfExist(t *testing.T) {
 	processor := &ProcessorAddFields{Fields: map[string]string{"a": "override"}, IgnoreIfExist: true}
 	require.NoError(t, processor.Init(mock.NewEmptyContext("p", "l", "c")))
 
@@ -111,9 +60,9 @@ func TestProcessorAddFields_ProcessV2IgnoreIfExist(t *testing.T) {
 	assert.Equal(t, "original", log.GetIndices().Get("a"), "IgnoreIfExist must keep the original value")
 }
 
-// TestProcessorAddFields_ProcessV2PassesThroughMetric verifies Metric events are
+// TestProcessorAddFields_ProcessPassesThroughMetric verifies Metric events are
 // not modified and not dropped by the log-only processor.
-func TestProcessorAddFields_ProcessV2PassesThroughMetric(t *testing.T) {
+func TestProcessorAddFields_ProcessPassesThroughMetric(t *testing.T) {
 	processor := &ProcessorAddFields{Fields: map[string]string{"new_key": "new_value"}}
 	require.NoError(t, processor.Init(mock.NewEmptyContext("p", "l", "c")))
 

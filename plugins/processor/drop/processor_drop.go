@@ -19,7 +19,6 @@ import (
 
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
 type ProcessorDrop struct {
@@ -49,22 +48,7 @@ func (*ProcessorDrop) Description() string {
 	return "drop processor for logtail"
 }
 
-func (p *ProcessorDrop) ProcessLogs(logArray []*protocol.Log) []*protocol.Log {
-	for _, log := range logArray {
-		p.processLog(log)
-	}
-	return logArray
-}
-
-func (p *ProcessorDrop) processLog(log *protocol.Log) {
-	for idx := len(log.Contents) - 1; idx >= 0; idx-- {
-		if _, exists := p.keyDictionary[log.Contents[idx].Key]; exists {
-			log.Contents = append(log.Contents[:idx], log.Contents[idx+1:]...)
-		}
-	}
-}
-
-// Process implements the v2 ProcessorV2 interface: it drops the configured keys
+// Process implements the Processor interface: it drops the configured keys
 // from each Log event and passes Metric/Span events through unchanged.
 func (p *ProcessorDrop) Process(in *models.PipelineGroupEvents, context pipeline.PipelineContext) {
 	pipeline.ProcessLogEventsOnly(in, context, p.processLogEvent)

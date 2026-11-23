@@ -83,7 +83,7 @@ func TransferLogEventToPB(log *models.Log) (*protocol.LogEvent, error) {
 	logEvent.Timestamp = log.GetTimestamp()
 	fields := log.GetIndices()
 	logEvent.Contents = make([]*protocol.LogEvent_Content, 0, fields.Len())
-	for k, v := range fields.Iterator() {
+	for k, v := range models.LogContentEntries(fields) {
 		var val string
 		switch tv := v.(type) {
 		case string:
@@ -305,32 +305,29 @@ func TransferSpanEventToPB(span *models.Span) (*protocol.SpanEvent, error) {
 	spanEvent.Kind = protocol.SpanEvent_SpanKind(span.GetKind())
 	spanEvent.StartTime = span.GetStartTime()
 	spanEvent.EndTime = span.GetEndTime()
-	spanEvent.Tags = make(map[string][]byte, span.GetTags().Len())
-	for k, v := range span.GetTags().Iterator() {
-		spanEvent.Tags[k] = util.ZeroCopyStringToBytes(v)
-	}
+	spanEvent.Tags = reportBytes(span.GetTags())
 	spanEvent.Events = make([]*protocol.SpanEvent_InnerEvent, 0, len(span.GetEvents()))
 	for _, srcEvent := range span.GetEvents() {
+		if srcEvent == nil {
+			return nil, fmt.Errorf("nil span inner event")
+		}
 		dstEvent := protocol.SpanEvent_InnerEvent{
 			Timestamp: uint64(srcEvent.Timestamp),
 			Name:      util.ZeroCopyStringToBytes(srcEvent.Name),
-			Tags:      make(map[string][]byte, srcEvent.Tags.Len()),
-		}
-		for k, v := range srcEvent.Tags.Iterator() {
-			dstEvent.Tags[k] = util.ZeroCopyStringToBytes(v)
+			Tags:      reportBytes(srcEvent.Tags),
 		}
 		spanEvent.Events = append(spanEvent.Events, &dstEvent)
 	}
 	spanEvent.Links = make([]*protocol.SpanEvent_SpanLink, 0, len(span.GetLinks()))
 	for _, srcLink := range span.GetLinks() {
+		if srcLink == nil {
+			return nil, fmt.Errorf("nil span link")
+		}
 		dstLink := protocol.SpanEvent_SpanLink{
 			TraceID:    util.ZeroCopyStringToBytes(srcLink.TraceID),
 			SpanID:     util.ZeroCopyStringToBytes(srcLink.SpanID),
 			TraceState: util.ZeroCopyStringToBytes(srcLink.TraceState),
-			Tags:       make(map[string][]byte, srcLink.Tags.Len()),
-		}
-		for k, v := range srcLink.Tags.Iterator() {
-			dstLink.Tags[k] = util.ZeroCopyStringToBytes(v)
+			Tags:       reportBytes(srcLink.Tags),
 		}
 		spanEvent.Links = append(spanEvent.Links, &dstLink)
 	}

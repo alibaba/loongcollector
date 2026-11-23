@@ -30,7 +30,6 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
@@ -91,40 +90,7 @@ func (*ProcessorEncrypt) Description() string {
 	return fmt.Sprintf("processor %v is used to encrypt data with AES CBC", pluginType)
 }
 
-func (p *ProcessorEncrypt) ProcessLogs(logArray []*protocol.Log) []*protocol.Log {
-	if p.key == nil {
-		return logArray
-	}
-	for _, log := range logArray {
-		p.processLog(log)
-	}
-	return logArray
-}
-
-// @return (the index of encrypted field,  -1 means not found
-// any error,  nil if the field is not found)
-func (p *ProcessorEncrypt) processLog(log *protocol.Log) {
-	for _, cont := range log.Contents {
-		if _, exists := p.keyDict[cont.Key]; !exists {
-			continue
-		}
-
-		ciphertext, err := p.encrypt(cont.Value)
-		if err == nil {
-			cont.Value = hex.EncodeToString(ciphertext)
-		} else {
-			logger.Warningf(p.context.GetRuntimeContext(), defaultAlarmType, "encrypt field %v error: %v", cont.Key, err)
-			if !p.KeepSourceValueIfError {
-				cont.Value = encryptErrorText
-			}
-		}
-	}
-}
-
-// Process implements the v2 ProcessorV2 interface: it encrypts the configured
-// SourceKeys of each Log event with AES CBC; Metric/Span events pass through
-// unchanged. When the key failed to load, all events pass through untouched
-// (mirroring the v1 guard), never leaking plaintext silently.
+// Process encrypts configured fields of each log. Other events pass through.
 func (p *ProcessorEncrypt) Process(in *models.PipelineGroupEvents, context pipeline.PipelineContext) {
 	if p.key == nil {
 		pipeline.CollectGroupEvents(context, in)

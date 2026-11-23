@@ -20,7 +20,6 @@ import (
 
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
 
 	"github.com/stretchr/testify/assert"
@@ -52,180 +51,6 @@ var jsonVal = "{\"k1\":{\"k2\":{\"k3\":{\"k4\":{\"k51\":\"51\",\"k52\":\"52\"},\
 func TestSourceKey(t *testing.T) {
 	processor, err := newProcessor()
 	require.NoError(t, err)
-	log := &protocol.Log{Time: 0}
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "s_key", Value: jsonVal})
-	processor.processLog(log)
-	assert.Equal(t, "js_key-k1-k2-k3-k4-k51", log.Contents[1].Key)
-	assert.Equal(t, "51", log.Contents[1].Value)
-	assert.Equal(t, "js_key-k1-k2-k3-k4-k52", log.Contents[2].Key)
-	assert.Equal(t, "52", log.Contents[2].Value)
-	assert.Equal(t, "js_key-k1-k2-k3-k41", log.Contents[3].Key)
-	assert.Equal(t, "41", log.Contents[3].Value)
-	assert.Equal(t, "js_key-k6", log.Contents[4].Key)
-	assert.Equal(t, "[{\"x\":\"a\"},{\"x\":\"b\"}]", log.Contents[4].Value)
-	assert.Equal(t, "js_key-k7", log.Contents[5].Key)
-	assert.Equal(t, "[]", log.Contents[5].Value)
-}
-
-func TestIgnoreFirstConnector(t *testing.T) {
-	processor, err := newProcessor()
-	require.NotNil(t, processor)
-	require.NoError(t, err)
-
-	processor.IgnoreFirstConnector = true
-	processor.UseSourceKeyAsPrefix = false
-	log := &protocol.Log{Time: 0}
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "s_key", Value: jsonVal})
-	processor.processLog(log)
-	assert.Equal(t, "jk1-k2-k3-k4-k51", log.Contents[1].Key)
-	assert.Equal(t, "51", log.Contents[1].Value)
-	assert.Equal(t, "jk1-k2-k3-k4-k52", log.Contents[2].Key)
-	assert.Equal(t, "52", log.Contents[2].Value)
-	assert.Equal(t, "jk1-k2-k3-k41", log.Contents[3].Key)
-	assert.Equal(t, "41", log.Contents[3].Value)
-	assert.Equal(t, "jk6", log.Contents[4].Key)
-	assert.Equal(t, "[{\"x\":\"a\"},{\"x\":\"b\"}]", log.Contents[4].Value)
-	assert.Equal(t, "jk7", log.Contents[5].Key)
-	assert.Equal(t, "[]", log.Contents[5].Value)
-}
-
-func TestExpandDepth(t *testing.T) {
-	processor, err := newProcessor()
-	if processor == nil {
-		return
-	}
-	processor.ExpandDepth = 1
-	require.NoError(t, err)
-	log := &protocol.Log{Time: 0}
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "s_key", Value: jsonVal})
-	processor.processLog(log)
-	assert.Equal(t, "js_key-k1", log.Contents[1].Key)
-	assert.Equal(t, "{\"k2\":{\"k3\":{\"k4\":{\"k51\":\"51\",\"k52\":\"52\"},\"k41\":\"41\"}}}", log.Contents[1].Value)
-	assert.Equal(t, "js_key-k6", log.Contents[2].Key)
-	assert.Equal(t, "[{\"x\":\"a\"},{\"x\":\"b\"}]", log.Contents[2].Value)
-	assert.Equal(t, "js_key-k7", log.Contents[3].Key)
-	assert.Equal(t, "[]", log.Contents[3].Value)
-}
-
-func TestKeepSource(t *testing.T) {
-	processor, err := newProcessor()
-	if processor == nil {
-		return
-	}
-	processor.KeepSource = false
-	processor.ExpandDepth = 1
-	require.NoError(t, err)
-	log := &protocol.Log{Time: 0}
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "s_key", Value: jsonVal})
-	processor.processLog(log)
-	assert.Equal(t, "js_key-k1", log.Contents[0].Key)
-	assert.Equal(t, "{\"k2\":{\"k3\":{\"k4\":{\"k51\":\"51\",\"k52\":\"52\"},\"k41\":\"41\"}}}", log.Contents[0].Value)
-	assert.Equal(t, "js_key-k6", log.Contents[1].Key)
-	assert.Equal(t, "[{\"x\":\"a\"},{\"x\":\"b\"}]", log.Contents[1].Value)
-	assert.Equal(t, "js_key-k7", log.Contents[2].Key)
-	assert.Equal(t, "[]", log.Contents[2].Value)
-}
-
-func TestExpandKeySameToSource(t *testing.T) {
-	ctx := mock.NewEmptyContext("p", "l", "c")
-	processor := &ProcessorJSON{
-		SourceKey:              "key",
-		NoKeyError:             true, // 目标Key，为空不生效
-		ExpandDepth:            0,
-		ExpandConnector:        "",
-		Prefix:                 "",
-		KeepSource:             false, // 是否保留源字段
-		KeepSourceIfParseError: false,
-		UseSourceKeyAsPrefix:   false,
-	}
-	assert.Nil(t, processor.Init(ctx))
-	var jsonV = "{\"key\":\"value\"}"
-	log := &protocol.Log{Time: 0}
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "key", Value: jsonV})
-	processor.processLog(log)
-	assert.Equal(t, 1, len(log.Contents))
-	assert.Equal(t, "key", log.Contents[0].Key)
-	assert.Equal(t, "value", log.Contents[0].Value)
-}
-
-func TestKeepSourceIfParseError(t *testing.T) {
-	processor, err := newProcessor()
-	require.NoError(t, err)
-	require.NotNil(t, processor)
-
-	processor.KeepSource = false
-	processor.ExpandDepth = 1
-
-	// Case 1: Valid log, no source key in output log.
-	{
-		log := &protocol.Log{Time: 0}
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "s_key", Value: jsonVal})
-		processor.processLog(log)
-		require.Equal(t, 3, len(log.Contents))
-		require.Equal(t, "js_key-k1", log.Contents[0].Key)
-		require.Equal(t, "{\"k2\":{\"k3\":{\"k4\":{\"k51\":\"51\",\"k52\":\"52\"},\"k41\":\"41\"}}}",
-			log.Contents[0].Value)
-		require.Equal(t, "js_key-k6", log.Contents[1].Key)
-		require.Equal(t, "[{\"x\":\"a\"},{\"x\":\"b\"}]", log.Contents[1].Value)
-		require.Equal(t, "js_key-k7", log.Contents[2].Key)
-		require.Equal(t, "[]", log.Contents[2].Value)
-	}
-
-	// Case 2: Invalid log, keep source key in output log.
-	{
-		const invalidValue = "hello"
-		log := &protocol.Log{Time: 0}
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "s_key", Value: invalidValue})
-		processor.processLog(log)
-		require.Equal(t, 1, len(log.Contents))
-		require.Equal(t, "s_key", log.Contents[0].Key)
-		require.Equal(t, invalidValue, log.Contents[0].Value)
-	}
-}
-
-func TestNoKeyError(t *testing.T) {
-	logger.ClearMemoryLog()
-	processor, err := newProcessor()
-	if processor == nil {
-		return
-	}
-	processor.KeepSource = false
-	processor.ExpandDepth = 1
-	require.NoError(t, err)
-	log := &protocol.Log{Time: 0}
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "d_key", Value: jsonVal})
-	processor.processLog(log)
-	memoryLog, ok := logger.ReadMemoryLog(1)
-	assert.True(t, ok)
-	assert.True(t, strings.Contains(memoryLog, "PROCESSOR_JSON_FIND_ALARM\tcannot find key s_key"))
-}
-
-func TestExpandArray(t *testing.T) {
-	processor, err := newProcessor()
-	if processor == nil {
-		return
-	}
-	processor.ExpandArray = true
-	require.NoError(t, err)
-	log := &protocol.Log{Time: 0}
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "s_key", Value: jsonVal})
-	processor.processLog(log)
-	assert.Equal(t, "js_key-k1-k2-k3-k4-k51", log.Contents[1].Key)
-	assert.Equal(t, "51", log.Contents[1].Value)
-	assert.Equal(t, "js_key-k1-k2-k3-k4-k52", log.Contents[2].Key)
-	assert.Equal(t, "52", log.Contents[2].Value)
-	assert.Equal(t, "js_key-k1-k2-k3-k41", log.Contents[3].Key)
-	assert.Equal(t, "41", log.Contents[3].Value)
-	assert.Equal(t, "js_key-k6[0]-x", log.Contents[4].Key)
-	assert.Equal(t, "a", log.Contents[4].Value)
-	assert.Equal(t, "js_key-k6[1]-x", log.Contents[5].Key)
-	assert.Equal(t, "b", log.Contents[5].Value)
-	assert.Equal(t, 6, len(log.Contents))
-}
-
-func TestSourceKeyV2(t *testing.T) {
-	processor, err := newProcessor()
-	require.NoError(t, err)
 	log := models.NewLog("", nil, "", "", "", models.NewTags(), 0)
 	contents := log.GetIndices()
 	contents.Add("s_key", jsonVal)
@@ -242,7 +67,7 @@ func TestSourceKeyV2(t *testing.T) {
 	assert.Equal(t, "[]", contents.Get("js_key-k7"))
 }
 
-func TestIgnoreFirstConnectorV2(t *testing.T) {
+func TestIgnoreFirstConnector(t *testing.T) {
 	processor, err := newProcessor()
 	require.NotNil(t, processor)
 	require.NoError(t, err)
@@ -265,7 +90,7 @@ func TestIgnoreFirstConnectorV2(t *testing.T) {
 	assert.Equal(t, "[]", contents.Get("jk7"))
 }
 
-func TestExpandDepthV2(t *testing.T) {
+func TestExpandDepth(t *testing.T) {
 	processor, err := newProcessor()
 	if processor == nil {
 		return
@@ -284,7 +109,7 @@ func TestExpandDepthV2(t *testing.T) {
 	assert.Equal(t, "[]", contents.Get("js_key-k7"))
 }
 
-func TestKeepSourceV2(t *testing.T) {
+func TestKeepSource(t *testing.T) {
 	processor, err := newProcessor()
 	if processor == nil {
 		return
@@ -304,7 +129,7 @@ func TestKeepSourceV2(t *testing.T) {
 	assert.Equal(t, "[]", contents.Get("js_key-k7"))
 }
 
-func TestExpandKeySameToSourceV2(t *testing.T) {
+func TestExpandKeySameToSource(t *testing.T) {
 	ctx := mock.NewEmptyContext("p", "l", "c")
 	processor := &ProcessorJSON{
 		SourceKey:              "key",
@@ -327,7 +152,7 @@ func TestExpandKeySameToSourceV2(t *testing.T) {
 	assert.Equal(t, "value", contents.Get("key"))
 }
 
-func TestKeepSourceIfParseErrorV2(t *testing.T) {
+func TestKeepSourceIfParseError(t *testing.T) {
 	processor, err := newProcessor()
 	require.NoError(t, err)
 	require.NotNil(t, processor)
@@ -363,7 +188,7 @@ func TestKeepSourceIfParseErrorV2(t *testing.T) {
 	}
 }
 
-func TestNoKeyErrorV2(t *testing.T) {
+func TestNoKeyError(t *testing.T) {
 	logger.ClearMemoryLog()
 	processor, err := newProcessor()
 	if processor == nil {
@@ -381,7 +206,7 @@ func TestNoKeyErrorV2(t *testing.T) {
 	assert.True(t, strings.Contains(memoryLog, "PROCESSOR_JSON_FIND_ALARM\tcannot find key s_key"))
 }
 
-func TestExpandArrayV2(t *testing.T) {
+func TestExpandArray(t *testing.T) {
 	processor, err := newProcessor()
 	processor.ExpandArray = true
 	require.NoError(t, err)

@@ -23,7 +23,6 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
@@ -48,10 +47,9 @@ type ProcessorGeoIP struct {
 	SourceKey     string
 	Language      string
 
-	context       pipeline.Context
-	db            *geoip2.Reader
-	sourceIP      bool
-	sourceIPConts []*protocol.Log_Content
+	context  pipeline.Context
+	db       *geoip2.Reader
+	sourceIP bool
 }
 
 // Init called for init some system resources, like socket, mutex...
@@ -71,45 +69,6 @@ func (*ProcessorGeoIP) Description() string {
 	return "geoip processor for logtail"
 }
 
-func (p *ProcessorGeoIP) ProcessLogs(logArray []*protocol.Log) []*protocol.Log {
-	if p.db == nil {
-		return logArray
-	}
-	for _, log := range logArray {
-		p.ProcessLog(log)
-	}
-	return logArray
-}
-
-func (p *ProcessorGeoIP) ProcessLog(log *protocol.Log) {
-	if p.sourceIP {
-		if len(p.sourceIPConts) == 0 {
-			ip := util.GetIPAddress()
-			startSize := len(log.Contents)
-			p.ProcessGeoIP(log, &ip)
-			p.sourceIPConts = make([]*protocol.Log_Content, 0, len(log.Contents)-startSize)
-			p.sourceIPConts = append(p.sourceIPConts, log.Contents[startSize:]...)
-		} else {
-			log.Contents = append(log.Contents, p.sourceIPConts...)
-		}
-		return
-	}
-	findKey := false
-	for i, cont := range log.Contents {
-		if len(p.SourceKey) == 0 || p.SourceKey == cont.Key {
-			findKey = true
-			if !p.KeepSource {
-				log.Contents = append(log.Contents[:i], log.Contents[i+1:]...)
-			}
-			p.ProcessGeoIP(log, &cont.Value)
-			break
-		}
-	}
-	if !findKey && p.NoKeyError {
-		logger.Warning(p.context.GetRuntimeContext(), selfmonitor.GeoipAlarm, "cannot find key", p.SourceKey)
-	}
-}
-
 func inetNtoa(ipValueStr string) net.IP {
 	ipnr, _ := strconv.Atoi(ipValueStr)
 	var bytes [4]byte
@@ -120,15 +79,7 @@ func inetNtoa(ipValueStr string) net.IP {
 	return net.IPv4(bytes[3], bytes[2], bytes[1], bytes[0])
 }
 
-func (p *ProcessorGeoIP) ProcessGeoIP(log *protocol.Log, val *string) {
-	p.addGeoFields(*val, func(key, value string) {
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: key, Value: value})
-	})
-}
-
-// addGeoFields resolves the geographical information for val and emits the
-// derived key/value pairs via add. It is shared by the v1 (ProcessGeoIP) and
-// v2 (processLogEvent) paths so both stay behaviorally identical.
+// addGeoFields looks up geographical information for an IP address and emits each derived field.
 func (p *ProcessorGeoIP) addGeoFields(val string, add func(key, value string)) {
 	var ip net.IP
 	if p.IPValueFlag {
@@ -183,10 +134,7 @@ func init() {
 	}
 }
 
-// Process implements the v2 ProcessorV2 interface: for each Log event it inserts
-// the geographical information derived from the SourceKey value; Metric/Span
-// events pass through unchanged. When the GeoIP database is not loaded the v1
-// path is a no-op, and this path preserves that by guarding on p.db == nil.
+// Process enriches logs with geographical information when the GeoIP database is loaded.
 func (p *ProcessorGeoIP) Process(in *models.PipelineGroupEvents, context pipeline.PipelineContext) {
 	if p.db == nil {
 		pipeline.CollectGroupEvents(context, in)

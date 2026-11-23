@@ -25,7 +25,6 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
@@ -112,70 +111,6 @@ func (s *Strptime) Description() string {
 	return "Processor to extract time from log: strptime(SourceKey, Format)"
 }
 
-// ProcessLogs ...
-func (s *Strptime) ProcessLogs(logs []*protocol.Log) []*protocol.Log {
-	for _, log := range logs {
-		s.processLog(log)
-	}
-	return logs
-}
-
-func (s *Strptime) processLog(log *protocol.Log) {
-	logTime := time.Time{}
-	var err error
-	for idx, content := range log.Contents {
-		if content.Key != s.SourceKey {
-			continue
-		}
-
-		value := content.Value
-		// Truncate if format is Unix timestamp.
-		if s.Format == "%s" {
-			value = value[0:10]
-		}
-
-		logTime, err = strtime.Strptime(value, s.Format)
-		if err != nil || (logTime == time.Time{}) {
-			if s.AlarmIfFail {
-				logger.Warningf(s.context.GetRuntimeContext(), selfmonitor.StrptimeParseAlarm, "strptime(%v, %v) failed: %v, %v",
-					content.Value, s.Format, logTime, err)
-			}
-			break
-		}
-
-		if s.location != nil {
-			logTime = logTime.In(s.location).Add(time.Second * time.Duration(-s.UTCOffset))
-		}
-
-		if s.context.GetPipelineScopeConfig().EnableTimestampNanosecond {
-			protocol.SetLogTimeWithNano(log, uint32(logTime.Unix()), uint32(logTime.Nanosecond()))
-		} else {
-			protocol.SetLogTime(log, uint32(logTime.Unix()))
-		}
-		if !s.KeepSource {
-			log.Contents = append(log.Contents[:idx], log.Contents[idx+1:]...)
-		}
-		break
-	}
-	if (s.EnablePreciseTimestamp && logTime != time.Time{}) {
-		var timestamp string
-		switch s.PreciseTimestampUnit {
-		case "", timeStampMilliSecond:
-			timestamp = strconv.FormatInt(logTime.UnixNano()/1e6, 10)
-		case timeStampMicroSecond:
-			timestamp = strconv.FormatInt(logTime.UnixNano()/1e3, 10)
-		case timeStampNanoSecond:
-			timestamp = strconv.FormatInt(logTime.UnixNano(), 10)
-		default:
-			timestamp = strconv.FormatInt(logTime.UnixNano()/1e6, 10)
-		}
-		log.Contents = append(log.Contents, &protocol.Log_Content{
-			Key:   s.PreciseTimestampKey,
-			Value: timestamp,
-		})
-	}
-}
-
 func newStrptime() *Strptime {
 	return &Strptime{
 		SourceKey:              defaultSourceKey,
@@ -195,14 +130,13 @@ func init() {
 	}
 }
 
-// Process implements the v2 ProcessorV2 interface: it parses the SourceKey value
+// Process implements the Processor interface: it parses the SourceKey value
 // of each Log event and overwrites the log timestamp; Metric/Span events pass
 // through unchanged.
 func (s *Strptime) Process(in *models.PipelineGroupEvents, context pipeline.PipelineContext) {
 	pipeline.ProcessLogEventsOnly(in, context, s.processLogEvent)
 }
 
-// processLogEvent reproduces processLog on the v2 models.Log data model.
 func (s *Strptime) processLogEvent(log *models.Log) {
 	contents := log.GetIndices()
 	logTime := time.Time{}
@@ -226,9 +160,7 @@ func (s *Strptime) processLogEvent(log *models.Log) {
 				logTime = logTime.In(s.location).Add(time.Second * time.Duration(-s.UTCOffset))
 			}
 
-			// models.Log.Timestamp is in nanoseconds (see plugin_runner_v2 conversion:
-			// uint64(time.Second * time.Duration(in.Time)) [+ TimeNs]). Reproduce the v1
-			// SetLogTime/SetLogTimeWithNano behavior on that unit.
+			// Event timestamps use nanoseconds.
 			if s.context.GetPipelineScopeConfig().EnableTimestampNanosecond {
 				log.Timestamp = uint64(logTime.Unix())*uint64(time.Second) + uint64(logTime.Nanosecond())
 			} else {

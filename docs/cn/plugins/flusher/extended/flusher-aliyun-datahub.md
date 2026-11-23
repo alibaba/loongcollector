@@ -6,7 +6,7 @@
 
 源代码：[flusher_datahub.go](https://github.com/alibaba/loongcollector/blob/main/plugins/flusher/datahub/flusher_datahub.go)
 
-使用统一的 Go 事件 Pipeline；采集配置默认启用，无需显式设置 `global.StructureType`。配置结构详见[采集配置](../../../configuration/collection-config.md)。
+采集配置使用 Go 事件 Pipeline。配置结构详见[采集配置](../../../configuration/collection-config.md)。
 
 ## 事件能力
 
@@ -64,8 +64,6 @@
 
 ```yaml
 enable: true
-global:
-  StructureType: v2
 inputs:
   - Type: input_file
     FilePaths:
@@ -95,8 +93,6 @@ flushers:
 
 ```yaml
 enable: true
-global:
-  StructureType: v2
 inputs:
   - Type: input_file
     FilePaths:

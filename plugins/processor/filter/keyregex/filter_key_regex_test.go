@@ -18,6 +18,8 @@ import (
 	"context"
 	"testing"
 
+	"github.com/alibaba/ilogtail/plugins/processor/internal/processortest"
+
 	"github.com/pingcap/check"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -26,8 +28,6 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
-	"github.com/alibaba/ilogtail/plugins/test"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
 )
 
@@ -62,98 +62,76 @@ func (s *processorTestSuite) TestInitError(c *check.C) {
 func (s *processorTestSuite) TestMatch(c *check.C) {
 	{
 		var log = "xxxx\nyyyy\nzzzz"
-		logPb := test.CreateLogs("content", log, "key1", "value1", "key2", "value2")
+		logEvent := processortest.Log("content", log, "key1", "value1", "key2", "value2")
 		processor, _ := s.processor.(*ProcessorKeyFilter)
 		processor.Exclude = []string{"keyd"}
 		processor.Include = []string{"content", "key1", "key2"}
 		_ = s.processor.Init(mock.NewEmptyContext("p", "l", "c"))
-		logArray := make([]*protocol.Log, 1)
-		logArray[0] = logPb
-		outLogs := processor.ProcessLogs(logArray)
+		outLogs := processortest.Apply(processor, logEvent)
 		c.Assert(len(outLogs), check.Equals, 1)
-		c.Assert(len(outLogs[0].Contents), check.Equals, 3)
+		c.Assert(outLogs[0].Contents.Len(), check.Equals, 3)
 
-		c.Assert(outLogs[0].Contents[0].GetKey(), check.Equals, "content")
-		c.Assert(outLogs[0].Contents[1].GetKey(), check.Equals, "key1")
-		c.Assert(outLogs[0].Contents[2].GetKey(), check.Equals, "key2")
-
-		c.Assert(outLogs[0].Contents[0].GetValue(), check.Equals, log)
-		c.Assert(outLogs[0].Contents[1].GetValue(), check.Equals, "value1")
-		c.Assert(outLogs[0].Contents[2].GetValue(), check.Equals, "value2")
+		c.Assert(pipeline.GetStringValue(outLogs[0].Contents.Get("content")), check.Equals, log)
+		c.Assert(pipeline.GetStringValue(outLogs[0].Contents.Get("key1")), check.Equals, "value1")
+		c.Assert(pipeline.GetStringValue(outLogs[0].Contents.Get("key2")), check.Equals, "value2")
 	}
 	{
-		logPb := test.CreateLogs(`10.200.98.220`, "hello ilogtail")
+		logEvent := processortest.Log(`10.200.98.220`, "hello ilogtail")
 		processor, _ := s.processor.(*ProcessorKeyFilter)
 		reg := `([\d\.]+)`
 		processor.Include = []string{reg}
 		_ = s.processor.Init(mock.NewEmptyContext("p", "l", "c"))
-		logArray := make([]*protocol.Log, 1)
-		logArray[0] = logPb
-		outLogs := processor.ProcessLogs(logArray)
+		outLogs := processortest.Apply(processor, logEvent)
 		c.Assert(len(outLogs), check.Equals, 1)
-		c.Assert(len(outLogs[0].Contents), check.Equals, 1)
-		c.Assert(outLogs[0].Contents[0].GetKey(), check.Equals, `10.200.98.220`)
-		c.Assert(outLogs[0].Contents[0].GetValue(), check.Equals, "hello ilogtail")
+		c.Assert(outLogs[0].Contents.Len(), check.Equals, 1)
+		c.Assert(pipeline.GetStringValue(outLogs[0].Contents.Get(`10.200.98.220`)), check.Equals, "hello ilogtail")
 	}
 	{
-		logPb := test.CreateLogs("request_time", "20", "request_length", "2314", "browser", "aliyun-sdk-java")
+		logEvent := processortest.Log("request_time", "20", "request_length", "2314", "browser", "aliyun-sdk-java")
 		processor, _ := s.processor.(*ProcessorKeyFilter)
 		processor.Include = []string{"request.*"}
 		_ = s.processor.Init(mock.NewEmptyContext("p", "l", "c"))
-		logArray := make([]*protocol.Log, 1)
-		logArray[0] = logPb
-		outLogs := processor.ProcessLogs(logArray)
+		outLogs := processortest.Apply(processor, logEvent)
 		c.Assert(len(outLogs), check.Equals, 1)
-		c.Assert(len(outLogs[0].Contents), check.Equals, 3)
-		c.Assert(outLogs[0].Contents[0].GetKey(), check.Equals, "request_time")
-		c.Assert(outLogs[0].Contents[1].GetKey(), check.Equals, "request_length")
-		c.Assert(outLogs[0].Contents[2].GetKey(), check.Equals, "browser")
+		c.Assert(outLogs[0].Contents.Len(), check.Equals, 3)
 
-		c.Assert(outLogs[0].Contents[0].GetValue(), check.Equals, "20")
-		c.Assert(outLogs[0].Contents[1].GetValue(), check.Equals, "2314")
-		c.Assert(outLogs[0].Contents[2].GetValue(), check.Equals, "aliyun-sdk-java")
+		c.Assert(pipeline.GetStringValue(outLogs[0].Contents.Get("request_time")), check.Equals, "20")
+		c.Assert(pipeline.GetStringValue(outLogs[0].Contents.Get("request_length")), check.Equals, "2314")
+		c.Assert(pipeline.GetStringValue(outLogs[0].Contents.Get("browser")), check.Equals, "aliyun-sdk-java")
 	}
 }
 
 func (s *processorTestSuite) TestNotMatch(c *check.C) {
 
 	{
-		logPb := test.CreateLogs(`abc10.200.98.220`, "hello ilogtail")
+		logEvent := processortest.Log(`abc10.200.98.220`, "hello ilogtail")
 		processor, _ := s.processor.(*ProcessorKeyFilter)
 		reg := `^([\d\.]+)`
 		processor.Include = []string{reg}
 		_ = s.processor.Init(mock.NewEmptyContext("p", "l", "c"))
-		logArray := make([]*protocol.Log, 1)
-		logArray[0] = logPb
-		outLogs := processor.ProcessLogs(logArray)
+		outLogs := processortest.Apply(processor, logEvent)
 		c.Assert(len(outLogs), check.Equals, 0)
 	}
 	{
-		logPb := test.CreateLogs("browser", "ali-sls-ilogtail", "status", "200")
+		logEvent := processortest.Log("browser", "ali-sls-ilogtail", "status", "200")
 		processor, _ := s.processor.(*ProcessorKeyFilter)
 		processor.Include = []string{"request.*"}
 		_ = s.processor.Init(mock.NewEmptyContext("p", "l", "c"))
-		logArray := make([]*protocol.Log, 1)
-		logArray[0] = logPb
-		outLogs := processor.ProcessLogs(logArray)
+		outLogs := processortest.Apply(processor, logEvent)
 		c.Assert(len(outLogs), check.Equals, 0)
 	}
 	{
-		logPb := test.CreateLogs("content", "log", "key1", "value1", "key2", "value2")
+		logEvent := processortest.Log("content", "log", "key1", "value1", "key2", "value2")
 		processor, _ := s.processor.(*ProcessorKeyFilter)
 		processor.Exclude = []string{"key1"} // exclude has higher priority
 		processor.Include = []string{"key1", "key2"}
 		_ = s.processor.Init(mock.NewEmptyContext("p", "l", "c"))
-		logArray := make([]*protocol.Log, 1)
-		logArray[0] = logPb
-		outLogs := processor.ProcessLogs(logArray)
+		outLogs := processortest.Apply(processor, logEvent)
 		c.Assert(len(outLogs), check.Equals, 0)
 	}
 }
 
-// ---- v2 (PipelineEvent / SendPb) Process path tests ----
-
-func newV2Log(keys ...string) *models.Log {
+func newEventLog(keys ...string) *models.Log {
 	log := models.NewLog("", nil, "", "", "", models.NewTags(), 0)
 	for _, key := range keys {
 		log.GetIndices().Add(key, "v")
@@ -161,19 +139,19 @@ func newV2Log(keys ...string) *models.Log {
 	return log
 }
 
-// TestProcessorKeyFilter_ProcessV2Filter verifies that the v2 Process drops Log
+// TestProcessorKeyFilter_ProcessFilter verifies that Process drops Log
 // events whose keys fail the Include/Exclude rules while keeping matching ones
 // and passing Metric events through unchanged.
-func TestProcessorKeyFilter_ProcessV2Filter(t *testing.T) {
+func TestProcessorKeyFilter_ProcessFilter(t *testing.T) {
 	processor := &ProcessorKeyFilter{
 		Include: []string{"key1", "key2"},
 		Exclude: []string{"secret"},
 	}
 	require.NoError(t, processor.Init(mock.NewEmptyContext("p", "l", "c")))
 
-	keep := newV2Log("key1", "key2")                  // has all required keys, no excluded key
-	dropInclude := newV2Log("key1")                   // missing key2 -> drop
-	dropExclude := newV2Log("key1", "key2", "secret") // excluded key present -> drop
+	keep := newEventLog("key1", "key2")                  // has all required keys, no excluded key
+	dropInclude := newEventLog("key1")                   // missing key2 -> drop
+	dropExclude := newEventLog("key1", "key2", "secret") // excluded key present -> drop
 	metric := models.NewSingleValueMetric("m", models.MetricTypeCounter, models.NewTags(), 0, 1.0)
 
 	context := helper.NewObservePipelineContext(10)
@@ -189,9 +167,9 @@ func TestProcessorKeyFilter_ProcessV2Filter(t *testing.T) {
 	assert.Equal(t, metric, events[1], "metric events must pass through unchanged")
 }
 
-// TestProcessorKeyFilter_ProcessV2AllDropped verifies zero surviving log events
+// TestProcessorKeyFilter_ProcessAllDropped verifies zero surviving log events
 // results in no collected group.
-func TestProcessorKeyFilter_ProcessV2AllDropped(t *testing.T) {
+func TestProcessorKeyFilter_ProcessAllDropped(t *testing.T) {
 	processor := &ProcessorKeyFilter{
 		Include: []string{"required"},
 	}
@@ -199,7 +177,7 @@ func TestProcessorKeyFilter_ProcessV2AllDropped(t *testing.T) {
 
 	context := helper.NewObservePipelineContext(10)
 	processor.Process(&models.PipelineGroupEvents{
-		Events: []models.PipelineEvent{newV2Log("other")},
+		Events: []models.PipelineEvent{newEventLog("other")},
 	}, context)
 
 	require.Len(t, context.Collector().ToArray(), 0)

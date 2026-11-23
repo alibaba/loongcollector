@@ -19,13 +19,15 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/alibaba/ilogtail/plugins/processor/internal/processortest"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
-	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
 )
 
@@ -48,12 +50,11 @@ func newProcessor() (*ProcessorPackjson, error) {
 func TestSourceKey(t *testing.T) {
 	processor, err := newProcessor()
 	require.NoError(t, err)
-	log := &protocol.Log{Time: 0}
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "a", Value: "1"})
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "b", Value: "2"})
-	processor.processLog(log)
-	assert.Equal(t, "d_key", log.Contents[2].Key)
-	assert.Equal(t, "{\"a\":\"1\",\"b\":\"2\"}", log.Contents[2].Value)
+	log := processortest.Log()
+	log.Contents.Add("a", "1")
+	log.Contents.Add("b", "2")
+	processortest.Apply(processor, log)
+	assert.Equal(t, "{\"a\":\"1\",\"b\":\"2\"}", pipeline.GetStringValue(log.Contents.Get("d_key")))
 }
 
 func TestKeepSource(t *testing.T) {
@@ -63,29 +64,26 @@ func TestKeepSource(t *testing.T) {
 	}
 	processor.KeepSource = false
 	require.NoError(t, err)
-	log := &protocol.Log{Time: 0}
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "a", Value: "1"})
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "b", Value: "2"})
-	processor.processLog(log)
-	assert.Equal(t, "d_key", log.Contents[0].Key)
-	assert.Equal(t, "{\"a\":\"1\",\"b\":\"2\"}", log.Contents[0].Value)
+	log := processortest.Log()
+	log.Contents.Add("a", "1")
+	log.Contents.Add("b", "2")
+	processortest.Apply(processor, log)
+	assert.Equal(t, "{\"a\":\"1\",\"b\":\"2\"}", pipeline.GetStringValue(log.Contents.Get("d_key")))
 }
 
 func TestAlarmIfEmpty(t *testing.T) {
 	logger.ClearMemoryLog()
 	processor, err := newProcessor()
 	require.NoError(t, err)
-	log := &protocol.Log{Time: 0}
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "a", Value: "1"})
-	processor.processLog(log)
+	log := processortest.Log()
+	log.Contents.Add("a", "1")
+	processortest.Apply(processor, log)
 	memoryLog, ok := logger.ReadMemoryLog(1)
 	assert.True(t, ok)
 	assert.Truef(t, strings.Contains(memoryLog, "PACK_JSON_ALARM\tSourceKeys not found [b]"), "got %s", memoryLog)
 }
 
-// ---- v2 (PipelineEvent / SendPb) Process path tests ----
-
-func TestProcessorPackjson_ProcessV2PacksFields(t *testing.T) {
+func TestProcessorPackjson_ProcessPacksFields(t *testing.T) {
 	processor := &ProcessorPackjson{
 		SourceKeys: []string{"a", "b"},
 		DestKey:    "packed",
@@ -112,7 +110,7 @@ func TestProcessorPackjson_ProcessV2PacksFields(t *testing.T) {
 	assert.True(t, log.GetIndices().Contains("other"))
 }
 
-func TestProcessorPackjson_ProcessV2KeepSource(t *testing.T) {
+func TestProcessorPackjson_ProcessKeepSource(t *testing.T) {
 	processor := &ProcessorPackjson{
 		SourceKeys: []string{"a"},
 		DestKey:    "packed",
@@ -130,9 +128,9 @@ func TestProcessorPackjson_ProcessV2KeepSource(t *testing.T) {
 	assert.True(t, log.GetIndices().Contains("packed"))
 }
 
-// TestProcessorPackjson_ProcessV2PassesThroughMetric verifies Metric events pass
+// TestProcessorPackjson_ProcessPassesThroughMetric verifies Metric events pass
 // through the log-only processor unchanged.
-func TestProcessorPackjson_ProcessV2PassesThroughMetric(t *testing.T) {
+func TestProcessorPackjson_ProcessPassesThroughMetric(t *testing.T) {
 	processor := &ProcessorPackjson{
 		SourceKeys: []string{"a"},
 		DestKey:    "packed",

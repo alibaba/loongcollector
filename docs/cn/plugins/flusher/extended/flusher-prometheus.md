@@ -54,8 +54,6 @@
 
 ```yaml
 enable: true
-global:
-  StructureType: v2
 inputs:
 - Type: service_prometheus
   ConfigFilePath: '/etc/prometheus/prometheus.yml'

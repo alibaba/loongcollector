@@ -41,8 +41,6 @@ type PluginRunner interface {
 
 	AddDefaultFlusherIfEmpty() error
 
-	ReceiveRawLog(log *pipeline.LogWithContext)
-
 	ReceivePipelineEventGroup(group *protocol.PipelineEventGroup, context map[string]interface{})
 
 	AddPlugin(pluginMeta *pipeline.PluginMeta, category pluginCategory, plugin interface{}, config map[string]interface{}) error

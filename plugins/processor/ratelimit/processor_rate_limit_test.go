@@ -20,6 +20,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alibaba/ilogtail/plugins/processor/internal/processortest"
+
 	"github.com/pingcap/check"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -28,8 +30,6 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
-	"github.com/alibaba/ilogtail/plugins/test"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
 )
 
@@ -41,11 +41,11 @@ func Test(t *testing.T) {
 }
 
 type processorTestSuite struct {
-	processor pipeline.ProcessorV1
+	processor pipeline.Processor
 }
 
 func (s *processorTestSuite) SetUpTest(c *check.C) {
-	s.processor = pipeline.Processors["processor_rate_limit"]().(pipeline.ProcessorV1)
+	s.processor = pipeline.Processors["processor_rate_limit"]()
 	_ = s.processor.Init(mock.NewEmptyContext("p", "l", "c"))
 	logger.Info(context.Background(), "set up", s.processor.Description())
 }
@@ -61,19 +61,19 @@ func (s *processorTestSuite) TestDefault(c *check.C) {
 		processor, _ := s.processor.(*ProcessorRateLimit)
 		processor.Limit = "3/s"
 		_ = s.processor.Init(mock.NewEmptyContext("p", "l", "c"))
-		logArray := []*protocol.Log{
-			test.CreateLogs("content", log, "key1", "value1", "key2", "value2"),
-			test.CreateLogs("content", log, "key1", "value1", "key2", "value2"),
-			test.CreateLogs("content", log, "key1", "value1", "key2", "value2"),
-			test.CreateLogs("content", log, "key1", "value2", "key2", "value1"),
+		logArray := []*models.Log{
+			processortest.Log("content", log, "key1", "value1", "key2", "value2"),
+			processortest.Log("content", log, "key1", "value1", "key2", "value2"),
+			processortest.Log("content", log, "key1", "value1", "key2", "value2"),
+			processortest.Log("content", log, "key1", "value2", "key2", "value1"),
 		}
-		outLogs := s.processor.ProcessLogs(logArray)
+		outLogs := processortest.Apply(s.processor, logArray...)
 		c.Assert(len(outLogs), check.Equals, 3)
-		c.Assert(len(outLogs[0].Contents), check.Equals, 3)
+		c.Assert(outLogs[0].Contents.Len(), check.Equals, 3)
 		time.Sleep(time.Second)
-		outLogs = s.processor.ProcessLogs(logArray)
+		outLogs = processortest.Apply(s.processor, logArray...)
 		c.Assert(len(outLogs), check.Equals, 3)
-		c.Assert(len(outLogs[0].Contents), check.Equals, 3)
+		c.Assert(outLogs[0].Contents.Len(), check.Equals, 3)
 		// metric
 		c.Assert(int64(processor.limitMetric.Collect().Value), check.Equals, int64(2))
 	}
@@ -87,16 +87,16 @@ func (s *processorTestSuite) TestField(c *check.C) {
 		processor.Limit = "3/s"
 		processor.Fields = []string{"key1"}
 		_ = s.processor.Init(mock.NewEmptyContext("p", "l", "c"))
-		logArray := []*protocol.Log{
-			test.CreateLogs("content", log, "key1", "value1", "key2", "value2"),
-			test.CreateLogs("content", log, "key1", "value1", "key2", "value2"),
-			test.CreateLogs("content", log, "key1", "value1", "key2", "value2"),
-			test.CreateLogs("content", log, "key1", "value1", "key2", "value2"),
+		logArray := []*models.Log{
+			processortest.Log("content", log, "key1", "value1", "key2", "value2"),
+			processortest.Log("content", log, "key1", "value1", "key2", "value2"),
+			processortest.Log("content", log, "key1", "value1", "key2", "value2"),
+			processortest.Log("content", log, "key1", "value1", "key2", "value2"),
 
-			test.CreateLogs("content", log, "key1", "value2", "key2", "value2"),
-			test.CreateLogs("content", log, "key1", "value2", "key2", "value2"),
+			processortest.Log("content", log, "key1", "value2", "key2", "value2"),
+			processortest.Log("content", log, "key1", "value2", "key2", "value2"),
 		}
-		outLogs := s.processor.ProcessLogs(logArray)
+		outLogs := processortest.Apply(s.processor, logArray...)
 		c.Assert(len(outLogs), check.Equals, 5)
 		// metric
 		c.Assert(int64(processor.limitMetric.Collect().Value), check.Equals, int64(1))
@@ -108,23 +108,23 @@ func (s *processorTestSuite) TestField(c *check.C) {
 		processor.Limit = "3/s"
 		processor.Fields = []string{"key1", "key2"}
 		_ = s.processor.Init(mock.NewEmptyContext("p", "l", "c"))
-		logArray := []*protocol.Log{
-			test.CreateLogs("content", log, "key1", "value1", "key2", "value2"),
-			test.CreateLogs("content", log, "key1", "value1", "key2", "value2"),
-			test.CreateLogs("content", log, "key1", "value1", "key2", "value2"),
-			test.CreateLogs("content", log, "key1", "value1", "key2", "value2"),
+		logArray := []*models.Log{
+			processortest.Log("content", log, "key1", "value1", "key2", "value2"),
+			processortest.Log("content", log, "key1", "value1", "key2", "value2"),
+			processortest.Log("content", log, "key1", "value1", "key2", "value2"),
+			processortest.Log("content", log, "key1", "value1", "key2", "value2"),
 
-			test.CreateLogs("content", log, "key1", "value2", "key2", "value2"),
-			test.CreateLogs("content", log, "key1", "value2", "key2", "value2"),
-			test.CreateLogs("content", log, "key1", "value2", "key2", "value2"),
-			test.CreateLogs("content", log, "key1", "value2", "key2", "value2"),
+			processortest.Log("content", log, "key1", "value2", "key2", "value2"),
+			processortest.Log("content", log, "key1", "value2", "key2", "value2"),
+			processortest.Log("content", log, "key1", "value2", "key2", "value2"),
+			processortest.Log("content", log, "key1", "value2", "key2", "value2"),
 
-			test.CreateLogs("content", log, "key1", "value2", "key2", "value1"),
-			test.CreateLogs("content", log, "key1", "value2", "key2", "value1"),
-			test.CreateLogs("content", log, "key1", "value2", "key2", "value1"),
-			test.CreateLogs("content", log, "key1", "value2", "key2", "value1"),
+			processortest.Log("content", log, "key1", "value2", "key2", "value1"),
+			processortest.Log("content", log, "key1", "value2", "key2", "value1"),
+			processortest.Log("content", log, "key1", "value2", "key2", "value1"),
+			processortest.Log("content", log, "key1", "value2", "key2", "value1"),
 		}
-		outLogs := s.processor.ProcessLogs(logArray)
+		outLogs := processortest.Apply(s.processor, logArray...)
 		c.Assert(len(outLogs), check.Equals, 9)
 		// metric
 		c.Assert(int64(processor.limitMetric.Collect().Value), check.Equals, int64(3))
@@ -139,17 +139,17 @@ func (s *processorTestSuite) TestGC(c *check.C) {
 		processor.Limit = "3/s"
 		processor.Fields = []string{"key1"}
 		_ = s.processor.Init(mock.NewEmptyContext("p", "l", "c"))
-		logArray := make([]*protocol.Log, 10010)
+		logArray := make([]*models.Log, 10010)
 		for i := 0; i < 5; i++ {
-			logArray[i] = test.CreateLogs("content", log, "key1", "value1", "key2", "value2")
+			logArray[i] = processortest.Log("content", log, "key1", "value1", "key2", "value2")
 		}
 		for i := 5; i < 10005; i++ {
-			logArray[i] = test.CreateLogs("content", log, "key1", "value2", "key2", "value2")
+			logArray[i] = processortest.Log("content", log, "key1", "value2", "key2", "value2")
 		}
 		for i := 10005; i < 10010; i++ {
-			logArray[i] = test.CreateLogs("content", log, "key1", "value1", "key2", "value2")
+			logArray[i] = processortest.Log("content", log, "key1", "value1", "key2", "value2")
 		}
-		outLogs := s.processor.ProcessLogs(logArray)
+		outLogs := processortest.Apply(s.processor, logArray...)
 		c.Assert(len(outLogs), check.Equals, 6)
 		// metric
 		c.Assert(int64(processor.limitMetric.Collect().Value), check.Equals, int64(10004))
@@ -161,29 +161,27 @@ func (s *processorTestSuite) TestGC(c *check.C) {
 		processor.Limit = "3/s"
 		processor.Fields = []string{"key1"}
 		_ = s.processor.Init(mock.NewEmptyContext("p", "l", "c"))
-		logArray := make([]*protocol.Log, 10005)
+		logArray := make([]*models.Log, 10005)
 		for i := 0; i < 5; i++ {
-			logArray[i] = test.CreateLogs("content", log, "key1", "value1", "key2", "value2")
+			logArray[i] = processortest.Log("content", log, "key1", "value1", "key2", "value2")
 		}
 		for i := 5; i < 10005; i++ {
-			logArray[i] = test.CreateLogs("content", log, "key1", "value2", "key2", "value2")
+			logArray[i] = processortest.Log("content", log, "key1", "value2", "key2", "value2")
 		}
-		outLogs := s.processor.ProcessLogs(logArray)
+		outLogs := processortest.Apply(s.processor, logArray...)
 		c.Assert(len(outLogs), check.Equals, 6)
-		logArray = make([]*protocol.Log, 5)
+		logArray = make([]*models.Log, 5)
 		for i := 0; i < 5; i++ {
-			logArray[i] = test.CreateLogs("content", log, "key1", "value1", "key2", "value2")
+			logArray[i] = processortest.Log("content", log, "key1", "value1", "key2", "value2")
 		}
-		outLogs = s.processor.ProcessLogs(logArray)
+		outLogs = processortest.Apply(s.processor, logArray...)
 		c.Assert(len(outLogs), check.Equals, 0)
 		// metric
 		c.Assert(int64(processor.limitMetric.Collect().Value), check.Equals, int64(10004))
 	}
 }
 
-// ---- v2 (PipelineEvent / SendPb) Process path tests ----
-
-func newV2Log(kv ...string) *models.Log {
+func newEventLog(kv ...string) *models.Log {
 	log := models.NewLog("", nil, "", "", "", models.NewTags(), 0)
 	for i := 0; i+1 < len(kv); i += 2 {
 		log.GetIndices().Add(kv[i], kv[i+1])
@@ -191,17 +189,17 @@ func newV2Log(kv ...string) *models.Log {
 	return log
 }
 
-// TestProcessorRateLimit_ProcessV2Filter verifies that the v2 Process drops Log
+// TestProcessorRateLimit_ProcessFilter verifies that Process drops Log
 // events once the shared rate limit is exhausted while keeping earlier ones and
 // passing Metric events through unchanged. Order is preserved.
-func TestProcessorRateLimit_ProcessV2Filter(t *testing.T) {
+func TestProcessorRateLimit_ProcessFilter(t *testing.T) {
 	processor := &ProcessorRateLimit{Limit: "3/s"}
 	require.NoError(t, processor.Init(mock.NewEmptyContext("p", "l", "c")))
 
-	log1 := newV2Log("k", "1")
-	log2 := newV2Log("k", "2")
-	log3 := newV2Log("k", "3")
-	log4 := newV2Log("k", "4") // exceeds 3/s -> drop
+	log1 := newEventLog("k", "1")
+	log2 := newEventLog("k", "2")
+	log3 := newEventLog("k", "3")
+	log4 := newEventLog("k", "4") // exceeds 3/s -> drop
 	metric := models.NewSingleValueMetric("m", models.MetricTypeCounter, models.NewTags(), 0, 1.0)
 
 	context := helper.NewObservePipelineContext(10)
@@ -221,23 +219,18 @@ func TestProcessorRateLimit_ProcessV2Filter(t *testing.T) {
 }
 
 // TestProcessorRateLimit_MakeKeyNoEmptyPrefix guards against the regression
-// where makeKey/makeKeyV2 preallocated values with len(Fields), so append built
-// keys like "___a_b" (leading empty segments). Both the v1 and v2 key builders
-// must emit exactly one segment per field, and Init must sort Fields once so the
-// key is independent of the configured field order.
+// where preallocating and appending values introduced leading empty segments.
+// The key has one segment per field, in sorted order.
 func TestProcessorRateLimit_MakeKeyNoEmptyPrefix(t *testing.T) {
 	// Fields deliberately unsorted to prove Init sorts them.
 	processor := &ProcessorRateLimit{Limit: "3/s", Fields: []string{"key2", "key1"}}
 	require.NoError(t, processor.Init(mock.NewEmptyContext("p", "l", "c")))
 
-	v1Key := processor.makeKey(test.CreateLogs("content", "x", "key1", "a", "key2", "b"))
-	assert.Equal(t, "a_b", v1Key, "v1 key: sorted key1,key2 -> a_b, no empty prefix")
-
-	v2Key := processor.makeKeyV2(newV2Log("key1", "a", "key2", "b"))
-	assert.Equal(t, "a_b", v2Key, "v2 key must mirror v1")
+	key := processor.makeKey(newEventLog("key1", "a", "key2", "b"))
+	assert.Equal(t, "a_b", key)
 
 	// Missing field yields a single empty segment, not extra leading separators.
-	assert.Equal(t, "_b", processor.makeKeyV2(newV2Log("key2", "b")))
+	assert.Equal(t, "_b", processor.makeKey(newEventLog("key2", "b")))
 }
 
 // TestTokenBucketGCConcurrentNoRace guards the token-bucket GC counter reset
@@ -267,18 +260,18 @@ func TestTokenBucketGCConcurrentNoRace(t *testing.T) {
 	wg.Wait()
 }
 
-// TestProcessorRateLimit_ProcessV2Fields verifies the per-key limiting when
+// TestProcessorRateLimit_ProcessFields verifies the per-key limiting when
 // Fields are configured: separate limit keys have independent budgets.
-func TestProcessorRateLimit_ProcessV2Fields(t *testing.T) {
+func TestProcessorRateLimit_ProcessFields(t *testing.T) {
 	processor := &ProcessorRateLimit{Limit: "3/s", Fields: []string{"key1"}}
 	require.NoError(t, processor.Init(mock.NewEmptyContext("p", "l", "c")))
 
 	events := []models.PipelineEvent{
-		newV2Log("key1", "a"),
-		newV2Log("key1", "a"),
-		newV2Log("key1", "a"),
-		newV2Log("key1", "a"), // 4th "a" -> drop
-		newV2Log("key1", "b"), // different key -> allowed
+		newEventLog("key1", "a"),
+		newEventLog("key1", "a"),
+		newEventLog("key1", "a"),
+		newEventLog("key1", "a"), // 4th "a" -> drop
+		newEventLog("key1", "b"), // different key -> allowed
 	}
 
 	context := helper.NewObservePipelineContext(10)

@@ -17,12 +17,13 @@ package otel
 import (
 	"testing"
 
+	"github.com/alibaba/ilogtail/plugins/processor/internal/processortest"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/models"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
 )
 
@@ -31,63 +32,27 @@ const protoJSONData = `
 `
 const protoJSONWithFlags = `{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"test-service"}},{"key":"telemetry.sdk.language","value":{"stringValue":"go"}},{"key":"telemetry.sdk.name","value":{"stringValue":"opentelemetry"}},{"key":"telemetry.sdk.version","value":{"stringValue":"1.33.0"}}]},"scopeSpans":[{"scope":{"name":"github.com/pyet/framework/v2/pkg/core"},"spans":[{"traceId":"92ROnPOgG7S7B3VyyN/gwQ==","spanId":"BXxPh5hmJrU=","flags":256,"name":"syncResource","kind":"SPAN_KIND_INTERNAL","startTimeUnixNano":"1770195994522712216","endTimeUnixNano":"1770195994524000927","attributes":[{"key":"ref","value":{"stringValue":"testdata"}},{"key":"active","value":{"boolValue":false}}],"status":{}},{"traceId":"oZKhbsHGp0TB5mKbEPxvcA==","spanId":"ZIGxpIr1vFE=","flags":256,"name":"syncResource","kind":"SPAN_KIND_INTERNAL","startTimeUnixNano":"1770195994552858471","endTimeUnixNano":"1770195994554166025","attributes":[{"key":"ref","value":{"stringValue":"test-attribute-value"}},{"key":"active","value":{"boolValue":false}}],"status":{}}]}],"schemaUrl":"https://opentelemetry.io/schemas/1.26.0"}`
 
-func TestParserOtelData(t *testing.T) {
-	parser := ProcessorOtelTraceParser{
-		SourceKey:              "otel",
-		Format:                 "protojson",
-		TraceIDNeedDecode:      true,
-		SpanIDNeedDecode:       true,
-		ParentSpanIDNeedDecode: true,
-	}
+func TestProcessorOtelTraceParserDecodesBase64IDs(t *testing.T) {
+	parser := &ProcessorOtelTraceParser{SourceKey: "otel", Format: "protojson"}
+	require.NoError(t, parser.Init(mock.NewEmptyContext("p", "l", "c")))
 
-	log := &protocol.Log{
-		Contents: []*protocol.Log_Content{
-			{
-				Key:   "otel",
-				Value: protoJSONData,
-			},
-		},
-	}
-
-	if result, err := parser.processLog(log); err != nil {
-		t.Fatalf("processLog failed: %v", err)
-	} else {
-		assert.Equal(t, 10, len(result))
-		assert.Equal(t, "adb_worker", result[0].Contents[1].Value)
-	}
+	log := processortest.Log("otel", protoJSONWithFlags)
+	context := helper.NewGroupedPipelineContext()
+	parser.Process(&models.PipelineGroupEvents{Events: []models.PipelineEvent{log}}, context)
+	groups := context.Collector().ToArray()
+	require.Len(t, groups, 1)
+	require.Len(t, groups[0].Events, 2)
+	assert.Equal(t, "test-service", groups[0].Group.GetMetadata().Get("service.name"))
+	span, ok := groups[0].Events[0].(*models.Span)
+	require.True(t, ok)
+	assert.Equal(t, "f7644e9cf3a01bb4bb077572c8dfe0c1", span.GetTraceID())
+	assert.Equal(t, "057c4f87986626b5", span.GetSpanID())
+	assert.Equal(t, uint64(1770195994522712216), span.GetStartTime())
 }
-
-func TestParserOtelBase64Data(t *testing.T) {
-	parser := ProcessorOtelTraceParser{
-		SourceKey:              "otel",
-		Format:                 "protojson",
-		TraceIDNeedDecode:      false,
-		SpanIDNeedDecode:       false,
-		ParentSpanIDNeedDecode: false,
-	}
-
-	log := &protocol.Log{
-		Contents: []*protocol.Log_Content{
-			{
-				Key:   "otel",
-				Value: protoJSONWithFlags,
-			},
-		},
-	}
-
-	if result, err := parser.processLog(log); err != nil {
-		t.Fatalf("processLog failed: %v", err)
-	} else {
-		assert.Equal(t, 2, len(result))
-		assert.Equal(t, "test-service", result[0].Contents[1].Value)
-	}
-}
-
-// ---- v2 (PipelineEvent / SendPb) Process path tests ----
 
 // A Log carrying an OTLP trace payload is converted to native models.Span
-// events ("v2场景下输入Log输出Span"); the source Log is replaced (not preserved).
-func TestProcessorOtelTraceParser_ProcessV2LogToSpan(t *testing.T) {
+// events that replace the source log.
+func TestProcessorOtelTraceParser_ProcessLogToSpan(t *testing.T) {
 	parser := &ProcessorOtelTraceParser{SourceKey: "otel", Format: "protojson"}
 	require.NoError(t, parser.Init(mock.NewEmptyContext("p", "l", "c")))
 
@@ -99,6 +64,7 @@ func TestProcessorOtelTraceParser_ProcessV2LogToSpan(t *testing.T) {
 
 	results := context.Collector().ToArray()
 	require.NotEmpty(t, results)
+	assert.Equal(t, "adb_worker", results[0].Group.GetMetadata().Get("service.name"))
 
 	spanCount := 0
 	for _, group := range results {
@@ -114,7 +80,7 @@ func TestProcessorOtelTraceParser_ProcessV2LogToSpan(t *testing.T) {
 }
 
 // A pre-existing Span event passes through unchanged.
-func TestProcessorOtelTraceParser_ProcessV2PassesThroughSpan(t *testing.T) {
+func TestProcessorOtelTraceParser_ProcessPassesThroughSpan(t *testing.T) {
 	parser := &ProcessorOtelTraceParser{SourceKey: "otel", Format: "protojson"}
 	require.NoError(t, parser.Init(mock.NewEmptyContext("p", "l", "c")))
 

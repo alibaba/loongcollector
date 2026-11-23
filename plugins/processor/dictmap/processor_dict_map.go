@@ -23,7 +23,6 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
 const pluginType = "processor_dict_map"
@@ -86,13 +85,6 @@ func (*ProcessorDictMap) Description() string {
 	return "dict map processor for logtail"
 }
 
-func (p *ProcessorDictMap) ProcessLogs(logArray []*protocol.Log) []*protocol.Log {
-	for _, log := range logArray {
-		p.processLog(log)
-	}
-	return logArray
-}
-
 // read Csv File for map dict
 func (p *ProcessorDictMap) readCsvFile() error {
 	fs, err := os.Open(p.DictFilePath)
@@ -135,62 +127,7 @@ func (p *ProcessorDictMap) readCsvFile() error {
 	return nil
 }
 
-func (p *ProcessorDictMap) handleMode(log *protocol.Log, destKeyIdx int, fillIn string) {
-	switch p.Mode {
-	case "fill":
-		return
-	case "overwrite":
-		log.Contents[destKeyIdx].Value = fillIn
-		return
-	}
-}
-
-// map log contents into target value
-func (p *ProcessorDictMap) processLog(log *protocol.Log) {
-	hasSourceKey, hasDestKey := false, false
-	sourceKeyIdx, destKeyIdx := 0, 0
-	fillIn := ""
-	for idx := range log.Contents {
-		if !hasSourceKey && p.SourceKey == log.Contents[idx].Key {
-			hasSourceKey = true
-			sourceKeyIdx = idx
-			if value, exist := p.MapDict[log.Contents[sourceKeyIdx].Value]; exist {
-				fillIn = value
-				if !p.scanDestKey {
-					log.Contents[sourceKeyIdx].Value = fillIn
-					return
-				}
-			} else {
-				return
-			}
-		}
-		if p.scanDestKey && !hasDestKey && p.DestKey == log.Contents[idx].Key {
-			hasDestKey = true
-			destKeyIdx = idx
-		}
-		if hasSourceKey && hasDestKey {
-			p.handleMode(log, destKeyIdx, fillIn)
-			return
-		}
-	}
-	if !hasSourceKey && p.HandleMissing {
-		if hasDestKey {
-			p.handleMode(log, destKeyIdx, p.Missing)
-		} else {
-			log.Contents = append(log.Contents, &protocol.Log_Content{Key: p.DestKey, Value: p.Missing})
-		}
-		return
-	}
-	if p.scanDestKey && !hasDestKey {
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: p.DestKey, Value: fillIn})
-		return
-	}
-}
-
-// Process implements the v2 ProcessorV2 interface: it maps the SourceKey value
-// of each Log event through MapDict into DestKey (or in place); Metric/Span
-// events pass through unchanged. Mode ("fill"/"overwrite") and HandleMissing
-// follow the same semantics as the v1 path.
+// Process maps SourceKey through MapDict into DestKey on each log. Other events pass through.
 func (p *ProcessorDictMap) Process(in *models.PipelineGroupEvents, context pipeline.PipelineContext) {
 	pipeline.ProcessLogEventsOnly(in, context, p.processLogEvent)
 }

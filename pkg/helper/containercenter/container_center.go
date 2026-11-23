@@ -367,6 +367,42 @@ func (did *DockerInfoDetail) GetExternalTags(envs, k8sLabels map[string]string) 
 	return tags
 }
 
+// GetStdoutTags selects container tags for the Go stdout inputs. In the current
+// format, configured mappings override built-in keys and missing values are
+// omitted, matching input_container_stdio.
+func (did *DockerInfoDetail) GetStdoutTags(envs, k8sLabels map[string]string, usingOldContentTag bool) map[string]string {
+	if usingOldContentTag {
+		tags := did.GetExternalTags(envs, k8sLabels)
+		for key, value := range did.ContainerNameTag {
+			tags[key] = value
+		}
+		return tags
+	}
+
+	tags := make(map[string]string, len(did.ContainerNameTag)+len(envs)+len(k8sLabels))
+	for key, value := range did.ContainerNameTag {
+		tags[key] = value
+	}
+	if len(envs) > 0 && did.ContainerInfo.Config != nil {
+		for _, env := range did.ContainerInfo.Config.Env {
+			key, value, ok := strings.Cut(env, "=")
+			if tag, matched := envs[key]; ok && matched {
+				tags[tag] = value
+			}
+		}
+	}
+	if did.K8SInfo != nil {
+		did.K8SInfo.mu.RLock()
+		defer did.K8SInfo.mu.RUnlock()
+		for key, tag := range k8sLabels {
+			if value, ok := did.K8SInfo.Labels[key]; ok {
+				tags[tag] = value
+			}
+		}
+	}
+	return tags
+}
+
 func (did *DockerInfoDetail) GetCustomExternalTags(tags, envs, k8sLabels map[string]string) {
 	if len(envs) == 0 && len(k8sLabels) == 0 {
 		return

@@ -22,7 +22,6 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
@@ -57,47 +56,6 @@ func (*ProcessorJSON) Description() string {
 	return "json processor for logtail"
 }
 
-func (p *ProcessorJSON) ProcessLogs(logArray []*protocol.Log) []*protocol.Log {
-	for _, log := range logArray {
-		p.processLog(log)
-	}
-	return logArray
-}
-
-func (p *ProcessorJSON) processLog(log *protocol.Log) {
-	findKey := false
-	for idx := range log.Contents {
-		if log.Contents[idx].Key == p.SourceKey {
-			objectVal := log.Contents[idx].Value
-			param := ExpandParam{
-				sourceKey:            p.SourceKey,
-				log:                  log,
-				nowDepth:             0,
-				maxDepth:             p.ExpandDepth,
-				connector:            p.ExpandConnector,
-				prefix:               p.Prefix,
-				ignoreFirstConnector: p.IgnoreFirstConnector,
-				expandArray:          p.ExpandArray,
-			}
-			if p.UseSourceKeyAsPrefix {
-				param.preKey = p.SourceKey
-			}
-			err := jsonparser.ObjectEach([]byte(objectVal), param.ExpandJSONCallBack)
-			if err != nil {
-				logger.Warningf(p.context.GetRuntimeContext(), selfmonitor.ProcessorJSONParserAlarm, "parser json error %v", err)
-			}
-			if !p.shouldKeepSource(err) {
-				log.Contents = append(log.Contents[:idx], log.Contents[idx+1:]...)
-			}
-			findKey = true
-			break
-		}
-	}
-	if !findKey && p.NoKeyError {
-		logger.Warningf(p.context.GetRuntimeContext(), selfmonitor.ProcessorJSONFindAlarm, "cannot find key %v", p.SourceKey)
-	}
-}
-
 func (p *ProcessorJSON) shouldKeepSource(err error) bool {
 	return p.KeepSource || (p.KeepSourceIfParseError && err != nil)
 }
@@ -120,7 +78,6 @@ func init() {
 
 type ExpandParam struct {
 	sourceKey              string
-	log                    *protocol.Log
 	contents               models.LogContents
 	preKey                 string
 	nowDepth               int
@@ -202,30 +159,6 @@ func (p *ExpandParam) flattenValue(key []byte, value []byte) {
 }
 
 func (p *ExpandParam) appendNewContent(key string, value string) {
-	if p.log != nil {
-		p.appendNewContentV1(key, value)
-	} else {
-		p.appendNewContentV2(key, value)
-	}
-}
-
-func (p *ExpandParam) appendNewContentV1(key string, value string) {
-	if len(p.prefix) > 0 {
-		newContent := &protocol.Log_Content{
-			Key:   p.prefix + key,
-			Value: value,
-		}
-		p.log.Contents = append(p.log.Contents, newContent)
-	} else {
-		newContent := &protocol.Log_Content{
-			Key:   key,
-			Value: value,
-		}
-		p.log.Contents = append(p.log.Contents, newContent)
-	}
-}
-
-func (p *ExpandParam) appendNewContentV2(key string, value string) {
 	if len(p.prefix) > 0 {
 		key = p.prefix + key
 	}

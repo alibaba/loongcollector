@@ -17,7 +17,6 @@ package defaultone
 import (
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
 type ProcessorDefault struct {
@@ -30,10 +29,6 @@ func (*ProcessorDefault) Init(pipeline.Context) error {
 
 func (*ProcessorDefault) Description() string {
 	return "default processor for logtail"
-}
-
-func (*ProcessorDefault) ProcessLogs(logArray []*protocol.Log) []*protocol.Log {
-	return logArray
 }
 
 func (*ProcessorDefault) Process(in *models.PipelineGroupEvents, context pipeline.PipelineContext) {

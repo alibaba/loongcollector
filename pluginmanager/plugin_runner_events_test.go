@@ -29,26 +29,18 @@ import (
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
-func TestEventRunner_ReceiveRawLog(t *testing.T) {
-	timeSec := uint32(time.Now().UnixMilli() / 1e3)
-	logCtx := &pipeline.LogWithContext{
-		Log: &protocol.Log{
-			Time: timeSec,
-			Contents: []*protocol.Log_Content{
-				{Key: rawStringKey, Value: "test content"},
-				{Key: fileOffsetKey, Value: "10"},
-				{Key: tagPrefix + "tenant", Value: "default"},
-			},
-		},
-	}
-
+func TestInputCollector_ConvertsRawLog(t *testing.T) {
+	timeSec := uint32(time.Now().Unix())
 	ctx := &mockContect{}
-
-	p := &pluginRunner{
-		InputPipeContext: ctx,
-	}
-
-	p.ReceiveRawLog(logCtx)
+	collector := &inputCollector{context: ctx}
+	collector.AddRawLog(&protocol.Log{
+		Time: timeSec,
+		Contents: []*protocol.Log_Content{
+			{Key: contentKey, Value: "test content"},
+			{Key: fileOffsetKey, Value: "10"},
+			{Key: tagPrefix + "tenant", Value: "default"},
+		},
+	})
 
 	logContent := models.NewOrderedLogContents(1)
 	logContent.Add(models.BodyKey, []byte("test content"))

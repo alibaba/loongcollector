@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	"github.com/alibaba/ilogtail/pkg/helper"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 
 	"github.com/pyroscope-io/pyroscope/pkg/structs/transporttrie"
@@ -79,6 +80,15 @@ func TestDecoder_DecodeTire(t *testing.T) {
 	require.Equal(t, ReadLogVal(log, "durationNs"), "10000000000")
 	require.Equal(t, ReadLogVal(log, "labels"), "{\"__name__\":\"demo\",\"a\":\"b\",\"cluster\":\"sls-mall\"}")
 	require.Equal(t, ReadLogVal(log, "val"), "10000000.00")
+
+	d.Tags = map[string]string{"cluster": "sls-mall"}
+	groups, err := d.DecodeV2(buf.Bytes(), request)
+	require.NoError(t, err)
+	require.Len(t, groups, 1)
+	require.Len(t, groups[0].Events, len(logs))
+	event := groups[0].Events[1].(*models.Log)
+	require.Equal(t, uint64(log.GetTime())*1_000_000_000+uint64(log.GetTimeNs()), event.GetTimestamp())
+	require.Equal(t, ReadLogVal(log, "labels"), event.GetIndices().Get("labels"))
 }
 
 func TestDecoder_DecodePprofCumulative(t *testing.T) {

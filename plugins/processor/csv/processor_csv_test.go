@@ -17,21 +17,24 @@ package csv
 import (
 	"testing"
 
+	"github.com/alibaba/ilogtail/plugins/processor/internal/processortest"
+
 	. "github.com/smartystreets/goconvey/convey"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/models"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
 )
 
 func newProcessor() (*ProcessorCSVDecoder, error) {
 	ctx := mock.NewEmptyContext("p", "l", "c")
 	processor := &ProcessorCSVDecoder{
-		SplitSep:  ",",
-		SplitKeys: []string{"f1", "f2", "f3"},
+		SourceKey:  "content",
+		KeepSource: true,
+		SplitSep:   ",",
+		SplitKeys:  []string{"f1", "f2", "f3"},
 	}
 	err := processor.Init(ctx)
 	return processor, err
@@ -44,170 +47,149 @@ func TestProcessorCSVDecoder(t *testing.T) {
 
 		Convey("When the src record has zero value", func() {
 			record := ""
-			log := &protocol.Log{Time: 0}
-			log.Contents = append(log.Contents, &protocol.Log_Content{Key: "content", Value: record})
-			res := processor.decodeCSV(log, record)
+			log := processortest.Log("content", record)
+			processortest.Apply(processor, log)
 
 			Convey("Then the decoding is valid", func() {
-				So(res, ShouldBeTrue)
-				So(len(log.Contents), ShouldEqual, 2)
-				So(log.Contents[1].Value, ShouldEqual, "")
+				So(log.Contents.Len(), ShouldEqual, 2)
+				So(log.Contents.Get("f1"), ShouldEqual, "")
 			})
 		})
 
 		Convey("When the src record contains purely blank chars", func() {
 			record := "  "
-			log := &protocol.Log{Time: 0}
-			log.Contents = append(log.Contents, &protocol.Log_Content{Key: "content", Value: record})
-			res := processor.decodeCSV(log, record)
+			log := processortest.Log("content", record)
+			processortest.Apply(processor, log)
 
 			Convey("Then the decoding is valid with warning", func() {
-				So(res, ShouldBeTrue)
-				So(len(log.Contents), ShouldEqual, 2)
-				So(log.Contents[1].Value, ShouldEqual, "  ")
+				So(log.Contents.Len(), ShouldEqual, 2)
+				So(log.Contents.Get("f1"), ShouldEqual, "  ")
 			})
 		})
 
 		Convey("When the src record has only a single field", func() {
 			record := "12"
-			log := &protocol.Log{Time: 0}
-			log.Contents = append(log.Contents, &protocol.Log_Content{Key: "content", Value: record})
-			res := processor.decodeCSV(log, record)
+			log := processortest.Log("content", record)
+			processortest.Apply(processor, log)
 
 			Convey("Then the decoding is valid with warning", func() {
-				So(res, ShouldBeTrue)
-				So(len(log.Contents), ShouldEqual, 2)
-				So(log.Contents[1].Value, ShouldEqual, "12")
+				So(log.Contents.Len(), ShouldEqual, 2)
+				So(log.Contents.Get("f1"), ShouldEqual, "12")
 			})
 		})
 
 		Convey("When the src record fits the schema", func() {
 			record := "12,34,56"
-			log := &protocol.Log{Time: 0}
-			log.Contents = append(log.Contents, &protocol.Log_Content{Key: "content", Value: record})
-			res := processor.decodeCSV(log, record)
+			log := processortest.Log("content", record)
+			processortest.Apply(processor, log)
 
 			Convey("Then the decoding is valid", func() {
-				So(res, ShouldBeTrue)
-				So(len(log.Contents), ShouldEqual, 4)
-				So(log.Contents[1].Key, ShouldEqual, "f1")
-				So(log.Contents[1].Value, ShouldEqual, "12")
-				So(log.Contents[2].Key, ShouldEqual, "f2")
-				So(log.Contents[2].Value, ShouldEqual, "34")
-				So(log.Contents[3].Key, ShouldEqual, "f3")
-				So(log.Contents[3].Value, ShouldEqual, "56")
+				So(log.Contents.Len(), ShouldEqual, 4)
+
+				So(log.Contents.Get("f1"), ShouldEqual, "12")
+
+				So(log.Contents.Get("f2"), ShouldEqual, "34")
+
+				So(log.Contents.Get("f3"), ShouldEqual, "56")
 			})
 		})
 
 		Convey("When the src record fits the schema and all fields are properly quoted", func() {
 			record := "\"normal\",\"\"\"quote\"\"\",\",\""
-			log := &protocol.Log{Time: 0}
-			log.Contents = append(log.Contents, &protocol.Log_Content{Key: "content", Value: record})
-			res := processor.decodeCSV(log, record)
+			log := processortest.Log("content", record)
+			processortest.Apply(processor, log)
 
 			Convey("Then the decoding is valid", func() {
-				So(res, ShouldBeTrue)
-				So(len(log.Contents), ShouldEqual, 4)
-				So(log.Contents[1].Value, ShouldEqual, "normal")
-				So(log.Contents[2].Value, ShouldEqual, "\"quote\"")
-				So(log.Contents[3].Value, ShouldEqual, ",")
+				So(log.Contents.Len(), ShouldEqual, 4)
+				So(log.Contents.Get("f1"), ShouldEqual, "normal")
+				So(log.Contents.Get("f2"), ShouldEqual, "\"quote\"")
+				So(log.Contents.Get("f3"), ShouldEqual, ",")
 			})
 		})
 
 		Convey("When #src record fields < #DstKeys", func() {
 			record := "12,34"
-			log := &protocol.Log{Time: 0}
-			log.Contents = append(log.Contents, &protocol.Log_Content{Key: "content", Value: record})
-			res := processor.decodeCSV(log, record)
+			log := processortest.Log("content", record)
+			processortest.Apply(processor, log)
 
 			Convey("Then the decoding is valid with warning", func() {
-				So(res, ShouldBeTrue)
-				So(len(log.Contents), ShouldEqual, 3)
-				So(log.Contents[1].Value, ShouldEqual, "12")
-				So(log.Contents[2].Value, ShouldEqual, "34")
+				So(log.Contents.Len(), ShouldEqual, 3)
+				So(log.Contents.Get("f1"), ShouldEqual, "12")
+				So(log.Contents.Get("f2"), ShouldEqual, "34")
 			})
 		})
 
 		Convey("When #src record fields > #DstKeys", func() {
 			record := "12,34,56,78,90"
-			log := &protocol.Log{Time: 0}
-			log.Contents = append(log.Contents, &protocol.Log_Content{Key: "content", Value: record})
-			res := processor.decodeCSV(log, record)
+			log := processortest.Log("content", record)
+			processortest.Apply(processor, log)
 
 			Convey("Then the decoding is valid", func() {
-				So(res, ShouldBeTrue)
-				So(len(log.Contents), ShouldEqual, 4)
-				So(log.Contents[1].Value, ShouldEqual, "12")
-				So(log.Contents[2].Value, ShouldEqual, "34")
-				So(log.Contents[3].Value, ShouldEqual, "56")
+				So(log.Contents.Len(), ShouldEqual, 4)
+				So(log.Contents.Get("f1"), ShouldEqual, "12")
+				So(log.Contents.Get("f2"), ShouldEqual, "34")
+				So(log.Contents.Get("f3"), ShouldEqual, "56")
 			})
 		})
 
 		Convey("When the src record includes json", func() {
 			record := "\"  words{\"\"a\"\":123,\"\"b\"\":\"\"string\"\",\"\"c\"\":[1,2,3],\"\"d\"\":{\"\"e\"\":\"\"string\"\"}}  \""
-			log := &protocol.Log{Time: 0}
-			log.Contents = append(log.Contents, &protocol.Log_Content{Key: "content", Value: record})
-			res := processor.decodeCSV(log, record)
+			log := processortest.Log("content", record)
+			processortest.Apply(processor, log)
 
 			Convey("Then the decoding is valid", func() {
-				So(res, ShouldBeTrue)
-				So(len(log.Contents), ShouldEqual, 2)
-				So(log.Contents[1].Value, ShouldEqual, "  words{\"a\":123,\"b\":\"string\",\"c\":[1,2,3],\"d\":{\"e\":\"string\"}}  ")
+				So(log.Contents.Len(), ShouldEqual, 2)
+				So(log.Contents.Get("f1"), ShouldEqual, "  words{\"a\":123,\"b\":\"string\",\"c\":[1,2,3],\"d\":{\"e\":\"string\"}}  ")
 			})
 		})
 
 		Convey("When the upper quotes in the src record has leading words", func() {
 			record := "12\",34,56"
-			log := &protocol.Log{Time: 0}
-			log.Contents = append(log.Contents, &protocol.Log_Content{Key: "content", Value: record})
-			res := processor.decodeCSV(log, record)
+			log := processortest.Log("content", record)
+			processortest.Apply(processor, log)
 
 			Convey("Then the decoding is invalid", func() {
-				So(res, ShouldBeFalse)
+				So(log.Contents.Iterator(), ShouldResemble, map[string]interface{}{"content": record})
 			})
 		})
 
 		Convey("When the upper quotes in the src record has leading space", func() {
 			record := "  \"12,34,56"
-			log := &protocol.Log{Time: 0}
-			log.Contents = append(log.Contents, &protocol.Log_Content{Key: "content", Value: record})
-			res := processor.decodeCSV(log, record)
+			log := processortest.Log("content", record)
+			processortest.Apply(processor, log)
 
 			Convey("Then the decoding is invalid", func() {
-				So(res, ShouldBeFalse)
+				So(log.Contents.Iterator(), ShouldResemble, map[string]interface{}{"content": record})
 			})
 		})
 
 		Convey("When bare quotes exist in the src record", func() {
 			record := "\"12,34,56"
-			log := &protocol.Log{Time: 0}
-			log.Contents = append(log.Contents, &protocol.Log_Content{Key: "content", Value: record})
-			res := processor.decodeCSV(log, record)
+			log := processortest.Log("content", record)
+			processortest.Apply(processor, log)
 
 			Convey("Then the decoding is invalid", func() {
-				So(res, ShouldBeFalse)
+				So(log.Contents.Iterator(), ShouldResemble, map[string]interface{}{"content": record})
 			})
 		})
 
 		Convey("When the lower quotes in the src record has trailing words", func() {
 			record := "12\",\"34,56"
-			log := &protocol.Log{Time: 0}
-			log.Contents = append(log.Contents, &protocol.Log_Content{Key: "content", Value: record})
-			res := processor.decodeCSV(log, record)
+			log := processortest.Log("content", record)
+			processortest.Apply(processor, log)
 
 			Convey("Then the decoding is invalid", func() {
-				So(res, ShouldBeFalse)
+				So(log.Contents.Iterator(), ShouldResemble, map[string]interface{}{"content": record})
 			})
 		})
 
 		Convey("When the lower quotes in the src record has trailing space", func() {
 			record := "\"12\"  ,34,56"
-			log := &protocol.Log{Time: 0}
-			log.Contents = append(log.Contents, &protocol.Log_Content{Key: "content", Value: record})
-			res := processor.decodeCSV(log, record)
+			log := processortest.Log("content", record)
+			processortest.Apply(processor, log)
 
 			Convey("Then the decoding is invalid", func() {
-				So(res, ShouldBeFalse)
+				So(log.Contents.Iterator(), ShouldResemble, map[string]interface{}{"content": record})
 			})
 		})
 	})
@@ -219,65 +201,57 @@ func TestProcessorCSVDecoder(t *testing.T) {
 
 		Convey("When #src record fields > #DstKeys", func() {
 			record := "12,34,56,78,90"
-			log := &protocol.Log{Time: 0}
-			log.Contents = append(log.Contents, &protocol.Log_Content{Key: "content", Value: record})
-			res := processor.decodeCSV(log, record)
+			log := processortest.Log("content", record)
+			processortest.Apply(processor, log)
 
 			Convey("Then the decoding is valid with warning", func() {
-				So(res, ShouldBeTrue)
-				So(len(log.Contents), ShouldEqual, 5)
-				So(log.Contents[1].Value, ShouldEqual, "12")
-				So(log.Contents[2].Value, ShouldEqual, "34")
-				So(log.Contents[3].Value, ShouldEqual, "56")
-				So(log.Contents[4].Value, ShouldEqual, "78,90")
+				So(log.Contents.Len(), ShouldEqual, 5)
+				So(log.Contents.Get("f1"), ShouldEqual, "12")
+				So(log.Contents.Get("f2"), ShouldEqual, "34")
+				So(log.Contents.Get("f3"), ShouldEqual, "56")
+				So(log.Contents.Get("_decode_preserve_"), ShouldEqual, "78,90")
 			})
 		})
 
 		Convey("When #src record fields > #DstKeys and all fields are properly quoted", func() {
 			record := "12,34,56,\"normal\",\"\"\"quote\"\"\",\",\""
-			log := &protocol.Log{Time: 0}
-			log.Contents = append(log.Contents, &protocol.Log_Content{Key: "content", Value: record})
-			res := processor.decodeCSV(log, record)
+			log := processortest.Log("content", record)
+			processortest.Apply(processor, log)
 
 			Convey("Then the decoding is valid with warning", func() {
-				So(res, ShouldBeTrue)
-				So(len(log.Contents), ShouldEqual, 5)
-				So(log.Contents[1].Value, ShouldEqual, "12")
-				So(log.Contents[2].Value, ShouldEqual, "34")
-				So(log.Contents[3].Value, ShouldEqual, "56")
-				So(log.Contents[4].Value, ShouldEqual, "normal,\"\"\"quote\"\"\",\",\"")
+				So(log.Contents.Len(), ShouldEqual, 5)
+				So(log.Contents.Get("f1"), ShouldEqual, "12")
+				So(log.Contents.Get("f2"), ShouldEqual, "34")
+				So(log.Contents.Get("f3"), ShouldEqual, "56")
+				So(log.Contents.Get("_decode_preserve_"), ShouldEqual, "normal,\"\"\"quote\"\"\",\",\"")
 			})
 		})
 
 		Convey("When the src record fields have leading space", func() {
 			record := "  12,  ,\"  34\",  78,  ,\"  90\""
-			log := &protocol.Log{Time: 0}
-			log.Contents = append(log.Contents, &protocol.Log_Content{Key: "content", Value: record})
-			res := processor.decodeCSV(log, record)
+			log := processortest.Log("content", record)
+			processortest.Apply(processor, log)
 
 			Convey("Then the decoding is valid", func() {
-				So(res, ShouldBeTrue)
-				So(len(log.Contents), ShouldEqual, 5)
-				So(log.Contents[1].Value, ShouldEqual, "  12")
-				So(log.Contents[2].Value, ShouldEqual, "  ")
-				So(log.Contents[3].Value, ShouldEqual, "  34")
-				So(log.Contents[4].Value, ShouldEqual, "\"  78\",\"  \",\"  90\"")
+				So(log.Contents.Len(), ShouldEqual, 5)
+				So(log.Contents.Get("f1"), ShouldEqual, "  12")
+				So(log.Contents.Get("f2"), ShouldEqual, "  ")
+				So(log.Contents.Get("f3"), ShouldEqual, "  34")
+				So(log.Contents.Get("_decode_preserve_"), ShouldEqual, "\"  78\",\"  \",\"  90\"")
 			})
 		})
 
 		Convey("When the src record fields have trailing space", func() {
 			record := "12  ,  ,\"34  \",78  ,  ,\"90  \""
-			log := &protocol.Log{Time: 0}
-			log.Contents = append(log.Contents, &protocol.Log_Content{Key: "content", Value: record})
-			res := processor.decodeCSV(log, record)
+			log := processortest.Log("content", record)
+			processortest.Apply(processor, log)
 
 			Convey("Then the decoding is valid", func() {
-				So(res, ShouldBeTrue)
-				So(len(log.Contents), ShouldEqual, 5)
-				So(log.Contents[1].Value, ShouldEqual, "12  ")
-				So(log.Contents[2].Value, ShouldEqual, "  ")
-				So(log.Contents[3].Value, ShouldEqual, "34  ")
-				So(log.Contents[4].Value, ShouldEqual, "78  ,\"  \",90  ")
+				So(log.Contents.Len(), ShouldEqual, 5)
+				So(log.Contents.Get("f1"), ShouldEqual, "12  ")
+				So(log.Contents.Get("f2"), ShouldEqual, "  ")
+				So(log.Contents.Get("f3"), ShouldEqual, "34  ")
+				So(log.Contents.Get("_decode_preserve_"), ShouldEqual, "78  ,\"  \",90  ")
 			})
 		})
 	})
@@ -290,45 +264,39 @@ func TestProcessorCSVDecoder(t *testing.T) {
 
 		Convey("When the src record contains purely blank chars", func() {
 			record := "  "
-			log := &protocol.Log{Time: 0}
-			log.Contents = append(log.Contents, &protocol.Log_Content{Key: "content", Value: record})
-			res := processor.decodeCSV(log, record)
+			log := processortest.Log("content", record)
+			processortest.Apply(processor, log)
 
 			Convey("Then the decoding is valid", func() {
-				So(res, ShouldBeTrue)
-				So(len(log.Contents), ShouldEqual, 2)
-				So(log.Contents[1].Value, ShouldEqual, "")
+				So(log.Contents.Len(), ShouldEqual, 2)
+				So(log.Contents.Get("f1"), ShouldEqual, "")
 			})
 		})
 
 		Convey("When the src record fields have leading space", func() {
 			record := "  12,  ,\"  34\",  78,  ,\"  90\""
-			log := &protocol.Log{Time: 0}
-			log.Contents = append(log.Contents, &protocol.Log_Content{Key: "content", Value: record})
-			res := processor.decodeCSV(log, record)
+			log := processortest.Log("content", record)
+			processortest.Apply(processor, log)
 
 			Convey("Then the decoding is valid", func() {
-				So(res, ShouldBeTrue)
-				So(len(log.Contents), ShouldEqual, 5)
-				So(log.Contents[1].Value, ShouldEqual, "12")
-				So(log.Contents[2].Value, ShouldEqual, "")
-				So(log.Contents[3].Value, ShouldEqual, "  34")
-				So(log.Contents[4].Value, ShouldEqual, "78,,\"  90\"")
+				So(log.Contents.Len(), ShouldEqual, 5)
+				So(log.Contents.Get("f1"), ShouldEqual, "12")
+				So(log.Contents.Get("f2"), ShouldEqual, "")
+				So(log.Contents.Get("f3"), ShouldEqual, "  34")
+				So(log.Contents.Get("_decode_preserve_"), ShouldEqual, "78,,\"  90\"")
 			})
 		})
 
 		Convey("When the upper quotes in the src record has leading space", func() {
 			record := "  \"12\",34,56"
-			log := &protocol.Log{Time: 0}
-			log.Contents = append(log.Contents, &protocol.Log_Content{Key: "content", Value: record})
-			res := processor.decodeCSV(log, record)
+			log := processortest.Log("content", record)
+			processortest.Apply(processor, log)
 
 			Convey("Then the decoding is valid", func() {
-				So(res, ShouldBeTrue)
-				So(len(log.Contents), ShouldEqual, 4)
-				So(log.Contents[1].Value, ShouldEqual, "12")
-				So(log.Contents[2].Value, ShouldEqual, "34")
-				So(log.Contents[3].Value, ShouldEqual, "56")
+				So(log.Contents.Len(), ShouldEqual, 4)
+				So(log.Contents.Get("f1"), ShouldEqual, "12")
+				So(log.Contents.Get("f2"), ShouldEqual, "34")
+				So(log.Contents.Get("f3"), ShouldEqual, "56")
 			})
 		})
 	})
@@ -342,31 +310,27 @@ func TestProcessorCSVDecoder(t *testing.T) {
 
 		Convey("When #src record fields > #DstKeys", func() {
 			record := "12,34,56,\"normal\",\"\"\"quote\"\"\",\",\""
-			log := &protocol.Log{Time: 0}
-			log.Contents = append(log.Contents, &protocol.Log_Content{Key: "content", Value: record})
-			res := processor.decodeCSV(log, record)
+			log := processortest.Log("content", record)
+			processortest.Apply(processor, log)
 
 			Convey("Then the decoding is valid", func() {
-				So(res, ShouldBeTrue)
-				So(len(log.Contents), ShouldEqual, 7)
-				So(log.Contents[1].Value, ShouldEqual, "12")
-				So(log.Contents[2].Value, ShouldEqual, "34")
-				So(log.Contents[3].Value, ShouldEqual, "56")
-				So(log.Contents[4].Key, ShouldEqual, "expand_1")
-				So(log.Contents[4].Value, ShouldEqual, "normal")
-				So(log.Contents[5].Key, ShouldEqual, "expand_2")
-				So(log.Contents[5].Value, ShouldEqual, "\"quote\"")
-				So(log.Contents[6].Key, ShouldEqual, "expand_3")
-				So(log.Contents[6].Value, ShouldEqual, ",")
+				So(log.Contents.Len(), ShouldEqual, 7)
+				So(log.Contents.Get("f1"), ShouldEqual, "12")
+				So(log.Contents.Get("f2"), ShouldEqual, "34")
+				So(log.Contents.Get("f3"), ShouldEqual, "56")
+
+				So(log.Contents.Get("expand_1"), ShouldEqual, "normal")
+
+				So(log.Contents.Get("expand_2"), ShouldEqual, "\"quote\"")
+
+				So(log.Contents.Get("expand_3"), ShouldEqual, ",")
 
 			})
 		})
 	})
 }
 
-// ---- v2 (PipelineEvent / SendPb) Process path tests ----
-
-func TestProcessorCSVDecoder_ProcessV2Splits(t *testing.T) {
+func TestProcessorCSVDecoder_ProcessSplits(t *testing.T) {
 	processor := &ProcessorCSVDecoder{
 		SourceKey: "content",
 		SplitSep:  ",",
@@ -388,7 +352,7 @@ func TestProcessorCSVDecoder_ProcessV2Splits(t *testing.T) {
 	assert.False(t, contents.Contains("content"), "source key must be removed on successful decode")
 }
 
-func TestProcessorCSVDecoder_ProcessV2ExpandOthers(t *testing.T) {
+func TestProcessorCSVDecoder_ProcessExpandOthers(t *testing.T) {
 	processor := &ProcessorCSVDecoder{
 		SourceKey:       "content",
 		SplitSep:        ",",
@@ -415,7 +379,7 @@ func TestProcessorCSVDecoder_ProcessV2ExpandOthers(t *testing.T) {
 	assert.True(t, contents.Contains("content"), "source key must be kept when KeepSource is true")
 }
 
-func TestProcessorCSVDecoder_ProcessV2PassesThroughMetric(t *testing.T) {
+func TestProcessorCSVDecoder_ProcessPassesThroughMetric(t *testing.T) {
 	processor := &ProcessorCSVDecoder{
 		SourceKey: "content",
 		SplitSep:  ",",

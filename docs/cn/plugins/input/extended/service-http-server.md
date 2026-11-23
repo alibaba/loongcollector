@@ -26,7 +26,7 @@
 | 参数                 | 类型                | 是否必选 | 说明                                                                                                                                                                                                                     |
 |--------------------|-------------------|------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | Type               | string            | 是    | 插件类型，固定为`service_http_server`                                                                                                                                                                                          |
-| Format             | string            | 否    | <p>数据格式。</p> <p>支持格式：`sls`、`prometheus`、`influxdb`、`otlp_logv1`、 `otlp_metricv1`、`pyroscope`、`statsd`</p>  <p>v2版本支持格式:`raw`、`prometheus`、`otlp_logv1`、`otlp_metricv1`、`otlp_tracev1`</p><p>说明：`raw`格式以原始请求字节流传输数据</p> |
+| Format | string | 否 | 支持 `sls`、`prometheus`、`influxdb`、`otlp_logv1`、`otlp_metricv1`、`otlp_tracev1`、`pyroscope`、`statsd` 和 `raw`。`raw` 提交原始字节事件，`sls` 保留日志时间、内容、来源及组标签。 |
 | Address            | string            | 否    | <p>监听地址。</p><p></p>                                                                                                                                                                                                    |
 | Path               | string            | 否    | <p>接收端点, 如Format 为 `otlp_logv1` 时, 默认端点为`/v1/logs` 。</p><p></p>                                                                                                                                                        |
 | ReadTimeoutSec     | string            | 否    | <p>读取超时时间。</p><p>默认取值为:`10s`。</p>                                                                                                                                                                                      |
@@ -34,12 +34,12 @@
 | MaxBodySize        | string            | 否    | <p>最大传输 body 大小。</p><p>默认取值为:`64k`。</p>                                                                                                                                                                                |
 | UnlinkUnixSock     | string            | 否    | <p>启动前如果监听地址为unix socket，是否进行强制释放。</p><p>默认取值为:`true`。</p>                                                                                                                                                             |
 | FieldsExtend       | bool           | 否    | <p>是否支持非integer以外的数据类型(如String)</p><p>目前仅针对有 String、Bool 等额外类型的 influxdb Format 有效</p>                                                                                                                                 |
-| QueryParams        | []string          | 否    | 需要解析到Group.Metadata中的请求参数。<p>解析结果会以KeyValue放入Metadata。默认取值为`[]`，即不解析。</p><p>仅v2版本有效</p>                                                                                                                                |
-| QueryParamPrefix   | string            | 否    | 解析请求参数时需要添加的key前缀，如`_query_param_`。<p>前缀会直接拼接在每个QueryParam前，无额外连接符，默认取值为空，即不增加前缀。</p><p>仅v2版本有效</p>                                                                                                                    |
-| HeaderParams       | []string          | 否    | 需要解析到Group.Metadata中的header参数。<p>解析结果会以KeyValue放入Metadata。默认取值为`[]`，即不解析。</p><p>仅v2版本有效</p>                                                                                                                            |
-| HeaderParamPrefix  | string            | 否    | 解析Header参数时需要添加的key前缀，如`_header_param_`。<p>前缀会直接拼接在每个HeaderParam前，无额外连接符，默认取值为空，即不增加前缀。</p><p>仅v2版本有效</p>                                                                                                              |
-| DisableUncompress  | bool           | 否    | 禁用对于请求数据的解压缩, 默认取值为:`false`<p>目前仅针对Raw Format有效</p><p>仅v2版本有效</p>                                                                                                                                                      |
-| Tags               | map[string]string | 否    | 输出数据默认携带标签<p>仅v1版本有效</p>                                                                                                                                                                                               |
+| QueryParams        | []string          | 否    | 需要解析到Group.Metadata中的请求参数。<p>解析结果会以KeyValue放入Metadata。默认取值为`[]`，即不解析。</p>                                                                                                                                |
+| QueryParamPrefix   | string            | 否    | 解析请求参数时需要添加的key前缀，如`_query_param_`。<p>前缀会直接拼接在每个QueryParam前，无额外连接符，默认取值为空，即不增加前缀。</p>                                                                                                                    |
+| HeaderParams       | []string          | 否    | 需要解析到Group.Metadata中的header参数。<p>解析结果会以KeyValue放入Metadata。默认取值为`[]`，即不解析。</p>                                                                                                                            |
+| HeaderParamPrefix  | string            | 否    | 解析Header参数时需要添加的key前缀，如`_header_param_`。<p>前缀会直接拼接在每个HeaderParam前，无额外连接符，默认取值为空，即不增加前缀。</p>                                                                                                              |
+| DisableUncompress  | bool           | 否    | 禁用对于请求数据的解压缩, 默认取值为:`false`<p>目前仅针对Raw Format有效</p>                                                                                                                                                      |
+| Tags | map[string]string | 否 | `pyroscope` 格式的附加标签。 |
 | DumpData           | bool           | 否    | [开发使用] 将接收的请求存储于本地文件, 默认取值为:`false`                                                                                                                                                                                    |
 | DumpDataKeepFiles  | int               | 否    | [开发使用] Dump文件保留文件数目, 文件按小时滚动, 此参数默认值为5, 表示保留5小时Dump 参数                                                                                                                                                                 |
 | AllowUnsafeMode    | bool           | 否    | 是否允许unsafe模式的Decode，启用该模式，Decoder将可能利用go unsafe技术来加速解码，目前仅当Format=prometheus时有效(注：暂不支持Exemplar、Histogram)                                                                                                              |
@@ -130,16 +130,13 @@ opentelemetry-java-sdk构造数据，基于[ExampleConfiguration.java](https://g
 }
 ```
 
-### 接收 OTLP Logs/Metrics/Traces (v2)
-
-注意：目前v2 pipeline尚不支持otlp logs请求，会丢弃数据。
+### 接收 OTLP 日志、指标和链路
 
 * 采集配置
 
 ```yaml
 
 enable: true
-version: v2
 inputs:
   - Type: service_http_server
     Format: "otlp_logv1"
@@ -161,7 +158,6 @@ flushers:
 
 ```yaml
 enable: true
-version: v2
 inputs:
   - Type: service_http_server
     Format: "raw"

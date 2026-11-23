@@ -19,6 +19,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alibaba/ilogtail/plugins/processor/internal/processortest"
+
 	"github.com/dlclark/regexp2"
 	. "github.com/smartystreets/goconvey/convey"
 	"github.com/stretchr/testify/assert"
@@ -26,8 +28,7 @@ import (
 
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/models"
-	"github.com/alibaba/ilogtail/pkg/protocol"
-	"github.com/alibaba/ilogtail/plugins/test"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
 )
 
@@ -123,6 +124,7 @@ func TestProcessorGrokInit(t *testing.T) {
 func TestProcessorGrokParse(t *testing.T) {
 	Convey("Test parse logs with one Grok Pattern in Match", t, func() {
 		processor, err := newProcessor()
+		processor.KeepSource = true
 		So(err, ShouldBeNil)
 		processor.Match = []string{
 			"%{WORD:word1} %{NUMBER:request_time} %{WORD:word2}",
@@ -132,38 +134,32 @@ func TestProcessorGrokParse(t *testing.T) {
 
 		Convey("A single log which is in english.", func() {
 			record := "begin 123.456 end"
-			log := &protocol.Log{Time: 0}
-			log.Contents = append(log.Contents, &protocol.Log_Content{Key: "content", Value: record})
-			res := processor.processGrok(log, &record)
-
-			So(res, ShouldEqual, matchSuccess)
-			So(len(log.Contents), ShouldEqual, 4)
-			So(log.Contents[1].Value, ShouldEqual, "begin")
-			So(log.Contents[2].Value, ShouldEqual, "123.456")
-			So(log.Contents[3].Value, ShouldEqual, "end")
+			log := processortest.Log()
+			log.Contents.Add("content", record)
+			processortest.Apply(processor, log)
+			So(log.Contents.Len(), ShouldEqual, 4)
+			So(log.Contents.Get("word1"), ShouldEqual, "begin")
+			So(log.Contents.Get("request_time"), ShouldEqual, "123.456")
+			So(log.Contents.Get("word2"), ShouldEqual, "end")
 		})
 
 		Convey("A single log which is empty.", func() {
 			record := ""
-			log := &protocol.Log{Time: 0}
-			log.Contents = append(log.Contents, &protocol.Log_Content{Key: "content", Value: record})
-			res := processor.processGrok(log, &record)
-
-			So(res, ShouldEqual, matchFail)
-			So(len(log.Contents), ShouldEqual, 1)
+			log := processortest.Log()
+			log.Contents.Add("content", record)
+			processortest.Apply(processor, log)
+			So(log.Contents.Len(), ShouldEqual, 1)
 		})
 
 		Convey("A single log which has escape character.", func() {
 			record := "begin 123.456 end\n"
-			log := &protocol.Log{Time: 0}
-			log.Contents = append(log.Contents, &protocol.Log_Content{Key: "content", Value: record})
-			res := processor.processGrok(log, &record)
-
-			So(res, ShouldEqual, matchSuccess)
-			So(len(log.Contents), ShouldEqual, 4)
-			So(log.Contents[1].Value, ShouldEqual, "begin")
-			So(log.Contents[2].Value, ShouldEqual, "123.456")
-			So(log.Contents[3].Value, ShouldEqual, "end")
+			log := processortest.Log()
+			log.Contents.Add("content", record)
+			processortest.Apply(processor, log)
+			So(log.Contents.Len(), ShouldEqual, 4)
+			So(log.Contents.Get("word1"), ShouldEqual, "begin")
+			So(log.Contents.Get("request_time"), ShouldEqual, "123.456")
+			So(log.Contents.Get("word2"), ShouldEqual, "end")
 		})
 
 		processor.Match = []string{
@@ -173,14 +169,12 @@ func TestProcessorGrokParse(t *testing.T) {
 		So(err, ShouldBeNil)
 		Convey("A single log which has special character.", func() {
 			record := "hello こんにちは"
-			log := &protocol.Log{Time: 0}
-			log.Contents = append(log.Contents, &protocol.Log_Content{Key: "content", Value: record})
-			res := processor.processGrok(log, &record)
-
-			So(res, ShouldEqual, matchSuccess)
-			So(len(log.Contents), ShouldEqual, 3)
-			So(log.Contents[1].Value, ShouldEqual, "hello")
-			So(log.Contents[2].Value, ShouldEqual, "こんにちは")
+			log := processortest.Log()
+			log.Contents.Add("content", record)
+			processortest.Apply(processor, log)
+			So(log.Contents.Len(), ShouldEqual, 3)
+			So(log.Contents.Get("english-word"), ShouldEqual, "hello")
+			So(log.Contents.Get("message"), ShouldEqual, "こんにちは")
 		})
 
 		processor.Match = []string{
@@ -190,15 +184,13 @@ func TestProcessorGrokParse(t *testing.T) {
 		So(err, ShouldBeNil)
 		Convey("Grok Pattern with grok expression and regex expression.", func() {
 			record := "hello こんにちは 你好"
-			log := &protocol.Log{Time: 0}
-			log.Contents = append(log.Contents, &protocol.Log_Content{Key: "content", Value: record})
-			res := processor.processGrok(log, &record)
-
-			So(res, ShouldEqual, matchSuccess)
-			So(len(log.Contents), ShouldEqual, 4)
-			So(log.Contents[1].Value, ShouldEqual, "hello")
-			So(log.Contents[2].Value, ShouldEqual, "こんにちは")
-			So(log.Contents[3].Value, ShouldEqual, "你好")
+			log := processortest.Log()
+			log.Contents.Add("content", record)
+			processortest.Apply(processor, log)
+			So(log.Contents.Len(), ShouldEqual, 4)
+			So(log.Contents.Get("english-word"), ShouldEqual, "hello")
+			So(log.Contents.Get("message"), ShouldEqual, "こんにちは")
+			So(log.Contents.Get("message2"), ShouldEqual, "你好")
 		})
 
 		processor.Match = []string{
@@ -211,21 +203,19 @@ func TestProcessorGrokParse(t *testing.T) {
 java.lang.Thread.State: BLOCKED (on object monitor)
 			 at com.nbp.theplatform.threaddump.ThreadBlockedState.monitorLock(ThreadBlockedState.java:43)
 			 - waiting to lock <0x0000000780a000b0> (a com.nbp.theplatform.threaddump.ThreadBlockedState)`
-			log := &protocol.Log{Time: 0}
-			log.Contents = append(log.Contents, &protocol.Log_Content{Key: "content", Value: record})
-			res := processor.processGrok(log, &record)
-
-			So(res, ShouldEqual, matchSuccess)
-			So(len(log.Contents), ShouldEqual, 10)
-			So(log.Contents[1].Value, ShouldEqual, "2023-02-09T00:24:43.922554223+08:00")
-			So(log.Contents[2].Value, ShouldEqual, "1")
-			So(log.Contents[3].Value, ShouldEqual, "\"BLOCKED_TEST pool-1-thread-2\"")
-			So(log.Contents[4].Value, ShouldEqual, "6")
-			So(log.Contents[5].Value, ShouldEqual, "0x0000000007673800")
-			So(log.Contents[6].Value, ShouldEqual, "0x260c")
-			So(log.Contents[7].Value, ShouldEqual, "waiting for monitor entry")
-			So(log.Contents[8].Value, ShouldEqual, "0x0000000008abf000")
-			So(log.Contents[9].Value, ShouldEqual, `java.lang.Thread.State: BLOCKED (on object monitor)
+			log := processortest.Log()
+			log.Contents.Add("content", record)
+			processortest.Apply(processor, log)
+			So(log.Contents.Len(), ShouldEqual, 10)
+			So(log.Contents.Get("time_local"), ShouldEqual, "2023-02-09T00:24:43.922554223+08:00")
+			So(log.Contents.Get("pid"), ShouldEqual, "1")
+			So(log.Contents.Get("thread"), ShouldEqual, "\"BLOCKED_TEST pool-1-thread-2\"")
+			So(log.Contents.Get("prio"), ShouldEqual, "6")
+			So(log.Contents.Get("tid"), ShouldEqual, "0x0000000007673800")
+			So(log.Contents.Get("nid"), ShouldEqual, "0x260c")
+			So(log.Contents.Get("func"), ShouldEqual, "waiting for monitor entry")
+			So(log.Contents.Get("addr"), ShouldEqual, "0x0000000008abf000")
+			So(log.Contents.Get("stack"), ShouldEqual, `java.lang.Thread.State: BLOCKED (on object monitor)
 			 at com.nbp.theplatform.threaddump.ThreadBlockedState.monitorLock(ThreadBlockedState.java:43)
 			 - waiting to lock <0x0000000780a000b0> (a com.nbp.theplatform.threaddump.ThreadBlockedState)`)
 		})
@@ -247,77 +237,65 @@ java.lang.Thread.State: BLOCKED (on object monitor)
 
 		Convey("Parse logs with multiple Grok Patterns.", func() {
 			log1 := `begin 123.456 end`
-			logPb1 := test.CreateLogs("content", log1)
+			logEvent1 := processortest.Log("content", log1)
 			log2 := `2019 June 24 "I am iron man"`
-			logPb2 := test.CreateLogs("content", log2)
+			logEvent2 := processortest.Log("content", log2)
 			log3 := `WRONG LOG`
-			logPb3 := test.CreateLogs("content", log3)
+			logEvent3 := processortest.Log("content", log3)
 			log4 := `10.0.0.0 GET /index.html 15824 0.043`
-			logPb4 := test.CreateLogs("content", log4)
-			logArray := make([]*protocol.Log, 4)
-			logArray[0] = logPb1
-			logArray[1] = logPb2
-			logArray[2] = logPb3
-			logArray[3] = logPb4
+			logEvent4 := processortest.Log("content", log4)
+			logArray := make([]*models.Log, 4)
+			logArray[0] = logEvent1
+			logArray[1] = logEvent2
+			logArray[2] = logEvent3
+			logArray[3] = logEvent4
 
-			outLogs := processor.ProcessLogs(logArray)
+			outLogs := processortest.Apply(processor, logArray...)
 
 			So(len(outLogs), ShouldEqual, 4)
 
-			So(len(outLogs[0].Contents), ShouldEqual, 4)
-			So(outLogs[0].Contents[1].GetKey(), ShouldEqual, "word1")
-			So(outLogs[0].Contents[1].GetValue(), ShouldEqual, "begin")
-			So(outLogs[0].Contents[2].GetKey(), ShouldEqual, "request_time")
-			So(outLogs[0].Contents[2].GetValue(), ShouldEqual, "123.456")
-			So(outLogs[0].Contents[3].GetKey(), ShouldEqual, "word2")
-			So(outLogs[0].Contents[3].GetValue(), ShouldEqual, "end")
+			So(outLogs[0].Contents.Len(), ShouldEqual, 4)
+			So(pipeline.GetStringValue(outLogs[0].Contents.Get("word1")), ShouldEqual, "begin")
+			So(pipeline.GetStringValue(outLogs[0].Contents.Get("request_time")), ShouldEqual, "123.456")
+			So(pipeline.GetStringValue(outLogs[0].Contents.Get("word2")), ShouldEqual, "end")
 
-			So(len(outLogs[1].Contents), ShouldEqual, 5)
-			So(outLogs[1].Contents[1].GetKey(), ShouldEqual, "year")
-			So(outLogs[1].Contents[1].GetValue(), ShouldEqual, "2019")
-			So(outLogs[1].Contents[2].GetKey(), ShouldEqual, "month")
-			So(outLogs[1].Contents[2].GetValue(), ShouldEqual, "June")
-			So(outLogs[1].Contents[3].GetKey(), ShouldEqual, "day")
-			So(outLogs[1].Contents[3].GetValue(), ShouldEqual, "24")
-			So(outLogs[1].Contents[4].GetKey(), ShouldEqual, "motto")
-			So(outLogs[1].Contents[4].GetValue(), ShouldEqual, "\"I am iron man\"")
+			So(outLogs[1].Contents.Len(), ShouldEqual, 5)
+			So(pipeline.GetStringValue(outLogs[1].Contents.Get("year")), ShouldEqual, "2019")
+			So(pipeline.GetStringValue(outLogs[1].Contents.Get("month")), ShouldEqual, "June")
+			So(pipeline.GetStringValue(outLogs[1].Contents.Get("day")), ShouldEqual, "24")
+			So(pipeline.GetStringValue(outLogs[1].Contents.Get("motto")), ShouldEqual, "\"I am iron man\"")
 
-			So(len(outLogs[2].Contents), ShouldEqual, 1)
+			So(outLogs[2].Contents.Len(), ShouldEqual, 1)
 
-			So(len(outLogs[3].Contents), ShouldEqual, 6)
-			So(outLogs[3].Contents[1].GetKey(), ShouldEqual, "client")
-			So(outLogs[3].Contents[1].GetValue(), ShouldEqual, "10.0.0.0")
-			So(outLogs[3].Contents[2].GetKey(), ShouldEqual, "method")
-			So(outLogs[3].Contents[2].GetValue(), ShouldEqual, "GET")
-			So(outLogs[3].Contents[3].GetKey(), ShouldEqual, "request")
-			So(outLogs[3].Contents[3].GetValue(), ShouldEqual, "/index.html")
-			So(outLogs[3].Contents[4].GetKey(), ShouldEqual, "bytes")
-			So(outLogs[3].Contents[4].GetValue(), ShouldEqual, "15824")
-			So(outLogs[3].Contents[5].GetKey(), ShouldEqual, "duration")
-			So(outLogs[3].Contents[5].GetValue(), ShouldEqual, "0.043")
+			So(outLogs[3].Contents.Len(), ShouldEqual, 6)
+			So(pipeline.GetStringValue(outLogs[3].Contents.Get("client")), ShouldEqual, "10.0.0.0")
+			So(pipeline.GetStringValue(outLogs[3].Contents.Get("method")), ShouldEqual, "GET")
+			So(pipeline.GetStringValue(outLogs[3].Contents.Get("request")), ShouldEqual, "/index.html")
+			So(pipeline.GetStringValue(outLogs[3].Contents.Get("bytes")), ShouldEqual, "15824")
+			So(pipeline.GetStringValue(outLogs[3].Contents.Get("duration")), ShouldEqual, "0.043")
 		})
 
 		Convey("Test IgnoreParseFailure.", func() {
 			processor.IgnoreParseFailure = false
 			log1 := `begin 123.456 end`
-			logPb1 := test.CreateLogs("content", log1)
+			logEvent1 := processortest.Log("content", log1)
 			log2 := `2019 June 24 "I am iron man"`
-			logPb2 := test.CreateLogs("content", log2)
+			logEvent2 := processortest.Log("content", log2)
 			log3 := `WRONG LOG`
-			logPb3 := test.CreateLogs("content", log3)
+			logEvent3 := processortest.Log("content", log3)
 			log4 := `10.0.0.0 GET /index.html 15824 0.043`
-			logPb4 := test.CreateLogs("content", log4)
-			logArray := make([]*protocol.Log, 4)
-			logArray[0] = logPb1
-			logArray[1] = logPb2
-			logArray[2] = logPb3
-			logArray[3] = logPb4
+			logEvent4 := processortest.Log("content", log4)
+			logArray := make([]*models.Log, 4)
+			logArray[0] = logEvent1
+			logArray[1] = logEvent2
+			logArray[2] = logEvent3
+			logArray[3] = logEvent4
 
-			outLogs := processor.ProcessLogs(logArray)
+			outLogs := processortest.Apply(processor, logArray...)
 
 			So(len(outLogs), ShouldEqual, 4)
 
-			So(len(outLogs[2].Contents), ShouldEqual, 0)
+			So(outLogs[2].Contents.Len(), ShouldEqual, 0)
 		})
 
 		Convey("Test KeepSource.", func() {
@@ -325,54 +303,42 @@ java.lang.Thread.State: BLOCKED (on object monitor)
 			processor.KeepSource = false
 
 			log1 := `begin 123.456 end`
-			logPb1 := test.CreateLogs("content", log1)
+			logEvent1 := processortest.Log("content", log1)
 			log2 := `2019 June 24 "I am iron man"`
-			logPb2 := test.CreateLogs("content", log2)
+			logEvent2 := processortest.Log("content", log2)
 			log3 := `WRONG LOG`
-			logPb3 := test.CreateLogs("content", log3)
+			logEvent3 := processortest.Log("content", log3)
 			log4 := `10.0.0.0 GET /index.html 15824 0.043`
-			logPb4 := test.CreateLogs("content", log4)
-			logArray := make([]*protocol.Log, 4)
-			logArray[0] = logPb1
-			logArray[1] = logPb2
-			logArray[2] = logPb3
-			logArray[3] = logPb4
+			logEvent4 := processortest.Log("content", log4)
+			logArray := make([]*models.Log, 4)
+			logArray[0] = logEvent1
+			logArray[1] = logEvent2
+			logArray[2] = logEvent3
+			logArray[3] = logEvent4
 
-			outLogs := processor.ProcessLogs(logArray)
+			outLogs := processortest.Apply(processor, logArray...)
 
 			So(len(outLogs), ShouldEqual, 4)
 
-			So(len(outLogs[0].Contents), ShouldEqual, 3)
-			So(outLogs[0].Contents[0].GetKey(), ShouldEqual, "word1")
-			So(outLogs[0].Contents[0].GetValue(), ShouldEqual, "begin")
-			So(outLogs[0].Contents[1].GetKey(), ShouldEqual, "request_time")
-			So(outLogs[0].Contents[1].GetValue(), ShouldEqual, "123.456")
-			So(outLogs[0].Contents[2].GetKey(), ShouldEqual, "word2")
-			So(outLogs[0].Contents[2].GetValue(), ShouldEqual, "end")
+			So(outLogs[0].Contents.Len(), ShouldEqual, 3)
+			So(pipeline.GetStringValue(outLogs[0].Contents.Get("word1")), ShouldEqual, "begin")
+			So(pipeline.GetStringValue(outLogs[0].Contents.Get("request_time")), ShouldEqual, "123.456")
+			So(pipeline.GetStringValue(outLogs[0].Contents.Get("word2")), ShouldEqual, "end")
 
-			So(len(outLogs[1].Contents), ShouldEqual, 4)
-			So(outLogs[1].Contents[0].GetKey(), ShouldEqual, "year")
-			So(outLogs[1].Contents[0].GetValue(), ShouldEqual, "2019")
-			So(outLogs[1].Contents[1].GetKey(), ShouldEqual, "month")
-			So(outLogs[1].Contents[1].GetValue(), ShouldEqual, "June")
-			So(outLogs[1].Contents[2].GetKey(), ShouldEqual, "day")
-			So(outLogs[1].Contents[2].GetValue(), ShouldEqual, "24")
-			So(outLogs[1].Contents[3].GetKey(), ShouldEqual, "motto")
-			So(outLogs[1].Contents[3].GetValue(), ShouldEqual, "\"I am iron man\"")
+			So(outLogs[1].Contents.Len(), ShouldEqual, 4)
+			So(pipeline.GetStringValue(outLogs[1].Contents.Get("year")), ShouldEqual, "2019")
+			So(pipeline.GetStringValue(outLogs[1].Contents.Get("month")), ShouldEqual, "June")
+			So(pipeline.GetStringValue(outLogs[1].Contents.Get("day")), ShouldEqual, "24")
+			So(pipeline.GetStringValue(outLogs[1].Contents.Get("motto")), ShouldEqual, "\"I am iron man\"")
 
-			So(len(outLogs[2].Contents), ShouldEqual, 1)
+			So(outLogs[2].Contents.Len(), ShouldEqual, 1)
 
-			So(len(outLogs[3].Contents), ShouldEqual, 5)
-			So(outLogs[3].Contents[0].GetKey(), ShouldEqual, "client")
-			So(outLogs[3].Contents[0].GetValue(), ShouldEqual, "10.0.0.0")
-			So(outLogs[3].Contents[1].GetKey(), ShouldEqual, "method")
-			So(outLogs[3].Contents[1].GetValue(), ShouldEqual, "GET")
-			So(outLogs[3].Contents[2].GetKey(), ShouldEqual, "request")
-			So(outLogs[3].Contents[2].GetValue(), ShouldEqual, "/index.html")
-			So(outLogs[3].Contents[3].GetKey(), ShouldEqual, "bytes")
-			So(outLogs[3].Contents[3].GetValue(), ShouldEqual, "15824")
-			So(outLogs[3].Contents[4].GetKey(), ShouldEqual, "duration")
-			So(outLogs[3].Contents[4].GetValue(), ShouldEqual, "0.043")
+			So(outLogs[3].Contents.Len(), ShouldEqual, 5)
+			So(pipeline.GetStringValue(outLogs[3].Contents.Get("client")), ShouldEqual, "10.0.0.0")
+			So(pipeline.GetStringValue(outLogs[3].Contents.Get("method")), ShouldEqual, "GET")
+			So(pipeline.GetStringValue(outLogs[3].Contents.Get("request")), ShouldEqual, "/index.html")
+			So(pipeline.GetStringValue(outLogs[3].Contents.Get("bytes")), ShouldEqual, "15824")
+			So(pipeline.GetStringValue(outLogs[3].Contents.Get("duration")), ShouldEqual, "0.043")
 		})
 	})
 }
@@ -421,10 +387,10 @@ func TestGrokWarnZeroWidthPattern(t *testing.T) {
 		So(err, ShouldBeNil)
 
 		// The processor should still work despite zero-width pattern
-		log := &protocol.Log{Time: 0}
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "content", Value: ""})
-		logs := []*protocol.Log{log}
-		out := p.ProcessLogs(logs)
+		log := processortest.Log()
+		log.Contents.Add("content", "")
+		logs := []*models.Log{log}
+		out := processortest.Apply(p, logs...)
 		So(len(out), ShouldEqual, 1)
 	})
 }
@@ -441,11 +407,8 @@ func TestGrokTotalTimeoutBudget(t *testing.T) {
 
 		// Input that triggers catastrophic backtracking - many 'a's but no 'b'
 		record := strings.Repeat("a", 10000) + "c"
-		log := &protocol.Log{Time: 0}
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "content", Value: record})
-
 		start := time.Now()
-		result := p.processGrok(log, &record)
+		_, _, result := p.matchGrok(record)
 		elapsed := time.Since(start)
 
 		// Should timeout and return matchTimeOut
@@ -475,9 +438,7 @@ func TestGrokTimeoutDefaults(t *testing.T) {
 	})
 }
 
-// ---- v2 (PipelineEvent / SendPb) Process path tests ----
-
-func newV2Processor(t *testing.T) *ProcessorGrok {
+func newEventProcessor(t *testing.T) *ProcessorGrok {
 	processor := &ProcessorGrok{
 		CustomPatternDir:    []string{},
 		CustomPatterns:      map[string]string{},
@@ -494,10 +455,10 @@ func newV2Processor(t *testing.T) *ProcessorGrok {
 	return processor
 }
 
-// TestProcessorGrok_ProcessV2Parse verifies the v2 Process path extracts the
+// TestProcessorGrok_ProcessParse verifies that Process extracts the
 // grok-matched fields into new keys and keeps the source (KeepSource=true).
-func TestProcessorGrok_ProcessV2Parse(t *testing.T) {
-	processor := newV2Processor(t)
+func TestProcessorGrok_ProcessParse(t *testing.T) {
+	processor := newEventProcessor(t)
 
 	log := models.NewLog("", nil, "", "", "", models.NewTags(), 0)
 	log.GetIndices().Add("content", "begin 123.456 end")
@@ -512,10 +473,10 @@ func TestProcessorGrok_ProcessV2Parse(t *testing.T) {
 	assert.Equal(t, "begin 123.456 end", contents.Get("content"), "source kept when KeepSource is true")
 }
 
-// TestProcessorGrok_ProcessV2KeepSourceFalse verifies the source field is
+// TestProcessorGrok_ProcessKeepSourceFalse verifies the source field is
 // dropped on a successful match when KeepSource is false.
-func TestProcessorGrok_ProcessV2KeepSourceFalse(t *testing.T) {
-	processor := newV2Processor(t)
+func TestProcessorGrok_ProcessKeepSourceFalse(t *testing.T) {
+	processor := newEventProcessor(t)
 	processor.KeepSource = false
 
 	log := models.NewLog("", nil, "", "", "", models.NewTags(), 0)
@@ -529,10 +490,10 @@ func TestProcessorGrok_ProcessV2KeepSourceFalse(t *testing.T) {
 	assert.Equal(t, "begin", contents.Get("word1"))
 }
 
-// TestProcessorGrok_ProcessV2NoMatchKeepsSource verifies that on a parse
+// TestProcessorGrok_ProcessNoMatchKeepsSource verifies that on a parse
 // failure the source is kept (IgnoreParseFailure) and no fields are extracted.
-func TestProcessorGrok_ProcessV2NoMatchKeepsSource(t *testing.T) {
-	processor := newV2Processor(t)
+func TestProcessorGrok_ProcessNoMatchKeepsSource(t *testing.T) {
+	processor := newEventProcessor(t)
 	processor.KeepSource = false
 	processor.IgnoreParseFailure = true
 
@@ -547,10 +508,10 @@ func TestProcessorGrok_ProcessV2NoMatchKeepsSource(t *testing.T) {
 	assert.False(t, contents.Contains("word1"), "no fields extracted on no-match")
 }
 
-// TestProcessorGrok_ProcessV2PassesThroughMetric verifies a Metric event is
+// TestProcessorGrok_ProcessPassesThroughMetric verifies a Metric event is
 // emitted unchanged (not dropped) by the log-only processor.
-func TestProcessorGrok_ProcessV2PassesThroughMetric(t *testing.T) {
-	processor := newV2Processor(t)
+func TestProcessorGrok_ProcessPassesThroughMetric(t *testing.T) {
+	processor := newEventProcessor(t)
 
 	metric := models.NewSingleValueMetric("m", models.MetricTypeGauge, models.NewTags(), 0, 1.0)
 	context := helper.NewObservePipelineContext(10)

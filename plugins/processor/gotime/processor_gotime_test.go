@@ -19,13 +19,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alibaba/ilogtail/plugins/processor/internal/processortest"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
-	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
 )
 
@@ -55,25 +57,24 @@ func TestSourceKey(t *testing.T) {
 	processor, err := newProcessor()
 	require.NoError(t, err)
 
-	log := &protocol.Log{Time: 0}
+	log := processortest.Log()
 	timeStr := "2019-07-05 19:28:01"
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "s_key", Value: timeStr})
-	processor.processLog(log)
-	assert.Equal(t, "d_key", log.Contents[1].Key)
-	assert.Equal(t, "2019/07/05 20:28:01", log.Contents[1].Value)
+	log.Contents.Add("s_key", timeStr)
+	processortest.Apply(processor, log)
+	assert.Equal(t, "2019/07/05 20:28:01", pipeline.GetStringValue(log.Contents.Get("d_key")))
 }
 
 func TestSetTime(t *testing.T) {
 	processor, err := newProcessor()
 	require.NoError(t, err)
-	log := &protocol.Log{Time: 0}
+	log := processortest.Log()
 	timeStr := "2019-07-05 19:28:01"
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "s_key", Value: timeStr})
-	processor.processLog(log)
+	log.Contents.Add("s_key", timeStr)
+	processortest.Apply(processor, log)
 	destLocation := time.FixedZone("SpecifiedTimezone", 9*60*60)
 	time1, _ := time.ParseInLocation("2006-01-02 15:04:05", "2019-07-05 20:28:01", destLocation)
-	unixTime1 := uint32(time1.Unix())
-	assert.Equal(t, unixTime1, log.Time)
+	unixTime1 := uint64(time1.UnixNano())
+	assert.Equal(t, unixTime1, log.GetTimestamp())
 }
 
 func TestKeepSource(t *testing.T) {
@@ -83,11 +84,11 @@ func TestKeepSource(t *testing.T) {
 	}
 	processor.KeepSource = false
 	require.NoError(t, err)
-	log := &protocol.Log{Time: 0}
+	log := processortest.Log()
 	timeStr := "2019-07-05 19:28:01"
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "s_key", Value: timeStr})
-	processor.processLog(log)
-	assert.Equal(t, "d_key", log.Contents[0].Key)
+	log.Contents.Add("s_key", timeStr)
+	processortest.Apply(processor, log)
+
 }
 
 func TestNoKeyError(t *testing.T) {
@@ -95,8 +96,8 @@ func TestNoKeyError(t *testing.T) {
 	processor, err := newProcessor()
 	require.NoError(t, err)
 
-	log := &protocol.Log{Time: 0}
-	processor.processLog(log)
+	log := processortest.Log()
+	processortest.Apply(processor, log)
 	memoryLog, ok := logger.ReadMemoryLog(1)
 	assert.True(t, ok)
 	assert.True(t, strings.Contains(memoryLog, "GOTIME_FIND_ALARM\tcannot find key s_key"))
@@ -106,10 +107,10 @@ func TestAlarmIfFail(t *testing.T) {
 	logger.ClearMemoryLog()
 	processor, err := newProcessor()
 	require.NoError(t, err)
-	log := &protocol.Log{Time: 0}
+	log := processortest.Log()
 	timeStr := "2019-07-05-19:28:01"
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "s_key", Value: timeStr})
-	processor.processLog(log)
+	log.Contents.Add("s_key", timeStr)
+	processortest.Apply(processor, log)
 	memoryLog, ok := logger.ReadMemoryLog(1)
 	assert.True(t, ok)
 	assert.True(t, strings.Contains(memoryLog, "GOTIME_PARSE_ALARM\tParseInLocation(2006-01-02 15:04:05, 2019-07-05-19:28:01, SpecifiedTimezone) "+
@@ -120,15 +121,14 @@ func TestSourceFormatTimestampSeconds(t *testing.T) {
 	processor, err := newProcessor()
 	require.NoError(t, err)
 
-	log := &protocol.Log{Time: 0}
+	log := processortest.Log()
 	unixStr := "1645595256"
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "s_key", Value: unixStr})
+	log.Contents.Add("s_key", unixStr)
 	processor.SourceFormat = fixedSecondsTimestampPattern
 	_ = processor.Init(processor.context)
 
-	processor.processLog(log)
-	assert.Equal(t, "d_key", log.Contents[1].Key)
-	assert.Equal(t, "2022/02/23 14:47:36", log.Contents[1].Value)
+	processortest.Apply(processor, log)
+	assert.Equal(t, "2022/02/23 14:47:36", pipeline.GetStringValue(log.Contents.Get("d_key")))
 }
 
 func TestSourceFormatTimestampMilliseconds(t *testing.T) {
@@ -138,43 +138,40 @@ func TestSourceFormatTimestampMilliseconds(t *testing.T) {
 	processor.DestFormat = "2006/01/02 15:04:05.000"
 	_ = processor.Init(processor.context)
 
-	log := &protocol.Log{Time: 0}
+	log := processortest.Log()
 	unixStr := "1645595256807"
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "s_key", Value: unixStr})
+	log.Contents.Add("s_key", unixStr)
 
-	processor.processLog(log)
-	assert.Equal(t, "d_key", log.Contents[1].Key)
-	assert.Equal(t, "2022/02/23 14:47:36.807", log.Contents[1].Value)
+	processortest.Apply(processor, log)
+	assert.Equal(t, "2022/02/23 14:47:36.807", pipeline.GetStringValue(log.Contents.Get("d_key")))
 }
 
 func TestSourceFormatTimestampMicroseconds(t *testing.T) {
 	processor, err := newProcessor()
 	require.NoError(t, err)
 
-	log := &protocol.Log{Time: 0}
+	log := processortest.Log()
 	unixStr := "1645595256807000"
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "s_key", Value: unixStr})
+	log.Contents.Add("s_key", unixStr)
 	processor.SourceFormat = fixedMicrosecondsTimestampPattern
 	processor.DestFormat = "2006/01/02 15:04:05.000000"
 	_ = processor.Init(processor.context)
-	processor.processLog(log)
-	assert.Equal(t, "d_key", log.Contents[1].Key)
-	assert.Equal(t, "2022/02/23 14:47:36.807000", log.Contents[1].Value)
+	processortest.Apply(processor, log)
+	assert.Equal(t, "2022/02/23 14:47:36.807000", pipeline.GetStringValue(log.Contents.Get("d_key")))
 }
 
 func TestSourceFormatTimestampNanoseconds(t *testing.T) {
 	processor, err := newProcessor()
 	require.NoError(t, err)
 
-	log := &protocol.Log{Time: 0}
+	log := processortest.Log()
 	unixStr := "1645595256807000123"
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "s_key", Value: unixStr})
+	log.Contents.Add("s_key", unixStr)
 	processor.SourceFormat = fixedNanosecondsTimestampPattern
 	processor.DestFormat = "2006/01/02 15:04:05.000000000"
 	_ = processor.Init(processor.context)
-	processor.processLog(log)
-	assert.Equal(t, "d_key", log.Contents[1].Key)
-	assert.Equal(t, "2022/02/23 14:47:36.807000123", log.Contents[1].Value)
+	processortest.Apply(processor, log)
+	assert.Equal(t, "2022/02/23 14:47:36.807000123", pipeline.GetStringValue(log.Contents.Get("d_key")))
 }
 
 func TestEmptyTimezone(t *testing.T) {
@@ -194,20 +191,17 @@ func TestEmptyTimezone(t *testing.T) {
 	err := processor.Init(ctx)
 	require.NoError(t, err)
 
-	log := &protocol.Log{Time: 0}
+	log := processortest.Log()
 	timeStr := "2019-07-05 19:28:01"
 	localTime, _ := time.ParseInLocation("2006-01-02 15:04:05", timeStr, time.Local)
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "s_key", Value: localTime.Format(processor.SourceFormat)})
-	processor.processLog(log)
+	log.Contents.Add("s_key", localTime.Format(processor.SourceFormat))
+	processortest.Apply(processor, log)
 	destLocation := time.FixedZone("SpecifiedTimezone", 9*60*60)
 	processedTime := localTime.In(destLocation)
-	assert.Equal(t, "d_key", log.Contents[1].Key)
-	assert.Equal(t, processedTime.Format(processor.DestFormat), log.Contents[1].Value)
+	assert.Equal(t, processedTime.Format(processor.DestFormat), pipeline.GetStringValue(log.Contents.Get("d_key")))
 }
 
-// ---- v2 (PipelineEvent / SendPb) Process path tests ----
-
-func TestProcessorGotime_ProcessV2ReformatsDestKey(t *testing.T) {
+func TestProcessorGotime_ProcessReformatsDestKey(t *testing.T) {
 	processor, err := newProcessor()
 	require.NoError(t, err)
 
@@ -226,7 +220,7 @@ func TestProcessorGotime_ProcessV2ReformatsDestKey(t *testing.T) {
 	assert.Equal(t, uint64(expected.Unix())*uint64(time.Second), log.GetTimestamp())
 }
 
-func TestProcessorGotime_ProcessV2KeepSourceFalse(t *testing.T) {
+func TestProcessorGotime_ProcessKeepSourceFalse(t *testing.T) {
 	processor, err := newProcessor()
 	require.NoError(t, err)
 	processor.KeepSource = false
@@ -241,7 +235,7 @@ func TestProcessorGotime_ProcessV2KeepSourceFalse(t *testing.T) {
 	assert.Equal(t, "2019/07/05 20:28:01", log.GetIndices().Get("d_key"))
 }
 
-func TestProcessorGotime_ProcessV2TimestampSeconds(t *testing.T) {
+func TestProcessorGotime_ProcessTimestampSeconds(t *testing.T) {
 	processor, err := newProcessor()
 	require.NoError(t, err)
 	processor.SourceFormat = fixedSecondsTimestampPattern
@@ -256,7 +250,7 @@ func TestProcessorGotime_ProcessV2TimestampSeconds(t *testing.T) {
 	assert.Equal(t, "2022/02/23 14:47:36", log.GetIndices().Get("d_key"))
 }
 
-func TestProcessorGotime_ProcessV2PassesThroughMetric(t *testing.T) {
+func TestProcessorGotime_ProcessPassesThroughMetric(t *testing.T) {
 	processor, err := newProcessor()
 	require.NoError(t, err)
 

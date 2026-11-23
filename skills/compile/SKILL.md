@@ -134,7 +134,7 @@ make e2edocker
 
 ## Native → Go 桥接（PPEG）
 
-Native 批量数据通过 `ProcessPipelineEventGroup` 传入 `PipelineEventGroup` PB，Go runner 由 `ReceivePipelineEventGroup` 接收并处理事件组。Go 的 `flusher_sls` 通过 `SendPipelineEventGroup` 将事件传回 C++，由 C++ Flusher 在 SLS 日志出口序列化为 `LogGroup`。`flusher_grpc` 在发送时将事件组编码为 `protocol.LogGroup`。
+Native 批量数据通过 `ProcessPipelineEventGroup` 传入 `PipelineEventGroup` PB，Go runner 由 `ReceivePipelineEventGroup` 接收并处理事件组。Go 的 `flusher_sls` 通过 `SendPipelineEventGroup` 将事件传回 C++，由 C++ Flusher 在 SLS 日志出口序列化为 `LogGroup`。`flusher_grpc` 使用 `PipelineEventGroupReportService.Collect` 发送事件。
 
 ## 常见问题
 

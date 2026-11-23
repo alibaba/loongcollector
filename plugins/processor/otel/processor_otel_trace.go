@@ -19,22 +19,24 @@ import (
 	"strings"
 
 	"go.opentelemetry.io/collector/pdata/ptrace"
-	v1 "go.opentelemetry.io/proto/otlp/trace/v1"
+	tracecollector "go.opentelemetry.io/proto/otlp/collector/trace/v1"
+	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/protocol/decoder/opentelemetry"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
 type ProcessorOtelTraceParser struct {
-	SourceKey              string
-	Format                 string
-	NoKeyError             bool
-	context                pipeline.Context
+	SourceKey  string
+	Format     string
+	NoKeyError bool
+	context    pipeline.Context
+	// ID decoding is selected by the wire format. These fields are accepted for configuration compatibility.
 	TraceIDNeedDecode      bool
 	SpanIDNeedDecode       bool
 	ParentSpanIDNeedDecode bool
@@ -55,98 +57,6 @@ func (p *ProcessorOtelTraceParser) Description() string {
 	return "otel trace parser for logtail"
 }
 
-func (p *ProcessorOtelTraceParser) ProcessLogs(logArray []*protocol.Log) []*protocol.Log {
-	var logs = make([]*protocol.Log, 0)
-	for _, log := range logArray {
-		if l, err := p.processLog(log); err != nil {
-			logger.Warningf(p.context.GetRuntimeContext(), selfmonitor.ProcessorOTELTraceParserAlarm, "parser otel trace error %v", err)
-		} else {
-			logs = append(logs, l...)
-		}
-	}
-	return logs
-}
-
-func (p *ProcessorOtelTraceParser) processLog(log *protocol.Log) (logs []*protocol.Log, err error) {
-	logs = make([]*protocol.Log, 0)
-
-	findKey := false
-	for idx := range log.Contents {
-		if log.Contents[idx].Key == p.SourceKey {
-			findKey = true
-			objectVal := log.Contents[idx].Value
-			var l []*protocol.Log
-
-			switch strings.ToLower(p.Format) {
-			case "json":
-				if l, err = p.processJSONTraceData(objectVal); err != nil {
-					return logs, err
-				}
-			case "protobuf":
-				if l, err = p.processProtobufTraceData(objectVal); err != nil {
-					return logs, err
-				}
-			case "protojson":
-				if l, err = p.processProtoJSONTraceData(objectVal); err != nil {
-					return logs, err
-				}
-			}
-			logs = append(logs, l...)
-		}
-	}
-
-	if !findKey && p.NoKeyError {
-		logger.Warningf(p.context.GetRuntimeContext(), selfmonitor.ProcessorOTELTraceFindAlarm, "cannot find key %v", p.SourceKey)
-		return logs, nil
-	}
-
-	return logs, nil
-}
-
-func (p *ProcessorOtelTraceParser) processJSONTraceData(data string) ([]*protocol.Log, error) {
-	jsonUnmarshaler := ptrace.JSONUnmarshaler{}
-	var trace ptrace.Traces
-	var err error
-
-	if trace, err = jsonUnmarshaler.UnmarshalTraces([]byte(data)); err != nil {
-		return nil, err
-	}
-
-	log, _ := opentelemetry.ConvertTrace(trace)
-	return log, nil
-}
-
-func (p *ProcessorOtelTraceParser) processProtobufTraceData(val string) ([]*protocol.Log, error) {
-	protoUnmarshaler := ptrace.ProtoUnmarshaler{}
-	var trace ptrace.Traces
-	var err error
-
-	if trace, err = protoUnmarshaler.UnmarshalTraces([]byte(val)); err != nil {
-		return nil, err
-	}
-
-	log, _ := opentelemetry.ConvertTrace(trace)
-	return log, nil
-}
-
-func (p *ProcessorOtelTraceParser) processProtoJSONTraceData(val string) ([]*protocol.Log, error) {
-	resourceSpans := &v1.ResourceSpans{}
-	var err error
-
-	opt := protojson.UnmarshalOptions{DiscardUnknown: true}
-	if err = opt.Unmarshal([]byte(val), resourceSpans); err != nil {
-		return nil, err
-	}
-
-	var log []*protocol.Log
-
-	if log, err = opentelemetry.ConvertResourceSpans(resourceSpans, p.TraceIDNeedDecode, p.SpanIDNeedDecode, p.ParentSpanIDNeedDecode); err != nil {
-		return nil, err
-	}
-
-	return log, nil
-}
-
 func init() {
 	pipeline.Processors[pluginType] = func() pipeline.Processor {
 		return &ProcessorOtelTraceParser{
@@ -157,17 +67,8 @@ func init() {
 	}
 }
 
-// Process implements the v2 ProcessorV2 interface: "v2场景下输入Log输出Span".
-// For each Log event it reads the OTLP trace payload from p.SourceKey, decodes
-// it per the configured format and emits native models.Span events produced by
-// the canonical OTLP→models converter. As in v1 (ProcessLogs/processLog), the
-// source Log is NOT preserved: it is replaced by the converted spans. Non-Log
-// events (Metric/Span) are passed through unchanged.
-//
-// Note: the v1 protojson-only TraceIDNeedDecode/SpanIDNeedDecode/
-// ParentSpanIDNeedDecode flags do not apply here. The pdata trace unmarshaler
-// decodes span/trace IDs itself, and the canonical converter renders them via
-// (*ptrace.Span).TraceID().String(); those v1 flags are ignored in v2.
+// Process converts the OTLP payload of each log to native events grouped by resource.
+// Other event types pass through unchanged.
 func (p *ProcessorOtelTraceParser) Process(in *models.PipelineGroupEvents, context pipeline.PipelineContext) {
 	if in == nil {
 		return
@@ -183,7 +84,6 @@ func (p *ProcessorOtelTraceParser) Process(in *models.PipelineGroupEvents, conte
 
 		groups, err := p.convertLogToSpanGroups(log)
 		if err != nil {
-			// Mirror v1 ProcessLogs error handling: log and skip.
 			logger.Warningf(p.context.GetRuntimeContext(), selfmonitor.ProcessorOTELTraceParserAlarm, "parser otel trace error %v", err)
 			continue
 		}
@@ -226,11 +126,7 @@ func (p *ProcessorOtelTraceParser) convertLogToSpanGroups(log *models.Log) ([]*m
 	return opentelemetry.ConvertOtlpTracesToGroupEvents(traces)
 }
 
-// unmarshalTraces decodes the OTLP trace payload into pdata ptrace.Traces (the
-// input accepted by the canonical converter). json/protobuf mirror v1 exactly;
-// protojson wraps the single ResourceSpans object (v1's protojson input shape)
-// into the standard OTLP request envelope so the pdata JSON unmarshaler can
-// parse it.
+// unmarshalTraces decodes the configured format. Protojson carries one ResourceSpans object.
 func (p *ProcessorOtelTraceParser) unmarshalTraces(data []byte) (ptrace.Traces, error) {
 	switch strings.ToLower(p.Format) {
 	case "json":
@@ -242,7 +138,21 @@ func (p *ProcessorOtelTraceParser) unmarshalTraces(data []byte) (ptrace.Traces, 
 	case "protojson":
 		unmarshaler := ptrace.JSONUnmarshaler{}
 		wrapped := []byte(`{"resourceSpans":[` + string(data) + `]}`)
-		return unmarshaler.UnmarshalTraces(wrapped)
+		traces, err := unmarshaler.UnmarshalTraces(wrapped)
+		if err == nil {
+			return traces, nil
+		}
+		// Protobuf JSON encodes byte fields as base64. OTLP JSON uses hex IDs.
+		resourceSpans := &tracepb.ResourceSpans{}
+		if err = (protojson.UnmarshalOptions{DiscardUnknown: true}).Unmarshal(data, resourceSpans); err != nil {
+			return traces, err
+		}
+		request := &tracecollector.ExportTraceServiceRequest{ResourceSpans: []*tracepb.ResourceSpans{resourceSpans}}
+		wire, err := proto.Marshal(request)
+		if err != nil {
+			return traces, err
+		}
+		return (&ptrace.ProtoUnmarshaler{}).UnmarshalTraces(wire)
 	}
 	return ptrace.NewTraces(), nil
 }

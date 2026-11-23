@@ -19,13 +19,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alibaba/ilogtail/plugins/processor/internal/processortest"
+
 	. "github.com/smartystreets/goconvey/convey"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/models"
-	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	pm "github.com/alibaba/ilogtail/pluginmanager"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
 )
@@ -85,14 +87,13 @@ func TestProcessorStringReplaceWork(t *testing.T) {
 
 		Convey("Test regex1", func() {
 			record := `2022-09-16 09:03:31.013 \u001b[32mINFO \u001b[0;39m \u001b[34m[TID: N/A]\u001b[0;39m [\u001b[35mThread-30\u001b[0;39m] \u001b[36mc.s.govern.polygonsync.job.BlockTask\u001b[0;39m : 区块采集------结束------\r`
-			log := &protocol.Log{Time: 0}
-			log.Contents = append(log.Contents, &protocol.Log_Content{Key: "content", Value: record})
-			logs := []*protocol.Log{}
+			log := processortest.Log()
+			log.Contents.Add("content", record)
+			logs := []*models.Log{}
 			logs = append(logs, log)
-			logs = processor.ProcessLogs(logs)
-			So(len(logs[0].Contents), ShouldEqual, 1)
-			So(logs[0].Contents[0].Key, ShouldEqual, `content`)
-			So(logs[0].Contents[0].Value, ShouldEqual, `2022-09-16 09:03:31.013 INFO  [TID: ] [Thread-30] c.s.govern.polygonsync.job.BlockTask : 区块采集------结束------\r`)
+			logs = processortest.Apply(processor, logs...)
+			So(logs[0].Contents.Len(), ShouldEqual, 1)
+			So(pipeline.GetStringValue(logs[0].Contents.Get(`content`)), ShouldEqual, `2022-09-16 09:03:31.013 INFO  [TID: ] [Thread-30] c.s.govern.polygonsync.job.BlockTask : 区块采集------结束------\r`)
 		})
 
 		processor = &ProcessorStringReplace{
@@ -106,14 +107,13 @@ func TestProcessorStringReplaceWork(t *testing.T) {
 
 		Convey("Test regex2 Group", func() {
 			ipRecord := `10.10.239.16`
-			log := &protocol.Log{Time: 0}
-			log.Contents = append(log.Contents, &protocol.Log_Content{Key: "ip", Value: ipRecord})
-			logs := []*protocol.Log{}
+			log := processortest.Log()
+			log.Contents.Add("ip", ipRecord)
+			logs := []*models.Log{}
 			logs = append(logs, log)
-			logs = processor.ProcessLogs(logs)
-			So(len(logs[0].Contents), ShouldEqual, 1)
-			So(logs[0].Contents[0].Key, ShouldEqual, `ip`)
-			So(logs[0].Contents[0].Value, ShouldEqual, `10.10.239.*/24`)
+			logs = processortest.Apply(processor, logs...)
+			So(logs[0].Contents.Len(), ShouldEqual, 1)
+			So(pipeline.GetStringValue(logs[0].Contents.Get(`ip`)), ShouldEqual, `10.10.239.*/24`)
 		})
 
 		processor = &ProcessorStringReplace{
@@ -127,14 +127,13 @@ func TestProcessorStringReplaceWork(t *testing.T) {
 
 		Convey("Test regex3 Group", func() {
 			ipRecord := `10.10.239.16 10.10.238.10 `
-			log := &protocol.Log{Time: 0}
-			log.Contents = append(log.Contents, &protocol.Log_Content{Key: "ip", Value: ipRecord})
-			logs := []*protocol.Log{}
+			log := processortest.Log()
+			log.Contents.Add("ip", ipRecord)
+			logs := []*models.Log{}
 			logs = append(logs, log)
-			logs = processor.ProcessLogs(logs)
-			So(len(logs[0].Contents), ShouldEqual, 1)
-			So(logs[0].Contents[0].Key, ShouldEqual, `ip`)
-			So(logs[0].Contents[0].Value, ShouldEqual, `10.10.239.0/24 10.10.238.0/24 `)
+			logs = processortest.Apply(processor, logs...)
+			So(logs[0].Contents.Len(), ShouldEqual, 1)
+			So(pipeline.GetStringValue(logs[0].Contents.Get(`ip`)), ShouldEqual, `10.10.239.0/24 10.10.238.0/24 `)
 		})
 
 		processor = &ProcessorStringReplace{
@@ -148,14 +147,13 @@ func TestProcessorStringReplaceWork(t *testing.T) {
 
 		Convey("Test regex4 Group(match fail)", func() {
 			ipRecord := "{\"http.method\":\"GET\",\"http.status_code\":\"200\",\"http.url\":\"http://\",\"requestClientIp\":\"0.0.0.0\",\"requestHeader\":\"Accept=[text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7]\\nAuth=null\\nHost=[]\",\"requestParams\":\"{\\\"userId\\\":\\\"666666\\\"}\",\"responseBody\":\"{\\\"msg\\\":\\\"OK\\\",\\\"code\\\":0,\\\"data\\\":[],\\\"success\\\":true,\\\"error\\\":false}\"}"
-			log := &protocol.Log{Time: 0}
-			log.Contents = append(log.Contents, &protocol.Log_Content{Key: "attribute", Value: ipRecord})
-			logs := []*protocol.Log{}
+			log := processortest.Log()
+			log.Contents.Add("attribute", ipRecord)
+			logs := []*models.Log{}
 			logs = append(logs, log)
-			logs = processor.ProcessLogs(logs)
-			So(len(logs[0].Contents), ShouldEqual, 1)
-			So(logs[0].Contents[0].Key, ShouldEqual, `attribute`)
-			So(logs[0].Contents[0].Value, ShouldEqual, "{\"http.method\":\"GET\",\"http.status_code\":\"200\",\"http.url\":\"http://\",\"requestClientIp\":\"0.0.0.0\",\"requestHeader\":\"Accept=[text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7]\\nAuth=null\\nHost=[]\",\"requestParams\":\"{\\\"userId\\\":\\\"666666\\\"}\",\"responseBody\":\"{\\\"msg\\\":\\\"OK\\\",\\\"code\\\":0,\\\"data\\\":[],\\\"success\\\":true,\\\"error\\\":false}\"}")
+			logs = processortest.Apply(processor, logs...)
+			So(logs[0].Contents.Len(), ShouldEqual, 1)
+			So(pipeline.GetStringValue(logs[0].Contents.Get(`attribute`)), ShouldEqual, "{\"http.method\":\"GET\",\"http.status_code\":\"200\",\"http.url\":\"http://\",\"requestClientIp\":\"0.0.0.0\",\"requestHeader\":\"Accept=[text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7]\\nAuth=null\\nHost=[]\",\"requestParams\":\"{\\\"userId\\\":\\\"666666\\\"}\",\"responseBody\":\"{\\\"msg\\\":\\\"OK\\\",\\\"code\\\":0,\\\"data\\\":[],\\\"success\\\":true,\\\"error\\\":false}\"}")
 		})
 	})
 }
@@ -172,14 +170,13 @@ func TestProcessorConstReplaceWork(t *testing.T) {
 		So(err, ShouldBeNil)
 
 		record := `hello,how old are you? nice to meet you`
-		log := &protocol.Log{Time: 0}
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "content", Value: record})
-		logs := []*protocol.Log{}
+		log := processortest.Log()
+		log.Contents.Add("content", record)
+		logs := []*models.Log{}
 		logs = append(logs, log)
-		logs = processor.ProcessLogs(logs)
-		So(len(logs[0].Contents), ShouldEqual, 1)
-		So(logs[0].Contents[0].Key, ShouldEqual, `content`)
-		So(logs[0].Contents[0].Value, ShouldEqual, `hello, nice to meet you`)
+		logs = processortest.Apply(processor, logs...)
+		So(logs[0].Contents.Len(), ShouldEqual, 1)
+		So(pipeline.GetStringValue(logs[0].Contents.Get(`content`)), ShouldEqual, `hello, nice to meet you`)
 	})
 }
 
@@ -194,38 +191,35 @@ func TestProcessorUnquoteReplaceWork(t *testing.T) {
 
 		Convey("Test unquote1", func() {
 			record := "{\\x22UNAME\\x22:\\x22\\x22,\\x22GID\\x22:\\x22\\x22,\\x22PAID\\x22:\\x22\\x22,\\x22UUID\\x22:\\x22\\x22,\\x22STARTTIME\\x22:\\x22\\x22,\\x22ENDTIME\\x22:\\x22\\x22,\\x22UID\\x22:\\x2212345678\\x22,\\x22page_num\\x22:1,\\x22page_size\\x22:10}"
-			log := &protocol.Log{Time: 0}
-			log.Contents = append(log.Contents, &protocol.Log_Content{Key: "content", Value: record})
-			logs := []*protocol.Log{}
+			log := processortest.Log()
+			log.Contents.Add("content", record)
+			logs := []*models.Log{}
 			logs = append(logs, log)
-			logs = processor.ProcessLogs(logs)
-			So(len(logs[0].Contents), ShouldEqual, 1)
-			So(logs[0].Contents[0].Key, ShouldEqual, `content`)
-			So(logs[0].Contents[0].Value, ShouldEqual, `{"UNAME":"","GID":"","PAID":"","UUID":"","STARTTIME":"","ENDTIME":"","UID":"12345678","page_num":1,"page_size":10}`)
+			logs = processortest.Apply(processor, logs...)
+			So(logs[0].Contents.Len(), ShouldEqual, 1)
+			So(pipeline.GetStringValue(logs[0].Contents.Get(`content`)), ShouldEqual, `{"UNAME":"","GID":"","PAID":"","UUID":"","STARTTIME":"","ENDTIME":"","UID":"12345678","page_num":1,"page_size":10}`)
 		})
 
 		Convey("Test unquote2", func() {
 			record := "aaa\"\\u554a"
-			log := &protocol.Log{Time: 0}
-			log.Contents = append(log.Contents, &protocol.Log_Content{Key: "content", Value: record})
-			logs := []*protocol.Log{}
+			log := processortest.Log()
+			log.Contents.Add("content", record)
+			logs := []*models.Log{}
 			logs = append(logs, log)
-			logs = processor.ProcessLogs(logs)
-			So(len(logs[0].Contents), ShouldEqual, 1)
-			So(logs[0].Contents[0].Key, ShouldEqual, `content`)
-			So(logs[0].Contents[0].Value, ShouldEqual, `aaa"啊`)
+			logs = processortest.Apply(processor, logs...)
+			So(logs[0].Contents.Len(), ShouldEqual, 1)
+			So(pipeline.GetStringValue(logs[0].Contents.Get(`content`)), ShouldEqual, `aaa"啊`)
 		})
 
 		Convey("Test unquote3", func() {
 			record := "\"message\""
-			log := &protocol.Log{Time: 0}
-			log.Contents = append(log.Contents, &protocol.Log_Content{Key: "content", Value: record})
-			logs := []*protocol.Log{}
+			log := processortest.Log()
+			log.Contents.Add("content", record)
+			logs := []*models.Log{}
 			logs = append(logs, log)
-			logs = processor.ProcessLogs(logs)
-			So(len(logs[0].Contents), ShouldEqual, 1)
-			So(logs[0].Contents[0].Key, ShouldEqual, `content`)
-			So(logs[0].Contents[0].Value, ShouldEqual, `message`)
+			logs = processortest.Apply(processor, logs...)
+			So(logs[0].Contents.Len(), ShouldEqual, 1)
+			So(pipeline.GetStringValue(logs[0].Contents.Get(`content`)), ShouldEqual, `message`)
 		})
 	})
 }
@@ -243,14 +237,13 @@ func TestProcessorRegexChinessCharacters(t *testing.T) {
 
 		Convey("Test regex", func() {
 			record := `替换前（需要被替换的字符）12345`
-			log := &protocol.Log{Time: 0}
-			log.Contents = append(log.Contents, &protocol.Log_Content{Key: "content", Value: record})
-			logs := []*protocol.Log{}
+			log := processortest.Log()
+			log.Contents.Add("content", record)
+			logs := []*models.Log{}
 			logs = append(logs, log)
-			logs = processor.ProcessLogs(logs)
-			So(len(logs[0].Contents), ShouldEqual, 1)
-			So(logs[0].Contents[0].Key, ShouldEqual, `content`)
-			So(logs[0].Contents[0].Value, ShouldEqual, `替换前12345`)
+			logs = processortest.Apply(processor, logs...)
+			So(logs[0].Contents.Len(), ShouldEqual, 1)
+			So(pipeline.GetStringValue(logs[0].Contents.Get(`content`)), ShouldEqual, `替换前12345`)
 		})
 
 		processor = &ProcessorStringReplace{
@@ -263,14 +256,13 @@ func TestProcessorRegexChinessCharacters(t *testing.T) {
 		So(err, ShouldBeNil)
 		Convey("Test const", func() {
 			record := `替换前（需要被替换的字符）12345`
-			log := &protocol.Log{Time: 0}
-			log.Contents = append(log.Contents, &protocol.Log_Content{Key: "content", Value: record})
-			logs := []*protocol.Log{}
+			log := processortest.Log()
+			log.Contents.Add("content", record)
+			logs := []*models.Log{}
 			logs = append(logs, log)
-			logs = processor.ProcessLogs(logs)
-			So(len(logs[0].Contents), ShouldEqual, 1)
-			So(logs[0].Contents[0].Key, ShouldEqual, `content`)
-			So(logs[0].Contents[0].Value, ShouldEqual, `替换前12345`)
+			logs = processortest.Apply(processor, logs...)
+			So(logs[0].Contents.Len(), ShouldEqual, 1)
+			So(pipeline.GetStringValue(logs[0].Contents.Get(`content`)), ShouldEqual, `替换前12345`)
 		})
 	})
 }
@@ -288,16 +280,14 @@ func TestProcessorRegexDestKey(t *testing.T) {
 		So(err, ShouldBeNil)
 
 		ipRecord := `10.10.239.16`
-		log := &protocol.Log{Time: 0}
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "ip", Value: ipRecord})
-		logs := []*protocol.Log{}
+		log := processortest.Log()
+		log.Contents.Add("ip", ipRecord)
+		logs := []*models.Log{}
 		logs = append(logs, log)
-		logs = processor.ProcessLogs(logs)
-		So(len(logs[0].Contents), ShouldEqual, 2)
-		So(logs[0].Contents[0].Key, ShouldEqual, `ip`)
-		So(logs[0].Contents[0].Value, ShouldEqual, `10.10.239.16`)
-		So(logs[0].Contents[1].Key, ShouldEqual, `ip_sebnet`)
-		So(logs[0].Contents[1].Value, ShouldEqual, `10.10.239.*/24`)
+		logs = processortest.Apply(processor, logs...)
+		So(logs[0].Contents.Len(), ShouldEqual, 2)
+		So(pipeline.GetStringValue(logs[0].Contents.Get(`ip`)), ShouldEqual, `10.10.239.16`)
+		So(pipeline.GetStringValue(logs[0].Contents.Get(`ip_sebnet`)), ShouldEqual, `10.10.239.*/24`)
 	})
 }
 
@@ -317,11 +307,7 @@ func benchmarkReplace(b *testing.B, s *ProcessorStringReplace, replaceCount int,
 
 	b.ResetTimer()
 	for loop := 0; loop < b.N; loop++ {
-		s.ProcessLogs([]*protocol.Log{{
-			Contents: []*protocol.Log_Content{
-				{Key: s.SourceKey, Value: value},
-			},
-		}})
+		processortest.Apply(s, processortest.Log(s.SourceKey, value))
 	}
 }
 
@@ -472,10 +458,10 @@ func TestZeroWidthRegexWarning(t *testing.T) {
 
 		// Should still work despite zero-width pattern
 		record := "test"
-		log := &protocol.Log{Time: 0}
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "content", Value: record})
-		logs := []*protocol.Log{log}
-		out := processor.ProcessLogs(logs)
+		log := processortest.Log()
+		log.Contents.Add("content", record)
+		logs := []*models.Log{log}
+		out := processortest.Apply(processor, logs...)
 		So(len(out), ShouldEqual, 1)
 	})
 }
@@ -494,18 +480,18 @@ func TestRegexTimeoutProtection(t *testing.T) {
 
 		// Input that will trigger catastrophic backtracking
 		record := strings.Repeat("a", 10000) + "c" // many 'a's but no 'b'
-		log := &protocol.Log{Time: 0}
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "content", Value: record})
+		log := processortest.Log()
+		log.Contents.Add("content", record)
 
 		start := time.Now()
-		logs := []*protocol.Log{log}
-		out := processor.ProcessLogs(logs)
+		logs := []*models.Log{log}
+		out := processortest.Apply(processor, logs...)
 		elapsed := time.Since(start)
 
 		// Should complete quickly due to timeout protection
 		So(elapsed.Milliseconds(), ShouldBeLessThan, 500)
 		// Original value should be kept when timeout occurs
-		So(out[0].Contents[0].Value, ShouldEqual, record)
+		So(pipeline.GetStringValue(out[0].Contents.Get("content")), ShouldEqual, record)
 	})
 }
 
@@ -523,9 +509,7 @@ func TestRegexTimeoutDefault(t *testing.T) {
 	})
 }
 
-// ---- v2 (PipelineEvent / SendPb) Process path tests ----
-
-func TestProcessorStringReplace_ProcessV2InPlace(t *testing.T) {
+func TestProcessorStringReplace_ProcessInPlace(t *testing.T) {
 	processor := &ProcessorStringReplace{SourceKey: "k", Method: MethodConst, Match: "foo", ReplaceString: "bar"}
 	require.NoError(t, processor.Init(mock.NewEmptyContext("p", "l", "c")))
 
@@ -538,7 +522,7 @@ func TestProcessorStringReplace_ProcessV2InPlace(t *testing.T) {
 	assert.Equal(t, "barbar", log.GetIndices().Get("k"))
 }
 
-func TestProcessorStringReplace_ProcessV2ToDestKey(t *testing.T) {
+func TestProcessorStringReplace_ProcessToDestKey(t *testing.T) {
 	processor := &ProcessorStringReplace{SourceKey: "k", DestKey: "d", Method: MethodConst, Match: "foo", ReplaceString: "bar"}
 	require.NoError(t, processor.Init(mock.NewEmptyContext("p", "l", "c")))
 
@@ -552,7 +536,7 @@ func TestProcessorStringReplace_ProcessV2ToDestKey(t *testing.T) {
 	assert.Equal(t, "barbar", log.GetIndices().Get("d"))
 }
 
-func TestProcessorStringReplace_ProcessV2PassesThroughMetric(t *testing.T) {
+func TestProcessorStringReplace_ProcessPassesThroughMetric(t *testing.T) {
 	processor := &ProcessorStringReplace{SourceKey: "k", Method: MethodConst, Match: "foo", ReplaceString: "bar"}
 	require.NoError(t, processor.Init(mock.NewEmptyContext("p", "l", "c")))
 

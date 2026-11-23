@@ -15,6 +15,7 @@
 package models
 
 import (
+	"iter"
 	"slices"
 	"sort"
 )
@@ -39,6 +40,25 @@ func FirstLogContentKey(contents LogContents) (string, bool) {
 		return ordered.keys[0], true
 	}
 	return "", false
+}
+
+// LogContentEntries iterates fields in input order when the log preserves it.
+func LogContentEntries(contents LogContents) iter.Seq2[string, any] {
+	return func(yield func(string, any) bool) {
+		if ordered, ok := contents.(*orderedLogContents); ok {
+			for _, key := range ordered.keys {
+				if !yield(key, ordered.Get(key)) {
+					return
+				}
+			}
+			return
+		}
+		for key, value := range contents.Iterator() {
+			if !yield(key, value) {
+				return
+			}
+		}
+	}
 }
 
 // RenameLogContent changes a field name while keeping its position in ordered contents.

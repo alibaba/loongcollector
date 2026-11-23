@@ -35,7 +35,7 @@
 
 使用 `flusher_http` 的 `influxdb` 协议可将多值 Metric 写成 InfluxDB 行协议。使用 `custom_single`、`custom_single_flatten` 或 `jsonline` 的 Flusher 可将指标值写成日志记录。具体以目标插件的协议配置为准。
 
-可以在采集配置中加入 Go Processor，例如 `processor_add_fields`。当前版本默认启用统一 Pipeline。若使用仍需显式选择事件 runner 的旧版本，请设置 `global.StructureType: v2`。
+可以在采集配置中加入 Go Processor，例如 `processor_add_fields`。处理器直接接收事件组。
 
 #### 原生 Flusher（C++，无需 Go 桥接）
 
@@ -166,8 +166,6 @@ flushers:
 
 ```yaml
 enable: true
-global:
-  StructureType: v2
 inputs:
   - Type: input_file
     FilePaths:

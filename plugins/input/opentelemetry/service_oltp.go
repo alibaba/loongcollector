@@ -55,17 +55,15 @@ var (
 	errInvalidMethod   = errors.New("method_invalid")
 )
 
-// Server implements ServiceInputV1 and ServiceInputV2
+// Server receives OTLP events over gRPC and HTTP.
 type Server struct {
 	context         pipeline.Context
-	collector       pipeline.Collector
-	piplineContext  pipeline.PipelineContext
 	serverGPRC      *grpc.Server
 	serverHTTP      *http.Server
 	grpcListener    net.Listener
 	httpListener    net.Listener
 	logsReceiver    plogotlp.GRPCServer
-	tracesReceiver  ptraceotlp.GRPCServer // currently traces are not supported when using the v1 pipeline
+	tracesReceiver  ptraceotlp.GRPCServer
 	metricsReceiver pmetricotlp.GRPCServer
 	wg              sync.WaitGroup
 
@@ -110,25 +108,11 @@ func (s *Server) Description() string {
 	return "Open-Telemetry service input plugin for logtail"
 }
 
-// Start ...
-func (s *Server) Start(c pipeline.Collector) error {
-	s.collector = c
-	s.tracesReceiver = newTracesReceiverV1(c)
-	s.metricsReceiver = newMetricsReceiverV1(c)
-	s.logsReceiver = newLogsReceiverV1(c)
-	return s.start()
-}
-
 // StartService(PipelineContext) error
 func (s *Server) StartService(ctx pipeline.PipelineContext) error {
-	s.piplineContext = ctx
 	s.tracesReceiver = newTracesReceiver(ctx)
 	s.metricsReceiver = newMetricsReceiver(ctx)
 	s.logsReceiver = newLogsReceiver(ctx)
-	return s.start()
-}
-
-func (s *Server) start() error {
 	if s.Protocals.GRPC != nil {
 		ops, err := s.Protocals.GRPC.GetServerOption()
 		if err != nil {

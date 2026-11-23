@@ -39,11 +39,21 @@ import (
 const AlarmType = selfmonitor.PyroscopeAlarm
 
 type Decoder struct {
+	Tags map[string]string
 }
 
-func (d *Decoder) DecodeV2(data []byte, req *http.Request) (groups []*models.PipelineGroupEvents, err error) {
-	// do nothing
-	return nil, nil
+func (d *Decoder) DecodeV2(data []byte, req *http.Request) ([]*models.PipelineGroupEvents, error) {
+	if req == nil {
+		return nil, fmt.Errorf("pyroscope decoder requires an HTTP request")
+	}
+	logs, err := d.Decode(data, req, d.Tags)
+	if err != nil || len(logs) == 0 {
+		return nil, err
+	}
+	return []*models.PipelineGroupEvents{{
+		Group:  models.NewGroup(models.NewMetadata(), models.NewTags()),
+		Events: common.WireLogsToEvents(logs),
+	}}, nil
 }
 
 func (d *Decoder) Decode(data []byte, req *http.Request, tags map[string]string) (logs []*protocol.Log, err error) {

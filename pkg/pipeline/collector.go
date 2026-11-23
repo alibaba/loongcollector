@@ -20,11 +20,6 @@ import (
 	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
-type LogWithContext struct {
-	Log     *protocol.Log
-	Context map[string]interface{}
-}
-
 // Collector ...
 type Collector interface {
 	AddData(tags map[string]string,

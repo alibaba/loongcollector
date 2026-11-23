@@ -1,0 +1,67 @@
+// Copyright 2022 iLogtail Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+package logtail.report;
+
+option go_package = "github.com/alibaba/ilogtail/pkg/protocol";
+
+import "pipeline_event_group.proto";
+
+// Collect accepts a stream of event groups. A successful response acknowledges
+// receipt of the stream. Failures are returned using a non-OK gRPC status.
+service PipelineEventGroupReportService {
+  rpc Collect(stream PipelineEventGroupReport) returns (PipelineEventGroupReportResponse);
+}
+
+message PipelineEventGroupReport {
+  // The group contains one kind of event. Consecutive runs of different kinds
+  // are sent in input order, with group tags and metadata on each message.
+  logtail.models.PipelineEventGroup event_group = 1;
+  string destination_logstore = 2;
+
+  // When present, attributes match the events in event_group by index.
+  repeated ReportLogAttributes log_attributes = 3;
+  repeated ReportMetricAttributes metric_attributes = 4;
+
+  // Raw events use event_group only for group tags and metadata.
+  repeated bytes raw_events = 5;
+
+  // When present, observed timestamps match events by index.
+  repeated uint64 observed_timestamps = 6;
+}
+
+message ReportLogAttributes {
+  // These tags are separate from both log contents and group tags.
+  map<string, bytes> tags = 1;
+  string name = 2;
+  string trace_id = 3;
+  string span_id = 4;
+
+  // Zero-based content positions whose values are byte arrays. Contents at
+  // other positions are strings.
+  repeated uint32 byte_field_indices = 5;
+}
+
+message ReportMetricAttributes {
+  string metric_type = 1;
+  string unit = 2;
+  string description = 3;
+
+  // Each value is a JSON string, boolean, array, or object. Numeric metric
+  // values use the corresponding MetricEvent fields in event_group.
+  map<string, bytes> typed_values_json = 4;
+}
+
+message PipelineEventGroupReportResponse {}

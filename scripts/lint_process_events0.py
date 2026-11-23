@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: Apache-2.0
-"""Forbid ProcessorV2.Process from treating Events[0] as a Log.
+"""Forbid Processor.Process from treating Events[0] as a Log.
 
 Discussion #1928 step B5 / Issue #2604.
 
@@ -179,7 +179,7 @@ def iter_process_v2_bodies(src):
 
 
 def find_violations(src, path):
-    """Find Events[0] (as Log) anti-patterns inside ProcessorV2.Process."""
+    """Find Events[0] (as Log) anti-patterns inside Processor.Process."""
     masked = mask_go_comments_and_strings(src)
     found = []
     seen = set()
@@ -285,7 +285,7 @@ def scan_repo(root, allow, scan_dirs=DEFAULT_SCAN_DIRS):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(
-        description="Forbid ProcessorV2.Process from assuming Events[0] is Log."
+        description="Forbid Processor.Process from assuming Events[0] is Log."
     )
     parser.add_argument(
         "--root",
@@ -308,7 +308,7 @@ def main(argv=None):
         print("lint_process_events0: OK (no Events[0]-as-Log in Process)")
         return 0
     print(
-        "lint_process_events0: ProcessorV2.Process must not assume Events[0] is Log:",
+        "lint_process_events0: Processor.Process must not assume Events[0] is Log:",
         file=sys.stderr,
     )
     for v in violations:

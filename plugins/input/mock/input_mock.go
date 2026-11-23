@@ -16,57 +16,26 @@ package mock
 
 import (
 	"fmt"
-	"strconv"
 	"time"
 
-	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 )
 
 type InputMock struct {
-	GroupMeta             map[string]string
-	GroupTags             map[string]string
-	Tags                  map[string]string
-	Fields                map[string]interface{}
-	Index                 int64
-	OpenPrometheusPattern bool
-
-	context pipeline.Context
-	labels  helper.MetricLabels
+	GroupMeta map[string]string
+	GroupTags map[string]string
+	Tags      map[string]string
+	Fields    map[string]interface{}
+	Index     int64
 }
 
-func (r *InputMock) Init(context pipeline.Context) (int, error) {
-	r.context = context
-	if r.OpenPrometheusPattern {
-		for k, v := range r.Tags {
-			r.labels.Append(k, v)
-		}
-		for k, v := range r.Fields {
-			r.labels.Append(k, fmt.Sprint(v))
-		}
-	}
+func (*InputMock) Init(pipeline.Context) (int, error) {
 	return 0, nil
 }
 
 func (r *InputMock) Description() string {
 	return "mock input plugin for logtail"
-}
-
-func (r *InputMock) Collect(collector pipeline.Collector) error {
-	r.Index++
-	if r.OpenPrometheusPattern {
-		collector.AddRawLog(helper.NewMetricLog("metrics_mock", time.Now().UnixNano(), float64(r.Index), &r.labels))
-	} else {
-		// original log pattern.
-		fields := make(map[string]string)
-		fields["Index"] = strconv.FormatInt(r.Index, 10)
-		for k, v := range r.Fields {
-			fields[k] = fmt.Sprint(v)
-		}
-		collector.AddData(r.Tags, fields)
-	}
-	return nil
 }
 
 func (r *InputMock) Read(context pipeline.PipelineContext) error {

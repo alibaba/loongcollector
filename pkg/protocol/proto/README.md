@@ -15,3 +15,32 @@ mv include/google/ /usr/local/include/
 go install github.com/gogo/protobuf/protoc-gen-gogofaster@latest
 
 bash pkg/protocol/proto/genernate.sh
+
+## gRPC event receiver
+
+Configure the receiver before upgrading a pipeline that uses the Go
+`flusher_grpc`. Generate server bindings from
+`pipeline_event_group_transfer.proto`, adding `protobuf_public/models` to the
+protoc include path.
+
+Implement the client-streaming method
+`/logtail.report.PipelineEventGroupReportService/Collect`. Read each
+`PipelineEventGroupReport` until the client closes the stream, then send an
+empty `PipelineEventGroupReportResponse` to acknowledge receipt. Return a
+non-OK gRPC status if receipt fails.
+
+A report carries a run of consecutive events of the same kind. Read reports in
+stream order. Each report carries the group's tags, metadata, and
+`destination_logstore`. For example, one group of log, metric, and log events
+arrives as three reports with the same group attributes. The log's event tags
+are in `log_attributes` and can have the same keys as the group tags. Both
+attribute lists and `observed_timestamps` correspond to events by index when
+present. Event and observed timestamps use nanoseconds. Log contents listed in
+`byte_field_indices` hold bytes, while the other contents hold strings. Other Go log field values use the pipeline's
+text representation.
+The metric attributes include a JSON representation of string, boolean,
+array, and object values. Raw events are in `raw_events` with the event group
+oneof left unset.
+
+Existing clients can continue using `LogReportService` on servers that expose
+it. The Go flusher uses the event service for every export.

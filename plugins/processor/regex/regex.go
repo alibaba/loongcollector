@@ -21,7 +21,6 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
@@ -70,54 +69,11 @@ func (*ProcessorRegex) Description() string {
 	return "regex processor for logtail"
 }
 
-func (p *ProcessorRegex) ProcessLogs(logArray []*protocol.Log) []*protocol.Log {
-	if p.re == nil {
-		return logArray
-	}
-	for _, log := range logArray {
-		p.ProcessLog(log)
-	}
-	return logArray
-}
-
-func (p *ProcessorRegex) ProcessLog(log *protocol.Log) {
-	beginLen := len(log.Contents)
-	findKey := false
-	for i, cont := range log.Contents {
-		if len(p.SourceKey) == 0 || p.SourceKey == cont.Key {
-			findKey = true
-			parseResult := p.processRegex(log, &cont.Value)
-			if !p.shouldKeepSource(parseResult) {
-				log.Contents = append(log.Contents[:i], log.Contents[i+1:]...)
-			}
-			break
-		}
-	}
-	if !findKey && p.NoKeyError {
-		logger.Warning(p.context.GetRuntimeContext(), selfmonitor.RegexFindAlarm, "anchor cannot find key", p.SourceKey)
-	}
-	p.logPairMetric.Add(int64(len(log.Contents) - beginLen + 1))
-}
-
 func (p *ProcessorRegex) shouldKeepSource(parseResult bool) bool {
 	return p.KeepSource || (p.KeepSourceIfParseError && !parseResult)
 }
 
-func (p *ProcessorRegex) processRegex(log *protocol.Log, val *string) bool {
-	keys, values, ok := p.matchRegex(*val)
-	if !ok {
-		return false
-	}
-	for i := range keys {
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: keys[i], Value: values[i]})
-	}
-	return true
-}
-
-// matchRegex applies the compiled regex to val and returns the extracted keys
-// and their values (in Keys order) plus whether the parse succeeded. It holds
-// the shared match + validation logic reused by both the v1 (ProcessLogs) and
-// v2 (Process) code paths, so their semantics stay identical.
+// matchRegex returns the configured captures in Keys order and reports whether matching succeeded.
 func (p *ProcessorRegex) matchRegex(val string) (keys []string, values []string, ok bool) {
 	indexArray := p.re.FindStringSubmatchIndex(val)
 	if len(indexArray) < 2 || (p.FullMatch && (indexArray[0] != 0 || indexArray[1] != len(val))) {
@@ -157,11 +113,7 @@ func init() {
 	}
 }
 
-// Process implements the v2 ProcessorV2 interface: it parses the SourceKey
-// value of each Log event with the compiled regex and writes the captured
-// groups into the configured Keys, faithfully reproducing the v1 transform
-// (KeepSource / KeepSourceIfParseError / NoKeyError / NoMatchError). Metric and
-// Span events pass through unchanged.
+// Process writes regex captures into each log. Other event types pass through unchanged.
 func (p *ProcessorRegex) Process(in *models.PipelineGroupEvents, context pipeline.PipelineContext) {
 	pipeline.ProcessLogEventsOnly(in, context, p.processLogEvent)
 }
@@ -176,7 +128,7 @@ func (p *ProcessorRegex) processLogEvent(log *models.Log) {
 		p.logPairMetric.Add(int64(contents.Len() - beginLen + 1))
 	}()
 
-	// v1 parses the field named by SourceKey, or the first field when SourceKey
+	// Parse the field named by SourceKey, or the first field when SourceKey
 	// is not configured.
 	sourceKey := p.SourceKey
 	if sourceKey == "" {

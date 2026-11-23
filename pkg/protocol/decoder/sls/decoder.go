@@ -15,11 +15,12 @@
 package sls
 
 import (
+	"net/http"
+
 	"github.com/alibaba/ilogtail/pkg/models"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/protocol/decoder/common"
-
-	"net/http"
 )
 
 // Decoder impl
@@ -39,7 +40,32 @@ func (d *Decoder) ParseRequest(res http.ResponseWriter, req *http.Request, maxBo
 	return common.CollectBody(res, req, maxBodySize)
 }
 
-func (d *Decoder) DecodeV2(data []byte, req *http.Request) (groups []*models.PipelineGroupEvents, err error) {
-	//TODO: Implement DecodeV2
-	return nil, nil
+// DecodeV2 converts the external SLS wire group at ingress.
+func (d *Decoder) DecodeV2(data []byte, _ *http.Request) ([]*models.PipelineGroupEvents, error) {
+	wireGroup := &protocol.LogGroup{}
+	if err := wireGroup.Unmarshal(data); err != nil {
+		return nil, err
+	}
+	if len(wireGroup.Logs) == 0 {
+		return nil, nil
+	}
+
+	group := models.NewGroup(models.NewMetadata(), models.NewTags())
+	for _, tag := range wireGroup.LogTags {
+		group.Tags.Add(tag.GetKey(), tag.GetValue())
+	}
+	if topic := wireGroup.GetTopic(); topic != "" {
+		group.Tags.Add(pipeline.TopicTagKey, topic)
+	}
+	if source := wireGroup.GetSource(); source != "" {
+		group.Metadata.Add("source", source)
+	}
+	if category := wireGroup.GetCategory(); category != "" {
+		group.Metadata.Add("sls.category", category)
+	}
+	if machineUUID := wireGroup.GetMachineUUID(); machineUUID != "" {
+		group.Tags.Add("__machine_uuid__", machineUUID)
+	}
+
+	return []*models.PipelineGroupEvents{{Group: group, Events: common.WireLogsToEvents(wireGroup.Logs)}}, nil
 }

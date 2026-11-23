@@ -22,7 +22,6 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
@@ -59,16 +58,16 @@ func (*ProcessorSplitString) Description() string {
 	return "string splitor for logtail"
 }
 
-func (p *ProcessorSplitString) SplitValue(log *protocol.Log, value string) {
+func (p *ProcessorSplitString) splitValue(value string, add func(key, value string)) {
 	if len(p.SplitKeys) == 0 {
 		if p.PreserveOthers {
 			if p.ExpandOthers {
 				splitValues := strings.Split(value, p.SplitSep)
 				for i, subVal := range splitValues {
-					log.Contents = append(log.Contents, &protocol.Log_Content{Key: p.ExpandKeyPrefix + strconv.Itoa(i+1), Value: subVal})
+					add(p.ExpandKeyPrefix+strconv.Itoa(i+1), subVal)
 				}
 			} else {
-				log.Contents = append(log.Contents, &protocol.Log_Content{Key: "_split_preserve_", Value: value})
+				add("_split_preserve_", value)
 			}
 		}
 		return
@@ -84,44 +83,22 @@ func (p *ProcessorSplitString) SplitValue(log *protocol.Log, value string) {
 			logger.Warning(p.context.GetRuntimeContext(), selfmonitor.SplitLogAlarm, "split keys not match, split len", len(splitValues), "log", util.CutString(value, 1024))
 		}
 		for i, val := range splitValues {
-			log.Contents = append(log.Contents, &protocol.Log_Content{Key: p.SplitKeys[i], Value: val})
+			add(p.SplitKeys[i], val)
 		}
 		return
 	}
 	for i, key := range p.SplitKeys {
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: key, Value: splitValues[i]})
+		add(key, splitValues[i])
 	}
 	if len(splitValues) > len(p.SplitKeys) && p.PreserveOthers {
 		if p.ExpandOthers {
 			for i := len(p.SplitKeys); i < len(splitValues); i++ {
-				log.Contents = append(log.Contents, &protocol.Log_Content{Key: p.ExpandKeyPrefix + strconv.Itoa(i+1-len(p.SplitKeys)), Value: splitValues[i]})
+				add(p.ExpandKeyPrefix+strconv.Itoa(i+1-len(p.SplitKeys)), splitValues[i])
 			}
 		} else {
-			log.Contents = append(log.Contents, &protocol.Log_Content{Key: "_split_preserve_", Value: splitValues[len(p.SplitKeys)]})
+			add("_split_preserve_", splitValues[len(p.SplitKeys)])
 		}
 	}
-}
-
-func (p *ProcessorSplitString) ProcessLogs(logArray []*protocol.Log) []*protocol.Log {
-	for _, log := range logArray {
-		findKey := false
-		for i, cont := range log.Contents {
-			if len(p.SourceKey) == 0 || p.SourceKey == cont.Key {
-				findKey = true
-				if !p.KeepSource {
-					log.Contents = append(log.Contents[:i], log.Contents[i+1:]...)
-				}
-				// process
-				p.SplitValue(log, cont.Value)
-				break
-			}
-		}
-		if !findKey && p.NoKeyError {
-			logger.Warning(p.context.GetRuntimeContext(), selfmonitor.SplitFindAlarm, "cannot find key", p.SourceKey)
-		}
-	}
-
-	return logArray
 }
 
 func init() {
@@ -130,7 +107,7 @@ func init() {
 	}
 }
 
-// Process implements the v2 ProcessorV2 interface: it splits the SourceKey value
+// Process implements the Processor interface: it splits the SourceKey value
 // of each Log event into SplitKeys on the same log. Metric/Span events pass
 // through unchanged.
 func (p *ProcessorSplitString) Process(in *models.PipelineGroupEvents, context pipeline.PipelineContext) {
@@ -141,13 +118,16 @@ func (p *ProcessorSplitString) processLogEvent(log *models.Log) {
 	contents := log.GetIndices()
 	sourceKey := p.SourceKey
 	if sourceKey == "" {
-		// v1 splits the first content when SourceKey is empty. The v2 index map
-		// iteration order is unspecified, so this picks the first key best-effort.
-		for k := range contents.Iterator() {
-			sourceKey = k
-			break
+		firstKey, ordered := models.FirstLogContentKey(contents)
+		if ordered {
+			sourceKey = firstKey
+		} else {
+			for key := range contents.Iterator() {
+				sourceKey = key
+				break
+			}
 		}
-		if sourceKey == "" {
+		if contents.Len() == 0 {
 			if p.NoKeyError {
 				logger.Warning(p.context.GetRuntimeContext(), selfmonitor.SplitFindAlarm, "cannot find key", p.SourceKey)
 			}
@@ -161,15 +141,11 @@ func (p *ProcessorSplitString) processLogEvent(log *models.Log) {
 	}
 
 	value := pipeline.GetStringValue(contents.Get(sourceKey))
-	// v1 string removes the source key BEFORE splitting (see ProcessLogs), so a
-	// split key equal to the source key wins over the original value.
+	// Remove the source first so a split field with the same key is kept.
 	if !p.KeepSource {
 		contents.Delete(sourceKey)
 	}
-	// Reuse the tested v1 parsing on a temporary protocol.Log.
-	tmp := &protocol.Log{}
-	p.SplitValue(tmp, value)
-	for _, c := range tmp.Contents {
-		contents.Add(c.Key, c.Value)
-	}
+	p.splitValue(value, func(key, value string) {
+		contents.Add(key, value)
+	})
 }

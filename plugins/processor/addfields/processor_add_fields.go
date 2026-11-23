@@ -19,7 +19,6 @@ import (
 
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
 // ProcessorAddFields struct implement the Processor interface.
@@ -46,45 +45,7 @@ func (*ProcessorAddFields) Description() string {
 	return "add fields processor for ilogtail"
 }
 
-// ProcessLogs append Fields to each log.
-func (p *ProcessorAddFields) ProcessLogs(logArray []*protocol.Log) []*protocol.Log {
-	for _, log := range logArray {
-		p.processLog(log)
-	}
-	return logArray
-}
-
-func (p *ProcessorAddFields) processLog(log *protocol.Log) {
-	if p.IgnoreIfExist && len(p.Fields) > 1 {
-		dict := make(map[string]bool)
-		for idx := range log.Contents {
-			dict[log.Contents[idx].Key] = true
-		}
-		for k, v := range p.Fields {
-			if _, exists := dict[k]; exists {
-				continue
-			}
-			newContent := &protocol.Log_Content{
-				Key:   k,
-				Value: v,
-			}
-			log.Contents = append(log.Contents, newContent)
-		}
-	} else {
-		for k, v := range p.Fields {
-			if p.IgnoreIfExist && p.isExist(log, k) {
-				continue
-			}
-			newContent := &protocol.Log_Content{
-				Key:   k,
-				Value: v,
-			}
-			log.Contents = append(log.Contents, newContent)
-		}
-	}
-}
-
-// Process implements the v2 ProcessorV2 interface: it appends Fields to each
+// Process implements the Processor interface: it appends Fields to each
 // Log event and passes Metric/Span events through unchanged.
 func (p *ProcessorAddFields) Process(in *models.PipelineGroupEvents, context pipeline.PipelineContext) {
 	pipeline.ProcessLogEventsOnly(in, context, p.processLogEvent)
@@ -98,15 +59,6 @@ func (p *ProcessorAddFields) processLogEvent(log *models.Log) {
 		}
 		contents.Add(k, v)
 	}
-}
-
-func (p *ProcessorAddFields) isExist(log *protocol.Log, key string) bool {
-	for idx := range log.Contents {
-		if log.Contents[idx].Key == key {
-			return true
-		}
-	}
-	return false
 }
 
 // Register the plugin to the Processors array.

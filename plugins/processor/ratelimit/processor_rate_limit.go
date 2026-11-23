@@ -14,13 +14,11 @@
 package ratelimit
 
 import (
-	"fmt"
 	"sort"
 	"strings"
 
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
@@ -47,7 +45,7 @@ func (p *ProcessorRateLimit) Init(context pipeline.Context) error {
 
 	// Sort the limit-key fields once here rather than on every makeKey call:
 	// Fields is fixed config, and sorting it in the hot path would both waste
-	// work and race when Process/ProcessLogs run concurrently on the shared slice.
+	// work and race when processors run concurrently on the shared slice.
 	sort.Strings(p.Fields)
 
 	metricsRecord := p.context.GetMetricRecord()
@@ -59,57 +57,14 @@ func (*ProcessorRateLimit) Description() string {
 	return "rate limit processor for logtail"
 }
 
-// V1
-func (p *ProcessorRateLimit) ProcessLogs(logArray []*protocol.Log) []*protocol.Log {
-	totalLen := len(logArray)
-	nextIdx := 0
-	for idx := 0; idx < totalLen; idx++ {
-		key := p.makeKey(logArray[idx])
-		if p.Algorithm.IsAllowed(key) {
-			if idx != nextIdx {
-				logArray[nextIdx] = logArray[idx]
-			}
-			nextIdx++
-		} else {
-			p.limitMetric.Add(1)
-		}
-	}
-	logArray = logArray[:nextIdx]
-	return logArray
-}
-
-func (p *ProcessorRateLimit) makeKey(log *protocol.Log) string {
-	if len(p.Fields) == 0 {
-		return ""
-	}
-
-	// Fields is already sorted in Init. Start from len=0 so the joined key holds
-	// exactly one segment per field (append below), instead of len(p.Fields)
-	// leading empty segments that would prefix every key with "_" separators.
-	values := make([]string, 0, len(p.Fields))
-	for _, field := range p.Fields {
-		value := ""
-		for _, logContent := range log.Contents {
-			if field == logContent.GetKey() {
-				value = fmt.Sprintf("%v", logContent.GetValue())
-				break
-			}
-		}
-		values = append(values, value)
-	}
-
-	return strings.Join(values, "_")
-}
-
 func init() {
 	pipeline.Processors[pluginType] = func() pipeline.Processor {
 		return &ProcessorRateLimit{}
 	}
 }
 
-// makeKeyV2 mirrors makeKey for the v2 models.Log representation, building the
-// limit key from the configured fields held in log.GetIndices().
-func (p *ProcessorRateLimit) makeKeyV2(log *models.Log) string {
+// makeKey joins the configured field values to select a token bucket.
+func (p *ProcessorRateLimit) makeKey(log *models.Log) string {
 	if len(p.Fields) == 0 {
 		return ""
 	}
@@ -129,11 +84,7 @@ func (p *ProcessorRateLimit) makeKeyV2(log *models.Log) string {
 	return strings.Join(values, "_")
 }
 
-// Process implements the v2 ProcessorV2 interface. Log events are rate limited
-// via the shared token-bucket algorithm (dropping logs when their limit key is
-// exhausted, mirroring the v1 semantics), while Metric/Span and any other
-// non-Log events always pass through unchanged. The original event order is
-// preserved.
+// Process rate-limits logs and passes other event types through.
 func (p *ProcessorRateLimit) Process(in *models.PipelineGroupEvents, context pipeline.PipelineContext) {
 	if in == nil {
 		return
@@ -141,7 +92,7 @@ func (p *ProcessorRateLimit) Process(in *models.PipelineGroupEvents, context pip
 	survivors := make([]models.PipelineEvent, 0, len(in.Events))
 	for _, event := range in.Events {
 		if event.GetType() == models.EventTypeLogging {
-			key := p.makeKeyV2(event.(*models.Log))
+			key := p.makeKey(event.(*models.Log))
 			if p.Algorithm.IsAllowed(key) {
 				survivors = append(survivors, event)
 			} else {

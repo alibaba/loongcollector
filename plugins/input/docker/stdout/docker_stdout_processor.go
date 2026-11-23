@@ -75,7 +75,7 @@ type DockerStdoutProcessor struct {
 	collector            pipeline.Collector
 
 	needCheckStream bool
-	source          string
+	logContext      map[string]interface{}
 	tags            []protocol.Log_Content
 	fieldNum        int
 
@@ -96,7 +96,7 @@ func NewDockerStdoutProcessor(beginLineReg *regexp.Regexp, beginLineTimeout time
 		stderr:               stderr,
 		context:              context,
 		collector:            collector,
-		source:               source,
+		logContext:           map[string]interface{}{"source": source},
 	}
 
 	if stdout && stderr {
@@ -230,7 +230,7 @@ func (p *DockerStdoutProcessor) Process(fileBlock []byte, noChangeInterval time.
 			switch {
 			case p.beginLineReg == nil && len(p.lastLogs) == 0 && lastChar == '\n':
 				// collect single line
-				p.collector.AddRawLogWithContext(p.newRawLogBySingleLine(thisLog), map[string]interface{}{"source": p.source})
+				p.collector.AddRawLogWithContext(p.newRawLogBySingleLine(thisLog), p.logContext)
 			case p.beginLineReg == nil:
 				// collect spilt multi lines, such as containerd.
 				if lastChar != '\n' {
@@ -239,7 +239,7 @@ func (p *DockerStdoutProcessor) Process(fileBlock []byte, noChangeInterval time.
 				p.lastLogs = append(p.lastLogs, thisLog)
 				p.lastLogsCount += len(thisLog.Content) + 24
 				if lastChar == '\n' {
-					p.collector.AddRawLogWithContext(p.newRawLogByMultiLine(), map[string]interface{}{"source": p.source})
+					p.collector.AddRawLogWithContext(p.newRawLogByMultiLine(), p.logContext)
 				}
 			default:
 				// collect user multi lines.
@@ -251,7 +251,7 @@ func (p *DockerStdoutProcessor) Process(fileBlock []byte, noChangeInterval time.
 				}
 				if p.beginLineReg.Match(checkLine) {
 					if len(p.lastLogs) != 0 {
-						p.collector.AddRawLogWithContext(p.newRawLogByMultiLine(), map[string]interface{}{"source": p.source})
+						p.collector.AddRawLogWithContext(p.newRawLogByMultiLine(), p.logContext)
 					}
 				}
 				thisLog.safeContent()
@@ -268,14 +268,14 @@ func (p *DockerStdoutProcessor) Process(fileBlock []byte, noChangeInterval time.
 
 	// last line and multi line timeout expired
 	if len(p.lastLogs) > 0 && (noChangeInterval > p.beginLineTimeout || p.lastLogsCount > p.maxLogSize) {
-		p.collector.AddRawLogWithContext(p.newRawLogByMultiLine(), map[string]interface{}{"source": p.source})
+		p.collector.AddRawLogWithContext(p.newRawLogByMultiLine(), p.logContext)
 	}
 
 	// no new line
 	if nowIndex == 0 && len(fileBlock) > 0 {
 		thisLog := p.ParseContainerLogLine(fileBlock)
 		if p.StreamAllowed(thisLog) {
-			p.collector.AddRawLogWithContext(p.newRawLogBySingleLine(thisLog), map[string]interface{}{"source": p.source})
+			p.collector.AddRawLogWithContext(p.newRawLogBySingleLine(thisLog), p.logContext)
 			processedCount = len(fileBlock)
 		}
 	}

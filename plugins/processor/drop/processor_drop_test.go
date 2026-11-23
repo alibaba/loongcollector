@@ -18,12 +18,13 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/alibaba/ilogtail/plugins/processor/internal/processortest"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/models"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
 )
 
@@ -41,13 +42,13 @@ func newProcessor(idxs ...int) (*ProcessorDrop, error) {
 	return processor, err
 }
 
-func getLog() *protocol.Log {
-	log := &protocol.Log{Time: 0}
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "test_1", Value: "test_1"})
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "test_2", Value: "test_2"})
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "test_3", Value: "test_3"})
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "test_4", Value: "test_4"})
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "test_5", Value: "test_5"})
+func getLog() *models.Log {
+	log := processortest.Log()
+	log.Contents.Add("test_1", "test_1")
+	log.Contents.Add("test_2", "test_2")
+	log.Contents.Add("test_3", "test_3")
+	log.Contents.Add("test_4", "test_4")
+	log.Contents.Add("test_5", "test_5")
 	return log
 }
 
@@ -56,8 +57,8 @@ func TestSourceKey(t *testing.T) {
 	processor, err := newProcessor(1, 2, 3, 4, 5)
 	require.NoError(t, err)
 	log := getLog()
-	processor.processLog(log)
-	assert.Equal(t, 0, len(log.Contents))
+	processortest.Apply(processor, log)
+	assert.Equal(t, 0, log.Contents.Len())
 }
 
 // drop first two
@@ -65,10 +66,11 @@ func TestSourceKey1(t *testing.T) {
 	processor, err := newProcessor(1, 2)
 	require.NoError(t, err)
 	log := getLog()
-	processor.processLog(log)
-	assert.Equal(t, "test_3", log.Contents[0].Value)
-	assert.Equal(t, "test_4", log.Contents[1].Value)
-	assert.Equal(t, "test_5", log.Contents[2].Value)
+	processortest.Apply(processor, log)
+	assert.Equal(t, "test_3", log.Contents.Get("test_3"))
+	assert.Equal(t, "test_4", log.Contents.Get("test_4"))
+	assert.Equal(t, "test_5", log.Contents.Get("test_5"))
+	assert.Equal(t, 3, log.Contents.Len())
 }
 
 // drop middle two
@@ -76,45 +78,47 @@ func TestSourceKey2(t *testing.T) {
 	processor, err := newProcessor(2, 3)
 	require.NoError(t, err)
 	log := getLog()
-	processor.processLog(log)
-	assert.Equal(t, "test_1", log.Contents[0].Value)
-	assert.Equal(t, "test_4", log.Contents[1].Value)
-	assert.Equal(t, "test_5", log.Contents[2].Value)
+	processortest.Apply(processor, log)
+	assert.Equal(t, "test_1", log.Contents.Get("test_1"))
+	assert.Equal(t, "test_4", log.Contents.Get("test_4"))
+	assert.Equal(t, "test_5", log.Contents.Get("test_5"))
+	assert.Equal(t, 3, log.Contents.Len())
 }
 
 func TestSourceKey3(t *testing.T) {
 	processor, err := newProcessor(1, 5)
 	require.NoError(t, err)
 	log := getLog()
-	processor.processLog(log)
-	assert.Equal(t, "test_2", log.Contents[0].Value)
-	assert.Equal(t, "test_3", log.Contents[1].Value)
-	assert.Equal(t, "test_4", log.Contents[2].Value)
+	processortest.Apply(processor, log)
+	assert.Equal(t, "test_2", log.Contents.Get("test_2"))
+	assert.Equal(t, "test_3", log.Contents.Get("test_3"))
+	assert.Equal(t, "test_4", log.Contents.Get("test_4"))
+	assert.Equal(t, 3, log.Contents.Len())
 }
 
 func TestSourceKey4(t *testing.T) {
 	processor, err := newProcessor(1, 3)
 	require.NoError(t, err)
 	log := getLog()
-	processor.processLog(log)
-	assert.Equal(t, "test_2", log.Contents[0].Value)
-	assert.Equal(t, "test_4", log.Contents[1].Value)
-	assert.Equal(t, "test_5", log.Contents[2].Value)
+	processortest.Apply(processor, log)
+	assert.Equal(t, "test_2", log.Contents.Get("test_2"))
+	assert.Equal(t, "test_4", log.Contents.Get("test_4"))
+	assert.Equal(t, "test_5", log.Contents.Get("test_5"))
+	assert.Equal(t, 3, log.Contents.Len())
 }
 
 func TestSourceKey5(t *testing.T) {
 	processor, err := newProcessor(3, 5)
 	require.NoError(t, err)
 	log := getLog()
-	processor.processLog(log)
-	assert.Equal(t, "test_1", log.Contents[0].Value)
-	assert.Equal(t, "test_2", log.Contents[1].Value)
-	assert.Equal(t, "test_4", log.Contents[2].Value)
+	processortest.Apply(processor, log)
+	assert.Equal(t, "test_1", log.Contents.Get("test_1"))
+	assert.Equal(t, "test_2", log.Contents.Get("test_2"))
+	assert.Equal(t, "test_4", log.Contents.Get("test_4"))
+	assert.Equal(t, 3, log.Contents.Len())
 }
 
-// ---- v2 (PipelineEvent / SendPb) Process path tests ----
-
-func TestProcessorDrop_ProcessV2DropsKeys(t *testing.T) {
+func TestProcessorDrop_ProcessDropsKeys(t *testing.T) {
 	processor := &ProcessorDrop{DropKeys: []string{"drop_me"}}
 	require.NoError(t, processor.Init(mock.NewEmptyContext("p", "l", "c")))
 
@@ -129,9 +133,9 @@ func TestProcessorDrop_ProcessV2DropsKeys(t *testing.T) {
 	assert.True(t, log.GetIndices().Contains("keep_me"), "other keys must be kept")
 }
 
-// TestProcessorDrop_ProcessV2PassesThroughMetric verifies Metric events are not
+// TestProcessorDrop_ProcessPassesThroughMetric verifies Metric events are not
 // dropped by the log-only processor.
-func TestProcessorDrop_ProcessV2PassesThroughMetric(t *testing.T) {
+func TestProcessorDrop_ProcessPassesThroughMetric(t *testing.T) {
 	processor := &ProcessorDrop{DropKeys: []string{"drop_me"}}
 	require.NoError(t, processor.Init(mock.NewEmptyContext("p", "l", "c")))
 

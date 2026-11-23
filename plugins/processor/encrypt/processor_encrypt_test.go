@@ -24,12 +24,14 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/alibaba/ilogtail/plugins/processor/internal/processortest"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/models"
-	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	pluginmanager "github.com/alibaba/ilogtail/pluginmanager"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
@@ -71,21 +73,21 @@ func newProcessor(sourceKeys []string, key []byte, iv []byte, keyFilePath string
 func testProcess(t *testing.T, p *ProcessorEncrypt) {
 	logCount := 3
 	testF := func(text string) {
-		var inputArray []*protocol.Log
+		var inputArray []*models.Log
 		for c := 0; c < logCount; c++ {
-			lg := &protocol.Log{}
-			lg.Contents = append(lg.Contents, &protocol.Log_Content{Key: "test", Value: "test"})
+			lg := processortest.Log()
+			lg.Contents.Add("test", "test")
 			for _, sourceName := range p.SourceKeys {
-				lg.Contents = append(lg.Contents, &protocol.Log_Content{Key: sourceName, Value: text})
+				lg.Contents.Add(sourceName, text)
 			}
-			lg.Contents = append(lg.Contents, &protocol.Log_Content{Key: "test2", Value: "test"})
+			lg.Contents.Add("test2", "test")
 			inputArray = append(inputArray, lg)
 		}
-		logArray := p.ProcessLogs(inputArray)
+		logArray := processortest.Apply(p, inputArray...)
 		require.Equal(t, 3, len(logArray))
 
 		for idx := 0; idx < logCount; idx++ {
-			ciphertext := logArray[idx].Contents[2].Value
+			ciphertext := pipeline.GetStringValue(logArray[idx].Contents.Get(p.SourceKeys[1]))
 			require.Equal(t, 0, len(ciphertext)%(p.blockSize*2))
 			iv := p.EncryptionParameters.IV
 			if len(iv) == 0 { // IV is generated randomly, read from ciphertext.
@@ -142,11 +144,7 @@ func benchmarkEncrypt(b *testing.B, p *ProcessorEncrypt, valueLen int) {
 
 	b.ResetTimer()
 	for loop := 0; loop < b.N; loop++ {
-		p.ProcessLogs([]*protocol.Log{{
-			Contents: []*protocol.Log_Content{
-				{Key: p.SourceKeys[0], Value: value},
-			},
-		}})
+		processortest.Apply(p, processortest.Log(p.SourceKeys[0], value))
 	}
 }
 
@@ -163,9 +161,7 @@ func BenchmarkConstantIV(b *testing.B) {
 //	benchmarkEncrypt(b, p, 255)
 // }
 
-// ---- v2 (PipelineEvent / SendPb) Process path tests ----
-
-func newEncryptV2(t *testing.T, sourceKeys ...string) *ProcessorEncrypt {
+func newEncrypt(t *testing.T, sourceKeys ...string) *ProcessorEncrypt {
 	processor := &ProcessorEncrypt{
 		SourceKeys: sourceKeys,
 		EncryptionParameters: &EncryptionInfo{
@@ -177,8 +173,8 @@ func newEncryptV2(t *testing.T, sourceKeys ...string) *ProcessorEncrypt {
 	return processor
 }
 
-func TestProcessorEncrypt_ProcessV2EncryptsSourceKey(t *testing.T) {
-	processor := newEncryptV2(t, "secret")
+func TestProcessorEncrypt_ProcessEncryptsSourceKey(t *testing.T) {
+	processor := newEncrypt(t, "secret")
 
 	log := models.NewLog("", nil, "", "", "", models.NewTags(), 0)
 	log.GetIndices().Add("secret", "plaintext")
@@ -195,8 +191,8 @@ func TestProcessorEncrypt_ProcessV2EncryptsSourceKey(t *testing.T) {
 	assert.Equal(t, "kept", log.GetIndices().Get("plain"), "non-source keys are untouched")
 }
 
-func TestProcessorEncrypt_ProcessV2PassesThroughMetric(t *testing.T) {
-	processor := newEncryptV2(t, "secret")
+func TestProcessorEncrypt_ProcessPassesThroughMetric(t *testing.T) {
+	processor := newEncrypt(t, "secret")
 
 	metric := models.NewSingleValueMetric("m", models.MetricTypeGauge, models.NewTags(), 0, 1.0)
 	context := helper.NewObservePipelineContext(10)

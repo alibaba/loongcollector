@@ -14,16 +14,7 @@
 
 package selfmonitor
 
-import (
-	"runtime"
-	"strconv"
-	"sync"
-	"time"
-
-	"github.com/alibaba/ilogtail/pkg/config"
-	"github.com/alibaba/ilogtail/pkg/protocol"
-	"github.com/alibaba/ilogtail/pkg/util"
-)
+import "sync"
 
 var GlobalAlarm *Alarm
 var alarmMutex sync.Mutex
@@ -41,14 +32,6 @@ func DeleteAlarm(key string) {
 	regMu.Lock()
 	defer regMu.Unlock()
 	delete(RegisterAlarms, key)
-}
-
-func RegisterAlarmsSerializeToPb(logGroup *protocol.LogGroup) {
-	regMu.Lock()
-	defer regMu.Unlock()
-	for _, alarm := range RegisterAlarms {
-		alarm.SerializeToPb(logGroup)
-	}
 }
 
 func RegisterAlarmsSerializeToMessages(results *[]AlarmExportMessage) {
@@ -118,39 +101,6 @@ func (p *Alarm) Record(alarmType AlarmType, level AlarmLevel, message string) {
 	}
 	alarmItem.Message = message
 	alarmItem.Count++
-	alarmMutex.Unlock()
-}
-
-func (p *Alarm) SerializeToPb(logGroup *protocol.LogGroup) {
-	nowTime := time.Now()
-	alarmMutex.Lock()
-	for _, item := range p.AlarmMap {
-		if item.Count == 0 {
-			continue
-		}
-		log := &protocol.Log{}
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "alarm_type", Value: item.AlarmType.String()})
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "alarm_level", Value: item.Level.String()})
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "alarm_message", Value: item.Message})
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "alarm_count", Value: strconv.Itoa(item.Count)})
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "ip", Value: util.GetIPAddress()})
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "os", Value: runtime.GOOS})
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "ver", Value: config.BaseVersion})
-		if p.Project != "" {
-			log.Contents = append(log.Contents, &protocol.Log_Content{Key: "project_name", Value: p.Project})
-		}
-		if p.Logstore != "" {
-			log.Contents = append(log.Contents, &protocol.Log_Content{Key: "category", Value: p.Logstore})
-		}
-		if p.Config != "" {
-			log.Contents = append(log.Contents, &protocol.Log_Content{Key: "config", Value: p.Config})
-		}
-		protocol.SetLogTime(log, uint32(nowTime.Unix()))
-		logGroup.Logs = append(logGroup.Logs, log)
-		// clear after serialize
-		item.Count = 0
-		item.Message = ""
-	}
 	alarmMutex.Unlock()
 }
 

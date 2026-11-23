@@ -27,7 +27,6 @@ import (
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
-	converter "github.com/alibaba/ilogtail/pkg/protocol/converter"
 )
 
 func TestDefaultEventPipeline(t *testing.T) {
@@ -196,23 +195,21 @@ func TestCollectorTagsStaySeparate(t *testing.T) {
 			require.Equal(t, "value", log.Tags.Get("configured"))
 			require.Equal(t, 3, log.Tags.Len())
 			require.Equal(t, "tag", group.Group.Tags.Get("group"))
-			wires, err := converter.PipelineGroupEventsToLogGroups(group)
+			var reports []*protocol.PipelineEventGroupReport
+			require.NoError(t, helper.ForEachPipelineEventReport(group, func(report *protocol.PipelineEventGroupReport) error {
+				reports = append(reports, report)
+				return nil
+			}))
+			require.Len(t, reports, 1)
+			received, err := helper.DecodePipelineEventReport(reports[0])
 			require.NoError(t, err)
-			require.Len(t, wires, 1)
-			wire := wires[0]
-			wireTags := make(map[string]string)
-			for _, tag := range wire.LogTags {
-				wireTags[tag.Key] = tag.Value
-			}
-			fields := make(map[string]string)
-			for _, field := range wire.Logs[0].Contents {
-				fields[field.Key] = field.Value
-			}
-			require.Equal(t, "GET", wireTags["_method_"])
-			require.NotContains(t, fields, "_method_")
-			require.Equal(t, "example-container:latest", wireTags["_image_name_"])
-			require.Equal(t, "value", wireTags["configured"])
-			require.Equal(t, "body", fields["content"])
+			require.Equal(t, "tag", received.Group.GetTags().Get("group"))
+			receivedLog := received.Events[0].(*models.Log)
+			require.Equal(t, "GET", receivedLog.GetTags().Get("_method_"))
+			require.Equal(t, "example-container:latest", receivedLog.GetTags().Get("_image_name_"))
+			require.Equal(t, "value", receivedLog.GetTags().Get("configured"))
+			require.False(t, receivedLog.GetIndices().Contains("_method_"))
+			require.Equal(t, []byte("body"), receivedLog.GetBody())
 		})
 	}
 }

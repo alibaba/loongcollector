@@ -2,7 +2,7 @@
 
 ## 简介
 
-`service_otlp` `input`插件实现了`ServiceInputV1`和`ServiceInputV2`接口，可以接受`Opentelemetry log/metric/trace protocol`的http/gRPC请求，并且转换输出SLSProto或PipelineGroupEvents。
+`service_otlp` 通过 HTTP 或 gRPC 接收 OpenTelemetry 日志、指标和链路，并将事件组提交给 Go Pipeline。
 
 
 ## 事件能力
@@ -48,8 +48,6 @@
   
 ```yaml
 enable: true
-global:
-  StructureType: v2
 inputs:
   - Type: service_otlp
     Protocals:
@@ -63,8 +61,6 @@ flushers:
 
 ```yaml
 enable: true
-global:
-  StructureType: v2
 inputs:
   - Type: service_otlp
     Protocals:
@@ -79,8 +75,6 @@ flushers:
   
 ```yaml
 enable: true
-global:
-  StructureType: v2
 inputs:
   - Type: service_otlp
     Protocals:

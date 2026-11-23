@@ -48,21 +48,6 @@ type logsGRPCServer struct {
 	plogotlp.UnimplementedGRPCServer
 }
 
-func newTracesReceiverV1(c pipeline.Collector) ptraceotlp.GRPCServer {
-	return &tracesGRPCServer{
-		ConsumeTracesFunc: func(ctx context.Context, td ptrace.Traces) error {
-			logs, err := opentelemetry.ConvertOtlpTraceV1(td)
-			if err != nil {
-				return err
-			}
-			for _, log := range logs {
-				c.AddRawLog(log)
-			}
-			return nil
-		},
-	}
-}
-
 func newTracesReceiver(pctx pipeline.PipelineContext) ptraceotlp.GRPCServer {
 	return &tracesGRPCServer{
 		ConsumeTracesFunc: func(ctx context.Context, td ptrace.Traces) error {
@@ -76,21 +61,6 @@ func newTracesReceiver(pctx pipeline.PipelineContext) ptraceotlp.GRPCServer {
 	}
 }
 
-func newMetricsReceiverV1(c pipeline.Collector) pmetricotlp.GRPCServer {
-	return &metricsGRPCServer{
-		ConsumeMetricsFunc: func(ctx context.Context, md pmetric.Metrics) error {
-			logs, err := opentelemetry.ConvertOtlpMetricV1(md)
-			if err != nil {
-				return err
-			}
-			for _, log := range logs {
-				c.AddRawLog(log)
-			}
-			return nil
-		},
-	}
-}
-
 func newMetricsReceiver(pctx pipeline.PipelineContext) pmetricotlp.GRPCServer {
 	return &metricsGRPCServer{
 		ConsumeMetricsFunc: func(ctx context.Context, md pmetric.Metrics) error {
@@ -99,21 +69,6 @@ func newMetricsReceiver(pctx pipeline.PipelineContext) pmetricotlp.GRPCServer {
 				return err
 			}
 			pctx.Collector().CollectList(groupEvents...)
-			return nil
-		},
-	}
-}
-
-func newLogsReceiverV1(c pipeline.Collector) plogotlp.GRPCServer {
-	return &logsGRPCServer{
-		ConsumeLogsFunc: func(ctx context.Context, ld plog.Logs) error {
-			logs, err := opentelemetry.ConvertOtlpLogV1(ld)
-			if err != nil {
-				return err
-			}
-			for _, log := range logs {
-				c.AddRawLog(log)
-			}
 			return nil
 		},
 	}

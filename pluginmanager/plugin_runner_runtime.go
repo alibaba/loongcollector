@@ -97,7 +97,7 @@ func (p *pluginRunner) AddPlugin(pluginMeta *pipeline.PluginMeta, category plugi
 			return p.addServiceInput(pluginMeta, service)
 		}
 	case pluginProcessor:
-		if processor, ok := plugin.(pipeline.ProcessorV2); ok {
+		if processor, ok := plugin.(pipeline.Processor); ok {
 			return p.addProcessor(pluginMeta, processor, config["priority"].(int))
 		}
 	case pluginAggregator:
@@ -161,7 +161,7 @@ func (p *pluginRunner) addServiceInput(pluginMeta *pipeline.PluginMeta, input pi
 	return err
 }
 
-func (p *pluginRunner) addProcessor(pluginMeta *pipeline.PluginMeta, processor pipeline.ProcessorV2, _ int) error {
+func (p *pluginRunner) addProcessor(pluginMeta *pipeline.PluginMeta, processor pipeline.Processor, _ int) error {
 	var wrapper ProcessorPluginWrapper
 	wrapper.Config = p.LogstoreConfig
 	wrapper.Processor = processor
@@ -441,29 +441,6 @@ func (p *pluginRunner) ReceivePipelineEventGroup(pbGroup *protocol.PipelineEvent
 	}
 
 	p.InputPipeContext.Collector().Collect(groupEvents.Group, groupEvents.Events...)
-}
-
-// ReceiveRawLog adapts the public raw-log input API to the event queue.
-func (p *pluginRunner) ReceiveRawLog(in *pipeline.LogWithContext) {
-	md := models.NewMetadata()
-	tags := models.NewTags()
-	if in.Context != nil {
-		for k, v := range in.Context {
-			switch value := v.(type) {
-			case string:
-				md.Add(k, value)
-			case []*protocol.LogTag:
-				for _, tag := range value {
-					tags.Add(tag.GetKey(), tag.GetValue())
-				}
-			default:
-				logger.Warningf(p.LogstoreConfig.Context.GetRuntimeContext(), selfmonitor.ReceiveRawLogAlarm, "unknown values found in context, type is %T", v)
-			}
-		}
-	}
-	log := convertInputLog(in.Log)
-	group := models.NewGroup(md, tags)
-	p.InputPipeContext.Collector().Collect(group, log)
 }
 
 func (p *pluginRunner) Merge(r PluginRunner) {
