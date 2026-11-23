@@ -71,11 +71,7 @@ func (p *groupedPipeCollector) Collect(group *models.GroupInfo, events ...models
 	if len(events) == 0 {
 		return
 	}
-	store, has := p.groupEvents[group]
-	if !has {
-		store = make([]models.PipelineEvent, 0)
-	}
-	p.groupEvents[group] = append(store, events...)
+	p.groupEvents[group] = append(p.groupEvents[group], events...)
 }
 
 func (p *groupedPipeCollector) CollectList(groups ...*models.PipelineGroupEvents) {
@@ -88,19 +84,20 @@ func (p *groupedPipeCollector) CollectList(groups ...*models.PipelineGroupEvents
 }
 
 func (p *groupedPipeCollector) ToArray() []*models.PipelineGroupEvents {
-	len, idx := len(p.groupEvents), 0
-	results := make([]*models.PipelineGroupEvents, len)
-	if len == 0 {
-		return results
-	}
+	results := make([]*models.PipelineGroupEvents, 0, len(p.groupEvents))
 	for group, events := range p.groupEvents {
-		results[idx] = &models.PipelineGroupEvents{
+		results = append(results, &models.PipelineGroupEvents{
 			Group:  group,
 			Events: events,
-		}
-		idx++
+		})
 	}
-	p.groupEvents = make(map[*models.GroupInfo][]models.PipelineEvent)
+	switch len(results) {
+	case 0, 1:
+		clear(p.groupEvents)
+	default:
+		// Keep the common single-group map, but release storage after fan-out.
+		p.groupEvents = make(map[*models.GroupInfo][]models.PipelineEvent)
+	}
 	return results
 }
 

@@ -21,7 +21,7 @@ import (
 )
 
 type orderedLogContents struct {
-	LogContents
+	keyValuesImpl[interface{}]
 	keys []string
 }
 
@@ -29,8 +29,8 @@ type orderedLogContents struct {
 // or a protobuf list of fields. The other log contents implementation is a map.
 func NewOrderedLogContents(capacity int) LogContents {
 	return &orderedLogContents{
-		LogContents: &keyValuesImpl[interface{}]{keyValues: make(map[string]interface{}, capacity)},
-		keys:        make([]string, 0, capacity),
+		keyValuesImpl: keyValuesImpl[interface{}]{keyValues: make(map[string]interface{}, capacity)},
+		keys:          make([]string, 0, capacity),
 	}
 }
 
@@ -71,8 +71,8 @@ func RenameLogContent(contents LogContents, source, destination string) {
 		ordered.Delete(destination)
 		if index := slices.Index(ordered.keys, source); index >= 0 {
 			ordered.keys[index] = destination
-			ordered.LogContents.Add(destination, value)
-			ordered.LogContents.Delete(source)
+			ordered.keyValuesImpl.Add(destination, value)
+			ordered.keyValuesImpl.Delete(source)
 		}
 		return
 	}
@@ -84,7 +84,7 @@ func (c *orderedLogContents) Add(key string, value interface{}) {
 	if !c.Contains(key) {
 		c.keys = append(c.keys, key)
 	}
-	c.LogContents.Add(key, value)
+	c.keyValuesImpl.Add(key, value)
 }
 
 func (c *orderedLogContents) AddAll(items map[string]interface{}) {
@@ -112,5 +112,5 @@ func (c *orderedLogContents) Delete(key string) {
 	if index := slices.Index(c.keys, key); index >= 0 {
 		c.keys = slices.Delete(c.keys, index, index+1)
 	}
-	c.LogContents.Delete(key)
+	c.keyValuesImpl.Delete(key)
 }
