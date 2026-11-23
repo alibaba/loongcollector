@@ -110,14 +110,15 @@ func (p *FlusherStdout) Export(in []*models.PipelineGroupEvents, context pipelin
 		if p.Tags {
 			metadata := fmt.Sprintf("%v", groupEvents.Group.GetMetadata().Iterator())
 			tags := fmt.Sprintf("%v", groupEvents.Group.GetTags().Iterator())
-			if batch != nil {
+			switch {
+			case batch != nil:
 				message := fmt.Sprintf("[Event] event %d, metadata %s, tags %s", len(groupEvents.Events), metadata, tags)
 				start := batch.beginLine()
 				batch.data = append(batch.data, message...)
 				batch = p.file.finishLine(batch, start)
-			} else if p.outLogger != nil {
+			case p.outLogger != nil:
 				p.outLogger.Infof("[Event] event %d, metadata %s, tags %s", len(groupEvents.Events), metadata, tags)
-			} else {
+			default:
 				logger.Info(p.context.GetRuntimeContext(), "[Event] event", len(groupEvents.Events), "metadata", metadata, "tags", tags)
 			}
 		}
