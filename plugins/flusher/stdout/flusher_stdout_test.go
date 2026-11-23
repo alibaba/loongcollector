@@ -20,6 +20,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	jsoniter "github.com/json-iterator/go"
 	"github.com/stretchr/testify/require"
@@ -84,8 +85,10 @@ func TestExportPreservesEachQueuedEvent(t *testing.T) {
 	lines := strings.Split(strings.TrimSpace(string(content)), "\n")
 	require.Len(t, lines, len(messages))
 	for i, line := range lines {
-		_, payload, found := strings.Cut(line, "{")
+		prefix, payload, found := strings.Cut(line, "{")
 		require.True(t, found)
+		_, err := time.Parse("2006-01-02 15:04:05", strings.TrimSpace(prefix))
+		require.NoError(t, err)
 		require.Equal(t, 1, strings.Count(payload, "\"traceID\":"))
 		var fields map[string]any
 		require.NoError(t, json.Unmarshal([]byte("{"+payload), &fields))

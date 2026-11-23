@@ -16,6 +16,8 @@ package stdout
 
 import (
 	"fmt"
+	"sync/atomic"
+	"time"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
@@ -32,7 +34,7 @@ const flushMsg = `
 	 %s
  </outputs>
  <formats>
-	 <format id="common" format="%%Date %%Time %%Msg%%n" />
+	 <format id="common" format="%s %%Msg%%n" />
  </formats>
 </seelog>
 `
@@ -71,7 +73,7 @@ func (p *FlusherStdout) Init(context pipeline.Context) error {
 	}
 	if pattern != "" {
 		var err error
-		p.outLogger, err = seelog.LoggerFromConfigAsString(fmt.Sprintf(flushMsg, pattern))
+		p.outLogger, err = seelog.LoggerFromConfigAsString(fmt.Sprintf(flushMsg, pattern, stdoutTimeFormat))
 		if err != nil {
 			logger.Warning(p.context.GetRuntimeContext(), selfmonitor.FlusherInitAlarm, "init stdout flusher fail, error", err)
 			p.outLogger = seelog.Disabled
@@ -252,8 +254,39 @@ func (p *FlusherStdout) Stop() error {
 	return nil
 }
 
+const stdoutTimestampFormatter = "LoongCollectorStdoutTimestamp"
+
+var stdoutTimeFormat = "%Date %Time"
+
+type timestampCacheEntry struct {
+	second   int64
+	location *time.Location
+	text     any
+}
+
+// newStdoutTimestampFormatter caches the formatted timestamp per logger.
+// The prefix has one-second precision and depends on the time's location.
+func newStdoutTimestampFormatter(_ string) seelog.FormatterFunc {
+	var cached atomic.Pointer[timestampCacheEntry]
+	return func(_ string, _ seelog.LogLevel, ctx seelog.LogContextInterface) any {
+		now := ctx.CallTime()
+		second, location := now.Unix(), now.Location()
+		if entry := cached.Load(); entry != nil && entry.second == second && entry.location == location {
+			return entry.text
+		}
+		entry := &timestampCacheEntry{
+			second: second, location: location, text: now.Format("2006-01-02 15:04:05"),
+		}
+		cached.Store(entry)
+		return entry.text
+	}
+}
+
 // Register the plugin to the Flushers array.
 func init() {
+	if err := seelog.RegisterCustomFormatter(stdoutTimestampFormatter, newStdoutTimestampFormatter); err == nil {
+		stdoutTimeFormat = "%" + stdoutTimestampFormatter
+	}
 	pipeline.Flushers["flusher_stdout"] = func() pipeline.Flusher {
 		return &FlusherStdout{
 			KeyValuePairs: true,
