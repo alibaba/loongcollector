@@ -36,7 +36,7 @@ type SlsFlusher struct { // nolint:revive
 	KeepShardHash   bool
 
 	context pipeline.Context
-	// sendPipelineEventGroup wraps the C++ bridge for testing.
+	// sendPipelineEventGroup wraps the C++ bridge for testing. It borrows the buffer until return.
 	sendPipelineEventGroup func(configName, logstore string, pbBuffer []byte, eventCount int, hash string) int
 }
 
@@ -96,14 +96,14 @@ func (p *SlsFlusher) sendPipelineEvents(group *models.GroupInfo, events []models
 		Tags: make(map[string][]byte), Metadata: make(map[string][]byte),
 	}
 	for k, v := range group.GetTags().Iterator() {
-		pb.Tags[k] = []byte(v)
+		pb.Tags[k] = util.ZeroCopyStringToBytes(v)
 	}
 	for k, v := range group.GetMetadata().Iterator() {
-		pb.Metadata[k] = []byte(v)
+		pb.Metadata[k] = util.ZeroCopyStringToBytes(v)
 	}
 	var shardHash string
 	if p.EnableShardHash {
-		shardHash = string(pb.Tags[util.ShardHashTagKey])
+		shardHash = group.GetTags().Get(util.ShardHashTagKey)
 		if !p.KeepShardHash {
 			delete(pb.Tags, util.ShardHashTagKey)
 		}
@@ -113,7 +113,9 @@ func (p *SlsFlusher) sendPipelineEvents(group *models.GroupInfo, events []models
 	eventCount := len(events)
 	switch events[0].GetType() {
 	case models.EventTypeLogging:
-		buf, count, err := marshalLogGroup(pb, events)
+		buffer := acquireLogWireBuffer()
+		defer releaseLogWireBuffer(buffer)
+		buf, count, err := buffer.marshalLogGroup(pb, events)
 		if err != nil || count == 0 {
 			return err
 		}

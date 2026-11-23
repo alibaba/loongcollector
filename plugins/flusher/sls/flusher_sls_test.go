@@ -18,10 +18,12 @@
 package sls
 
 import (
+	"bytes"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/encoding/protowire"
 
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/models"
@@ -52,6 +54,7 @@ func newTestFlusher(enableShardHash bool) (*SlsFlusher, *capturedSend) {
 	}
 	flusher.sendPipelineEventGroup = func(configName, logstore string, pbBuffer []byte, events int, hash string) int {
 		captured.configName, captured.logstore = configName, logstore
+		pbBuffer = bytes.Clone(pbBuffer)
 		captured.pbBuffer, captured.lines, captured.hash = pbBuffer, events, hash
 		captured.calls++
 		captured.pegCalls++
@@ -398,7 +401,8 @@ func TestMarshalLogGroupMatchesGeneratedEncoding(t *testing.T) {
 		Tags:     map[string][]byte{"__topic__": []byte("test"), "": {}},
 		Metadata: map[string][]byte{"source": []byte("input")},
 	}
-	encoded, count, err := marshalLogGroup(header, []models.PipelineEvent{
+	var buffer logWireBuffer
+	encoded, count, err := buffer.marshalLogGroup(header, []models.PipelineEvent{
 		&models.Log{}, log,
 	})
 	require.NoError(t, err)
@@ -418,4 +422,21 @@ func TestMarshalLogGroupMatchesGeneratedEncoding(t *testing.T) {
 	require.NoError(t, actual.Unmarshal(encoded))
 	require.NoError(t, expected.Unmarshal(originalWire))
 	require.Equal(t, expected, actual)
+}
+
+func TestWireMessageBackfillsCanonicalLength(t *testing.T) {
+	for _, size := range []int{0, 127, 128, 16383, 16384, 2097152} {
+		body := bytes.Repeat([]byte{0xFE}, size)
+		for _, reserved := range []int{2, 3} {
+			wire, lengthAt := beginWireMessage([]byte("header"), logEventField, reserved)
+			wire = finishWireMessage(append(wire, body...), lengthAt, reserved)
+			require.Equal(t, "header", string(wire[:6]))
+			number, kind, used := protowire.ConsumeTag(wire[6:])
+			require.EqualValues(t, logEventField, number)
+			require.Equal(t, protowire.BytesType, kind)
+			actual, consumed := protowire.ConsumeBytes(wire[6+used:])
+			require.Equal(t, protowire.SizeBytes(size), consumed)
+			require.Equal(t, body, actual)
+		}
+	}
 }
