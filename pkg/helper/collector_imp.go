@@ -65,25 +65,39 @@ func (p *observePipeCollector) Close() {
 // so it can only return all the grouped data at one time.
 type groupedPipeCollector struct {
 	groupEvents map[*models.GroupInfo][]models.PipelineEvent
+	firstGroup  *models.PipelineGroupEvents
 }
 
 func (p *groupedPipeCollector) Collect(group *models.GroupInfo, events ...models.PipelineEvent) {
 	if len(events) == 0 {
 		return
 	}
+	if first := p.firstGroup; first != nil {
+		p.groupEvents[first.Group] = append([]models.PipelineEvent(nil), first.Events...)
+		p.firstGroup = nil
+	}
 	p.groupEvents[group] = append(p.groupEvents[group], events...)
 }
 
 func (p *groupedPipeCollector) CollectList(groups ...*models.PipelineGroupEvents) {
-	if len(groups) == 0 {
-		return
-	}
-	for _, g := range groups {
-		p.Collect(g.Group, g.Events...)
+	for _, group := range groups {
+		if len(group.Events) == 0 {
+			continue
+		}
+		if p.firstGroup == nil && len(p.groupEvents) == 0 {
+			// An in-place processor can forward the group it received.
+			p.firstGroup = group
+			continue
+		}
+		p.Collect(group.Group, group.Events...)
 	}
 }
 
 func (p *groupedPipeCollector) ToArray() []*models.PipelineGroupEvents {
+	if group := p.firstGroup; group != nil {
+		p.firstGroup = nil
+		return []*models.PipelineGroupEvents{group}
+	}
 	results := make([]*models.PipelineGroupEvents, 0, len(p.groupEvents))
 	for group, events := range p.groupEvents {
 		results = append(results, &models.PipelineGroupEvents{
@@ -106,9 +120,8 @@ func (p *groupedPipeCollector) Observe() chan *models.PipelineGroupEvents {
 }
 
 func (p *groupedPipeCollector) Close() {
-	for k := range p.groupEvents {
-		delete(p.groupEvents, k)
-	}
+	p.firstGroup = nil
+	clear(p.groupEvents)
 }
 
 // noopPipeCollector is an empty collector implementation.

@@ -487,7 +487,8 @@ func (s *Syslog) handle(conn net.Conn, collector pipeline.PipelineCollector) {
 		s.connectionsWg.Done()
 	}()
 
-	logger.Info(s.context.GetRuntimeContext(), "handle for connection", conn.RemoteAddr().String(), "begin")
+	remoteAddr := conn.RemoteAddr().String()
+	logger.Info(s.context.GetRuntimeContext(), "handle for connection", remoteAddr, "begin")
 	buf := bufio.NewReader(conn)
 	scanner := bufio.NewScanner(buf)
 	byteBuf := make([]byte, s.MaxMessageSize)
@@ -522,14 +523,14 @@ func (s *Syslog) handle(conn net.Conn, collector pipeline.PipelineCollector) {
 
 		data := scanner.Bytes()
 		if len(data) > 0 {
-			s.parse(data, conn.RemoteAddr().String(), collector)
+			s.parse(data, remoteAddr, collector)
 		}
 		s.resetTimeout(conn)
 	}
 	if err := scanner.Err(); err != nil {
 		logger.Warning(s.context.GetRuntimeContext(), selfmonitor.ServiceSyslogStreamAlarm, "quit stream connection because of scan error out of loop", err)
 	}
-	logger.Info(s.context.GetRuntimeContext(), "handle for connection", conn.RemoteAddr().String(), "quit")
+	logger.Info(s.context.GetRuntimeContext(), "handle for connection", remoteAddr, "quit")
 }
 
 func (s *Syslog) removeConnection(c net.Conn) {
@@ -579,13 +580,9 @@ func (s *Syslog) listenPacket(collector pipeline.PipelineCollector) {
 }
 
 func (s *Syslog) parse(b []byte, clientIP string, collector pipeline.PipelineCollector) {
-	lines := bytes.Split(b, []byte("\n"))
-	if '\n' == b[len(b)-1] {
-		lines = lines[:len(lines)-1]
-	}
-
-	// Parse lines one by one, fill some fields of result if they are empty.
-	for _, line := range lines {
+	clientIP, _, _ = strings.Cut(clientIP, ":")
+	for line := range bytes.Lines(b) {
+		line = bytes.TrimSuffix(line, []byte{'\n'})
 		rst, err := s.parser.Parse(line)
 		if err != nil {
 			logger.Warning(s.context.GetRuntimeContext(), selfmonitor.ServiceSyslogParseAlarm, "Parse failed with protocol '", s.ParseProtocol,
@@ -594,6 +591,7 @@ func (s *Syslog) parse(b []byte, clientIP string, collector pipeline.PipelineCol
 			continue
 		}
 
+		timestamp := rst.time.UnixNano()
 		// Every parsed message has these nine standard fields.
 		fields := models.NewLogContentsWithCapacity(9)
 		fields.Add("_program_", rst.program)
@@ -602,17 +600,13 @@ func (s *Syslog) parse(b []byte, clientIP string, collector pipeline.PipelineCol
 		fields.Add("_severity_", strconv.Itoa(rst.severity))
 		// use nano timestamp because RFC5424's timestamp is [RFC3339]
 		// eg: 2003-08-24T05:14:15.000003-07:00, 2003-10-11T22:14:15.003Z
-		fields.Add("_unixtimestamp_", strconv.FormatInt(rst.time.UnixNano(), 10))
+		fields.Add("_unixtimestamp_", strconv.FormatInt(timestamp, 10))
 		if rst.hostname == "" {
 			fields.Add("_hostname_", util.GetHostName())
 		} else {
 			fields.Add("_hostname_", rst.hostname)
 		}
-		if len(clientIP) > 0 {
-			fields.Add("_client_ip_", strings.Split(clientIP, ":")[0])
-		} else {
-			fields.Add("_client_ip_", "")
-		}
+		fields.Add("_client_ip_", clientIP)
 
 		fields.Add("_ip_", util.GetIPAddress())
 		fields.Add("_content_", rst.content)
@@ -631,7 +625,7 @@ func (s *Syslog) parse(b []byte, clientIP string, collector pipeline.PipelineCol
 		log := &models.Log{
 			Contents:  fields,
 			Tags:      models.NewTags(),
-			Timestamp: uint64(rst.time.UnixNano()),
+			Timestamp: uint64(timestamp),
 		}
 		collector.Collect(models.NewGroup(models.NewMetadata(), models.NewTags()), log)
 	}

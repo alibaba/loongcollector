@@ -37,11 +37,7 @@ const flushMsg = `
 </seelog>
 `
 
-// FlusherStdout is a flusher plugin in plugin system.
-// It has two usages:
-// 1. flusher the logGroup to the stdout
-// 2. flusher the logGroup to the file. If the specified file name is not configured,
-// the logGroups would append to the global log file.
+// FlusherStdout writes events to stdout, a configured file or the global log.
 type FlusherStdout struct {
 	FileName      string
 	MaxSize       int
@@ -89,8 +85,8 @@ func (*FlusherStdout) Description() string {
 }
 
 func (p *FlusherStdout) Export(in []*models.PipelineGroupEvents, context pipeline.PipelineContext) error {
+	writer := jsoniter.NewStream(jsoniter.ConfigDefault, nil, 128)
 	for _, groupEvents := range in {
-
 		if p.Tags {
 			metadata := fmt.Sprintf("%v", groupEvents.Group.GetMetadata().Iterator())
 			tags := fmt.Sprintf("%v", groupEvents.Group.GetTags().Iterator())
@@ -102,10 +98,11 @@ func (p *FlusherStdout) Export(in []*models.PipelineGroupEvents, context pipelin
 		}
 
 		for _, event := range groupEvents.Events {
-			writer := jsoniter.NewStream(jsoniter.ConfigDefault, nil, 128)
+			writer.Reset(nil)
 			writer.WriteObjectStart()
 			writer.WriteObjectField("eventType")
-			switch event.GetType() {
+			eventType := event.GetType()
+			switch eventType {
 			case models.EventTypeMetric:
 				writer.WriteString("metric")
 			case models.EventTypeSpan:
@@ -115,30 +112,30 @@ func (p *FlusherStdout) Export(in []*models.PipelineGroupEvents, context pipelin
 			case models.EventTypeByteArray:
 				writer.WriteString("byteArray")
 			}
-			_, _ = writer.Write([]byte{','})
+			writer.WriteMore()
 			writer.WriteObjectField("name")
 			writer.WriteString(event.GetName())
-			_, _ = writer.Write([]byte{','})
+			writer.WriteMore()
 			writer.WriteObjectField("timestamp")
 			writer.WriteUint64(event.GetTimestamp())
-			_, _ = writer.Write([]byte{','})
+			writer.WriteMore()
 			writer.WriteObjectField("observedTimestamp")
 			writer.WriteUint64(event.GetObservedTimestamp())
-			_, _ = writer.Write([]byte{','})
+			writer.WriteMore()
 			writer.WriteObjectField("tags")
 			writer.WriteObjectStart()
-			i := 0
+			firstTag := true
 			for k, v := range event.GetTags().Iterator() {
+				if !firstTag {
+					writer.WriteMore()
+				}
+				firstTag = false
 				writer.WriteObjectField(k)
 				writer.WriteString(v)
-				if i < event.GetTags().Len()-1 {
-					_, _ = writer.Write([]byte{','})
-				}
-				i++
 			}
 			writer.WriteObjectEnd()
-			_, _ = writer.Write([]byte{','})
-			switch event.GetType() {
+			writer.WriteMore()
+			switch eventType {
 			case models.EventTypeMetric:
 				p.writeMetricValues(writer, event.(*models.Metric))
 			case models.EventTypeSpan:
@@ -151,10 +148,12 @@ func (p *FlusherStdout) Export(in []*models.PipelineGroupEvents, context pipelin
 
 			writer.WriteObjectEnd()
 
+			// The logger may retain the message after Export reuses the buffer.
+			message := string(writer.Buffer())
 			if p.outLogger != nil {
-				p.outLogger.Infof("%s", writer.Buffer())
+				p.outLogger.Info(message)
 			} else {
-				logger.Info(p.context.GetRuntimeContext(), string(writer.Buffer()))
+				logger.Info(p.context.GetRuntimeContext(), message)
 			}
 		}
 	}
@@ -209,26 +208,23 @@ func (p *FlusherStdout) writeSpan(writer *jsoniter.Stream, metric *models.Span) 
 func (p *FlusherStdout) writeLogBody(writer *jsoniter.Stream, log *models.Log) {
 	writer.WriteObjectField("offset")
 	writer.WriteInt64(int64(log.GetOffset()))
-	_, _ = writer.Write([]byte{','})
+	writer.WriteMore()
 	writer.WriteObjectField("level")
 	writer.WriteString(log.GetLevel())
-	_, _ = writer.Write([]byte{','})
+	writer.WriteMore()
 	writer.WriteObjectField("traceID")
 	writer.WriteString(log.GetTraceID())
-	_, _ = writer.Write([]byte{','})
-	writer.WriteObjectField("traceID")
-	writer.WriteString(log.GetTraceID())
-	_, _ = writer.Write([]byte{','})
+	writer.WriteMore()
 	writer.WriteObjectField("spanID")
 	writer.WriteString(log.GetSpanID())
 	contents := log.GetIndices()
 	for key, value := range contents.Iterator() {
-		_, _ = writer.Write([]byte{','})
+		writer.WriteMore()
 		writer.WriteObjectField(key)
 		if field, ok := value.(string); ok {
 			writer.WriteString(field)
 		} else {
-			_, _ = writer.Write([]byte(fmt.Sprintf("%#v", value)))
+			writer.WriteRaw(fmt.Sprintf("%#v", value))
 		}
 	}
 }

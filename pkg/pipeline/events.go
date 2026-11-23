@@ -127,7 +127,7 @@ func CollectGroupEvents(ctx PipelineContext, in *models.PipelineGroupEvents) {
 	if in == nil || len(in.Events) == 0 {
 		return
 	}
-	ctx.Collector().Collect(in.Group, in.Events...)
+	ctx.Collector().CollectList(in)
 }
 
 // GetStringValue converts a LogContents value to a string. A log body is

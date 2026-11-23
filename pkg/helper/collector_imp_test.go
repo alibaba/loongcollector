@@ -41,3 +41,24 @@ func TestGroupedPipelineCollectorDrainsWithoutRetainingEvents(t *testing.T) {
 	require.Equal(t, []models.PipelineEvent{second}, next[0].Events)
 	require.Equal(t, []models.PipelineEvent{first}, drained[0].Events)
 }
+
+func TestGroupedPipelineCollectorForwardAndMerge(t *testing.T) {
+	collector := NewGroupedPipelineContext().Collector()
+	info := &models.GroupInfo{}
+	first := &models.Log{Name: "first"}
+	second := &models.Log{Name: "second"}
+	in := &models.PipelineGroupEvents{Group: info, Events: []models.PipelineEvent{first}}
+
+	collector.CollectList(in)
+	forwarded := collector.ToArray()
+	require.Len(t, forwarded, 1)
+	require.Same(t, in, forwarded[0])
+	require.Empty(t, collector.ToArray())
+
+	collector.CollectList(in)
+	collector.Collect(info, second)
+	merged := collector.ToArray()
+	require.Len(t, merged, 1)
+	require.Equal(t, []models.PipelineEvent{first, second}, merged[0].Events)
+	require.Equal(t, []models.PipelineEvent{first}, in.Events)
+}

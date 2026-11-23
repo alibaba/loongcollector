@@ -16,12 +16,16 @@ package stdout
 
 import (
 	"encoding/json"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	jsoniter "github.com/json-iterator/go"
 	"github.com/stretchr/testify/require"
 
 	"github.com/alibaba/ilogtail/pkg/models"
+	"github.com/alibaba/ilogtail/plugins/test/mock"
 )
 
 func TestWriteLogBodyContentEncoding(t *testing.T) {
@@ -58,5 +62,34 @@ func TestWriteLogBodyContentEncoding(t *testing.T) {
 			require.NoError(t, json.Unmarshal(writer.Buffer(), &fields))
 			require.Equal(t, test.decoded, fields["field"])
 		})
+	}
+}
+
+func TestExportPreservesEachQueuedEvent(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "events.log")
+	flusher := &FlusherStdout{FileName: path}
+	require.NoError(t, flusher.Init(mock.NewEmptyContext("p", "l", "c")))
+	group := &models.PipelineGroupEvents{}
+	messages := []string{strings.Repeat("first % message ", 20), "second % message"}
+	for _, message := range messages {
+		fields := models.NewLogContents()
+		fields.Add("message", message)
+		group.Events = append(group.Events, &models.Log{TraceID: "trace-1", Tags: models.NewTags(), Contents: fields})
+	}
+
+	require.NoError(t, flusher.Export([]*models.PipelineGroupEvents{group}, nil))
+	require.NoError(t, flusher.Stop())
+	content, err := os.ReadFile(path)
+	require.NoError(t, err)
+	lines := strings.Split(strings.TrimSpace(string(content)), "\n")
+	require.Len(t, lines, len(messages))
+	for i, line := range lines {
+		_, payload, found := strings.Cut(line, "{")
+		require.True(t, found)
+		require.Equal(t, 1, strings.Count(payload, "\"traceID\":"))
+		var fields map[string]any
+		require.NoError(t, json.Unmarshal([]byte("{"+payload), &fields))
+		require.Equal(t, messages[i], fields["message"])
+		require.Equal(t, "trace-1", fields["traceID"])
 	}
 }
