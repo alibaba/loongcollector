@@ -47,6 +47,7 @@ public:
     void TestJsonUnicodeCharacters();
     void TestJsonWithNullValues();
     void TestInvalidJsonFormats();
+    void TestReuseParserAcrossLines();
 
     CollectionPipelineContext mContext;
 };
@@ -90,6 +91,8 @@ UNIT_TEST_CASE(ProcessorParseJsonNativeUnittest, TestJsonUnicodeCharacters);
 UNIT_TEST_CASE(ProcessorParseJsonNativeUnittest, TestJsonWithNullValues);
 
 UNIT_TEST_CASE(ProcessorParseJsonNativeUnittest, TestInvalidJsonFormats);
+
+UNIT_TEST_CASE(ProcessorParseJsonNativeUnittest, TestReuseParserAcrossLines);
 
 PluginInstance::PluginMeta getPluginMeta() {
     PluginInstance::PluginMeta pluginMeta{"1"};
@@ -1291,6 +1294,56 @@ void ProcessorParseJsonNativeUnittest::TestInvalidJsonFormats() {
     })";
     std::string outJson = eventGroupList[0].ToJsonString();
     APSARA_TEST_STREQ_FATAL(CompactJson(expectJson).c_str(), CompactJson(outJson).c_str());
+}
+
+void ProcessorParseJsonNativeUnittest::TestReuseParserAcrossLines() {
+    // A long line, a truncated line, a short line and a line above the reuse limit, parsed in sequence
+    Json::Value config;
+    config["SourceKey"] = "content";
+    config["KeepingSourceWhenParseFail"] = true;
+    config["KeepingSourceWhenParseSucceed"] = false;
+    config["CopingRawLog"] = false;
+    config["RenamedSourceKey"] = "rawLog";
+
+    const std::string longValue(1000, 'x');
+    const std::string hugeValue(100 * 1024, 'y');
+    std::vector<std::string> lines;
+    lines.emplace_back(std::string("{\"k\":\"") + longValue + "\",\"n\":1}");
+    lines.emplace_back("{\"k\":\"xxxx");
+    lines.emplace_back("{\"a\":2}");
+    lines.emplace_back(std::string("{\"h\":\"") + hugeValue + "\"}");
+    lines.emplace_back("{\"b\":true}");
+
+    auto sourceBuffer = std::make_shared<SourceBuffer>();
+    PipelineEventGroup eventGroup(sourceBuffer);
+    for (const auto& line : lines) {
+        auto* event = eventGroup.AddLogEvent();
+        event->SetTimestamp(12345678901);
+        event->SetContent(std::string("content"), line);
+    }
+
+    ProcessorParseJsonNative& processor = *(new ProcessorParseJsonNative);
+    ProcessorInstance processorInstance(&processor, getPluginMeta());
+    APSARA_TEST_TRUE_FATAL(processorInstance.Init(config, mContext));
+    std::vector<PipelineEventGroup> eventGroupList;
+    eventGroupList.emplace_back(std::move(eventGroup));
+    processorInstance.Process(eventGroupList);
+
+    auto& events = eventGroupList[0].GetEvents();
+    APSARA_TEST_EQUAL_FATAL(5U, events.size());
+    const auto& e0 = events[0].Cast<LogEvent>();
+    APSARA_TEST_EQUAL_FATAL(longValue, e0.GetContent("k").to_string());
+    APSARA_TEST_EQUAL_FATAL(std::string("1"), e0.GetContent("n").to_string());
+    const auto& e1 = events[1].Cast<LogEvent>();
+    APSARA_TEST_FALSE_FATAL(e1.HasContent("k"));
+    APSARA_TEST_EQUAL_FATAL(lines[1], e1.GetContent("rawLog").to_string());
+    const auto& e2 = events[2].Cast<LogEvent>();
+    APSARA_TEST_EQUAL_FATAL(std::string("2"), e2.GetContent("a").to_string());
+    APSARA_TEST_FALSE_FATAL(e2.HasContent("k"));
+    const auto& e3 = events[3].Cast<LogEvent>();
+    APSARA_TEST_EQUAL_FATAL(hugeValue, e3.GetContent("h").to_string());
+    const auto& e4 = events[4].Cast<LogEvent>();
+    APSARA_TEST_EQUAL_FATAL(std::string("true"), e4.GetContent("b").to_string());
 }
 
 } // namespace logtail

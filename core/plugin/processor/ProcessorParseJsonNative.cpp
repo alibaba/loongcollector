@@ -23,6 +23,12 @@
 #if defined(__INCLUDE_SSE4_2__)
 #include <cinttypes>
 #include <cstdio>
+#include <cstring>
+
+#include <memory>
+#include <new>
+#include <optional>
+#include <string>
 
 #include "simdjson/simdjson.h"
 
@@ -259,15 +265,39 @@ bool ProcessorParseJsonNative::JsonLogLineParserSimdJson(LogEvent& sourceEvent,
     if (buffer.empty())
         return false;
 
-    simdjson::ondemand::parser parser;
-    simdjson::padded_string bufStr(buffer.data(), buffer.size());
+    // Processor threads may run the same instance concurrently, so the reused parser and buffer are per thread.
+    // Lines larger than kSimdJsonReuseMaxSize use local ones so that one huge line does not pin memory.
+    static constexpr size_t kSimdJsonReuseMaxSize = 64 * 1024;
+    thread_local simdjson::ondemand::parser sParser;
+    thread_local std::string sPaddedBuffer;
+    std::optional<simdjson::ondemand::parser> localParser;
+    simdjson::padded_string localBuffer;
+    simdjson::ondemand::parser* parser = &sParser;
+    simdjson::padded_string_view bufStr;
+    bool useLocal = buffer.size() > kSimdJsonReuseMaxSize;
+    if (!useLocal) {
+        try {
+            sPaddedBuffer.resize(buffer.size() + simdjson::SIMDJSON_PADDING);
+            memcpy(sPaddedBuffer.data(), buffer.data(), buffer.size());
+            memset(sPaddedBuffer.data() + buffer.size(), 0, simdjson::SIMDJSON_PADDING);
+            bufStr = simdjson::padded_string_view(sPaddedBuffer.data(), buffer.size(), sPaddedBuffer.size());
+        } catch (const std::bad_alloc&) {
+            useLocal = true;
+        }
+    }
+    if (useLocal) {
+        localParser.emplace();
+        parser = &*localParser;
+        localBuffer = simdjson::padded_string(buffer.data(), buffer.size());
+        bufStr = localBuffer;
+    }
     simdjson::ondemand::document doc;
     simdjson::ondemand::object object;
 
     // Use try-catch to handle all simdjson parsing errors generically
     // This maintains compatibility with rapidjson's error handling approach
     try {
-        auto error = parser.iterate(bufStr).get(doc);
+        auto error = parser->iterate(bufStr).get(doc);
         if (error) {
             if (AlarmManager::GetInstance()->IsLowLevelAlarmValid()) {
                 LOG_WARNING(
