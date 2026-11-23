@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -262,21 +263,28 @@ func decodePipelineLogGroup(wire []byte) *models.PipelineGroupEvents {
 		return nil
 	}
 
-	events := make([]models.PipelineEvent, 0)
-	var fields [8]pipelineLogWireField
-	for len(logs) > 0 {
-		if logs[0] != logEventTag {
+	// Count the log frames to allocate the event list once. This pass only
+	// reads length prefixes and skips each log payload.
+	count := 0
+	for remaining := logs; len(remaining) > 0; count++ {
+		if remaining[0] != logEventTag {
 			return nil
 		}
-		data, n := protowire.ConsumeBytes(logs[1:])
+		_, n := protowire.ConsumeBytes(remaining[1:])
 		if n < 0 {
 			return nil
 		}
+		remaining = remaining[1+n:]
+	}
+	events := make([]models.PipelineEvent, count)
+	var fields [8]pipelineLogWireField
+	for i := range events {
+		data, n := protowire.ConsumeBytes(logs[1:])
 		log := decodePipelineLog(data, fields[:0])
 		if log == nil {
 			return nil
 		}
-		events = append(events, log)
+		events[i] = log
 		logs = logs[1+n:]
 	}
 
@@ -354,11 +362,51 @@ func decodePipelineLog(wire []byte, fields []pipelineLogWireField) *models.Log {
 	log.Tags = models.NewTags()
 	if len(fields) > 0 {
 		log.Contents = models.NewOrderedLogContents(len(fields))
-		for _, field := range fields {
-			addPipelineLogContent(&log, field.key, field.value, false)
+		if len(fields) == 1 {
+			addPipelineLogContent(&log, fields[0].key, fields[0].value, false)
+		} else {
+			addOwnedNativeLogContents(&log, fields)
 		}
 	}
 	return &log
+}
+
+// Small immutable fields from the same native log can share Go-owned string
+// storage. Keep the mutable body separate so dropping it releases its buffer.
+func addOwnedNativeLogContents(log *models.Log, fields []pipelineLogWireField) {
+	immutableSize := 0
+	for _, field := range fields {
+		if string(field.key) != models.BodyKey {
+			immutableSize += len(field.key) + len(field.value)
+		}
+	}
+	// A surviving small field should not pin a large deleted value.
+	const maxPackedLogFields = 4 * 1024
+	if immutableSize > maxPackedLogFields {
+		for _, field := range fields {
+			addPipelineLogContent(log, field.key, field.value, false)
+		}
+		return
+	}
+	var packed strings.Builder
+	packed.Grow(immutableSize)
+	for _, field := range fields {
+		if string(field.key) != models.BodyKey {
+			packed.Write(field.key)
+			packed.Write(field.value)
+		}
+	}
+	owned := packed.String()
+	for _, field := range fields {
+		if string(field.key) == models.BodyKey {
+			addPipelineLogContent(log, field.key, field.value, false)
+			continue
+		}
+		keyEnd := len(field.key)
+		valueEnd := keyEnd + len(field.value)
+		log.Contents.Add(owned[:keyEnd], owned[keyEnd:valueEnd])
+		owned = owned[valueEnd:]
+	}
 }
 
 type pipelineLogWireField struct {
