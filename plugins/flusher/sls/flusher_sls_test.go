@@ -381,3 +381,41 @@ func BenchmarkSlsFlusherExport(b *testing.B) {
 		})
 	}
 }
+
+func TestMarshalLogGroupMatchesGeneratedEncoding(t *testing.T) {
+	log := &models.Log{
+		Timestamp: 1700000001234567890,
+		Level:     "warn",
+		Offset:    65001,
+		RawSize:   65536,
+		Contents:  models.NewOrderedLogContents(4),
+	}
+	log.GetIndices().Add("message", "a UTF-8 message 日志")
+	log.GetIndices().Add("empty", "")
+	log.GetIndices().Add("", []byte{0xff, 0})
+	log.GetIndices().Add("data", []byte{})
+	header := &protocol.PipelineEventGroup{
+		Tags:     map[string][]byte{"__topic__": []byte("test"), "": {}},
+		Metadata: map[string][]byte{"source": []byte("input")},
+	}
+	encoded, count, err := marshalLogGroup(header, []models.PipelineEvent{
+		&models.Log{}, log,
+	})
+	require.NoError(t, err)
+	require.Equal(t, 1, count)
+	referenceLog, err := helper.TransferLogEventToPB(log)
+	require.NoError(t, err)
+	reference := &protocol.PipelineEventGroup{
+		Tags:     header.Tags,
+		Metadata: header.Metadata,
+		PipelineEvents: &protocol.PipelineEventGroup_Logs{
+			Logs: &protocol.PipelineEventGroup_LogEvents{Events: []*protocol.LogEvent{referenceLog}},
+		},
+	}
+	originalWire, err := reference.Marshal()
+	require.NoError(t, err)
+	var actual, expected protocol.PipelineEventGroup
+	require.NoError(t, actual.Unmarshal(encoded))
+	require.NoError(t, expected.Unmarshal(originalWire))
+	require.Equal(t, expected, actual)
+}

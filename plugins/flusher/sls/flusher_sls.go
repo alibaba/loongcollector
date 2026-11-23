@@ -101,34 +101,23 @@ func (p *SlsFlusher) sendPipelineEvents(group *models.GroupInfo, events []models
 	for k, v := range group.GetMetadata().Iterator() {
 		pb.Metadata[k] = []byte(v)
 	}
+	var shardHash string
+	if p.EnableShardHash {
+		shardHash = string(pb.Tags[util.ShardHashTagKey])
+		if !p.KeepShardHash {
+			delete(pb.Tags, util.ShardHashTagKey)
+		}
+	}
 	// Check conversion errors explicitly: the generic group helper ignores
 	// event conversion failures, which would turn malformed data into data loss.
 	eventCount := len(events)
 	switch events[0].GetType() {
 	case models.EventTypeLogging:
-		logs := &protocol.PipelineEventGroup_LogEvents{
-			Events: make([]*protocol.LogEvent, 0, len(events)),
+		buf, count, err := marshalLogGroup(pb, events)
+		if err != nil || count == 0 {
+			return err
 		}
-		for _, event := range events {
-			log, ok := event.(*models.Log)
-			if !ok || log == nil {
-				return fmt.Errorf("invalid log event %T", event)
-			}
-			// SLS requires at least one content field in each wire log.
-			if log.GetIndices().Len() == 0 {
-				continue
-			}
-			converted, err := helper.TransferLogEventToPB(log)
-			if err != nil {
-				return fmt.Errorf("convert log event: %w", err)
-			}
-			logs.Events = append(logs.Events, converted)
-		}
-		eventCount = len(logs.Events)
-		if eventCount == 0 {
-			return nil
-		}
-		pb.PipelineEvents = &protocol.PipelineEventGroup_Logs{Logs: logs}
+		return p.sendEventGroupBytes(group, buf, count, shardHash)
 	case models.EventTypeMetric:
 		metrics := &protocol.PipelineEventGroup_MetricEvents{
 			Events: make([]*protocol.MetricEvent, 0, len(events)),
@@ -164,17 +153,14 @@ func (p *SlsFlusher) sendPipelineEvents(group *models.GroupInfo, events []models
 	default:
 		return fmt.Errorf("unsupported pipeline event type %v", events[0].GetType())
 	}
-	var shardHash string
-	if p.EnableShardHash {
-		shardHash = string(pb.Tags[util.ShardHashTagKey])
-		if !p.KeepShardHash {
-			delete(pb.Tags, util.ShardHashTagKey)
-		}
-	}
 	buf, err := pb.Marshal()
 	if err != nil {
 		return fmt.Errorf("marshal pipeline event group: %w", err)
 	}
+	return p.sendEventGroupBytes(group, buf, eventCount, shardHash)
+}
+
+func (p *SlsFlusher) sendEventGroupBytes(group *models.GroupInfo, buf []byte, eventCount int, shardHash string) error {
 	logstore := group.GetDestinationLogstore()
 	if logstore == "" {
 		logstore = p.context.GetLogstore()
