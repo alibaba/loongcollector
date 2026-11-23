@@ -1,10 +1,13 @@
 package helper
 
 import (
+	"bytes"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/encoding/protowire"
 
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/protocol"
@@ -68,6 +71,150 @@ func TestTransferPBToLogEventsKeepBodyIndependent(t *testing.T) {
 	log.GetBody()[1] = 'R'
 	require.Equal(t, []byte("Original"), body)
 	require.Equal(t, []byte("original"), groupLog.GetBody())
+}
+
+func TestDecodePipelineGroupEventsOwnsLogData(t *testing.T) {
+	wire := marshalPipelineLogGroup(t,
+		&protocol.LogEvent{
+			Timestamp:  1_700_000_000_000_000_123,
+			Level:      []byte("warning"),
+			FileOffset: 100,
+			RawSize:    127,
+			Contents: []*protocol.LogEvent_Content{
+				{Key: []byte("before"), Value: []byte("original")},
+				{Key: []byte(models.BodyKey), Value: []byte("original body")},
+				{Key: []byte("after"), Value: []byte("last field")},
+				{Key: []byte("before"), Value: []byte("updated")},
+				{Key: []byte(models.BodyKey), Value: []byte{0xff, 0xfe, 0}},
+				{Key: []byte(models.BodyKey)},
+				{Key: []byte("empty")},
+			},
+		},
+		&protocol.LogEvent{},
+		&protocol.LogEvent{Contents: []*protocol.LogEvent_Content{{Key: []byte(models.BodyKey)}}},
+	)
+	require.NotNil(t, decodePipelineLogGroup(wire))
+
+	want, err := decodePipelineGroupEventsWithProtobuf(wire)
+	require.NoError(t, err)
+	got, err := DecodePipelineGroupEvents(wire)
+	require.NoError(t, err)
+	clear(wire)
+
+	require.Equal(t, want, got)
+	log := got.Events[0].(*models.Log)
+	require.Equal(t, []byte{0xff, 0xfe, 0}, log.GetBody())
+	require.Equal(t, "updated", log.GetIndices().Get("before"))
+	require.True(t, log.GetIndices().Contains("empty"))
+	var keys []string
+	for key := range models.LogContentEntries(log.GetIndices()) {
+		keys = append(keys, key)
+	}
+	require.Equal(t, []string{"before", models.BodyKey, "after", "empty"}, keys)
+	require.Equal(t, "host.example", got.Group.Tags.Get("hostname"))
+	require.Equal(t, "/var/log/app.log", got.Group.Metadata.Get("log.file.path"))
+}
+
+func TestDecodePipelineGroupEventsWireCompatibility(t *testing.T) {
+	logs := marshalPipelineLogGroup(t, &protocol.LogEvent{Timestamp: 100})
+	metrics, err := (&protocol.PipelineEventGroup{
+		PipelineEvents: &protocol.PipelineEventGroup_Metrics{Metrics: &protocol.PipelineEventGroup_MetricEvents{
+			Events: []*protocol.MetricEvent{{
+				Name: []byte("cpu"), Value: &protocol.MetricEvent_UntypedSingleValue{
+					UntypedSingleValue: &protocol.UntypedSingleValue{Value: 1.5},
+				},
+			}},
+		}},
+	}).Marshal()
+	require.NoError(t, err)
+	spans, err := (&protocol.PipelineEventGroup{
+		PipelineEvents: &protocol.PipelineEventGroup_Spans{Spans: &protocol.PipelineEventGroup_SpanEvents{
+			Events: []*protocol.SpanEvent{{Name: []byte("request"), TraceID: []byte("trace-id")}},
+		}},
+	}).Marshal()
+	require.NoError(t, err)
+	unknown := protowire.AppendTag(bytes.Clone(logs), 6, protowire.VarintType)
+	unknown = protowire.AppendVarint(unknown, 42)
+
+	for _, tc := range []struct {
+		name string
+		wire []byte
+		fast bool
+	}{
+		{name: "empty log wrapper", wire: marshalPipelineLogGroup(t), fast: true},
+		{name: "metrics", wire: metrics},
+		{name: "spans", wire: spans},
+		{name: "unknown field", wire: unknown},
+		{name: "last oneof member wins", wire: append(bytes.Clone(logs), metrics...)},
+		{name: "last repeated log wrapper wins", wire: append(bytes.Clone(logs), marshalPipelineLogGroup(t)...)},
+		{name: "invalid metadata entry", wire: []byte{0x0a, 0x01, 0x0a, 0x1a, 0x00}},
+		{name: "invalid log event", wire: []byte{0x1a, 0x03, 0x0a, 0x01, 0x80}},
+		{name: "truncated group", wire: logs[:len(logs)-1]},
+		{name: "missing event type"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			require.Equal(t, tc.fast, decodePipelineLogGroup(tc.wire) != nil)
+			want, wantErr := decodePipelineGroupEventsWithProtobuf(tc.wire)
+			got, err := DecodePipelineGroupEvents(tc.wire)
+			require.Equal(t, wantErr, err)
+			require.Equal(t, want, got)
+		})
+	}
+}
+
+func marshalPipelineLogGroup(t testing.TB, logs ...*protocol.LogEvent) []byte {
+	t.Helper()
+	wire, err := (&protocol.PipelineEventGroup{
+		Metadata: map[string][]byte{"log.file.path": []byte("/var/log/app.log")},
+		Tags:     map[string][]byte{"hostname": []byte("host.example")},
+		PipelineEvents: &protocol.PipelineEventGroup_Logs{
+			Logs: &protocol.PipelineEventGroup_LogEvents{Events: logs},
+		},
+	}).Marshal()
+	require.NoError(t, err)
+	return wire
+}
+
+func decodePipelineGroupEventsWithProtobuf(wire []byte) (*models.PipelineGroupEvents, error) {
+	var group protocol.PipelineEventGroup
+	if err := group.Unmarshal(wire); err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrInvalidPipelineEventGroupWire, err)
+	}
+	return transferPBToPipelineGroupEvents(&group, true)
+}
+
+func BenchmarkDecodePipelineGroupEvents(b *testing.B) {
+	for _, fieldCount := range []int{1, 6} {
+		b.Run(fmt.Sprintf("128_logs_%d_fields", fieldCount), func(b *testing.B) {
+			contents := []*protocol.LogEvent_Content{
+				{Key: []byte(models.BodyKey), Value: bytes.Repeat([]byte("x"), 512)},
+			}
+			for i := 1; i < fieldCount; i++ {
+				contents = append(contents, &protocol.LogEvent_Content{
+					Key: []byte(fmt.Sprintf("field-%d", i)), Value: []byte("app log field value"),
+				})
+			}
+			logs := make([]*protocol.LogEvent, 128)
+			for i := range logs {
+				logs[i] = &protocol.LogEvent{
+					Timestamp:  1_700_000_000_000_000_000 + uint64(i),
+					Level:      []byte("info"),
+					FileOffset: uint64(i * 512),
+					RawSize:    512,
+					Contents:   contents,
+				}
+			}
+			wire := marshalPipelineLogGroup(b, logs...)
+			b.ReportAllocs()
+			b.SetBytes(int64(len(wire)))
+			for b.Loop() {
+				_, err := DecodePipelineGroupEvents(wire)
+				if err != nil {
+					b.Fatal(err)
+				}
+			}
+		})
+	}
 }
 
 func TestTransferLogEventToPBPreservesContentOrderAndOwnership(t *testing.T) {

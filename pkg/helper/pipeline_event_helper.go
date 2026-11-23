@@ -7,6 +7,8 @@ import (
 	"sync"
 	"time"
 
+	"google.golang.org/protobuf/encoding/protowire"
+
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/util"
@@ -166,22 +168,24 @@ func transferPBToLogEvent(src *protocol.LogEvent, takeBody bool) (*models.Log, e
 		log.Contents = models.NewOrderedLogContents(len(src.Contents))
 	}
 	for _, content := range src.Contents {
-		key := string(content.Key)
-		if key != models.BodyKey {
-			log.Contents.Add(key, string(content.Value))
-			continue
-		}
-		body := content.Value
-		// Empty protobuf values do not insert or overwrite the body field.
-		if len(body) == 0 {
-			continue
-		}
-		if !takeBody {
-			body = slices.Clone(body)
-		}
-		log.SetBody(body)
+		addPipelineLogContent(log, content.Key, content.Value, takeBody)
 	}
 	return log, nil
+}
+
+func addPipelineLogContent(log *models.Log, key, value []byte, takeBody bool) {
+	if string(key) != models.BodyKey {
+		log.Contents.Add(string(key), string(value))
+		return
+	}
+	// Empty protobuf values do not insert or overwrite the body field.
+	if len(value) == 0 {
+		return
+	}
+	if !takeBody {
+		value = slices.Clone(value)
+	}
+	log.SetBody(value)
 }
 
 func TransferPBToMetricEvent(src *protocol.MetricEvent) (*models.Metric, error) {
@@ -209,14 +213,181 @@ func TransferPBToMetricEvent(src *protocol.MetricEvent) (*models.Metric, error) 
 // ErrInvalidPipelineEventGroupWire indicates a protobuf unmarshal failure.
 var ErrInvalidPipelineEventGroupWire = errors.New("invalid pipeline event group wire data")
 
-// DecodePipelineGroupEvents converts wire data to events. The events outlive
-// wire because the generated decoder copies protobuf bytes into its own slices.
+// DecodePipelineGroupEvents converts borrowed C++ wire data to Go-owned events.
 func DecodePipelineGroupEvents(wire []byte) (*models.PipelineGroupEvents, error) {
+	if group := decodePipelineLogGroup(wire); group != nil {
+		return group, nil
+	}
+
 	var group protocol.PipelineEventGroup
 	if err := group.Unmarshal(wire); err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrInvalidPipelineEventGroupWire, err)
 	}
 	return transferPBToPipelineGroupEvents(&group, true)
+}
+
+// decodePipelineLogGroup decodes the wire layout from
+// protobuf_public/models/pipeline_event_group.proto and log_event.proto. Each
+// accepted field has its usual one-byte tag. The generated decoder handles
+// other event types, unknown fields, repeated oneof members, and wire errors.
+func decodePipelineLogGroup(wire []byte) *models.PipelineGroupEvents {
+	const (
+		metadataTag = 1<<3 | byte(protowire.BytesType)
+		tagsTag     = 2<<3 | byte(protowire.BytesType)
+		logsTag     = 3<<3 | byte(protowire.BytesType)
+		logEventTag = 1<<3 | byte(protowire.BytesType)
+	)
+
+	// Read the group framing before allocating events or metadata. Metric and
+	// span groups take the generated decode path.
+	var logs []byte
+	for remaining := wire; len(remaining) > 0; {
+		tag := remaining[0]
+		if tag != metadataTag && tag != tagsTag && tag != logsTag {
+			return nil
+		}
+		data, n := protowire.ConsumeBytes(remaining[1:])
+		if n < 0 {
+			return nil
+		}
+		if tag == logsTag {
+			if logs != nil {
+				return nil
+			}
+			logs = data
+		}
+		remaining = remaining[1+n:]
+	}
+	if logs == nil {
+		return nil
+	}
+
+	events := make([]models.PipelineEvent, 0)
+	var fields [8]pipelineLogWireField
+	for len(logs) > 0 {
+		if logs[0] != logEventTag {
+			return nil
+		}
+		data, n := protowire.ConsumeBytes(logs[1:])
+		if n < 0 {
+			return nil
+		}
+		log := decodePipelineLog(data, fields[:0])
+		if log == nil {
+			return nil
+		}
+		events = append(events, log)
+		logs = logs[1+n:]
+	}
+
+	group := models.NewGroup(models.NewMetadata(), models.NewTags())
+	for len(wire) > 0 {
+		tag := wire[0]
+		data, n := protowire.ConsumeBytes(wire[1:])
+		wire = wire[1+n:]
+		if tag == logsTag {
+			continue
+		}
+		field, ok := decodePipelineLogWireField(data)
+		if !ok {
+			return nil
+		}
+		if tag == tagsTag {
+			group.Tags.Add(string(field.key), string(field.value))
+		} else {
+			group.Metadata.Add(string(field.key), string(field.value))
+		}
+	}
+	return &models.PipelineGroupEvents{Group: group, Events: events}
+}
+
+func decodePipelineLog(wire []byte, fields []pipelineLogWireField) *models.Log {
+	const (
+		timestampTag  = 1<<3 | byte(protowire.VarintType)
+		contentsTag   = 2<<3 | byte(protowire.BytesType)
+		levelTag      = 3<<3 | byte(protowire.BytesType)
+		fileOffsetTag = 4<<3 | byte(protowire.VarintType)
+		rawSizeTag    = 5<<3 | byte(protowire.VarintType)
+	)
+
+	var log models.Log
+	var level []byte
+	for len(wire) > 0 {
+		tag := wire[0]
+		wire = wire[1:]
+		switch tag {
+		case timestampTag, fileOffsetTag, rawSizeTag:
+			value, n := protowire.ConsumeVarint(wire)
+			if n < 0 {
+				return nil
+			}
+			switch tag {
+			case timestampTag:
+				log.Timestamp = value
+			case fileOffsetTag:
+				log.Offset = value
+			case rawSizeTag:
+				log.RawSize = value
+			}
+			wire = wire[n:]
+		case contentsTag, levelTag:
+			value, n := protowire.ConsumeBytes(wire)
+			if n < 0 {
+				return nil
+			}
+			if tag == levelTag {
+				level = value
+			} else {
+				field, ok := decodePipelineLogWireField(value)
+				if !ok {
+					return nil
+				}
+				fields = append(fields, field)
+			}
+			wire = wire[n:]
+		default:
+			return nil
+		}
+	}
+
+	log.Level = string(level)
+	log.Tags = models.NewTags()
+	if len(fields) > 0 {
+		log.Contents = models.NewOrderedLogContents(len(fields))
+		for _, field := range fields {
+			addPipelineLogContent(&log, field.key, field.value, false)
+		}
+	}
+	return &log
+}
+
+type pipelineLogWireField struct {
+	key, value []byte
+}
+
+func decodePipelineLogWireField(wire []byte) (pipelineLogWireField, bool) {
+	const (
+		keyTag   = 1<<3 | byte(protowire.BytesType)
+		valueTag = 2<<3 | byte(protowire.BytesType)
+	)
+	var field pipelineLogWireField
+	for len(wire) > 0 {
+		tag := wire[0]
+		value, n := protowire.ConsumeBytes(wire[1:])
+		if n < 0 {
+			return field, false
+		}
+		switch tag {
+		case keyTag:
+			field.key = value
+		case valueTag:
+			field.value = value
+		default:
+			return field, false
+		}
+		wire = wire[1+n:]
+	}
+	return field, true
 }
 
 func TransferPBToPipelineGroupEvents(src *protocol.PipelineEventGroup) (*models.PipelineGroupEvents, error) {
