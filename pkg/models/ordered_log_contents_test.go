@@ -103,3 +103,18 @@ func TestCompactLogContentsPublishesOneLiveMap(t *testing.T) {
 	require.Equal(t, "new", second["key"])
 	require.Equal(t, "new", fields.Get("key"))
 }
+
+func TestNativeLogTagsKeepWritableMap(t *testing.T) {
+	log := NewLogWithOrderedContents(1)
+	tags := log.GetTags().(*lazyLogTags)
+	require.Zero(t, tags.Len())
+	require.Empty(t, tags.Get("key"))
+	require.Empty(t, tags.SortTo(nil))
+	require.Nil(t, tags.values.Load())
+
+	fields := tags.Iterator()
+	fields["key"] = "value"
+	require.Equal(t, "value", tags.Get("key"))
+	tags.Add("key", "updated")
+	require.Equal(t, "updated", fields["key"])
+}

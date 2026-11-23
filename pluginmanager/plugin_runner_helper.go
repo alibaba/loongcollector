@@ -15,9 +15,13 @@
 package pluginmanager
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
+	"sync"
 	"time"
+
+	"golang.org/x/sync/semaphore"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
@@ -137,18 +141,23 @@ func pluginCategoryUndefinedError(category pluginCategory) error {
 	return fmt.Errorf("undefined plugin category : %s", category)
 }
 
+const fileInputWireBudget = 2 << 20
+
 // reservedInputQueue counts file groups against the existing queue capacity
 // before decoding. Native workers waiting for capacity retain only their
 // borrowed wire data until the processor takes another group.
 type reservedInputQueue struct {
 	pipeline.PipelineCollector
-	slots chan struct{}
+	slots      chan struct{}
+	wireBudget *semaphore.Weighted
+	weights    sync.Map // *models.PipelineGroupEvents -> int64
 }
 
 func newReservedInputQueue(input pipeline.PipelineContext, capacity int) *reservedInputQueue {
 	return &reservedInputQueue{
 		PipelineCollector: input.Collector(),
 		slots:             make(chan struct{}, capacity),
+		wireBudget:        semaphore.NewWeighted(fileInputWireBudget),
 	}
 }
 
@@ -157,6 +166,33 @@ func (q *reservedInputQueue) Collector() pipeline.PipelineCollector { return q }
 func (q *reservedInputQueue) reserve() { q.slots <- struct{}{} }
 
 func (q *reservedInputQueue) release() { <-q.slots }
+
+// A queue slot is one group, regardless of its size. Reserve wire bytes
+// before decoding as well, so a burst of large groups cannot inflate the Go
+// heap. An oversized group gets the entire budget and can still make progress.
+func (q *reservedInputQueue) reserveWire(size int) int64 {
+	q.reserve()
+	weight := int64(min(size, fileInputWireBudget))
+	_ = q.wireBudget.Acquire(context.Background(), weight)
+	return weight
+}
+
+func (q *reservedInputQueue) cancelWireReservation(weight int64) {
+	q.wireBudget.Release(weight)
+	q.release()
+}
+
+func (q *reservedInputQueue) collectReserved(group *models.PipelineGroupEvents, weight int64) {
+	q.weights.Store(group, weight)
+	q.PipelineCollector.CollectList(group)
+}
+
+func (q *reservedInputQueue) releaseGroup(group *models.PipelineGroupEvents) {
+	if weight, ok := q.weights.LoadAndDelete(group); ok {
+		q.wireBudget.Release(weight.(int64))
+	}
+	q.release()
+}
 
 func (q *reservedInputQueue) Collect(group *models.GroupInfo, events ...models.PipelineEvent) {
 	if len(events) != 0 {
@@ -173,8 +209,8 @@ func (q *reservedInputQueue) CollectList(groups ...*models.PipelineGroupEvents) 
 
 func (q *reservedInputQueue) ToArray() []*models.PipelineGroupEvents {
 	groups := q.PipelineCollector.ToArray()
-	for range groups {
-		q.release()
+	for _, group := range groups {
+		q.releaseGroup(group)
 	}
 	return groups
 }

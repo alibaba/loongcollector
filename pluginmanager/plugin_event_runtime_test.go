@@ -274,3 +274,33 @@ func TestFileIngressReleasesQueueReservations(t *testing.T) {
 		t.Fatal("processor failed to forward the queued event")
 	}
 }
+
+func TestFileIngressWireBudgetReleasesWhenDrained(t *testing.T) {
+	queue := newReservedInputQueue(helper.NewObservePipelineContext(3), 3)
+	firstWeight := queue.reserveWire(fileInputWireBudget * 2)
+	require.EqualValues(t, fileInputWireBudget, firstWeight)
+	first := &models.PipelineGroupEvents{Events: []models.PipelineEvent{&models.Log{Timestamp: 1}}}
+	queue.collectReserved(first, firstWeight)
+
+	started := make(chan struct{})
+	admitted := make(chan int64, 1)
+	go func() {
+		close(started)
+		admitted <- queue.reserveWire(1)
+	}()
+	<-started
+	select {
+	case <-admitted:
+		t.Fatal("another group entered while an oversized batch held the wire budget")
+	case <-time.After(10 * time.Millisecond):
+	}
+	require.Equal(t, []*models.PipelineGroupEvents{first}, queue.ToArray())
+	select {
+	case weight := <-admitted:
+		require.EqualValues(t, 1, weight)
+		queue.cancelWireReservation(weight)
+	case <-time.After(3 * time.Second):
+		t.Fatal("draining the group did not release its wire budget")
+	}
+	require.Empty(t, queue.slots)
+}

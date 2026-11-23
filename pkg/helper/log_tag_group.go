@@ -54,7 +54,7 @@ func ForEachLogTagGroup(group *models.PipelineGroupEvents, visit func(*models.Pi
 }
 
 func logEventTags(event models.PipelineEvent) models.Tags {
-	if log, ok := event.(*models.Log); ok && log != nil && log.Tags != nil {
+	if log, ok := event.(*models.Log); ok && log != nil && log.Tags != nil && log.Tags.Len() > 0 {
 		return log.Tags
 	}
 	return models.NilStringValues

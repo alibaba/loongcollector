@@ -262,7 +262,7 @@ func (p *pluginRunner) runProcessorInternal(cc *pipeline.AsyncControl) {
 			}
 		case group := <-pipeChan:
 			if inputQueue != nil {
-				inputQueue.release()
+				inputQueue.releaseGroup(group)
 			}
 			if processorTag != nil {
 				processorTag.Process(group)
@@ -439,11 +439,12 @@ func (p *pluginRunner) Stop(exit bool) error {
 func (p *pluginRunner) receivePipelineEventGroup(wire []byte, packID string) error {
 	inputQueue, _ := p.InputPipeContext.(*reservedInputQueue)
 	enqueued := false
+	var weight int64
 	if inputQueue != nil {
-		inputQueue.reserve()
+		weight = inputQueue.reserveWire(len(wire))
 		defer func() {
 			if !enqueued {
-				inputQueue.release()
+				inputQueue.cancelWireReservation(weight)
 			}
 		}()
 	}
@@ -454,7 +455,7 @@ func (p *pluginRunner) receivePipelineEventGroup(wire []byte, packID string) err
 	}
 	group.Group.Metadata.Add(ctxKeySource, packID)
 	if inputQueue != nil {
-		inputQueue.PipelineCollector.CollectList(group)
+		inputQueue.collectReserved(group, weight)
 		enqueued = true
 	} else {
 		p.InputPipeContext.Collector().Collect(group.Group, group.Events...)

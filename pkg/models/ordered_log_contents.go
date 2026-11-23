@@ -71,9 +71,8 @@ func NewLogWithOrderedContents(fieldCount int) *Log {
 		entry := new(struct {
 			log    Log
 			fields smallLogFields
-			tags   keyValuesImpl[string]
+			tags   lazyLogTags
 		})
-		entry.tags.keyValues = make(map[string]string)
 		entry.log.Tags = &entry.tags
 		entry.log.Contents = entry.fields.init()
 		return &entry.log
@@ -85,11 +84,10 @@ func NewLogWithOrderedContents(fieldCount int) *Log {
 		log    Log
 		fields orderedLogContents
 		mapped orderedLogMap
-		tags   keyValuesImpl[string]
+		tags   lazyLogTags
 	})
 	entry.mapped.init(fieldCount)
 	entry.fields.mapped.Store(&entry.mapped)
-	entry.tags.keyValues = make(map[string]string)
 	entry.log.Tags = &entry.tags
 	entry.log.Contents = &entry.fields
 	return &entry.log
