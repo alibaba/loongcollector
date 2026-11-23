@@ -21,6 +21,7 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/gogo/protobuf/proto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/encoding/protowire"
@@ -421,7 +422,13 @@ func TestMarshalLogGroupMatchesGeneratedEncoding(t *testing.T) {
 	var actual, expected protocol.PipelineEventGroup
 	require.NoError(t, actual.Unmarshal(encoded))
 	require.NoError(t, expected.Unmarshal(originalWire))
-	require.Equal(t, expected, actual)
+	require.True(t, proto.Equal(&expected, &actual))
+	// An explicit empty value means the native serializer can borrow
+	// the same content bytes when writing the required SLS fields.
+	for _, field := range actual.GetLogs().Events[0].Contents {
+		require.NotNil(t, field.Key)
+		require.NotNil(t, field.Value)
+	}
 }
 
 func TestWireMessageBackfillsCanonicalLength(t *testing.T) {

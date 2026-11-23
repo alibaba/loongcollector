@@ -45,13 +45,6 @@ func wireBytesSize(field protowire.Number, length int) int {
 	return protowire.SizeTag(field) + protowire.SizeBytes(length)
 }
 
-func optionalBytesSize(field protowire.Number, length int) int {
-	if length == 0 {
-		return 0
-	}
-	return wireBytesSize(field, length)
-}
-
 func appendWireLength(out []byte, field protowire.Number, length int) []byte {
 	out = protowire.AppendTag(out, field, protowire.BytesType)
 	return protowire.AppendVarint(out, uint64(length))
@@ -110,13 +103,14 @@ func appendLogWire(out []byte, log *models.Log) ([]byte, error) {
 		default:
 			return out, fmt.Errorf("unsupported log content type for key %s: %T", key, field)
 		}
-		size := optionalBytesSize(contentKeyField, len(key)) + optionalBytesSize(contentValField, len(bytes))
+		// Explicit empty fields are valid PEG defaults. SLS requires both
+		// fields, so writing them here also lets C++ reuse the content bytes.
+		size := wireBytesSize(contentKeyField, len(key)) + wireBytesSize(contentValField, len(bytes))
 		out = appendWireLength(out, contentField, size)
-		out = appendOptionalString(out, contentKeyField, key)
-		if len(bytes) > 0 {
-			out = protowire.AppendTag(out, contentValField, protowire.BytesType)
-			out = protowire.AppendBytes(out, bytes)
-		}
+		out = protowire.AppendTag(out, contentKeyField, protowire.BytesType)
+		out = protowire.AppendString(out, key)
+		out = protowire.AppendTag(out, contentValField, protowire.BytesType)
+		out = protowire.AppendBytes(out, bytes)
 	}
 	out = appendOptionalString(out, levelField, log.Level)
 	out = appendOptionalUint64(out, offsetField, log.Offset)
