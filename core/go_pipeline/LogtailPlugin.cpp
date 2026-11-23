@@ -16,7 +16,6 @@
 
 #include <memory>
 
-#include "google/protobuf/arena.h"
 #include "json/json.h"
 
 #include "StringView.h"
@@ -31,6 +30,7 @@
 #include "common/TimeUtil.h"
 #include "common/compression/CompressorFactory.h"
 #include "file_server/ConfigManager.h"
+#include "google/protobuf/arena.h"
 #include "logger/Logger.h"
 #include "models/PipelineEventGroup.h"
 #include "monitor/AlarmManager.h"
@@ -365,8 +365,8 @@ int LogtailPlugin::SendPipelineEventGroup(const char* configName,
     if (shardHashSize > 0 && shardHash != nullptr) {
         hash.assign(shardHash, static_cast<size_t>(shardHashSize));
     }
-    const bool sent = wire ? pConfig->SendPBLogWire(*pbGroup, *wire, hash, logstore)
-                           : pConfig->Send(*pbGroup, hash, logstore);
+    const bool sent
+        = wire ? pConfig->SendPBLogWire(*pbGroup, *wire, hash, logstore) : pConfig->Send(*pbGroup, hash, logstore);
     return sent ? 0 : -1;
 }
 

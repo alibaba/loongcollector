@@ -215,10 +215,9 @@ bool ParseSLSLogWire(StringView event, SLSLogGroupWireView& result) {
     size_t contentSize = 0;
     while (ConsumeWireTag(event, 0x12)) {
         StringView field, key, value;
-        if (keysEnd == keys.end() || !ConsumeWireBytes(event, field)
-            || !ConsumeWireTag(field, 0x0a) || !ConsumeWireBytes(field, key)
-            || !ConsumeWireTag(field, 0x12) || !ConsumeWireBytes(field, value) || !field.empty()
-            || find(keys.begin(), keysEnd, key) != keysEnd) {
+        if (keysEnd == keys.end() || !ConsumeWireBytes(event, field) || !ConsumeWireTag(field, 0x0a)
+            || !ConsumeWireBytes(field, key) || !ConsumeWireTag(field, 0x12) || !ConsumeWireBytes(field, value)
+            || !field.empty() || find(keys.begin(), keysEnd, key) != keysEnd) {
             return false;
         }
         *keysEnd++ = key;
@@ -312,11 +311,8 @@ std::optional<SLSLogGroupWireView> SLSLogGroupWireView::Parse(StringView wire, s
     return group;
 }
 
-bool SLSEventGroupSerializer::DoSerializePBLogWire(const SLSLogGroupWireView& group,
-                                                    const GroupTags& tags,
-                                                    size_t originalTagSize,
-                                                    string& res,
-                                                    string& errorMsg) {
+bool SLSEventGroupSerializer::DoSerializePBLogWire(
+    const SLSLogGroupWireView& group, const GroupTags& tags, size_t originalTagSize, string& res, string& errorMsg) {
     const size_t inputSize = sizeof(EventsContainer) + originalTagSize + group.mLogInputSize;
     return SerializeWithMetrics(inputSize, res, [&] {
         const bool enableNs = mFlusher->GetContext().GetGlobalConfig().mEnableTimestampNanosecond;

@@ -143,9 +143,9 @@ private:
     bool SerializeAndPush(PipelineEventGroup&& g); // for exactly once only
     bool PushToQueue(QueueKey key, std::unique_ptr<SenderQueueItem>&& item, uint32_t retryTimes = 500);
     bool sendPBLogs(const models::PipelineEventGroup& group,
-                     const std::string& shardHashKey,
-                     const std::string& logstore,
-                     const SLSLogGroupWireView* wire = nullptr);
+                    const std::string& shardHashKey,
+                    const std::string& logstore,
+                    const SLSLogGroupWireView* wire = nullptr);
     std::string GetShardHashKey(const GroupTags& tags) const;
     std::string generatePackId(StringView prefix) const;
     void AddPackId(BatchedEvents& g) const;

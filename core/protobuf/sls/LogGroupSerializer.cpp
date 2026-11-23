@@ -16,9 +16,8 @@
 
 #include <algorithm>
 
-#include "google/protobuf/io/coded_stream.h"
-
 #include "common/TimeUtil.h"
+#include "google/protobuf/io/coded_stream.h"
 
 using namespace std;
 
@@ -135,7 +134,9 @@ void LogGroupSerializer::AddLogTag(StringView key, StringView value) {
 }
 
 void LogGroupSerializer::AddLogContentMetricLabel(const MetricEvent& e, size_t valueSZ) {
-    AppendKeyPrefix(mRes, 0x12, GetStringSize(METRIC_RESERVED_KEY_LABELS.size()) + GetStringSize(valueSZ),
+    AppendKeyPrefix(mRes,
+                    0x12,
+                    GetStringSize(METRIC_RESERVED_KEY_LABELS.size()) + GetStringSize(valueSZ),
                     METRIC_RESERVED_KEY_LABELS.size());
     mRes.append(METRIC_RESERVED_KEY_LABELS);
     AppendTaggedVarint(mRes, 0x12, valueSZ);
@@ -153,7 +154,9 @@ void LogGroupSerializer::AddLogContentMetricLabel(const MetricEvent& e, size_t v
 
 void LogGroupSerializer::AddLogContentMetricTimeNano(const MetricEvent& e) {
     size_t valueSZ = e.GetTimestampNanosecond() ? 19U : 10U;
-    AppendKeyPrefix(mRes, 0x12, GetStringSize(METRIC_RESERVED_KEY_TIME_NANO.size()) + GetStringSize(valueSZ),
+    AppendKeyPrefix(mRes,
+                    0x12,
+                    GetStringSize(METRIC_RESERVED_KEY_TIME_NANO.size()) + GetStringSize(valueSZ),
                     METRIC_RESERVED_KEY_TIME_NANO.size());
     mRes.append(METRIC_RESERVED_KEY_TIME_NANO);
     AppendTaggedVarint(mRes, 0x12, valueSZ);
