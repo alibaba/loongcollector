@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pkg/util"
@@ -134,4 +135,46 @@ func pluginUnImplementError(category pluginCategory, pluginType string) error {
 
 func pluginCategoryUndefinedError(category pluginCategory) error {
 	return fmt.Errorf("undefined plugin category : %s", category)
+}
+
+// reservedInputQueue counts file groups against the existing queue capacity
+// before decoding. Native workers waiting for capacity retain only their
+// borrowed wire data until the processor takes another group.
+type reservedInputQueue struct {
+	pipeline.PipelineCollector
+	slots chan struct{}
+}
+
+func newReservedInputQueue(input pipeline.PipelineContext, capacity int) *reservedInputQueue {
+	return &reservedInputQueue{
+		PipelineCollector: input.Collector(),
+		slots:             make(chan struct{}, capacity),
+	}
+}
+
+func (q *reservedInputQueue) Collector() pipeline.PipelineCollector { return q }
+
+func (q *reservedInputQueue) reserve() { q.slots <- struct{}{} }
+
+func (q *reservedInputQueue) release() { <-q.slots }
+
+func (q *reservedInputQueue) Collect(group *models.GroupInfo, events ...models.PipelineEvent) {
+	if len(events) != 0 {
+		q.CollectList(&models.PipelineGroupEvents{Group: group, Events: events})
+	}
+}
+
+func (q *reservedInputQueue) CollectList(groups ...*models.PipelineGroupEvents) {
+	for _, group := range groups {
+		q.reserve()
+		q.PipelineCollector.CollectList(group)
+	}
+}
+
+func (q *reservedInputQueue) ToArray() []*models.PipelineGroupEvents {
+	groups := q.PipelineCollector.ToArray()
+	for range groups {
+		q.release()
+	}
+	return groups
 }

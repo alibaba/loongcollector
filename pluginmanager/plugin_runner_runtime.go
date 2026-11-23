@@ -249,6 +249,7 @@ func (p *pluginRunner) runProcessorInternal(cc *pipeline.AsyncControl) {
 	defer panicRecover(p.LogstoreConfig.ConfigName)
 	pipeContext := p.ProcessPipeContext
 	pipeChan := p.InputPipeContext.Collector().Observe()
+	inputQueue, _ := p.InputPipeContext.(*reservedInputQueue)
 	var processorTag *ProcessorTag
 	if globalConfig := p.LogstoreConfig.GlobalConfig; globalConfig.EnableProcessorTag {
 		processorTag = NewProcessorTag(globalConfig.PipelineMetaTagKey, globalConfig.AppendingAllEnvMetaTag, globalConfig.AgentEnvMetaTagKey)
@@ -260,6 +261,9 @@ func (p *pluginRunner) runProcessorInternal(cc *pipeline.AsyncControl) {
 				return
 			}
 		case group := <-pipeChan:
+			if inputQueue != nil {
+				inputQueue.release()
+			}
 			if processorTag != nil {
 				processorTag.Process(group)
 			}
@@ -432,8 +436,30 @@ func (p *pluginRunner) Stop(exit bool) error {
 	return nil
 }
 
-func (p *pluginRunner) receivePipelineEventGroup(group *models.PipelineGroupEvents) {
-	p.InputPipeContext.Collector().Collect(group.Group, group.Events...)
+func (p *pluginRunner) receivePipelineEventGroup(wire []byte, packID string) error {
+	inputQueue, _ := p.InputPipeContext.(*reservedInputQueue)
+	enqueued := false
+	if inputQueue != nil {
+		inputQueue.reserve()
+		defer func() {
+			if !enqueued {
+				inputQueue.release()
+			}
+		}()
+	}
+
+	group, err := helper.DecodePipelineGroupEvents(wire)
+	if err != nil || len(group.Events) == 0 {
+		return err
+	}
+	group.Group.Metadata.Add(ctxKeySource, packID)
+	if inputQueue != nil {
+		inputQueue.PipelineCollector.CollectList(group)
+		enqueued = true
+	} else {
+		p.InputPipeContext.Collector().Collect(group.Group, group.Events...)
+	}
+	return nil
 }
 
 func (p *pluginRunner) Merge(r PluginRunner) {

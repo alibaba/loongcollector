@@ -131,7 +131,7 @@ func (lc *LogstoreConfig) Stop(removedFlag bool) error {
 const ctxKeySource = "source"
 
 func (lc *LogstoreConfig) ProcessPipelineEventGroup(pbBytes []byte, packID string) int {
-	group, err := helper.DecodePipelineGroupEvents(pbBytes)
+	err := lc.PluginRunner.receivePipelineEventGroup(pbBytes, packID)
 	if err != nil {
 		if errors.Is(err, helper.ErrInvalidPipelineEventGroupWire) {
 			logger.Error(lc.Context.GetRuntimeContext(), selfmonitor.WrongProtobufAlarm, "cannot process pipeline event group passed by core, err", err)
@@ -140,8 +140,6 @@ func (lc *LogstoreConfig) ProcessPipelineEventGroup(pbBytes []byte, packID strin
 		logger.Warningf(lc.Context.GetRuntimeContext(), selfmonitor.ReceiveLogGroupAlarm, "transfer pipeline event group failed, err: %s", err.Error())
 		return 0
 	}
-	group.Group.Metadata.Add(ctxKeySource, packID)
-	lc.PluginRunner.receivePipelineEventGroup(group)
 	return 0
 }
 
@@ -310,7 +308,8 @@ func createLogstoreConfig(project string, logstore string, configName string, lo
 
 	logQueueSize := logstoreC.GlobalConfig.DefaultLogQueueSize
 	// Because the transferred data of the file MixProcessMode is quite large, we have to limit queue size to control memory usage here.
-	if checkMixProcessMode(plugins) == file {
+	fileInput := checkMixProcessMode(plugins) == file
+	if fileInput {
 		logger.Infof(contextImp.GetRuntimeContext(), "no inputs in config %v, maybe file input, limit queue size", configName)
 		logQueueSize = 10
 	}
@@ -319,6 +318,10 @@ func createLogstoreConfig(project string, logstore string, configName string, lo
 
 	if err = logstoreC.PluginRunner.Init(logQueueSize, flushQueueSize); err != nil {
 		return nil, err
+	}
+
+	if fileInput {
+		runner.InputPipeContext = newReservedInputQueue(runner.InputPipeContext, logQueueSize)
 	}
 
 	// extensions should be initialized first

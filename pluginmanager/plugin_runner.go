@@ -15,7 +15,6 @@
 package pluginmanager
 
 import (
-	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 )
 
@@ -35,7 +34,7 @@ type PluginRunner interface {
 
 	AddDefaultFlusherIfEmpty() error
 
-	receivePipelineEventGroup(group *models.PipelineGroupEvents)
+	receivePipelineEventGroup(wire []byte, packID string) error
 
 	AddPlugin(pluginMeta *pipeline.PluginMeta, category pluginCategory, plugin interface{}, config map[string]interface{}) error
 

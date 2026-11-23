@@ -216,3 +216,61 @@ func TestInputEventTagsStaySeparate(t *testing.T) {
 		})
 	}
 }
+
+func TestFileIngressReleasesQueueReservations(t *testing.T) {
+	ctx := &ContextImp{}
+	ctx.InitContext("", "", "file-ingress")
+	lc := &LogstoreConfig{Context: ctx, GlobalConfig: &config.GlobalConfig{}}
+	runner := initPluginRunner(lc)
+	lc.PluginRunner = runner
+	require.NoError(t, runner.Init(1, 1))
+	queue := newReservedInputQueue(runner.InputPipeContext, 1)
+	runner.InputPipeContext = queue
+
+	require.Equal(t, -1, lc.ProcessPipelineEventGroup([]byte{0x80}, "bad"))
+	empty := &protocol.PipelineEventGroup{
+		PipelineEvents: &protocol.PipelineEventGroup_Logs{Logs: &protocol.PipelineEventGroup_LogEvents{}},
+	}
+	wire, err := empty.Marshal()
+	require.NoError(t, err)
+	require.Equal(t, 0, lc.ProcessPipelineEventGroup(wire, "empty"))
+	require.Empty(t, queue.slots)
+	require.Empty(t, queue.Observe())
+
+	logs := empty.GetLogs()
+	logs.Events = []*protocol.LogEvent{{Timestamp: 123}}
+	wire, err = empty.Marshal()
+	require.NoError(t, err)
+	require.Equal(t, 0, lc.ProcessPipelineEventGroup(wire, "first"))
+	require.Len(t, queue.slots, 1)
+
+	started := make(chan struct{})
+	done := make(chan int, 1)
+	go func() {
+		close(started)
+		done <- lc.ProcessPipelineEventGroup([]byte{0x80}, "bad after valid")
+	}()
+	<-started
+	select {
+	case <-done:
+		t.Fatal("native ingress returned before queue capacity became available")
+	case <-time.After(10 * time.Millisecond):
+	}
+
+	runner.runProcessor()
+	defer runner.ProcessControl.WaitCancel()
+	select {
+	case result := <-done:
+		require.Equal(t, -1, result)
+	case <-time.After(3 * time.Second):
+		t.Fatal("native ingress failed to obtain the released reservation")
+	}
+	require.Empty(t, queue.slots)
+	select {
+	case group := <-runner.AggregatePipeContext.Collector().Observe():
+		require.Equal(t, "first", group.Group.Metadata.Get(ctxKeySource))
+		require.Equal(t, uint64(123), group.Events[0].GetTimestamp())
+	case <-time.After(3 * time.Second):
+		t.Fatal("processor failed to forward the queued event")
+	}
+}
