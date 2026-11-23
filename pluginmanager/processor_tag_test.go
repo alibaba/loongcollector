@@ -40,7 +40,7 @@ func TestTagDefault(t *testing.T) {
 			"tags": make([]*protocol.LogTag, 0),
 		},
 	}
-	processorTag.ProcessV1(logCtx)
+	processTagSnapshot(processorTag, logCtx)
 	tagsArray := logCtx.Context["tags"].([]*protocol.LogTag)
 	assert.Equal(t, 3, len(tagsArray))
 	sort.Slice(tagsArray, func(i, j int) bool {
@@ -62,7 +62,7 @@ func TestTagDefault(t *testing.T) {
 			"tags": make([]*protocol.LogTag, 0),
 		},
 	}
-	processorTag.ProcessV1(logCtx)
+	processTagSnapshot(processorTag, logCtx)
 	tagsArray = logCtx.Context["tags"].([]*protocol.LogTag)
 	assert.Equal(t, 3, len(tagsArray))
 	sort.Slice(tagsArray, func(i, j int) bool {
@@ -87,7 +87,7 @@ func TestTagDefaultV2(t *testing.T) {
 			Tags: models.NewTags(),
 		},
 	}
-	processorTag.ProcessV2(in)
+	processorTag.Process(in)
 	assert.Equal(t, util.GetHostName(), in.Group.Tags.Get(hostNameDefaultTagKey))
 	assert.Equal(t, util.GetIPAddress(), in.Group.Tags.Get(hostIPDefaultTagKey))
 	assert.Equal(t, "test_env_tag_value", in.Group.Tags.Get("test_env_tag"))
@@ -101,7 +101,7 @@ func TestTagDefaultV2(t *testing.T) {
 			Tags: models.NewTags(),
 		},
 	}
-	processorTag.ProcessV2(in)
+	processorTag.Process(in)
 	assert.Equal(t, util.GetHostName(), in.Group.Tags.Get(hostNameDefaultTagKey))
 	assert.Equal(t, util.GetIPAddress(), in.Group.Tags.Get(hostIPDefaultTagKey))
 	assert.Equal(t, "test_env_tag_value", in.Group.Tags.Get("test_env_tag"))
@@ -123,7 +123,7 @@ func TestTagRename(t *testing.T) {
 			"tags": make([]*protocol.LogTag, 0),
 		},
 	}
-	processorTag.ProcessV1(logCtx)
+	processTagSnapshot(processorTag, logCtx)
 	tagsArray := logCtx.Context["tags"].([]*protocol.LogTag)
 	assert.Equal(t, 3, len(tagsArray))
 	sort.Slice(tagsArray, func(i, j int) bool {
@@ -153,7 +153,7 @@ func TestTagRenameV2(t *testing.T) {
 			Tags: models.NewTags(),
 		},
 	}
-	processorTag.ProcessV2(in)
+	processorTag.Process(in)
 	assert.Equal(t, util.GetHostName(), in.Group.Tags.Get("test_host_name"))
 	assert.Equal(t, util.GetIPAddress(), in.Group.Tags.Get("test_host_ip"))
 	assert.Equal(t, "test_env_tag_value", in.Group.Tags.Get("test_env_tag_2"))
@@ -173,7 +173,7 @@ func TestTagDelete(t *testing.T) {
 			"tags": make([]*protocol.LogTag, 0),
 		},
 	}
-	processorTag.ProcessV1(logCtx)
+	processTagSnapshot(processorTag, logCtx)
 	tagsMap := logCtx.Context["tags"].([]*protocol.LogTag)
 	assert.Equal(t, 0, len(tagsMap))
 }
@@ -192,11 +192,11 @@ func TestTagDeleteV2(t *testing.T) {
 			Tags: models.NewTags(),
 		},
 	}
-	processorTag.ProcessV2(in)
+	processorTag.Process(in)
 	assert.Equal(t, 0, in.Group.Tags.Len())
 }
 
-func TestTagNilDefenseV2(t *testing.T) {
+func TestTagNilDefense(t *testing.T) {
 	helper.EnvTags = []string{
 		"test_env_tag",
 		"test_env_tag_value",
@@ -204,20 +204,40 @@ func TestTagNilDefenseV2(t *testing.T) {
 	processorTag := NewProcessorTag(make(map[string]string), true, make(map[string]string))
 
 	// nil in / nil Group must not panic and must be a no-op.
-	assert.NotPanics(t, func() { processorTag.ProcessV2(nil) })
-	assert.NotPanics(t, func() { processorTag.ProcessV2(&models.PipelineGroupEvents{}) })
+	assert.NotPanics(t, func() { processorTag.Process(nil) })
+	assert.NotPanics(t, func() { processorTag.Process(&models.PipelineGroupEvents{}) })
 
-	// A bare GroupInfo has a nil Tags interface; ProcessV2 must not panic and
+	// A bare GroupInfo has a nil Tags interface; Process must not panic and
 	// must materialize a writable Tags so configured tags actually land.
 	in := &models.PipelineGroupEvents{Group: &models.GroupInfo{}}
-	assert.NotPanics(t, func() { processorTag.ProcessV2(in) })
+	assert.NotPanics(t, func() { processorTag.Process(in) })
 	assert.NotNil(t, in.Group.Tags)
 	assert.Equal(t, util.GetHostName(), in.Group.Tags.Get(hostNameDefaultTagKey))
 	assert.Equal(t, "test_env_tag_value", in.Group.Tags.Get("test_env_tag"))
 
 	// The shared Nil sentinel silently drops on Add; it must be replaced too.
 	in = &models.PipelineGroupEvents{Group: &models.GroupInfo{Tags: models.NilStringValues}}
-	assert.NotPanics(t, func() { processorTag.ProcessV2(in) })
+	assert.NotPanics(t, func() { processorTag.Process(in) })
 	assert.False(t, in.Group.Tags.IsNil())
 	assert.Equal(t, util.GetHostName(), in.Group.Tags.Get(hostNameDefaultTagKey))
+}
+
+// Snapshot typed group tags for the existing configuration-value assertions.
+func processTagSnapshot(processor *ProcessorTag, input *pipeline.LogWithContext) {
+	tags := models.NewTags()
+	if input.Context == nil {
+		input.Context = make(map[string]interface{})
+	}
+	if previous, ok := input.Context["tags"].([]*protocol.LogTag); ok {
+		for _, tag := range previous {
+			tags.Add(tag.Key, tag.Value)
+		}
+	}
+	group := &models.PipelineGroupEvents{Group: models.NewGroup(models.NewMetadata(), tags)}
+	processor.Process(group)
+	snapshot := make([]*protocol.LogTag, 0, tags.Len())
+	for key, value := range tags.Iterator() {
+		snapshot = append(snapshot, &protocol.LogTag{Key: key, Value: value})
+	}
+	input.Context["tags"] = snapshot
 }

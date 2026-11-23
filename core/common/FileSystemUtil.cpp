@@ -510,6 +510,7 @@ bool Dir::IsOpened() const {
 bool Dir::Open() {
     if (IsOpened())
         return true;
+    mLastErrorCode = 0;
     if (mDirPath.empty()) {
         // Log it but don't return, let following call to generate errno.
         LOG_WARNING(sLogger, ("Empty dir path", mDirPath));
@@ -518,7 +519,7 @@ bool Dir::Open() {
 #if defined(__linux__)
     DIR* dir = opendir(mDirPath.c_str());
     if (NULL == dir) {
-        // TODO: Record errno
+        mLastErrorCode = errno;
         return false;
     }
 
@@ -529,7 +530,7 @@ bool Dir::Open() {
     WIN32_FIND_DATA ffd;
     mFind = FindFirstFile(findPath.c_str(), &ffd);
     if (INVALID_HANDLE_VALUE == mFind) {
-        // TODO: Record errno.
+        mLastErrorCode = GetLastError();
         return false;
     }
     // Cache first entry.
@@ -539,15 +540,30 @@ bool Dir::Open() {
 }
 
 Entry Dir::ReadNext(bool resolveWithStat) {
-    if (!IsOpened())
+    if (mLastErrorCode != 0)
         return Entry();
+    if (!IsOpened()) {
+#if defined(__linux__)
+        mLastErrorCode = EBADF;
+#elif defined(_MSC_VER)
+        mLastErrorCode = ERROR_INVALID_HANDLE;
+#endif
+        return Entry();
+    }
 
 #if defined(__linux__)
     // Call readdir until it returns nullptr or non-dot entry.
     while (true) {
+        // readdir leaves errno unchanged at normal end of directory.
+        errno = 0;
         struct dirent* ent = readdir(mDir);
-        if (nullptr == ent)
+        if (nullptr == ent) {
+            mLastErrorCode = errno;
+            if (mLastErrorCode != 0) {
+                LOG_WARNING(sLogger, ("Read dir failed", mDirPath)("errno", mLastErrorCode));
+            }
             return Entry();
+        }
 
         std::string fileName(ent->d_name);
         if (0 == fileName.find('.')) {
@@ -619,6 +635,7 @@ Entry Dir::ReadNext(bool resolveWithStat) {
         if (0 == FindNextFile(mFind, &ffd)) {
             auto err = GetLastError();
             if (err != ERROR_NO_MORE_FILES) {
+                mLastErrorCode = err;
                 LOG_WARNING(sLogger, ("Unexpected error when call FindNextFile", err)("dir path", mDirPath));
             }
             return Entry();
@@ -630,23 +647,30 @@ Entry Dir::ReadNext(bool resolveWithStat) {
 #endif
 }
 
-void Dir::Close() {
+bool Dir::Close() {
     if (!IsOpened())
-        return;
+        return true;
 
 #if defined(__linux__)
-    if (closedir(mDir) != 0) {
-        LOG_WARNING(sLogger, ("Close dir failed", mDirPath)("errno", errno));
-        return;
-    }
+    auto dir = mDir;
+    // closedir may free the directory stream even when closing its fd fails.
     mDir = nullptr;
-#elif defined(_MSC_VER)
-    if (!FindClose(mFind)) {
-        LOG_WARNING(sLogger, ("Close dir failed", mDirPath)("errno", GetLastError()));
-        return;
+    if (closedir(dir) != 0) {
+        mLastErrorCode = errno;
+        LOG_WARNING(sLogger, ("Close dir failed", mDirPath)("errno", mLastErrorCode));
+        return false;
     }
+#elif defined(_MSC_VER)
+    auto find = mFind;
     mFind = INVALID_HANDLE_VALUE;
+    mCachedEntry = Entry();
+    if (!FindClose(find)) {
+        mLastErrorCode = GetLastError();
+        LOG_WARNING(sLogger, ("Close dir failed", mDirPath)("errno", mLastErrorCode));
+        return false;
+    }
 #endif
+    return true;
 }
 
 PathStat::PathStat() {

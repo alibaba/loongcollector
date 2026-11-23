@@ -251,8 +251,23 @@ func marshalSingleProtocolEntry(entry map[string]interface{}) ([]byte, error) {
 	return marshalWithoutHTMLEscaped(entry)
 }
 
-// PipelineGroupEventsToLogGroup converts v2 pipeline events into a legacy LogGroup for v1-only flush paths.
-func PipelineGroupEventsToLogGroup(groupEvents *models.PipelineGroupEvents) (*protocol.LogGroup, error) {
+// PipelineGroupEventsToLogGroups serializes native events using the existing
+// LogGroup wire schema. Per-log tags stay in LogTags; distinct tag sets are
+// emitted in separate groups rather than flattened into log contents.
+func PipelineGroupEventsToLogGroups(events *models.PipelineGroupEvents) ([]*protocol.LogGroup, error) {
+	var groups []*protocol.LogGroup
+	err := helper.ForEachLogTagGroup(events, func(group *models.PipelineGroupEvents) error {
+		converted, err := pipelineGroupEventsToLogGroup(group)
+		if err != nil {
+			return err
+		}
+		groups = append(groups, converted)
+		return nil
+	})
+	return groups, err
+}
+
+func pipelineGroupEventsToLogGroup(groupEvents *models.PipelineGroupEvents) (*protocol.LogGroup, error) {
 	if groupEvents == nil || len(groupEvents.Events) == 0 {
 		return nil, nil
 	}
@@ -263,6 +278,11 @@ func PipelineGroupEventsToLogGroup(groupEvents *models.PipelineGroupEvents) (*pr
 	if groupEvents.Group != nil {
 		logGroup.LogTags = make([]*protocol.LogTag, 0, groupEvents.Group.GetTags().Len())
 		for k, v := range groupEvents.Group.GetTags().Iterator() {
+			if k == "__topic__" {
+				// Reserved pipeline topic maps to the LogGroup wire field.
+				logGroup.Topic = v
+				continue
+			}
 			logGroup.LogTags = append(logGroup.LogTags, &protocol.LogTag{Key: k, Value: v})
 		}
 	}

@@ -16,22 +16,8 @@ package pluginmanager
 
 import (
 	"github.com/alibaba/ilogtail/pkg"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
-
-func CollectAlarms(loggroup *protocol.LogGroup) {
-	LogtailConfigLock.RLock()
-	for _, config := range LogtailConfig {
-		alarm := config.Context.GetRuntimeContext().Value(pkg.LogTailMeta).(*pkg.LogtailContextMeta).GetAlarm()
-		if alarm != nil {
-			alarm.SerializeToPb(loggroup)
-		}
-	}
-	LogtailConfigLock.RUnlock()
-	selfmonitor.GlobalAlarm.SerializeToPb(loggroup)
-	selfmonitor.RegisterAlarmsSerializeToPb(loggroup)
-}
 
 func GetAlarmMessages() []selfmonitor.AlarmExportMessage {
 	results := make([]selfmonitor.AlarmExportMessage, 0)

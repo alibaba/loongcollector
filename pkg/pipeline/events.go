@@ -20,7 +20,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/models"
 )
 
-// Event pass-through contract for v2 Processor/Flusher plugins:
+// Event pass-through contract for Processor/Flusher plugins:
 //
 //   - Plugins that only handle a subset of event kinds MUST NOT silently drop the rest.
 //   - Log-only processors MUST pass Metric and Span events through unchanged.
@@ -130,9 +130,8 @@ func CollectGroupEvents(ctx PipelineContext, in *models.PipelineGroupEvents) {
 	ctx.Collector().Collect(in.Group, in.Events...)
 }
 
-// GetStringValue converts a v2 LogContents value to a string. A v2 log body is
-// stored under the "content" key as []byte (see models.Log.SetBody and the
-// C++->Go bridge in pluginv2Runner.convertToPipelineEvent), so callers that
+// GetStringValue converts a LogContents value to a string. A log body is
+// stored under the "content" key as []byte (see models.Log.SetBody), so callers that
 // treat a field as text MUST handle []byte: fmt.Sprintf("%v", []byte(...))
 // renders the byte numbers (e.g. "[108 101 ...]") instead of the string, which
 // silently breaks text-parsing processors (csv/grok/regex/split_*). Non-string,

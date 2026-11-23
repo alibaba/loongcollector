@@ -108,17 +108,16 @@ func (o *FlusherOdps) Description() string {
 
 func (o *FlusherOdps) Export(groups []*models.PipelineGroupEvents, _ pipeline.PipelineContext) error {
 	for _, groupEvents := range groups {
-		logGroup, err := converter.PipelineGroupEventsToLogGroup(groupEvents)
+		logGroups, err := converter.PipelineGroupEventsToLogGroups(groupEvents)
 		if err != nil {
 			return fmt.Errorf("convert pipeline group events to ODPS logs: %w", err)
 		}
-		if logGroup == nil || len(logGroup.Logs) == 0 {
-			continue
-		}
-		for _, log := range logGroup.Logs {
-			if err := o.sender.Send(logGroup, log); err != nil {
-				logger.Errorf(o.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "Flush odps(%s/%s/%s) failed, error:%v", o.ProjectName, o.SchemaName, o.TableName, err)
-				return err
+		for _, logGroup := range logGroups {
+			for _, log := range logGroup.Logs {
+				if err := o.sender.Send(logGroup, log); err != nil {
+					logger.Errorf(o.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "Flush odps(%s/%s/%s) failed, error:%v", o.ProjectName, o.SchemaName, o.TableName, err)
+					return err
+				}
 			}
 		}
 	}

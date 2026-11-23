@@ -45,8 +45,8 @@ func (f *fakePlainServiceInput) Start(pipeline.Collector) error     { return nil
 func TestNotifyPipelineRemoved(t *testing.T) {
 	removable := &fakeRemovableServiceInput{}
 	config := &LogstoreConfig{
-		PluginRunner: &pluginv1Runner{
-			ServicePlugins: []*ServiceWrapperV1{
+		PluginRunner: &pluginRunner{
+			ServicePlugins: []*ServiceInputWrapper{
 				{Input: removable},
 				{Input: &fakePlainServiceInput{}}, // must be skipped, not panic
 			},

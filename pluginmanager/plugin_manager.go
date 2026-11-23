@@ -166,24 +166,7 @@ func DeleteLogstoreConfig(config *LogstoreConfig, removedFlag bool) {
 		actualObject.logstoreC = nil
 	}
 	config.Context = nil
-	if runner, ok := config.PluginRunner.(*pluginv1Runner); ok {
-		for _, obj := range runner.MetricPlugins {
-			obj.Config = nil
-		}
-		for _, obj := range runner.ServicePlugins {
-			obj.Config = nil
-		}
-		for _, obj := range runner.ProcessorPlugins {
-			obj.Config = nil
-		}
-		for _, obj := range runner.AggregatorPlugins {
-			obj.Config = nil
-		}
-		for _, obj := range runner.FlusherPlugins {
-			obj.Config = nil
-		}
-		runner.LogstoreConfig = nil
-	} else if runner, ok := config.PluginRunner.(*pluginv2Runner); ok {
+	if runner, ok := config.PluginRunner.(*pluginRunner); ok {
 		for _, obj := range runner.MetricPlugins {
 			obj.Config = nil
 		}
@@ -237,14 +220,7 @@ func notifyPipelineRemoved(config *LogstoreConfig) {
 	if config == nil || config.PluginRunner == nil {
 		return
 	}
-	switch runner := config.PluginRunner.(type) {
-	case *pluginv1Runner:
-		for _, sw := range runner.ServicePlugins {
-			if cleaner, ok := sw.Input.(pipeline.PipelineRemovedCleaner); ok {
-				cleaner.OnPipelineRemoved()
-			}
-		}
-	case *pluginv2Runner:
+	if runner, ok := config.PluginRunner.(*pluginRunner); ok {
 		for _, sw := range runner.ServicePlugins {
 			if cleaner, ok := sw.Input.(pipeline.PipelineRemovedCleaner); ok {
 				cleaner.OnPipelineRemoved()

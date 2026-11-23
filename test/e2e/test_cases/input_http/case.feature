@@ -32,7 +32,6 @@ Feature: input http
     Then there is at least {4} logs
     Then the log fields match as below
     """
-    - _method_
     - _address_
     - _result_
     - _http_response_code_
@@ -41,8 +40,10 @@ Feature: input http
     Then the log fields match kv
     """
     _address_: "http://www.baidu.com"
-    _method_: "GET"
     _result_: "success"
     _http_response_code_: "200"
     """
-  
+    Then the log tags match kv
+    """
+    _method_: "GET"
+    """

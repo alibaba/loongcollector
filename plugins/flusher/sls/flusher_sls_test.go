@@ -142,7 +142,7 @@ func TestSlsFlusher_ExportPreservesReservedTopic(t *testing.T) {
 			group := models.NewGroup(models.NewMetadata(), models.NewTagsWithMap(tt.tags))
 			incoming, err := helper.TransferPipelineEventGroupToPB(group, []models.PipelineEvent{log})
 			require.NoError(t, err)
-			// Use the same conversion as the v2 runner before exporting back to C++.
+			// Use the same conversion as the event runner before exporting back to C++.
 			converted, err := helper.TransferPBToPipelineGroupEvents(incoming)
 			require.NoError(t, err)
 			flusher, captured := newTestFlusher(false)
@@ -291,6 +291,32 @@ func TestSlsFlusher_ExportShardHashDoesNotMutateInput(t *testing.T) {
 	}
 }
 
+func TestSlsFlusher_ExportKeepsLogTagsSeparate(t *testing.T) {
+	flusher, captured := newTestFlusher(false)
+	group := models.NewGroup(models.NewMetadataWithKeyValues("source", "pack"), models.NewTagsWithKeyValues("shared", "group"))
+	var events []models.PipelineEvent
+	for _, container := range []string{"a", "a", "b", "a"} {
+		events = append(events, models.NewSimpleLog([]byte(container), models.NewTagsWithKeyValues("container", container), 100))
+	}
+	require.NoError(t, flusher.Export([]*models.PipelineGroupEvents{{Group: group, Events: events}}, nil))
+	require.Len(t, captured.buffers, 3)
+	for i, data := range captured.buffers {
+		var pb protocol.PipelineEventGroup
+		require.NoError(t, pb.Unmarshal(data))
+		require.Equal(t, []byte([]string{"a", "b", "a"}[i]), pb.Tags["container"])
+		require.Equal(t, []byte("group"), pb.Tags["shared"])
+		require.Equal(t, []byte("pack"), pb.Metadata["source"])
+		require.Len(t, pb.GetLogs().Events, []int{2, 1, 1}[i])
+		for _, log := range pb.GetLogs().Events {
+			for _, field := range log.Contents {
+				require.NotEqual(t, "container", string(field.Key))
+			}
+		}
+	}
+	require.False(t, group.Tags.Contains("container"))
+	require.Equal(t, "a", events[0].GetTags().Get("container"))
+}
+
 func TestSlsFlusher_ExportErrors(t *testing.T) {
 	log := models.NewLog("", nil, "", "", "", models.NewTags(), 1)
 	log.Contents.Add("bad", 42)
@@ -359,13 +385,15 @@ func BenchmarkSlsFlusherExport(b *testing.B) {
 				for i := 0; i < b.N; i++ {
 					if legacy {
 						for _, group := range groups {
-							converted, err := converter.PipelineGroupEventsToLogGroup(group)
+							convertedGroups, err := converter.PipelineGroupEventsToLogGroups(group)
 							if err != nil {
 								b.Fatal(err)
 							}
-							converted.Category = "store"
-							if err := flusher.sendLogGroup("config", converted); err != nil {
-								b.Fatal(err)
+							for _, converted := range convertedGroups {
+								converted.Category = "store"
+								if err := flusher.sendLogGroup("config", converted); err != nil {
+									b.Fatal(err)
+								}
 							}
 						}
 						continue

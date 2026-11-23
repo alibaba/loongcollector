@@ -24,13 +24,8 @@ using namespace std;
 
 namespace logtail {
 
-const unordered_set<string> GlobalConfig::sNativeParam = {"TopicType",
-                                                          "TopicFormat",
-                                                          "Priority",
-                                                          "EnableTimestampNanosecond",
-                                                          "UsingOldContentTag",
-                                                          "PipelineMetaTagKey",
-                                                          "AgentMetaTagKey"};
+const unordered_set<string> GlobalConfig::sNativeParam
+    = {"TopicType", "TopicFormat", "Priority", "EnableTimestampNanosecond", "PipelineMetaTagKey", "AgentMetaTagKey"};
 
 bool GlobalConfig::Init(const Json::Value& config, const CollectionPipelineContext& ctx, Json::Value& extendedParams) {
     const string moduleName = "global";
@@ -133,19 +128,6 @@ bool GlobalConfig::Init(const Json::Value& config, const CollectionPipelineConte
                               ctx.GetAlarm(),
                               errorMsg,
                               mEnableTimestampNanosecond,
-                              moduleName,
-                              ctx.GetConfigName(),
-                              ctx.GetProjectName(),
-                              ctx.GetLogstoreName(),
-                              ctx.GetRegion());
-    }
-
-    // UsingOldContentTag
-    if (!GetOptionalBoolParam(config, "UsingOldContentTag", mUsingOldContentTag, errorMsg)) {
-        PARAM_WARNING_DEFAULT(ctx.GetLogger(),
-                              ctx.GetAlarm(),
-                              errorMsg,
-                              mUsingOldContentTag,
                               moduleName,
                               ctx.GetConfigName(),
                               ctx.GetProjectName(),

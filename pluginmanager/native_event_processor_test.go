@@ -42,7 +42,7 @@ func TestNativeMetricAndSpanReachGoProcessor(t *testing.T) {
 	pipeline.Processors[pluginName] = func() pipeline.Processor { return processor }
 	t.Cleanup(func() { delete(pipeline.Processors, pluginName) })
 	config, err := createLogstoreConfig("project", "store", "native-event", 0,
-		`{"global":{"StructureType":"v2"},"processors":[{"type":"processor_native_event_test"}],"flushers":[{"type":"flusher_stdout"}]}`)
+		`{"processors":[{"type":"processor_native_event_test"}],"flushers":[{"type":"flusher_stdout"}]}`)
 	require.NoError(t, err)
 	config.PluginRunner.Run()
 	defer func() { require.NoError(t, config.PluginRunner.Stop(false)) }()

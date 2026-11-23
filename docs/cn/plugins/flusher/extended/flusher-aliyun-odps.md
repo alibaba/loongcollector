@@ -6,7 +6,7 @@
 
 源代码：[flusher_odps.go](https://github.com/alibaba/loongcollector/blob/main/plugins/flusher/odps/flusher_odps.go)
 
-仅支持 Go v2 pipeline。采集配置必须设置 `global.StructureType: v2`，不支持 Go v1 pipeline。配置结构详见[采集配置](../../../configuration/collection-config.md)。
+使用统一的 Go 事件 Pipeline；采集配置默认启用，无需显式设置 `global.StructureType`。配置结构详见[采集配置](../../../configuration/collection-config.md)。
 
 ## 事件能力
 

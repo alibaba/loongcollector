@@ -41,7 +41,6 @@ Feature: input static file
     """
     enable: true
     global:
-      UsingOldContentTag: true
       DefaultLogQueueSize: 10
     inputs:
       - Type: input_file
@@ -54,8 +53,11 @@ Feature: input static file
     Then there is at least {1000} logs
     Then the log fields match kv
     """
-    "__tag__:__path__": "^/root/test/1/2/3/axxxx.log$"
     content: "^\\d+===="
+    """
+    Then the log tags match kv
+    """
+    __path__: "^/root/test/1/2/3/axxxx.log$"
     """
 ```
 

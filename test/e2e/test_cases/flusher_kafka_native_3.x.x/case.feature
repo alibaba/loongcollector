@@ -19,7 +19,6 @@ Feature: flusher kafka native 3.x.x
     """
     enable: true
     global:
-      UsingOldContentTag: true
       DefaultLogQueueSize: 10
     inputs:
       - Type: input_file
@@ -57,7 +56,6 @@ Feature: flusher kafka native 3.x.x
     """
     enable: true
     global:
-      UsingOldContentTag: true
       DefaultLogQueueSize: 10
     inputs:
       - Type: input_file
@@ -99,7 +97,6 @@ Feature: flusher kafka native 3.x.x
     """
     enable: true
     global:
-      UsingOldContentTag: true
       DefaultLogQueueSize: 10
     inputs:
       - Type: input_file

@@ -17,20 +17,32 @@ import (
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 )
 
-type ServiceWrapperV2 struct {
+type ServiceInputWrapper struct {
 	ServiceWrapper
 	pipelineCtxWrapper *PipelineContextWrapper
-	Input              pipeline.ServiceInputV2
+	Input              pipeline.ServiceInput
 }
 
-func (wrapper *ServiceWrapperV2) Init(pluginMeta *pipeline.PluginMeta) error {
+func (wrapper *ServiceInputWrapper) Init(pluginMeta *pipeline.PluginMeta) error {
+	if _, ok := wrapper.Input.(pipeline.ServiceInputV2); !ok {
+		if _, ok := wrapper.Input.(pipeline.ServiceInputV1); !ok {
+			return pluginUnImplementError(pluginServiceInput, pluginMeta.PluginType)
+		}
+	}
 	wrapper.InitMetricRecord(pluginMeta)
 
 	_, err := wrapper.Input.Init(wrapper.Config.Context)
 	return err
 }
 
-func (wrapper *ServiceWrapperV2) StartService(pipelineContext pipeline.PipelineContext) error {
+func (wrapper *ServiceInputWrapper) StartService(pipelineContext pipeline.PipelineContext) error {
 	wrapper.pipelineCtxWrapper = newPipelineContextWrapper(pipelineContext, wrapper.outEventsTotal, wrapper.outEventGroupsTotal, wrapper.outSizeBytes)
-	return wrapper.Input.StartService(wrapper.pipelineCtxWrapper)
+	if input, ok := wrapper.Input.(pipeline.ServiceInputV2); ok {
+		return input.StartService(wrapper.pipelineCtxWrapper)
+	}
+	return wrapper.Input.(pipeline.ServiceInputV1).Start(&inputCollector{
+		context:        wrapper.pipelineCtxWrapper,
+		configTags:     wrapper.Tags,
+		runtimeContext: wrapper.Config.Context.GetRuntimeContext(),
+	})
 }

@@ -1,12 +1,8 @@
 @input
 Feature: native input with Go processor/flusher
-  Registered native inputs can coexist with Go plugins. This scenario
-  verifies that a native input can load and reach a Go
-  processor plus the default Go flusher_grpc (injected by the subscriber).
-
-  Same-pipeline multi input_file stays rejected (FileServer keying,
-  tracked in #2644). Two independent input_file pipelines are existing
-  behavior and are not covered here.
+  Registered native inputs can coexist with Go plugins.
+  These scenarios send native Logs and Metrics through a Go processor and the
+  Go flusher_grpc injected by the subscriber on the default event pipeline.
 
   @e2e @docker-compose
   Scenario: TestHostMetaWithGoProcessorFlusher
@@ -39,8 +35,6 @@ Feature: native input with Go processor/flusher
     Given {input-native-metric-go-case} local config as below
     """
     enable: true
-    global:
-      StructureType: v2
     inputs:
       - Type: input_host_monitor
         Interval: 5

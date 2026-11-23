@@ -134,7 +134,7 @@ make e2edocker
 
 ## Native → Go 桥接（PPEG）
 
-批量数据仅走 **`ProcessPipelineEventGroup`**（`PipelineEventGroup` PB）。已移除 `ProcessLogGroup` / `ProcessLog` export；v1 插件 runner 在 Go 侧将 Log 转为 `LogGroup` 后 `ReceiveLogGroup`。
+批量数据仅走 **`ProcessPipelineEventGroup`**（`PipelineEventGroup` PB）。已移除 `ProcessLogGroup` / `ProcessLog` export；Go 侧统一通过事件 runner 的 `ReceivePipelineEventGroup` 接收，不再进行 Legacy LogGroup 回退转换。
 
 ## 常见问题
 
