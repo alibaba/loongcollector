@@ -488,10 +488,11 @@ func (s *Syslog) handle(conn net.Conn, collector pipeline.PipelineCollector) {
 	}()
 
 	remoteAddr := conn.RemoteAddr().String()
+	clientIP := clientIPField(remoteAddr)
 	logger.Info(s.context.GetRuntimeContext(), "handle for connection", remoteAddr, "begin")
-	buf := bufio.NewReader(conn)
-	scanner := bufio.NewScanner(buf)
-	byteBuf := make([]byte, s.MaxMessageSize)
+	scanner := bufio.NewScanner(conn)
+	// Grow the scanner for long messages instead of reserving the limit for each connection.
+	byteBuf := make([]byte, min(4*1024, s.MaxMessageSize))
 	scanner.Buffer(byteBuf, s.MaxMessageSize)
 	s.resetTimeout(conn)
 	backoff := newSimpleBackoff()
@@ -523,7 +524,7 @@ func (s *Syslog) handle(conn net.Conn, collector pipeline.PipelineCollector) {
 
 		data := scanner.Bytes()
 		if len(data) > 0 {
-			s.parse(data, remoteAddr, collector)
+			s.parse(data, clientIP, collector)
 		}
 		s.resetTimeout(conn)
 	}
@@ -574,13 +575,38 @@ func (s *Syslog) listenPacket(collector pipeline.PipelineCollector) {
 
 		data := b[:n]
 		if len(data) > 0 {
-			s.parse(data, fmt.Sprint(addr), collector)
+			s.parse(data, clientIPField(fmt.Sprint(addr)), collector)
 		}
 	}
 }
 
-func (s *Syslog) parse(b []byte, clientIP string, collector pipeline.PipelineCollector) {
-	clientIP, _, _ = strings.Cut(clientIP, ":")
+// clientIPField boxes the client IP once so a TCP connection can reuse it.
+func clientIPField(address string) any {
+	clientIP, _, _ := strings.Cut(address, ":")
+	return clientIP
+}
+
+// RFC priorities are bounded, so reuse their boxed string values for the
+// priority, facility and severity fields. Other accepted values still format normally.
+var syslogCodeFields = func() [192]any {
+	var fields [192]any
+	for code := range fields {
+		fields[code] = strconv.Itoa(code)
+	}
+	return fields
+}()
+
+func syslogCodeField(code int) any {
+	if code == -1 {
+		return "-1"
+	}
+	if code >= 0 && code < len(syslogCodeFields) {
+		return syslogCodeFields[code]
+	}
+	return strconv.Itoa(code)
+}
+
+func (s *Syslog) parse(b []byte, clientIP any, collector pipeline.PipelineCollector) {
 	for line := range bytes.Lines(b) {
 		line = bytes.TrimSuffix(line, []byte{'\n'})
 		rst, err := s.parser.Parse(line)
@@ -591,39 +617,37 @@ func (s *Syslog) parse(b []byte, clientIP string, collector pipeline.PipelineCol
 			continue
 		}
 
+		// RFC5424 timestamps can include fractional seconds.
 		timestamp := rst.time.UnixNano()
-		// Every parsed message has these nine standard fields.
-		fields := models.NewLogContentsWithCapacity(9)
-		fields.Add("_program_", rst.program)
-		fields.Add("_priority_", strconv.Itoa(rst.priority))
-		fields.Add("_facility_", strconv.Itoa(rst.facility))
-		fields.Add("_severity_", strconv.Itoa(rst.severity))
-		// use nano timestamp because RFC5424's timestamp is [RFC3339]
-		// eg: 2003-08-24T05:14:15.000003-07:00, 2003-10-11T22:14:15.003Z
-		fields.Add("_unixtimestamp_", strconv.FormatInt(timestamp, 10))
-		if rst.hostname == "" {
-			fields.Add("_hostname_", util.GetHostName())
-		} else {
-			fields.Add("_hostname_", rst.hostname)
+		hostname := rst.hostname
+		if hostname == "" {
+			hostname = util.GetHostName()
 		}
-		fields.Add("_client_ip_", clientIP)
-
-		fields.Add("_ip_", util.GetIPAddress())
-		fields.Add("_content_", rst.content)
+		fields := map[string]any{
+			"_program_":       rst.program,
+			"_priority_":      syslogCodeField(rst.priority),
+			"_facility_":      syslogCodeField(rst.facility),
+			"_severity_":      syslogCodeField(rst.severity),
+			"_unixtimestamp_": strconv.FormatInt(timestamp, 10),
+			"_hostname_":      hostname,
+			"_client_ip_":     clientIP,
+			"_ip_":            util.GetIPAddress(),
+			"_content_":       rst.content,
+		}
 
 		if rst.structuredData != nil {
 			structuredData, _ := json.Marshal(*rst.structuredData)
-			fields.Add("_structured_data_", string(structuredData))
+			fields["_structured_data_"] = string(structuredData)
 		}
 		if rst.msgID != nil {
-			fields.Add("_message_id_", *rst.msgID)
+			fields["_message_id_"] = *rst.msgID
 		}
 		if rst.procID != nil {
-			fields.Add("_process_id_", *rst.procID)
+			fields["_process_id_"] = *rst.procID
 		}
 
 		log := &models.Log{
-			Contents:  fields,
+			Contents:  models.NewLogContentsWithMap(fields),
 			Tags:      models.NewTags(),
 			Timestamp: uint64(timestamp),
 		}

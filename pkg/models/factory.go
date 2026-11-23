@@ -190,3 +190,8 @@ func NewLogContents() LogContents {
 func NewLogContentsWithCapacity(expectedFields int) LogContents {
 	return &keyValuesImpl[interface{}]{keyValues: make(map[string]interface{}, expectedFields)}
 }
+
+// NewLogContentsWithMap wraps the supplied map as log fields.
+func NewLogContentsWithMap(fields map[string]interface{}) LogContents {
+	return &keyValuesImpl[interface{}]{keyValues: fields}
+}

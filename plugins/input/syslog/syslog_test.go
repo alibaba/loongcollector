@@ -19,6 +19,7 @@ import (
 	_ "github.com/alibaba/ilogtail/pkg/logger/test"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
+	"github.com/alibaba/ilogtail/pkg/util"
 	"github.com/alibaba/ilogtail/pluginmanager"
 
 	"fmt"
@@ -26,6 +27,7 @@ import (
 	"net"
 	"os"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -248,4 +250,82 @@ func TestMockUnixGram(t *testing.T) {
 	time.Sleep(time.Duration(1) * time.Second)
 
 	mockRun(t, syslog, collector)
+}
+
+func TestSyslogParseKeepsRawMessageFields(t *testing.T) {
+	syslog := newSyslog()
+	syslog.parser = syslogParsers[""](&parserConfig{})
+	collector := helper.NewObservePipelineContext(2).Collector()
+
+	input := []byte("first\nsecond\n")
+	syslog.parse(input, clientIPField("192.0.2.1:514"), collector)
+	// The receive buffer may be reused before the pipeline processes the messages.
+	clear(input)
+
+	groups := collector.ToArray()
+	require.Len(t, groups, 2)
+	for i, content := range []string{"first", "second"} {
+		require.Len(t, groups[i].Events, 1)
+		log := groups[i].Events[0].(*models.Log)
+		require.Equal(t, map[string]any{
+			"_program_":       "",
+			"_priority_":      "-1",
+			"_facility_":      "-1",
+			"_severity_":      "-1",
+			"_unixtimestamp_": strconv.FormatInt(int64(log.GetTimestamp()), 10),
+			"_hostname_":      util.GetHostName(),
+			"_client_ip_":     "192.0.2.1",
+			"_ip_":            util.GetIPAddress(),
+			"_content_":       content,
+		}, log.GetIndices().Iterator())
+	}
+
+	first := groups[0].Events[0].(*models.Log)
+	first.GetIndices().Iterator()["_content_"] = "changed"
+	first.GetTags().Add("event", "tag")
+	groups[0].Group.GetTags().Add("group", "tag")
+	groups[0].Group.GetMetadata().Add("group", "metadata")
+
+	second := groups[1].Events[0].(*models.Log)
+	require.Equal(t, "changed", first.GetIndices().Get("_content_"))
+	require.Equal(t, "tag", first.GetTags().Get("event"))
+	require.Equal(t, "tag", groups[0].Group.GetTags().Get("group"))
+	require.Equal(t, "metadata", groups[0].Group.GetMetadata().Get("group"))
+	require.Equal(t, "second", second.GetIndices().Get("_content_"))
+	require.Empty(t, second.GetTags().Iterator())
+	require.Empty(t, groups[1].Group.GetTags().Iterator())
+	require.Empty(t, groups[1].Group.GetMetadata().Iterator())
+}
+
+func TestSyslogTCPReadsLineAtMessageSizeLimit(t *testing.T) {
+	config := &pluginmanager.ContextImp{}
+	config.InitContext("test_project", "test_logstore", "test_configname")
+	ctx := helper.NewObservePipelineContext(2)
+	syslog := newSyslog()
+	_, err := syslog.Init(config)
+	require.NoError(t, err)
+	require.NoError(t, syslog.StartService(ctx))
+	t.Cleanup(func() { require.NoError(t, syslog.Stop()) })
+
+	conn := connect(t, syslog)
+	t.Cleanup(func() { require.NoError(t, conn.Close()) })
+	require.NoError(t, conn.SetWriteDeadline(time.Now().Add(5*time.Second)))
+	content := strings.Repeat("x", syslog.MaxMessageSize-len("\r\n"))
+	payload := content + "\r\nnext\n"
+	n, err := conn.Write([]byte(payload))
+	require.NoError(t, err)
+	require.Equal(t, len(payload), n)
+
+	timer := time.NewTimer(5 * time.Second)
+	defer timer.Stop()
+	for _, want := range []string{content, "next"} {
+		select {
+		case group := <-ctx.Collector().Observe():
+			require.Len(t, group.Events, 1)
+			log := group.Events[0].(*models.Log)
+			require.Equal(t, want, log.GetIndices().Get("_content_"))
+		case <-timer.C:
+			t.Fatal("timed out waiting for TCP message")
+		}
+	}
 }
