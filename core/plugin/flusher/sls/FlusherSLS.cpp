@@ -25,6 +25,7 @@
 #include "common/HashUtil.h"
 #include "common/LogtailCommonFlags.h"
 #include "common/ParamExtractor.h"
+#include "common/StringTools.h"
 #include "common/TimeUtil.h"
 #include "common/compression/CompressorFactory.h"
 #include "common/http/Constant.h"
@@ -959,13 +960,13 @@ bool FlusherSLS::InitForProfile(CollectionPipelineContext& context) {
 }
 
 bool FlusherSLS::Send(const models::PipelineEventGroup& pbGroup, const string& shardHashKey, const string& logstore) {
+    if (pbGroup.has_logs()) {
+        return sendPBLogs(pbGroup, shardHashKey, logstore);
+    }
+
     PipelineEventGroup group(make_shared<SourceBuffer>());
     string errorMsg;
-    // Only the serialized SLS bytes enter the sender queue. Log contents can
-    // borrow from pbGroup through the synchronous serialization below.
-    bool converted = pbGroup.has_logs() ? TransferPBToPipelineLogGroupBorrowingContents(pbGroup, group, errorMsg)
-                                        : TransferPBToPipelineEventGroup(pbGroup, group, errorMsg);
-    if (!converted) {
+    if (!TransferPBToPipelineEventGroup(pbGroup, group, errorMsg)) {
         LOG_WARNING(sLogger, ("failed to convert PipelineEventGroup PB", errorMsg));
         return false;
     }
@@ -978,11 +979,50 @@ bool FlusherSLS::Send(const models::PipelineEventGroup& pbGroup, const string& s
     // shared flusher's configuration for a per-call override.
     string hash = shardHashKey;
     if (hash.empty() && !mShardHashKeys.empty()) {
-        hash = GetShardHashKey(batch);
+        hash = GetShardHashKey(batch.mTags.mInner);
     }
     AddPackId(batch);
     string data;
     if (!mGroupSerializer || !mGroupSerializer->DoSerialize(std::move(batch), data, errorMsg)) {
+        LOG_WARNING(sLogger, ("failed to serialize PipelineEventGroup PB", errorMsg));
+        return false;
+    }
+    return Send(std::move(data), hash, logstore);
+}
+
+bool FlusherSLS::sendPBLogs(const models::PipelineEventGroup& pbGroup,
+                            const string& shardHashKey,
+                            const string& logstore) {
+    if (pbGroup.logs().events_size() == 0) {
+        LOG_WARNING(
+            sLogger,
+            ("failed to convert PipelineEventGroup PB", "error transfer PB to PipelineEventGroup: no log events"));
+        return false;
+    }
+
+    SizedMap tags;
+    for (const auto& tag : pbGroup.tags()) {
+        tags.Insert(tag.first, tag.second);
+    }
+    const size_t originalTagSize = tags.DataSize();
+    string hash = shardHashKey;
+    if (hash.empty() && !mShardHashKeys.empty()) {
+        hash = GetShardHashKey(tags.mInner);
+    }
+
+    StringView packIdPrefix;
+    for (const auto& meta : pbGroup.metadata()) {
+        int key;
+        if (StringTo(meta.first, key) && key == static_cast<int>(EventGroupMetaKey::SOURCE_ID)) {
+            packIdPrefix = meta.second;
+        }
+    }
+    const string packId = generatePackId(packIdPrefix);
+    tags.Insert(LOG_RESERVED_KEY_PACKAGE_ID, packId);
+
+    string data, errorMsg;
+    if (!mGroupSerializer
+        || !mGroupSerializer->DoSerializePBLogs(pbGroup, tags.mInner, originalTagSize, data, errorMsg)) {
         LOG_WARNING(sLogger, ("failed to serialize PipelineEventGroup PB", errorMsg));
         return false;
     }
@@ -1115,7 +1155,7 @@ bool FlusherSLS::SerializeAndPush(BatchedEventsList&& groupList) {
     bool allSucceeded = true;
     for (auto& group : groupList) {
         if (!mShardHashKeys.empty()) {
-            shardHashKey = GetShardHashKey(group);
+            shardHashKey = GetShardHashKey(group.mTags.mInner);
         }
         AddPackId(group);
         string errorMsg;
@@ -1262,15 +1302,12 @@ bool FlusherSLS::PushToQueue(QueueKey key, unique_ptr<SenderQueueItem>&& item, u
     return false;
 }
 
-string FlusherSLS::GetShardHashKey(const BatchedEvents& g) const {
-    // TODO: improve performance
+string FlusherSLS::GetShardHashKey(const GroupTags& tags) const {
     string key;
     for (size_t i = 0; i < mShardHashKeys.size(); ++i) {
-        for (auto& item : g.mTags.mInner) {
-            if (item.first == mShardHashKeys[i]) {
-                key += item.second.to_string();
-                break;
-            }
+        const auto tag = tags.find(mShardHashKeys[i]);
+        if (tag != tags.end()) {
+            key += tag->second.to_string();
         }
         if (i != mShardHashKeys.size() - 1) {
             key += "_";
@@ -1280,12 +1317,16 @@ string FlusherSLS::GetShardHashKey(const BatchedEvents& g) const {
 }
 
 void FlusherSLS::AddPackId(BatchedEvents& g) const {
-    string packIdPrefixStr = g.mPackIdPrefix.to_string();
-    int64_t packidPrefix = HashString(packIdPrefixStr);
-    int64_t packSeq = PackIdManager::GetInstance()->GetAndIncPackSeq(
-        HashString(packIdPrefixStr + "_" + mProject + "_" + mLogstore));
-    auto packId = g.mSourceBuffers[0]->CopyString(ToHexString(packidPrefix) + "-" + ToHexString(packSeq));
+    const auto packId = g.mSourceBuffers[0]->CopyString(generatePackId(g.mPackIdPrefix));
     g.mTags.Insert(LOG_RESERVED_KEY_PACKAGE_ID, StringView(packId.data, packId.size));
+}
+
+string FlusherSLS::generatePackId(StringView prefix) const {
+    const string packIdPrefix = prefix.to_string();
+    const int64_t prefixHash = HashString(packIdPrefix);
+    const int64_t packSeq
+        = PackIdManager::GetInstance()->GetAndIncPackSeq(HashString(packIdPrefix + "_" + mProject + "_" + mLogstore));
+    return ToHexString(prefixHash) + "-" + ToHexString(packSeq);
 }
 
 unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostLogStoreLogsRequest(const string& accessKeyId,

@@ -17,6 +17,8 @@
 #include "collection_pipeline/serializer/SLSSerializer.h"
 #include "common/JsonUtil.h"
 #include "plugin/flusher/sls/FlusherSLS.h"
+#include "protobuf/models/ProtocolConversion.h"
+#include "protobuf/models/pipeline_event_group.pb.h"
 #include "unittest/Unittest.h"
 
 DECLARE_FLAG_INT32(max_send_log_group_size);
@@ -33,6 +35,7 @@ void SerializeSpanAttributesToString(const SpanEvent& event, std::string& result
 class SLSSerializerUnittest : public ::testing::Test {
 public:
     void TestSerializeEventGroup();
+    void TestSerializePBLogsMatchesBatchedEvents();
     void TestSerializeEventGroupList();
     void TestSerializeSpanLinksToString();
     void TestSerializeSpanEventsToString();
@@ -754,6 +757,86 @@ void SLSSerializerUnittest::TestSerializeEventGroup() {
         string res, errorMsg;
         APSARA_TEST_FALSE(serializer.DoSerialize(std::move(batch), res, errorMsg));
     }
+}
+
+void SLSSerializerUnittest::TestSerializePBLogsMatchesBatchedEvents() {
+    class MeasuredSerializer : public SLSEventGroupSerializer {
+    public:
+        using SLSEventGroupSerializer::SLSEventGroupSerializer;
+
+        array<uint64_t, 6> GetCounters() const {
+            return {mInItemsTotal->GetValue(),
+                    mInItemSizeBytes->GetValue(),
+                    mOutItemsTotal->GetValue(),
+                    mOutItemSizeBytes->GetValue(),
+                    mDiscardedItemsTotal->GetValue(),
+                    mDiscardedItemSizeBytes->GetValue()};
+        }
+    };
+
+    MeasuredSerializer batched(sFlusher.get()), direct(sFlusher.get());
+    models::PipelineEventGroup pb;
+    (*pb.mutable_tags())["__topic__"] = "topic";
+    (*pb.mutable_tags())["__source__"] = "source";
+    (*pb.mutable_tags())["__machine_uuid__"] = "uuid";
+    (*pb.mutable_tags())["__pack_id__"] = "incoming";
+    (*pb.mutable_tags())["raw"] = string("left\0right", 10);
+    pb.mutable_logs()->add_events();
+    auto* first = pb.mutable_logs()->add_events();
+    first->set_timestamp(1700000000000000000ULL);
+    first->set_level("ignored");
+    first->set_fileoffset(100);
+    first->set_rawsize(12);
+    first->add_contents()->set_key("duplicate");
+    auto* secondContent = first->add_contents();
+    secondContent->set_key("second");
+    secondContent->set_value(string("left\0right", 10));
+    auto* replacement = first->add_contents();
+    replacement->set_key("duplicate");
+    replacement->set_value(string(128, 'x'));
+    pb.mutable_logs()->add_events();
+    auto* last = pb.mutable_logs()->add_events();
+    last->set_timestamp(1000000005ULL);
+    last->add_contents(); // Present empty key and value are still a log content.
+
+    const auto compare = [&](bool expectedSuccess) {
+        string expected, actual, expectedError, actualError;
+        PipelineEventGroup group(make_shared<SourceBuffer>());
+        ASSERT_TRUE(TransferPBToPipelineLogGroupBorrowingContents(pb, group, expectedError)) << expectedError;
+        BatchedEvents batch(std::move(group.MutableEvents()),
+                            std::move(group.GetSizedTags()),
+                            std::move(group.GetSourceBuffer()),
+                            {},
+                            {});
+        const auto originalTagSize = batch.mTags.DataSize();
+        batch.mTags.Insert("__pack_id__", "generated");
+        EXPECT_EQ(expectedSuccess,
+                  direct.DoSerializePBLogs(pb, batch.mTags.mInner, originalTagSize, actual, actualError));
+        EXPECT_EQ(expectedSuccess, batched.DoSerialize(std::move(batch), expected, expectedError));
+        EXPECT_EQ(expected, actual);
+        EXPECT_EQ(expectedError, actualError);
+        EXPECT_EQ(batched.GetCounters(), direct.GetCounters());
+    };
+
+    auto& globals = const_cast<GlobalConfig&>(mCtx.GetGlobalConfig());
+    globals.mEnableTimestampNanosecond = false;
+    compare(true);
+    globals.mEnableTimestampNanosecond = true;
+    compare(true);
+
+    const int32_t oldMaxSize = INT32_FLAG(max_send_log_group_size);
+    INT32_FLAG(max_send_log_group_size) = 1;
+    compare(false);
+    INT32_FLAG(max_send_log_group_size) = oldMaxSize;
+
+    pb.mutable_logs()->clear_events();
+    pb.mutable_logs()->add_events();
+    compare(false);
+
+    const auto counters = direct.GetCounters();
+    EXPECT_EQ(4U, counters[0]);
+    EXPECT_EQ(2U, counters[2]);
+    EXPECT_EQ(2U, counters[4]);
 }
 
 void SLSSerializerUnittest::TestSerializeEventGroupList() {
@@ -1567,6 +1650,7 @@ void SLSSerializerUnittest::TestSerializeMetricEventWithMetadata() {
 }
 
 UNIT_TEST_CASE(SLSSerializerUnittest, TestSerializeEventGroup)
+UNIT_TEST_CASE(SLSSerializerUnittest, TestSerializePBLogsMatchesBatchedEvents)
 UNIT_TEST_CASE(SLSSerializerUnittest, TestSerializeEventGroupList)
 UNIT_TEST_CASE(SLSSerializerUnittest, TestSerializeSpanLinksToString)
 UNIT_TEST_CASE(SLSSerializerUnittest, TestSerializeSpanEventsToString)

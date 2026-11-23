@@ -137,7 +137,10 @@ private:
     bool SerializeAndPush(BatchedEventsList&& groupList);
     bool SerializeAndPush(PipelineEventGroup&& g); // for exactly once only
     bool PushToQueue(QueueKey key, std::unique_ptr<SenderQueueItem>&& item, uint32_t retryTimes = 500);
-    std::string GetShardHashKey(const BatchedEvents& g) const;
+    bool
+    sendPBLogs(const models::PipelineEventGroup& group, const std::string& shardHashKey, const std::string& logstore);
+    std::string GetShardHashKey(const GroupTags& tags) const;
+    std::string generatePackId(StringView prefix) const;
     void AddPackId(BatchedEvents& g) const;
 
     std::unique_ptr<HttpSinkRequest> CreatePostLogStoreLogsRequest(const std::string& accessKeyId,
@@ -167,7 +170,7 @@ private:
     std::string mWorkspace;
 
     Batcher<SLSEventBatchStatus> mBatcher;
-    std::unique_ptr<EventGroupSerializer> mGroupSerializer;
+    std::unique_ptr<SLSEventGroupSerializer> mGroupSerializer;
     std::unique_ptr<Serializer<std::vector<CompressedLogGroup>>> mGroupListSerializer;
 #ifdef __ENTERPRISE__
     // This may not be cached. However, this provides a simple way to control the lifetime of a CandidateDomainsInfo.

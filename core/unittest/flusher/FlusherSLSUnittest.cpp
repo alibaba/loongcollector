@@ -28,6 +28,7 @@
 #include "collection_pipeline/queue/SLSSenderQueueItem.h"
 #include "collection_pipeline/queue/SenderQueueManager.h"
 #include "collection_pipeline/serializer/SLSSerializer.h"
+#include "common/HashUtil.h"
 #include "common/JsonUtil.h"
 #include "common/LogtailCommonFlags.h"
 #include "common/compression/CompressorFactory.h"
@@ -2212,7 +2213,7 @@ void FlusherSLSUnittest::TestSendPipelineEventGroup() {
         EXPECT_EQ(type == 0 ? "override" : "test_logstore", item->mLogstore);
         BatchedEvents tags;
         tags.mTags.Insert("route", "configured-route");
-        EXPECT_EQ(type == 0 ? "explicit-hash" : flusher.GetShardHashKey(tags), item->mShardHashKey);
+        EXPECT_EQ(type == 0 ? "explicit-hash" : flusher.GetShardHashKey(tags.mTags.mInner), item->mShardHashKey);
         EXPECT_EQ(RawDataType::EVENT_GROUP, item->mType);
         string data;
         data.resize(item->mRawSize);
@@ -2256,6 +2257,8 @@ void FlusherSLSUnittest::TestSendPipelineEventGroup() {
     EXPECT_EQ("test_logstore", flusher.mLogstore);
     models::PipelineEventGroup empty;
     EXPECT_FALSE(flusher.Send(empty, ""));
+    empty.mutable_logs();
+    EXPECT_FALSE(flusher.Send(empty, ""));
     empty.mutable_logs()->add_events(); // Empty log serializes to no usable SLS payload.
     EXPECT_FALSE(flusher.Send(empty, ""));
 }
@@ -2270,6 +2273,9 @@ void FlusherSLSUnittest::TestSendPipelineEventGroupProfile() {
     auto* content = log->add_contents();
     content->set_key("container");
     content->set_value("profile-container");
+    (*pb.mutable_metadata())["0" + to_string(static_cast<int>(EventGroupMetaKey::SOURCE_ID))] = "source-id";
+    (*pb.mutable_tags())["route"] = "configured-route";
+    (*pb.mutable_tags())[LOG_RESERVED_KEY_PACKAGE_ID] = "incoming-pack";
     ASSERT_TRUE(flusher.InitForProfile(ctx));
     ASSERT_TRUE(flusher.HasContext());
     ASSERT_TRUE(flusher.Send(pb, "profile-hash", "profile-override"));
@@ -2283,6 +2289,9 @@ void FlusherSLSUnittest::TestSendPipelineEventGroupProfile() {
     ASSERT_TRUE(result.ParseFromString(item->mData));
     ASSERT_EQ(1, result.logs_size());
     EXPECT_EQ("profile-container", result.logs(0).contents(0).value());
+    ASSERT_EQ(2, result.logtags_size());
+    EXPECT_EQ(LOG_RESERVED_KEY_PACKAGE_ID, result.logtags(0).key());
+    EXPECT_EQ("34451096883514E2-0", result.logtags(0).value());
     SenderQueueManager::GetInstance()->RemoveItem(item->mQueueKey, item);
     // Without configured keys or an explicit hash, preserve the empty value.
     ASSERT_TRUE(flusher.Send(pb, ""));
@@ -2292,6 +2301,21 @@ void FlusherSLSUnittest::TestSendPipelineEventGroupProfile() {
     item = static_cast<SLSSenderQueueItem*>(items[0]);
     EXPECT_TRUE(item->mShardHashKey.empty());
     EXPECT_EQ("logtail_containers", item->mLogstore);
+    ASSERT_TRUE(result.ParseFromString(item->mData));
+    ASSERT_EQ(2, result.logtags_size());
+    EXPECT_EQ("34451096883514E2-1", result.logtags(0).value());
+    SenderQueueManager::GetInstance()->RemoveItem(item->mQueueKey, item);
+
+    flusher.mShardHashKeys = {"route", "missing", LOG_RESERVED_KEY_PACKAGE_ID};
+    ASSERT_TRUE(flusher.Send(pb, ""));
+    items.clear();
+    SenderQueueManager::GetInstance()->GetAvailableItems(items, 80);
+    ASSERT_EQ(1U, items.size());
+    item = static_cast<SLSSenderQueueItem*>(items[0]);
+    EXPECT_EQ(CalcMD5("configured-route__incoming-pack"), item->mShardHashKey);
+    ASSERT_TRUE(result.ParseFromString(item->mData));
+    ASSERT_EQ(2, result.logtags_size());
+    EXPECT_EQ("34451096883514E2-2", result.logtags(0).value());
     SenderQueueManager::GetInstance()->RemoveItem(item->mQueueKey, item);
 }
 

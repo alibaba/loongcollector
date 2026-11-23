@@ -24,6 +24,10 @@
 
 namespace logtail {
 
+namespace models {
+class PipelineEventGroup;
+}
+
 struct MetricEventContentCacheItem {
     std::vector<std::string> mMetricEventContentCache;
     size_t mLabelSize = 0;
@@ -32,6 +36,11 @@ struct MetricEventContentCacheItem {
 class SLSEventGroupSerializer : public Serializer<BatchedEvents> {
 public:
     SLSEventGroupSerializer(Flusher* f) : Serializer<BatchedEvents>(f) {}
+    bool DoSerializePBLogs(const models::PipelineEventGroup& group,
+                           const GroupTags& tags,
+                           size_t originalTagSize,
+                           std::string& res,
+                           std::string& errorMsg);
 
 private:
     bool Serialize(BatchedEvents&& p, std::string& res, std::string& errorMsg) override;

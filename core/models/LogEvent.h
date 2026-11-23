@@ -103,6 +103,9 @@ public:
     ConstContentIterator cend() const;
 
     size_t DataSize() const override;
+    static constexpr size_t DataSizeForContents(size_t contentSize) {
+        return sizeof(mTimestamp) + sizeof(mTimestampNanosecond) + sizeof(ContentsContainer) + contentSize;
+    }
 
 #ifdef APSARA_UNIT_TEST_MAIN
     Json::Value ToJson(bool enableEventMeta = false) const override;
