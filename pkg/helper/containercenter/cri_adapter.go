@@ -148,6 +148,10 @@ func (cw *CRIRuntimeWrapper) createContainerInfo(containerID string) (detail *Do
 	if err != nil {
 		return nil, "", ContainerStateContainerUnknown, err
 	}
+	if status == nil || status.Status == nil {
+		logger.Warningf(context.Background(), selfmonitor.CreateContainerdInfoAlarm, "ContainerStatus returned nil status, containerId: %s", containerID)
+		return nil, "", ContainerStateContainerUnknown, fmt.Errorf("ContainerStatus returned nil status, containerId: %s", containerID)
+	}
 
 	var ci containerdContainerInfo
 	foundInfo := false
@@ -457,6 +461,10 @@ func (cw *CRIRuntimeWrapper) wrapperK8sInfoByID(sandboxID string, detail *Docker
 	cancel()
 	if err != nil {
 		logger.Debug(context.Background(), "fetchone cannot read k8s info from sandbox, sandboxID", sandboxID)
+		return
+	}
+	if status == nil || status.Status == nil {
+		logger.Warningf(context.Background(), selfmonitor.CreateContainerdInfoAlarm, "PodSandboxStatus returned nil status, sandboxId: %s", sandboxID)
 		return
 	}
 	cw.wrapperK8sInfoByLabels(status.Status.Labels, detail)
