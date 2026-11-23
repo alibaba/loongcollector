@@ -296,13 +296,19 @@ TEST_F(GoPipelineBridgeUnittest, SendPipelineEventGroupContainerConfigEmptyProje
 
 
 TEST_F(GoPipelineBridgeUnittest, SendPipelineEventGroupContainerConfigQueuesPayload) {
-    PipelineEventGroup group(mSourceBuffer);
-    auto* log = group.AddLogEvent();
-    log->SetTimestamp(1700000000);
-    log->SetContent(string("container"), string("real-container"));
-    const string serialized = SerializeGroup(group);
+    const string container = string("real\0container", sizeof("real\0container") - 1) + string(4096, 'x');
     GetProfileSender()->SetDefaultProfileProjectName("bridge-profile-project");
-    EXPECT_EQ(0, CallSendPipelineEventGroup("logtail_containers", serialized, "profile-override"));
+    {
+        PipelineEventGroup group(mSourceBuffer);
+        auto* log = group.AddLogEvent();
+        log->SetTimestamp(1700000000);
+        log->SetContent(string("container"), container);
+        log->SetContent(string("_program_"), string());
+        const string serialized = SerializeGroup(group);
+        ASSERT_FALSE(serialized.empty());
+        EXPECT_EQ(0, CallSendPipelineEventGroup("logtail_containers", serialized, "profile-override"));
+    }
+    // Only the queued SLS payload survives the call and input buffer lifetime.
     vector<SenderQueueItem*> items;
     SenderQueueManager::GetInstance()->GetAvailableItems(items, 80);
     EXPECT_EQ(1U, items.size());
@@ -316,7 +322,15 @@ TEST_F(GoPipelineBridgeUnittest, SendPipelineEventGroupContainerConfigQueuesPayl
         EXPECT_TRUE(result.ParseFromString(data));
         EXPECT_EQ(1, result.logs_size());
         if (result.logs_size() == 1) {
-            EXPECT_EQ("real-container", result.logs(0).contents(0).value());
+            const auto& actual = result.logs(0);
+            EXPECT_EQ(1700000000U, actual.time());
+            EXPECT_EQ(2, actual.contents_size());
+            if (actual.contents_size() == 2) {
+                EXPECT_EQ("container", actual.contents(0).key());
+                EXPECT_EQ(container, actual.contents(0).value());
+                EXPECT_EQ("_program_", actual.contents(1).key());
+                EXPECT_TRUE(actual.contents(1).value().empty());
+            }
         }
         SenderQueueManager::GetInstance()->RemoveItem(item->mQueueKey, item);
     }

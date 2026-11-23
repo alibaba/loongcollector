@@ -16,6 +16,7 @@
 
 #include <memory>
 
+#include "google/protobuf/arena.h"
 #include "json/json.h"
 
 #include "StringView.h"
@@ -297,8 +298,10 @@ int LogtailPlugin::SendPipelineEventGroup(const char* configName,
         return -1;
     }
 
-    models::PipelineEventGroup pbGroup;
-    if (!pbGroup.ParseFromArray(pbBuffer, pbSize)) {
+    // The synchronous flusher borrows log contents until serialization finishes.
+    google::protobuf::Arena arena;
+    auto* pbGroup = google::protobuf::Arena::Create<models::PipelineEventGroup>(&arena);
+    if (!pbGroup->ParseFromArray(pbBuffer, pbSize)) {
         LOG_WARNING(sLogger,
                     ("error", "SendPipelineEventGroup invalid PipelineEventGroup PB")("pb size", pbSize)(
                         "config", std::string(configName, configNameSize)));
@@ -330,7 +333,7 @@ int LogtailPlugin::SendPipelineEventGroup(const char* configName,
         if (!containerConfig->InitForProfile(plugin->mPluginContainerContext)) {
             return -1;
         }
-        return containerConfig->Send(pbGroup, hash, logstore) ? 0 : -1;
+        return containerConfig->Send(*pbGroup, hash, logstore) ? 0 : -1;
     }
 
     shared_ptr<CollectionPipeline> p = CollectionPipelineManager::GetInstance()->FindConfigByName(configNameStr);
@@ -355,7 +358,7 @@ int LogtailPlugin::SendPipelineEventGroup(const char* configName,
     if (shardHashSize > 0 && shardHash != nullptr) {
         hash.assign(shardHash, static_cast<size_t>(shardHashSize));
     }
-    return pConfig->Send(pbGroup, hash, logstore) ? 0 : -1;
+    return pConfig->Send(*pbGroup, hash, logstore) ? 0 : -1;
 }
 
 bool LogtailPlugin::LoadPluginBase() {
