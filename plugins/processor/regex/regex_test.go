@@ -402,3 +402,18 @@ func TestProcessorRegexOptionalCaptures(t *testing.T) {
 		})
 	}
 }
+
+func TestByteBackedRegexCapturesOwnTheirText(t *testing.T) {
+	p := &ProcessorRegex{
+		Regex: "^(.*): (.*)$", Keys: []string{"level", "message"},
+		SourceKey: "content", FullMatch: true, KeepSource: true,
+	}
+	require.NoError(t, p.Init(mock.NewEmptyContext("p", "l", "c")))
+	body := []byte("INFO: 非 ASCII")
+	log := &models.Log{Contents: models.NewLogContents()}
+	log.SetBody(body)
+	p.processLogEvent(log)
+	clear(body)
+	require.Equal(t, "INFO", log.Contents.Get("level"))
+	require.Equal(t, "非 ASCII", log.Contents.Get("message"))
+}

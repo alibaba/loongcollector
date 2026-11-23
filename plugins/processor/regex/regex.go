@@ -73,12 +73,11 @@ func (p *ProcessorRegex) shouldKeepSource(parseResult bool) bool {
 	return p.KeepSource || (p.KeepSourceIfParseError && !parseResult)
 }
 
-// matchCaptures returns the offsets for the configured captures or nil on failure.
-func (p *ProcessorRegex) matchCaptures(val string) []int {
-	indices := p.re.FindStringSubmatchIndex(val)
-	if len(indices) < 2 || (p.FullMatch && (indices[0] != 0 || indices[1] != len(val))) {
+// configuredCaptures returns the offsets for the configured captures or nil on failure.
+func (p *ProcessorRegex) configuredCaptures(indices []int, size int, preview func() string) []int {
+	if len(indices) < 2 || (p.FullMatch && (indices[0] != 0 || indices[1] != size)) {
 		if p.NoMatchError {
-			logger.Warning(p.context.GetRuntimeContext(), selfmonitor.RegexUnmatchedAlarm, "unmatch this log content", util.CutString(val, 512))
+			logger.Warning(p.context.GetRuntimeContext(), selfmonitor.RegexUnmatchedAlarm, "unmatch this log content", preview())
 		}
 		return nil
 	}
@@ -135,8 +134,20 @@ func (p *ProcessorRegex) processLogEvent(log *models.Log) {
 		return
 	}
 
-	val := pipeline.GetStringValue(contents.Get(sourceKey))
-	captures := p.matchCaptures(val)
+	value := contents.Get(sourceKey)
+	var val string
+	var captures []int
+	if body, ok := value.([]byte); ok {
+		captures = p.configuredCaptures(p.re.FindSubmatchIndex(body), len(body), func() string {
+			return string(body[:min(len(body), 512)])
+		})
+		val = copyCapturedText(body, captures)
+	} else {
+		val = pipeline.GetStringValue(value)
+		captures = p.configuredCaptures(p.re.FindStringSubmatchIndex(val), len(val), func() string {
+			return util.CutString(val, 512)
+		})
+	}
 	sourceOverwritten := false
 	for i := 0; i < len(captures); i += 2 {
 		start, end := captures[i], captures[i+1]
@@ -152,4 +163,34 @@ func (p *ProcessorRegex) processLogEvent(log *models.Log) {
 	if !p.shouldKeepSource(captures != nil) && !sourceOverwritten {
 		contents.Delete(sourceKey)
 	}
+}
+
+// copyCapturedText gives byte-backed logs one owned string for the matched
+// fields. Capture offsets are rebased to the compacted string.
+func copyCapturedText(body []byte, captures []int) string {
+	size := 0
+	for i := 0; i < len(captures); i += 2 {
+		start, end := captures[i], captures[i+1]
+		if start >= 0 && end >= start {
+			// Nested captures can overlap. Copy the original body if that
+			// would use less storage and preserve the original offsets.
+			if end-start >= len(body)-size {
+				return string(body)
+			}
+			size += end - start
+		}
+	}
+	text := make([]byte, size)
+	offset := 0
+	for i := 0; i < len(captures); i += 2 {
+		start, end := captures[i], captures[i+1]
+		if start < 0 || end < start {
+			continue
+		}
+		captures[i] = offset
+		offset += copy(text[offset:], body[start:end])
+		captures[i+1] = offset
+	}
+	// This allocation is owned by the capture strings and never mutated.
+	return util.ZeroCopyBytesToString(text)
 }
