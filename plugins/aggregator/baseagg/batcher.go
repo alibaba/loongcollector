@@ -101,7 +101,7 @@ func (b *Batcher) CollectPartition(ctx pipeline.PipelineContext, key string, inf
 			batch = last
 		}
 	}
-	for _, event := range events {
+	for index, event := range events {
 		size := eventSize(event)
 		if b.pendingBytes > 0 && b.pendingBytes+size > maxPendingBytes {
 			b.collectPending(collector)
@@ -109,6 +109,13 @@ func (b *Batcher) CollectPartition(ctx pipeline.PipelineContext, key string, inf
 			pending = nil
 		}
 		if batch == nil || len(batch.group.Events) >= b.maxEvents || batch.size+size > MaxLogGroupSize {
+			// Reserve space for incoming events. For small deliveries, reuse
+			// the count already reached by the preceding batch for this group.
+			capacity := len(events) - index
+			if batch != nil {
+				capacity = max(capacity, len(batch.group.Events))
+			}
+			capacity = min(capacity, b.maxEvents, MaxLogCount, max(1, int(MaxLogGroupSize/size)))
 			if len(pending) >= b.maxGroups {
 				b.emit(collector, key, &pending[0].group)
 				b.pendingBytes -= pending[0].size
@@ -116,7 +123,10 @@ func (b *Batcher) CollectPartition(ctx pipeline.PipelineContext, key string, inf
 				pending[len(pending)-1] = nil
 				pending = pending[:len(pending)-1]
 			}
-			batch = &eventBatch{group: models.PipelineGroupEvents{Group: info}}
+			batch = &eventBatch{group: models.PipelineGroupEvents{
+				Group:  info,
+				Events: make([]models.PipelineEvent, 0, capacity),
+			}}
 			pending = append(pending, batch)
 			b.pending[key] = pending
 		}
