@@ -8,7 +8,7 @@ Feature: native forward and Prometheus inputs in one pipeline
     Given subcribe data from {prometheus} with config
     """
     prometheus_url: http://prometheus:9090
-    query: '{__name__=~"e2e_forward_metric|e2e_scraped_metric"}'
+    query: '{__name__=~"e2e_forward_metric|e2e_scraped_metric"} or scrape_duration_seconds{job="e2e-multi-input"}'
     """
     Given {forward-prometheus} local config as below
     """
@@ -29,9 +29,10 @@ Feature: native forward and Prometheus inputs in one pipeline
       - Type: flusher_prometheus
         Endpoint: http://prometheus:9090/api/v1/write
     """
-    Given loongcollector depends on containers {["prometheus"]}
+    Given loongcollector depends on containers {["prometheus", "metrics-source"]}
+    Given run command on datasource {GOOS=linux CGO_ENABLED=0 go build -mod=readonly -o report/input_forward_prometheus_metrics_source ./test_cases/input_forward_prometheus}
     When start docker-compose {input_forward_prometheus}
-    Then there is at least {2} logs
+    Then there is at least {3} logs
     Then the log fields have exact kv
     """
     - __name__: e2e_forward_metric
@@ -40,4 +41,6 @@ Feature: native forward and Prometheus inputs in one pipeline
     - __name__: e2e_scraped_metric
       source: scrape
       __value__: "17"
+    - __name__: scrape_duration_seconds
+      job: e2e-multi-input
     """

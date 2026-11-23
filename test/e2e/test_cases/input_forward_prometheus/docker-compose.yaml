@@ -14,14 +14,15 @@
 
 services:
   metrics-source:
-    image: golang:1.25.9
-    working_dir: /workspace/test
+    image: alpine:latest
     volumes:
-      - ../../../../pkg:/workspace/pkg:ro
-      - ../../../go.mod:/workspace/test/go.mod:ro
-      - ../../../go.sum:/workspace/test/go.sum:ro
-      - ./metrics.go:/workspace/test/metrics.go:ro
-    command: ["go", "run", "-mod=readonly", "metrics.go"]
+      - ../../report/input_forward_prometheus_metrics_source:/usr/local/bin/metrics-source:ro
+    command: ["/usr/local/bin/metrics-source"]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:18080/metrics"]
+      interval: 2s
+      timeout: 2s
+      retries: 15
   prometheus:
     image: prom/prometheus:v2.45.0
     command:
