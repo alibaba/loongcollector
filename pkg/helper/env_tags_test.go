@@ -15,15 +15,56 @@
 package helper
 
 import (
-	"os"
+	"reflect"
 	"testing"
 )
 
+func TestLoadEnvTagsVariablePrecedence(t *testing.T) {
+	tests := []struct {
+		name     string
+		loong    string
+		loongLog string
+		aliyun   string
+		want     []string
+	}{
+		{name: "LOONG_ENV_TAGS only", loong: "ENV_TAGS_TEST_NEW", want: []string{"ENV_TAGS_TEST_NEW", "new"}},
+		{name: "LOONG_LOG_ENV_TAGS only", loongLog: "ENV_TAGS_TEST_OLD", want: []string{"ENV_TAGS_TEST_OLD", "old"}},
+		{name: "ALIYUN_LOG_ENV_TAGS only", aliyun: "ENV_TAGS_TEST_ALIYUN", want: []string{"ENV_TAGS_TEST_ALIYUN", "aliyun"}},
+		{name: "all configured", loong: "ENV_TAGS_TEST_NEW", loongLog: "ENV_TAGS_TEST_OLD", aliyun: "ENV_TAGS_TEST_ALIYUN", want: []string{"ENV_TAGS_TEST_NEW", "new"}},
+		{name: "empty LOONG_ENV_TAGS", loongLog: "ENV_TAGS_TEST_OLD", aliyun: "ENV_TAGS_TEST_ALIYUN", want: []string{"ENV_TAGS_TEST_OLD", "old"}},
+		{name: "no configured tags"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("LOONG_ENV_TAGS", tt.loong)
+			t.Setenv("LOONG_LOG_ENV_TAGS", tt.loongLog)
+			t.Setenv("ALIYUN_LOG_ENV_TAGS", tt.aliyun)
+			t.Setenv("ENV_TAGS_TEST_NEW", "new")
+			t.Setenv("ENV_TAGS_TEST_OLD", "old")
+			t.Setenv("ENV_TAGS_TEST_ALIYUN", "aliyun")
+
+			previous := EnvTags
+			t.Cleanup(func() { EnvTags = previous })
+			EnvTags = nil
+
+			LoadEnvTags()
+			if !reflect.DeepEqual(EnvTags, tt.want) {
+				t.Errorf("EnvTags = %q, want %q", EnvTags, tt.want)
+			}
+		})
+	}
+}
+
 func TestEnvConfig(t *testing.T) {
+	previous := EnvTags
+	t.Cleanup(func() { EnvTags = previous })
 	EnvTags = nil
-	os.Setenv("ALIYUN_LOG_ENV_TAGS", "a|b|c")
-	os.Setenv("a", "1")
-	os.Setenv("b", "2")
+	t.Setenv("LOONG_ENV_TAGS", "")
+	t.Setenv("LOONG_LOG_ENV_TAGS", "")
+	t.Setenv("ALIYUN_LOG_ENV_TAGS", "a|b|c")
+	t.Setenv("a", "1")
+	t.Setenv("b", "2")
+	t.Setenv("c", "")
 
 	LoadEnvTags()
 
@@ -63,8 +104,4 @@ func TestEnvConfig(t *testing.T) {
 	if !HasEnvTags("c", "") {
 		t.Error("error")
 	}
-
-	os.Unsetenv("ALIYUN_LOG_ENV_TAGS")
-	os.Unsetenv("1")
-	os.Unsetenv("2")
 }
