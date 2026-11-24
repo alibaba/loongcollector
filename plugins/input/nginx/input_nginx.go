@@ -25,9 +25,8 @@ import (
 	"time"
 
 	"github.com/alibaba/ilogtail/pkg/helper"
-	"github.com/alibaba/ilogtail/pkg/models"
-
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pkg/util"
@@ -162,8 +161,10 @@ func (n *Nginx) gatherURL(addr *url.URL, collector pipeline.PipelineCollector) e
 	writing := data[3]
 	waiting := data[5]
 
-	tags := getTags(addr)
+	host, port := getServerAddress(addr)
 	fields := map[string]string{
+		"_server_": host,
+		"_port_":   port,
 		"active":   active,
 		"accepts":  accepts,
 		"handled":  handled,
@@ -172,12 +173,11 @@ func (n *Nginx) gatherURL(addr *url.URL, collector pipeline.PipelineCollector) e
 		"writing":  writing,
 		"waiting":  waiting,
 	}
-	collector.Collect(models.NewGroup(models.NewMetadata(), models.NewTags()), helper.NewInputLog(tags, fields))
+	collector.Collect(models.NewGroup(models.NewMetadata(), models.NewTags()), helper.NewInputLog(nil, fields))
 	return nil
 }
 
-// Get tag(s) for the nginx plugin
-func getTags(addr *url.URL) map[string]string {
+func getServerAddress(addr *url.URL) (host, port string) {
 	h := addr.Host
 	host, port, err := net.SplitHostPort(h)
 	if err != nil {
@@ -191,7 +191,7 @@ func getTags(addr *url.URL) map[string]string {
 			port = ""
 		}
 	}
-	return map[string]string{"_server_": host, "_port_": port}
+	return host, port
 }
 
 func init() {

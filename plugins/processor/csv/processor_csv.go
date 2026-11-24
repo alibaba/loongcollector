@@ -16,6 +16,7 @@ package csv
 
 import (
 	"encoding/csv"
+	"errors"
 	"fmt"
 	"io"
 	"strconv"
@@ -29,7 +30,7 @@ import (
 )
 
 type ProcessorCSVDecoder struct {
-	SourceKey        string   `comment:"The source key containing the CSV record"`
+	SourceKey        string   `comment:"Required. The source key containing the CSV record"`
 	NoKeyError       bool     `comment:"Optional. Whether to report error if no key in the log mathes the SourceKey, default to false"`
 	SplitKeys        []string `comment:"The keys matching the decoded CSV fields"`
 	SplitSep         string   `comment:"Optional. The Separator, default to ,"`
@@ -44,6 +45,9 @@ type ProcessorCSVDecoder struct {
 }
 
 func (p *ProcessorCSVDecoder) Init(context pipeline.Context) error {
+	if p.SourceKey == "" {
+		return errors.New("parameter SourceKey should not be empty")
+	}
 	sepRunes := []rune(p.SplitSep)
 	if len(sepRunes) != 1 {
 		return fmt.Errorf("invalid separator: %s", p.SplitSep)

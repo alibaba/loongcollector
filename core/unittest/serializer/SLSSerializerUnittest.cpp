@@ -37,6 +37,7 @@ public:
     void TestSerializeEventGroup();
     void TestSerializePBLogsMatchesBatchedEvents();
     void TestSerializePBLogWire();
+    void TestOversizedGroupDoesNotConsumePackIdOrCountAsDiscard();
     void TestSerializeEventGroupList();
     void TestSerializeSpanLinksToString();
     void TestSerializeSpanEventsToString();
@@ -885,13 +886,13 @@ void SLSSerializerUnittest::TestSerializePBLogWire() {
     const int32_t oldMaxSize = INT32_FLAG(max_send_log_group_size);
     INT32_FLAG(max_send_log_group_size) = 1;
     string output, error;
-    bool exceedsSizeLimit = false;
-    EXPECT_FALSE(serializer.DoSerializePBLogWire(*wire, tags.mInner, 5, output, error, &exceedsSizeLimit));
-    EXPECT_TRUE(exceedsSizeLimit);
+    SLSLogGroupOptions options{};
+    EXPECT_FALSE(serializer.DoSerializePBLogWire(*wire, tags.mInner, 5, output, error, &options));
+    EXPECT_TRUE(options.mExceedsSizeLimit);
     EXPECT_TRUE(output.empty());
-    exceedsSizeLimit = false;
-    EXPECT_FALSE(serializer.DoSerializePBLogs(pb, tags.mInner, 5, output, error, &exceedsSizeLimit));
-    EXPECT_TRUE(exceedsSizeLimit);
+    options.mExceedsSizeLimit = false;
+    EXPECT_FALSE(serializer.DoSerializePBLogs(pb, tags.mInner, 5, output, error, &options));
+    EXPECT_TRUE(options.mExceedsSizeLimit);
     EXPECT_TRUE(output.empty());
     INT32_FLAG(max_send_log_group_size) = oldMaxSize;
 
@@ -902,6 +903,56 @@ void SLSSerializerUnittest::TestSerializePBLogWire() {
     field->set_key("second");
     field->clear_value(); // A missing proto3 value needs an explicit SLS field.
     EXPECT_FALSE(SLSLogGroupWireView::Parse(pb.SerializeAsString(), 2));
+}
+
+void SLSSerializerUnittest::TestOversizedGroupDoesNotConsumePackIdOrCountAsDiscard() {
+    class MeasuredSerializer : public SLSEventGroupSerializer {
+    public:
+        using SLSEventGroupSerializer::SLSEventGroupSerializer;
+        uint64_t Discards() const { return mDiscardedItemsTotal->GetValue(); }
+    };
+    MeasuredSerializer serializer(sFlusher.get());
+    models::PipelineEventGroup pb;
+    auto* log = pb.mutable_logs()->add_events();
+    log->set_timestamp(1700000000000000000ULL);
+    auto* content = log->add_contents();
+    content->set_key("content");
+    content->set_value(string(512, 'x'));
+    *pb.mutable_logs()->add_events() = *log;
+    SLSLogGroupOptions options{"oversized-test", "project", "logstore", true};
+    const auto oldLimit = INT32_FLAG(max_send_log_group_size);
+    INT32_FLAG(max_send_log_group_size) = 800;
+    string output, error;
+    auto encoded = pb.SerializeAsString();
+    auto wire = SLSLogGroupWireView::Parse(encoded, 2);
+    const bool rejected = wire && !serializer.DoSerializePBLogWire(*wire, {}, 0, output, error, &options);
+    const bool exceeded = options.mExceedsSizeLimit;
+    const auto retryDiscards = serializer.Discards();
+    pb.mutable_logs()->mutable_events()->RemoveLast();
+    options.mCanSplit = false;
+    options.mExceedsSizeLimit = false;
+    const bool firstAccepted = serializer.DoSerializePBLogs(pb, {}, 0, output, error, &options);
+    sls_logs::LogGroup first;
+    const bool firstParsed = first.ParseFromString(output);
+    const bool secondAccepted = serializer.DoSerializePBLogs(pb, {}, 0, output, error, &options);
+    sls_logs::LogGroup second;
+    const bool secondParsed = second.ParseFromString(output);
+    INT32_FLAG(max_send_log_group_size) = 1;
+    options.mExceedsSizeLimit = false;
+    const bool terminalRejected = !serializer.DoSerializePBLogs(pb, {}, 0, output, error, &options);
+    INT32_FLAG(max_send_log_group_size) = oldLimit;
+
+    ASSERT_TRUE(rejected && exceeded);
+    EXPECT_EQ(0U, retryDiscards);
+    ASSERT_TRUE(firstAccepted && firstParsed && secondAccepted && secondParsed);
+    ASSERT_EQ(1, first.logtags_size());
+    ASSERT_EQ(1, second.logtags_size());
+    const auto& firstId = first.logtags(0).value();
+    ASSERT_FALSE(firstId.empty());
+    EXPECT_EQ('0', firstId.back());
+    EXPECT_EQ(firstId.substr(0, firstId.size() - 1) + "1", second.logtags(0).value());
+    EXPECT_TRUE(terminalRejected && options.mExceedsSizeLimit);
+    EXPECT_EQ(1U, serializer.Discards());
 }
 
 void SLSSerializerUnittest::TestSerializeEventGroupList() {
@@ -1722,6 +1773,7 @@ void SLSSerializerUnittest::TestSerializeMetricEventWithMetadata() {
 UNIT_TEST_CASE(SLSSerializerUnittest, TestSerializeEventGroup)
 UNIT_TEST_CASE(SLSSerializerUnittest, TestSerializePBLogsMatchesBatchedEvents)
 UNIT_TEST_CASE(SLSSerializerUnittest, TestSerializePBLogWire)
+UNIT_TEST_CASE(SLSSerializerUnittest, TestOversizedGroupDoesNotConsumePackIdOrCountAsDiscard)
 UNIT_TEST_CASE(SLSSerializerUnittest, TestSerializeEventGroupList)
 UNIT_TEST_CASE(SLSSerializerUnittest, TestSerializeSpanLinksToString)
 UNIT_TEST_CASE(SLSSerializerUnittest, TestSerializeSpanEventsToString)

@@ -18,6 +18,7 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
+	"maps"
 	"net"
 	"net/url"
 	"strconv"
@@ -26,9 +27,8 @@ import (
 	"time"
 
 	"github.com/alibaba/ilogtail/pkg/helper"
-	"github.com/alibaba/ilogtail/pkg/models"
-
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
@@ -164,19 +164,18 @@ func (r *InputRedis) gatherServer(addr *url.URL, collector pipeline.PipelineColl
 	_, _ = c.Write([]byte("EOF\r\n"))
 	rdr := bufio.NewReader(c)
 
-	var tags map[string]string
-
+	var addressFields map[string]string
 	if addr.Scheme == "unix" {
-		tags = map[string]string{"socket": addr.Path}
+		addressFields = map[string]string{"socket": addr.Path}
 	} else {
-		// If there's an error, ignore and use 'unknown' tags
+		// If there's an error, use "unknown" for both fields.
 		host, port, err := net.SplitHostPort(addr.Host)
 		if err != nil {
 			host, port = "unknown", "unknown"
 		}
-		tags = map[string]string{"server": host, "port": port}
+		addressFields = map[string]string{"server": host, "port": port}
 	}
-	gatherInfoOutput(rdr, collector, tags)
+	gatherInfoOutput(rdr, collector, addressFields)
 	return nil
 }
 
@@ -184,13 +183,14 @@ func (r *InputRedis) gatherServer(addr *url.URL, collector pipeline.PipelineColl
 func gatherInfoOutput(
 	rdr *bufio.Reader,
 	collector pipeline.PipelineCollector,
-	tags map[string]string,
+	addressFields map[string]string,
 ) {
 	var section string
 
 	var dbTotal TotalDBInfo
 	scanner := bufio.NewScanner(rdr)
-	fields := make(map[string]string)
+	fields := make(map[string]string, len(addressFields))
+	maps.Copy(fields, addressFields)
 	for scanner.Scan() {
 		line := scanner.Text()
 		if strings.Contains(line, "ERR") {
@@ -243,7 +243,7 @@ func gatherInfoOutput(
 	fields["total_db_avg_ttl"] = strconv.FormatInt(dbTotal.avgTTL, 10)
 	fields["total_db_keys"] = strconv.FormatInt(dbTotal.keys, 10)
 	fields["total_db_expires"] = strconv.FormatInt(dbTotal.expires, 10)
-	collector.Collect(models.NewGroup(models.NewMetadata(), models.NewTags()), helper.NewInputLog(tags, fields))
+	collector.Collect(models.NewGroup(models.NewMetadata(), models.NewTags()), helper.NewInputLog(nil, fields))
 }
 
 // Parse the special Keyspace line at end of redis stats

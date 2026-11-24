@@ -26,6 +26,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang/snappy"
+	"github.com/prometheus/prometheus/prompb"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/encoding/protowire"
 	"gotest.tools/assert"
@@ -188,6 +190,71 @@ func TestInputPrometheus(t *testing.T) {
 		}
 	}
 	require.Equal(t, 20, count)
+}
+
+func TestInputPrometheusRemoteWrite(t *testing.T) {
+	input, err := newInput("prometheus")
+	require.NoError(t, err)
+	input.collector = helper.NewObservePipelineContext(10).Collector()
+	write := &prompb.WriteRequest{Timeseries: []prompb.TimeSeries{{
+		Labels:  []prompb.Label{{Name: "__name__", Value: "requests"}},
+		Samples: []prompb.Sample{{Timestamp: 1700000000123, Value: 10}},
+	}}}
+	body, err := write.Marshal()
+	require.NoError(t, err)
+	request := httptest.NewRequest(http.MethodPost, "/write?db=metrics", bytes.NewReader(snappy.Encode(nil, body)))
+	request.Header.Set("Content-Encoding", "snappy")
+	request.Header.Set("Content-Type", "application/x-protobuf")
+	response := httptest.NewRecorder()
+	input.ServeHTTP(response, request)
+	require.Equal(t, http.StatusOK, response.Code)
+	groups := input.collector.ToArray()
+	require.Len(t, groups, 1)
+	require.Equal(t, "metrics", groups[0].Group.Metadata.Get("db"))
+	require.Len(t, groups[0].Events, 1)
+	require.IsType(t, &models.Metric{}, groups[0].Events[0])
+	metric := groups[0].Events[0].(*models.Metric)
+	require.Equal(t, "requests", metric.GetName())
+	require.Equal(t, uint64(1700000000123000000), metric.GetTimestamp())
+}
+
+func TestInputRawLog(t *testing.T) {
+	input, err := newInputWithOpts(" RAW ", func(input *ServiceHTTP) {
+		input.QueryParams = []string{"example_query"}
+	})
+	require.NoError(t, err)
+	for _, body := range []string{"raw\x00\xff", ""} {
+		before := time.Now().Unix()
+		groups := collectRequestEvents(t, input, []byte(body), http.StatusNoContent)
+		after := time.Now().Unix()
+		require.Len(t, groups, 1)
+		require.Equal(t, map[string]string{"example_query": "preserved"}, groups[0].Group.Metadata.Iterator())
+		require.Len(t, groups[0].Events, 1)
+		require.IsType(t, &models.Log{}, groups[0].Events[0])
+		event := groups[0].Events[0].(*models.Log)
+		require.Equal(t, body, event.Contents.Get(models.ContentKey))
+		log, err := helper.TransferLogEventToPB(event)
+		require.NoError(t, err)
+		require.Len(t, log.Contents, 1)
+		require.Equal(t, models.ContentKey, string(log.Contents[0].Key))
+		require.Equal(t, body, string(log.Contents[0].Value))
+		require.Zero(t, log.Timestamp%uint64(time.Second))
+		require.GreaterOrEqual(t, log.Timestamp, uint64(before)*uint64(time.Second))
+		require.LessOrEqual(t, log.Timestamp, uint64(after)*uint64(time.Second))
+	}
+}
+
+func TestInputRawWithCustomDecoder(t *testing.T) {
+	const customDecoder = "ext_http_raw_test_decoder"
+	pipeline.AddExtensionCreator(customDecoder, pipeline.Extensions[defaultDecoder])
+	t.Cleanup(func() { delete(pipeline.Extensions, customDecoder) })
+	input, err := newInputWithOpts("raw", func(input *ServiceHTTP) {
+		input.Decoder = customDecoder
+	})
+	require.NoError(t, err)
+	groups := collectRequestEvents(t, input, []byte("payload"), http.StatusNoContent)
+	require.Len(t, groups, 1)
+	require.Equal(t, []models.PipelineEvent{models.ByteArray("payload")}, groups[0].Events)
 }
 
 func TestInputInfluxDB(t *testing.T) {

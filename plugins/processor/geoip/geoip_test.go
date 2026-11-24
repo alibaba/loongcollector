@@ -15,6 +15,7 @@
 package geoip
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -22,7 +23,19 @@ import (
 
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/models"
+	"github.com/alibaba/ilogtail/plugins/test/mock"
 )
+
+func TestProcessorGeoIPInitRequiresSourceKey(t *testing.T) {
+	processor := &ProcessorGeoIP{DBPath: filepath.Join(t.TempDir(), "missing.mmdb")}
+	ctx := mock.NewEmptyContext("p", "l", "c")
+	require.ErrorContains(t, processor.Init(ctx), "SourceKey")
+
+	for _, key := range []string{"ip", "__source__"} {
+		processor.SourceKey = key
+		require.ErrorContains(t, processor.Init(ctx), "missing.mmdb")
+	}
+}
 
 // The plugin ships no GeoIP database, so a db-backed transform cannot be
 // exercised without a database fixture.

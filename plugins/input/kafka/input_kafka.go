@@ -26,6 +26,7 @@ import (
 	"github.com/IBM/sarama"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/pipeline/extensions"
 	"github.com/alibaba/ilogtail/pkg/protocol/decoder"
@@ -232,6 +233,17 @@ func (k *InputKafka) onMessage(msg *sarama.ConsumerMessage) {
 	if msg == nil {
 		return
 	}
+	if k.Format == common.ProtocolRaw {
+		key := models.ContentKey
+		if len(msg.Key) != 0 {
+			key = string(msg.Key)
+		}
+		log := models.NewLogWithOrderedContents(1)
+		log.Timestamp = uint64(time.Now().Truncate(time.Second).UnixNano())
+		log.Contents.Add(key, string(msg.Value))
+		k.collector.Collect(models.NewGroup(models.NewMetadata(), models.NewTags()), log)
+		return
+	}
 	groups, err := k.decoder.Decode(msg.Value, k.decodeRequest(msg.Headers))
 	if err != nil {
 		logger.Warning(k.context.GetRuntimeContext(), selfmonitor.DecodeMessageFailAlarm, "decode message failed", err)
@@ -297,6 +309,7 @@ func init() {
 			SASLUsername:  "",
 			SASLPassword:  "",
 			Assignor:      "range",
+			Format:        common.ProtocolRaw,
 			messages:      make(chan *sarama.ConsumerMessage, 256),
 			ready:         make(chan bool),
 		}

@@ -34,7 +34,10 @@ import (
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
-const name = "service_http_server"
+const (
+	name           = "service_http_server"
+	defaultDecoder = "ext_default_decoder"
+)
 
 // ServiceHTTP ...
 type ServiceHTTP struct {
@@ -161,6 +164,20 @@ func (s *ServiceHTTP) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		logger.Warning(s.context.GetRuntimeContext(), selfmonitor.DecodeBodyFailAlarm, "decode body failed", err, "request", r.URL.String())
 		BadRequest(w)
 		return
+	}
+	decoderType, _, _ := strings.Cut(s.Decoder, "/")
+	if decoderType == defaultDecoder && strings.EqualFold(strings.TrimSpace(s.Format), common.ProtocolRaw) {
+		// The raw protocol decoder is shared with inputs that emit bytes.
+		for _, group := range groups {
+			for i, event := range group.Events {
+				if body, ok := event.(models.ByteArray); ok {
+					log := models.NewLogWithOrderedContents(1)
+					log.Timestamp = uint64(time.Now().Truncate(time.Second).UnixNano())
+					log.Contents.Add(models.ContentKey, string(body))
+					group.Events[i] = log
+				}
+			}
+		}
 	}
 	if reqParams := s.extractRequestParams(r); len(reqParams) != 0 {
 		for _, group := range groups {
@@ -303,7 +320,7 @@ func (s *ServiceHTTP) Stop() error {
 func init() {
 	pipeline.ServiceInputs[name] = func() pipeline.ServiceInput {
 		return &ServiceHTTP{
-			Decoder:            "ext_default_decoder",
+			Decoder:            defaultDecoder,
 			ReadTimeoutSec:     10,
 			ShutdownTimeoutSec: 5,
 			MaxBodySize:        64 * 1024 * 1024,

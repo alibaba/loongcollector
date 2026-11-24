@@ -15,6 +15,7 @@
 #include "plugin/flusher/sls/FlusherSLS.h"
 
 #include "app_config/AppConfig.h"
+#include "application/Application.h"
 #include "collection_pipeline/CollectionPipeline.h"
 #include "collection_pipeline/batch/FlushStrategy.h"
 #include "collection_pipeline/queue/QueueKeyManager.h"
@@ -30,8 +31,8 @@
 #include "common/compression/CompressorFactory.h"
 #include "common/http/Constant.h"
 #include "common/http/HttpRequest.h"
+#include "monitor/Monitor.h"
 #include "plugin/flusher/sls/DiskBufferWriter.h"
-#include "plugin/flusher/sls/PackIdManager.h"
 #include "plugin/flusher/sls/SLSClientManager.h"
 #include "plugin/flusher/sls/SLSConstant.h"
 #include "plugin/flusher/sls/SLSResponse.h"
@@ -959,10 +960,25 @@ bool FlusherSLS::InitForProfile(CollectionPipelineContext& context) {
         || SenderQueueManager::GetInstance()->CreateQueue(mQueueKey, mPluginID, mLogstore, context, {});
 }
 
+// Native inputs have already supplied these transport attributes in
+// ProcessorTagNative. Go can supply them explicitly or use the same agent values.
+static void addGoTransportTags(SizedMap& tags, string& machineUUID) {
+    if (tags.mInner.find(LOG_RESERVED_KEY_SOURCE) == tags.mInner.end()) {
+        tags.Insert(LOG_RESERVED_KEY_SOURCE, LoongCollectorMonitor::mIpAddr);
+    }
+    if (tags.mInner.find(LOG_RESERVED_KEY_MACHINE_UUID) == tags.mInner.end()) {
+        machineUUID = Application::GetInstance()->GetUUID();
+        tags.Insert(LOG_RESERVED_KEY_MACHINE_UUID, machineUUID);
+    }
+}
+
 bool FlusherSLS::Send(const models::PipelineEventGroup& pbGroup,
                       const string& shardHashKey,
                       const string& logstore,
                       bool* exceedsSizeLimit) {
+    if (!mGroupSerializer) {
+        return false;
+    }
     if (pbGroup.has_logs()) {
         return sendPBLogs(pbGroup, shardHashKey, logstore, nullptr, exceedsSizeLimit);
     }
@@ -980,19 +996,22 @@ bool FlusherSLS::Send(const models::PipelineEventGroup& pbGroup,
                         std::move(group.GetExactlyOnceCheckpoint()));
     // Resolve routing before serialization moves the batch. Never change the
     // shared flusher's configuration for a per-call override.
+    string machineUUID;
+    addGoTransportTags(batch.mTags, machineUUID);
     string hash = shardHashKey;
     if (hash.empty() && !mShardHashKeys.empty()) {
         hash = GetShardHashKey(batch.mTags.mInner);
     }
-    AddPackId(batch);
+    auto options = makeLogGroupOptions(batch.mPackIdPrefix, logstore, exceedsSizeLimit && batch.mEvents.size() > 1);
     string data;
-    if (!mGroupSerializer || !mGroupSerializer->DoSerializeGoEvents(std::move(batch), data, errorMsg, exceedsSizeLimit)) {
-        if (exceedsSizeLimit == nullptr || !*exceedsSizeLimit) {
-            LOG_WARNING(sLogger, ("failed to serialize PipelineEventGroup PB", errorMsg));
+    if (!mGroupSerializer->DoSerializeEventGroup(batch, data, errorMsg, options)) {
+        if (exceedsSizeLimit && options.mExceedsSizeLimit) {
+            *exceedsSizeLimit = true;
+            return false;
         }
-        return false;
+        return reportSerializationFailure(errorMsg);
     }
-    return sendGoSerializedGroup(std::move(data), hash, logstore, exceedsSizeLimit);
+    return sendSerializedGroup(std::move(data), hash, logstore);
 }
 
 bool FlusherSLS::SendPBLogWire(const models::PipelineEventGroup& header,
@@ -1008,6 +1027,9 @@ bool FlusherSLS::sendPBLogs(const models::PipelineEventGroup& pbGroup,
                             const string& logstore,
                             const SLSLogGroupWireView* wire,
                             bool* exceedsSizeLimit) {
+    if (!mGroupSerializer) {
+        return false;
+    }
     if (wire ? wire->mEventCount == 0 : pbGroup.logs().events_size() == 0) {
         LOG_WARNING(
             sLogger,
@@ -1020,11 +1042,6 @@ bool FlusherSLS::sendPBLogs(const models::PipelineEventGroup& pbGroup,
         tags.Insert(tag.first, tag.second);
     }
     const size_t originalTagSize = tags.DataSize();
-    string hash = shardHashKey;
-    if (hash.empty() && !mShardHashKeys.empty()) {
-        hash = GetShardHashKey(tags.mInner);
-    }
-
     StringView packIdPrefix;
     for (const auto& meta : pbGroup.metadata()) {
         int key;
@@ -1032,58 +1049,71 @@ bool FlusherSLS::sendPBLogs(const models::PipelineEventGroup& pbGroup,
             packIdPrefix = meta.second;
         }
     }
-    const string packId = generatePackId(packIdPrefix);
-    tags.Insert(LOG_RESERVED_KEY_PACKAGE_ID, packId);
-
-    string data, errorMsg;
-    const bool serialized = mGroupSerializer
-        && (wire ? mGroupSerializer->DoSerializePBLogWire(
-                       *wire, tags.mInner, originalTagSize, data, errorMsg, exceedsSizeLimit)
-                 : mGroupSerializer->DoSerializePBLogs(
-                       pbGroup, tags.mInner, originalTagSize, data, errorMsg, exceedsSizeLimit));
-    if (!serialized) {
-        if (exceedsSizeLimit == nullptr || !*exceedsSizeLimit) {
-            LOG_WARNING(sLogger, ("failed to serialize PipelineEventGroup PB", errorMsg));
-        }
-        return false;
+    string machineUUID;
+    addGoTransportTags(tags, machineUUID);
+    string hash = shardHashKey;
+    if (hash.empty() && !mShardHashKeys.empty()) {
+        hash = GetShardHashKey(tags.mInner);
     }
-    return sendGoSerializedGroup(std::move(data), hash, logstore, exceedsSizeLimit);
+    const size_t eventCount = wire ? wire->mLogs.size() : pbGroup.logs().events_size();
+    auto options = makeLogGroupOptions(packIdPrefix, logstore, exceedsSizeLimit && eventCount > 1);
+    string data, errorMsg;
+    const bool serialized = wire
+        ? mGroupSerializer->DoSerializePBLogWire(*wire, tags.mInner, originalTagSize, data, errorMsg, &options)
+        : mGroupSerializer->DoSerializePBLogs(pbGroup, tags.mInner, originalTagSize, data, errorMsg, &options);
+    if (!serialized) {
+        if (exceedsSizeLimit && options.mExceedsSizeLimit) {
+            *exceedsSizeLimit = true;
+            return false;
+        }
+        return reportSerializationFailure(errorMsg);
+    }
+    return sendSerializedGroup(std::move(data), hash, logstore);
 }
 
-bool FlusherSLS::sendGoSerializedGroup(
-    string&& data, const string& shardHashKey, const string& logstore, bool* exceedsSizeLimit) {
-    // Enforce the limit on the final payload, including group tags and pack ID.
-    const auto limit = INT32_FLAG(max_send_log_group_size);
-    if (limit <= 0 || data.size() > static_cast<size_t>(limit)) {
-        if (exceedsSizeLimit != nullptr) {
-            *exceedsSizeLimit = true;
-        }
-        return false;
+bool FlusherSLS::reportSerializationFailure(const string& errorMsg) const {
+    LOG_WARNING(mContext->GetLogger(),
+                ("failed to serialize event group",
+                 errorMsg)("action", "discard data")("plugin", sName)("config", mContext->GetConfigName()));
+    mContext->GetAlarm().SendAlarmWarning(SERIALIZE_FAIL_ALARM,
+                                          "failed to serialize event group: " + errorMsg
+                                              + "\taction: discard data\tplugin: " + sName
+                                              + "\tconfig: " + mContext->GetConfigName(),
+                                          mContext->GetRegion(),
+                                          mContext->GetProjectName(),
+                                          mContext->GetConfigName(),
+                                          mContext->GetLogstoreName());
+    return false;
+}
+
+bool FlusherSLS::compressEventGroup(string& data, string& compressedData) {
+    if (!mCompressor) {
+        compressedData = std::move(data);
+        return true;
     }
-    return sendSerializedGroup(std::move(data), shardHashKey, logstore);
+    string errorMsg;
+    if (mCompressor->DoCompress(data, compressedData, errorMsg)) {
+        return true;
+    }
+    LOG_WARNING(mContext->GetLogger(),
+                ("failed to compress event group",
+                 errorMsg)("action", "discard data")("plugin", sName)("config", mContext->GetConfigName()));
+    mContext->GetAlarm().SendAlarmWarning(COMPRESS_FAIL_ALARM,
+                                          "failed to compress event group: " + errorMsg
+                                              + "\taction: discard data\tplugin: " + sName
+                                              + "\tconfig: " + mContext->GetConfigName(),
+                                          mContext->GetRegion(),
+                                          mContext->GetProjectName(),
+                                          mContext->GetConfigName(),
+                                          mContext->GetLogstoreName());
+    return false;
 }
 
 bool FlusherSLS::sendSerializedGroup(string&& data, const string& shardHashKey, const string& logstore) {
     const auto rawSize = data.size();
     string compressedData;
-    if (mCompressor) {
-        string errorMsg;
-        if (!mCompressor->DoCompress(data, compressedData, errorMsg)) {
-            LOG_WARNING(mContext->GetLogger(),
-                        ("failed to compress data",
-                         errorMsg)("action", "discard data")("plugin", sName)("config", mContext->GetConfigName()));
-            mContext->GetAlarm().SendAlarmWarning(COMPRESS_FAIL_ALARM,
-                                                  "failed to compress data: " + errorMsg
-                                                      + "\taction: discard data\tplugin: " + sName
-                                                      + "\tconfig: " + mContext->GetConfigName(),
-                                                  mContext->GetRegion(),
-                                                  mContext->GetProjectName(),
-                                                  mContext->GetConfigName(),
-                                                  mContext->GetLogstoreName());
-            return false;
-        }
-    } else {
-        compressedData = std::move(data);
+    if (!compressEventGroup(data, compressedData)) {
+        return false;
     }
 
     QueueKey key = mQueueKey;
@@ -1130,45 +1160,20 @@ bool FlusherSLS::SerializeAndPush(PipelineEventGroup&& group) {
     for (const auto& extraSourceBuffer : group.GetExtraSourceBuffers()) {
         g.mSourceBuffers.emplace_back(extraSourceBuffer);
     }
-    AddPackId(g);
+    auto options = makeLogGroupOptions(g.mPackIdPrefix, mLogstore, false);
     string errorMsg;
-    if (!mGroupSerializer->DoSerialize(std::move(g), serializedData, errorMsg)) {
-        LOG_WARNING(mContext->GetLogger(),
-                    ("failed to serialize event group",
-                     errorMsg)("action", "discard data")("plugin", sName)("config", mContext->GetConfigName()));
-        mContext->GetAlarm().SendAlarmWarning(SERIALIZE_FAIL_ALARM,
-                                              "failed to serialize event group: " + errorMsg
-                                                  + "\taction: discard data\tplugin: " + sName
-                                                  + "\tconfig: " + mContext->GetConfigName(),
-                                              mContext->GetRegion(),
-                                              mContext->GetProjectName(),
-                                              mContext->GetConfigName(),
-                                              mContext->GetLogstoreName());
-        return false;
+    if (!mGroupSerializer->DoSerializeEventGroup(g, serializedData, errorMsg, options)) {
+        return reportSerializationFailure(errorMsg);
     }
-    if (mCompressor) {
-        if (!mCompressor->DoCompress(serializedData, compressedData, errorMsg)) {
-            LOG_WARNING(mContext->GetLogger(),
-                        ("failed to compress event group",
-                         errorMsg)("action", "discard data")("plugin", sName)("config", mContext->GetConfigName()));
-            mContext->GetAlarm().SendAlarmWarning(COMPRESS_FAIL_ALARM,
-                                                  "failed to compress event group: " + errorMsg
-                                                      + "\taction: discard data\tplugin: " + sName
-                                                      + "\tconfig: " + mContext->GetConfigName(),
-                                                  mContext->GetRegion(),
-                                                  mContext->GetProjectName(),
-                                                  mContext->GetConfigName(),
-                                                  mContext->GetLogstoreName());
-            return false;
-        }
-    } else {
-        compressedData = serializedData;
+    const auto rawSize = serializedData.size();
+    if (!compressEventGroup(serializedData, compressedData)) {
+        return false;
     }
     // must create a tmp, because eoo checkpoint is moved in second param
     auto fbKey = g.mExactlyOnceCheckpoint->fbKey;
     return PushToQueue(fbKey,
                        make_unique<SLSSenderQueueItem>(std::move(compressedData),
-                                                       serializedData.size(),
+                                                       rawSize,
                                                        this,
                                                        fbKey,
                                                        mLogstore,
@@ -1192,71 +1197,40 @@ bool FlusherSLS::SerializeAndPush(BatchedEventsList&& groupList) {
         if (!mShardHashKeys.empty()) {
             shardHashKey = GetShardHashKey(group.mTags.mInner);
         }
-        AddPackId(group);
+        auto options = makeLogGroupOptions(group.mPackIdPrefix, mLogstore, false);
         string errorMsg;
-        if (!mGroupSerializer->DoSerialize(std::move(group), serializedData, errorMsg)) {
-            LOG_WARNING(mContext->GetLogger(),
-                        ("failed to serialize event group",
-                         errorMsg)("action", "discard data")("plugin", sName)("config", mContext->GetConfigName()));
-            mContext->GetAlarm().SendAlarmWarning(SERIALIZE_FAIL_ALARM,
-                                                  "failed to serialize event group: " + errorMsg
-                                                      + "\taction: discard data\tplugin: " + sName
-                                                      + "\tconfig: " + mContext->GetConfigName(),
-                                                  mContext->GetRegion(),
-                                                  mContext->GetProjectName(),
-                                                  mContext->GetConfigName(),
-                                                  mContext->GetLogstoreName());
+        if (!mGroupSerializer->DoSerializeEventGroup(group, serializedData, errorMsg, options)) {
+            reportSerializationFailure(errorMsg);
             allSucceeded = false;
             continue;
         }
-        if (mCompressor) {
-            if (!mCompressor->DoCompress(serializedData, compressedData, errorMsg)) {
-                LOG_WARNING(mContext->GetLogger(),
-                            ("failed to compress event group",
-                             errorMsg)("action", "discard data")("plugin", sName)("config", mContext->GetConfigName()));
-                mContext->GetAlarm().SendAlarmWarning(COMPRESS_FAIL_ALARM,
-                                                      "failed to compress event group: " + errorMsg
-                                                          + "\taction: discard data\tplugin: " + sName
-                                                          + "\tconfig: " + mContext->GetConfigName(),
-                                                      mContext->GetRegion(),
-                                                      mContext->GetProjectName(),
-                                                      mContext->GetConfigName(),
-                                                      mContext->GetLogstoreName());
-                allSucceeded = false;
-                continue;
-            }
-        } else {
-            compressedData = serializedData;
+        if (!enablePackageList && !group.mExactlyOnceCheckpoint) {
+            allSucceeded = sendSerializedGroup(std::move(serializedData), shardHashKey, mLogstore) && allSucceeded;
+            continue;
+        }
+
+        const auto rawSize = serializedData.size();
+        if (!compressEventGroup(serializedData, compressedData)) {
+            allSucceeded = false;
+            continue;
         }
         if (enablePackageList) {
-            packageSize += serializedData.size();
-            compressedLogGroups.emplace_back(std::move(compressedData), serializedData.size());
+            packageSize += rawSize;
+            compressedLogGroups.emplace_back(std::move(compressedData), rawSize);
         } else {
-            if (group.mExactlyOnceCheckpoint) {
-                // must create a tmp, because eoo checkpoint is moved in second param
-                auto fbKey = group.mExactlyOnceCheckpoint->fbKey;
-                allSucceeded
-                    = PushToQueue(fbKey,
-                                  make_unique<SLSSenderQueueItem>(std::move(compressedData),
-                                                                  serializedData.size(),
-                                                                  this,
-                                                                  fbKey,
-                                                                  mLogstore,
-                                                                  RawDataType::EVENT_GROUP,
-                                                                  group.mExactlyOnceCheckpoint->data.hash_key(),
-                                                                  std::move(group.mExactlyOnceCheckpoint),
-                                                                  false))
-                    && allSucceeded;
-            } else {
-                allSucceeded = Flusher::PushToQueue(make_unique<SLSSenderQueueItem>(std::move(compressedData),
-                                                                                    serializedData.size(),
-                                                                                    this,
-                                                                                    mQueueKey,
-                                                                                    mLogstore,
-                                                                                    RawDataType::EVENT_GROUP,
-                                                                                    shardHashKey))
-                    && allSucceeded;
-            }
+            // must create a tmp, because eoo checkpoint is moved in second param
+            auto fbKey = group.mExactlyOnceCheckpoint->fbKey;
+            allSucceeded = PushToQueue(fbKey,
+                                       make_unique<SLSSenderQueueItem>(std::move(compressedData),
+                                                                       rawSize,
+                                                                       this,
+                                                                       fbKey,
+                                                                       mLogstore,
+                                                                       RawDataType::EVENT_GROUP,
+                                                                       group.mExactlyOnceCheckpoint->data.hash_key(),
+                                                                       std::move(group.mExactlyOnceCheckpoint),
+                                                                       false))
+                && allSucceeded;
         }
     }
     // all groups in the list may fail to be serialized or compressed, in which case nothing should be sent, otherwise
@@ -1351,17 +1325,8 @@ string FlusherSLS::GetShardHashKey(const GroupTags& tags) const {
     return CalcMD5(key);
 }
 
-void FlusherSLS::AddPackId(BatchedEvents& g) const {
-    const auto packId = g.mSourceBuffers[0]->CopyString(generatePackId(g.mPackIdPrefix));
-    g.mTags.Insert(LOG_RESERVED_KEY_PACKAGE_ID, StringView(packId.data, packId.size));
-}
-
-string FlusherSLS::generatePackId(StringView prefix) const {
-    const string packIdPrefix = prefix.to_string();
-    const int64_t prefixHash = HashString(packIdPrefix);
-    const int64_t packSeq
-        = PackIdManager::GetInstance()->GetAndIncPackSeq(HashString(packIdPrefix + "_" + mProject + "_" + mLogstore));
-    return ToHexString(prefixHash) + "-" + ToHexString(packSeq);
+SLSLogGroupOptions FlusherSLS::makeLogGroupOptions(StringView sourceId, const string& logstore, bool canSplit) const {
+    return {sourceId, mProject, logstore.empty() ? mLogstore : logstore, canSplit};
 }
 
 unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostLogStoreLogsRequest(const string& accessKeyId,

@@ -18,8 +18,8 @@
         {
             "type":"processor_csv",
             "detail":{
-                "SrcKey":"content",
-                "DstKeys":["f1", "f2", "f3"],
+                "SourceKey":"content",
+                "SplitKeys":["f1", "f2", "f3"],
                 "PreserveOthers":true,
                 "ExpandOthers":false,
                 "TrimLeadingSpace":false

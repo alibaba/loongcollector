@@ -224,6 +224,7 @@ func TestIgnoreJSONError(t *testing.T) {
 func TestInit(t *testing.T) {
 	p := pipeline.Processors["processor_anchor"]()
 	assert.Equal(t, reflect.TypeOf(p).String(), "*anchor.ProcessorAnchor")
+	require.ErrorContains(t, p.Init(mock.NewEmptyContext("p", "l", "c")), "SourceKey")
 }
 
 func TestProcessorAnchor_ProcessExtracts(t *testing.T) {

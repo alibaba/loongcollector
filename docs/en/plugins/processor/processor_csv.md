@@ -8,7 +8,7 @@ csv decoder for logtail
 
 |  field   |   type   |   description   | default value   |
 | ---- | ---- | ---- | ---- |
-|SourceKey|string|The source key containing the CSV record|""|
+|SourceKey|string|Required. The source key containing the CSV record| |
 |NoKeyError|bool|Optional. Whether to report error if no key in the log mathes the SourceKey, default to false|false|
 |SplitKeys|[]string|The keys matching the decoded CSV fields|null|
 |SplitSep|string|Optional. The Seperator, default to ,|","|

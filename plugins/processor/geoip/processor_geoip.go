@@ -15,6 +15,7 @@
 package geoip
 
 import (
+	"errors"
 	"net"
 	"strconv"
 
@@ -54,6 +55,9 @@ type ProcessorGeoIP struct {
 
 // Init called for init some system resources, like socket, mutex...
 func (p *ProcessorGeoIP) Init(context pipeline.Context) error {
+	if p.SourceKey == "" {
+		return errors.New("parameter SourceKey should not be empty")
+	}
 	p.context = context
 	var err error
 	if p.db, err = geoip2.Open(p.DBPath); err != nil {

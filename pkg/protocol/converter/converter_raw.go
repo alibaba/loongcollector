@@ -19,6 +19,7 @@ import (
 	"strings"
 
 	"github.com/alibaba/ilogtail/pkg/models"
+	"github.com/alibaba/ilogtail/pkg/util"
 )
 
 func (c *Converter) ConvertToRawStream(groupEvents *models.PipelineGroupEvents, targetFields []string) (stream [][]byte, values []map[string]string, err error) {
@@ -41,14 +42,14 @@ func (c *Converter) ConvertToRawStream(groupEvents *models.PipelineGroupEvents, 
 func getByteStreamWithSep(groupEvents *models.PipelineGroupEvents, targetValues map[string]string, sep string) (stream [][]byte, values []map[string]string, err error) {
 	joinedStream := *GetPooledByteBuf()
 	for idx, event := range groupEvents.Events {
-		eventType := event.GetType()
-		if eventType != models.EventTypeByteArray {
-			return nil, nil, fmt.Errorf("unsupported event type %v", eventType)
+		payload, err := rawEventPayload(event)
+		if err != nil {
+			return nil, nil, err
 		}
 		if idx != 0 {
 			joinedStream = append(joinedStream, sep...)
 		}
-		joinedStream = append(joinedStream, event.(models.ByteArray)...)
+		joinedStream = append(joinedStream, payload...)
 	}
 	return [][]byte{joinedStream}, []map[string]string{targetValues}, nil
 }
@@ -57,17 +58,43 @@ func getByteStream(groupEvents *models.PipelineGroupEvents, targetValues map[str
 	byteGroup := make([][]byte, 0, len(groupEvents.Events))
 	valueGroup := make([]map[string]string, 0, len(groupEvents.Events))
 	for _, event := range groupEvents.Events {
-		eventType := event.GetType()
-		if eventType != models.EventTypeByteArray {
-			return nil, nil, fmt.Errorf("unsupported event type %v", eventType)
+		payload, err := rawEventPayload(event)
+		if err != nil {
+			return nil, nil, err
 		}
 
 		byteStream := *GetPooledByteBuf()
-		byteStream = append(byteStream, event.(models.ByteArray)...)
+		byteStream = append(byteStream, payload...)
 		byteGroup = append(byteGroup, byteStream)
 		valueGroup = append(valueGroup, targetValues)
 	}
 	return byteGroup, valueGroup, nil
+}
+
+func rawEventPayload(event models.PipelineEvent) ([]byte, error) {
+	switch event := event.(type) {
+	case models.ByteArray:
+		return event, nil
+	case *models.Log:
+		contents := event.GetIndices()
+		value := contents.Get(models.BodyKey)
+		if !contents.Contains(models.BodyKey) && contents.Len() == 1 {
+			// A raw Kafka message with a key uses that key as its sole field.
+			for _, field := range models.LogContentEntries(contents) {
+				value = field
+			}
+		}
+		switch value := value.(type) {
+		case string:
+			return util.ZeroCopyStringToBytes(value), nil
+		case []byte:
+			return value, nil
+		default:
+			return nil, fmt.Errorf("raw output needs a log body or one string or byte field")
+		}
+	default:
+		return nil, fmt.Errorf("unsupported event type %v", event.GetType())
+	}
 }
 
 func findTargetFieldsInGroup(targetFields []string, group *models.GroupInfo) map[string]string {

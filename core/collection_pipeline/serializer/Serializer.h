@@ -72,11 +72,18 @@ public:
 
 protected:
     template <typename SerializeFunc>
-    bool SerializeWithMetrics(const size_t& inputSize, const std::string& output, SerializeFunc serialize) {
-        ADD_COUNTER(mInItemsTotal, 1);
+    bool SerializeWithMetrics(const size_t& inputSize,
+                              const std::string& output,
+                              SerializeFunc serialize,
+                              const bool* retryableRejection = nullptr) {
         auto before = std::chrono::system_clock::now();
         const bool res = serialize();
         ADD_COUNTER(mTotalProcessMs, std::chrono::system_clock::now() - before);
+        // Oversized batches that will be split are neither accepted nor discarded.
+        if (!res && retryableRejection != nullptr && *retryableRejection) {
+            return false;
+        }
+        ADD_COUNTER(mInItemsTotal, 1);
         ADD_COUNTER(mInItemSizeBytes, inputSize);
 
         if (res) {

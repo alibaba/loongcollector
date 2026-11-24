@@ -22,6 +22,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
+	"github.com/alibaba/ilogtail/pkg/util"
 )
 
 type ProcessorSplit struct {
@@ -29,7 +30,7 @@ type ProcessorSplit struct {
 	SplitSep              string
 	PreserveOthers        bool
 	NoKeyError            bool
-	EnableLogPositionMeta bool
+	EnableLogPositionMeta bool // Legacy V1 option. V2 emits relative offsets.
 
 	context pipeline.Context
 }
@@ -57,50 +58,42 @@ func (p *ProcessorSplit) Process(in *models.PipelineGroupEvents, context pipelin
 			context.Collector().Collect(in.Group, event)
 			continue
 		}
-		contents := log.GetIndices()
-		key := p.SplitKey
-		if key == "" {
-			if first, ordered := models.FirstLogContentKey(contents); ordered {
-				key = first
-			} else if contents.Contains(models.BodyKey) {
-				key = models.BodyKey
-			} else {
-				for field := range contents.Iterator() {
-					key = field
-					break
-				}
-			}
+		payload := util.ZeroCopyBytesToString(log.GetBody())
+		fromTag := false
+		if tags := log.GetTags(); payload == "" && tags != nil {
+			fromTag = tags.Contains(p.SplitKey)
+			payload = tags.Get(p.SplitKey)
 		}
-
-		if !contents.Contains(key) {
+		if payload == "" {
 			if p.NoKeyError {
 				logger.Warning(p.context.GetRuntimeContext(), selfmonitor.ProcessorSplitLogStringFindAlarm, "can't find split key", p.SplitKey)
 			}
-			if p.PreserveOthers {
-				if log.Timestamp == 0 {
-					log = log.Clone().(*models.Log)
-					log.Timestamp = uint64(time.Now().Truncate(time.Second).UnixNano())
-				}
-				context.Collector().Collect(in.Group, log)
+			if !p.PreserveOthers {
+				continue
 			}
-			continue
-		}
-		payload := pipeline.GetStringValue(contents.Get(key))
-		if payload == "" {
-			continue
 		}
 
 		template := log.Clone().(*models.Log)
-		if p.PreserveOthers {
-			template.GetIndices().Delete(key)
-		} else {
-			template.SetIndices(models.NewOrderedLogContents(1))
+		if !p.PreserveOthers || template.Tags == nil {
 			template.Tags = models.NewTags()
+		} else if fromTag {
+			template.Tags.Delete(p.SplitKey)
 		}
 		if template.Timestamp == 0 {
-			template.Timestamp = uint64(time.Now().Truncate(time.Second).UnixNano())
+			template.Timestamp = uint64(time.Now().UnixNano())
 		}
-		hasOffset := log.GetOffset() != 0 || log.GetRawSize() != 0
+		// The original V2 output starts with no input position or observed time.
+		template.Offset = 0
+		template.RawSize = 0
+		template.ObservedTimestamp = 0
+		if payload == "" {
+			context.Collector().Collect(in.Group, template)
+			continue
+		}
+
+		// Keep the body field in its original position without cloning its full
+		// input buffer for each output.
+		template.SetBody([]byte{})
 		parts := strings.Split(payload, p.SplitSep)
 		var offset uint64
 		for i, part := range parts {
@@ -111,11 +104,9 @@ func (p *ProcessorSplit) Process(in *models.PipelineGroupEvents, context pipelin
 			if i < len(parts)-1 {
 				output = template.Clone().(*models.Log)
 			}
-			output.GetIndices().Add(key, part)
-			if p.EnableLogPositionMeta && hasOffset {
-				output.SetOffset(log.GetOffset() + offset)
-				offset += uint64(len(part) + len(p.SplitSep))
-			}
+			output.SetBody([]byte(part))
+			output.Offset = offset
+			offset += uint64(len(part) + len(p.SplitSep))
 			context.Collector().Collect(in.Group, output)
 		}
 	}

@@ -26,7 +26,7 @@
 | 参数                        | 类型      | 是否必选 | 说明                                                                                                                                          |
 |---------------------------|---------|------|---------------------------------------------------------------------------------------------------------------------------------------------|
 | Type                      | string  | 是    | 插件类型，指定为`service_kafka`。                                                                                                                    |
-| Format | string | 否 | 消息格式，如 `raw`、`sls`、`prometheus`、`otlp_metricv1`、`otlp_tracev1`。默认为 `raw`，提交消息的原始字节。 |
+| Format | string | 否 | 消息格式，如 `raw`、`sls`、`prometheus`、`otlp_metricv1`、`otlp_tracev1`。默认为 `raw`，将消息值写入日志内容。消息 key 非空时作字段名，空 key 使用 `content`。 |
 | Version                   | string  | 是    | Kafka集群版本号。                                                                                                                                 |
 | Brokers                   | Array   | 是    | Kafka服务器地址列表。                                                                                                                               |
 | ConsumerGroup             | string  | 是    | Kafka消费组名称。                                                                                                                                 |
@@ -52,7 +52,7 @@ Kafka 消息头可传入解码器要求的元数据。OTLP 消息默认使用 pr
 {"payload":"foo"}
 ```
 
-### 采集配置（v1）
+### 采集配置
 
 ```yaml
 enable: true
@@ -74,36 +74,8 @@ flushers:
 
 * 输出
 
-```json
-{"payload":"foo"}
-```
-
-### 采集配置（v2）
-
-`v2` 是自 **1.6.0** 起新增的实现（旧文档常写作 ilogtail），主要支持通过 `Format` 指定 `raw`、`prometheus`、`otlp_metricv1`、`otlp_tracev1` 等数据格式，
-其它配置变更可查看【配置参数】表。如果没有特殊的需求，使用默认的`v1`即可。
-
-```yaml
-enable: true
-version: v2
-inputs:
-  - Type: service_kafka
-    Version: 2.1.1
-    Brokers: 
-        - 172.xx.xx.48
-        - 172.xx.xx.34
-    ConsumerGroup: test-group
-    Topics:
-        - topicA
-        - topicB
-    ClientID: sls
-flushers:
-  - Type: flusher_stdout
-    OnlyStdout: true  
-```
-
-* 输出
+消息没有 key 时，日志的 `content` 字段保存完整消息值。
 
 ```json
-{"eventType":"byteArray","name":"","timestamp":0,"observedTimestamp":0,"tags":{},"byteArray":"{\"payload \": \"foo \"}"}
+{"eventType":"log","name":"","timestamp":1700000000000000000,"observedTimestamp":0,"tags":{},"offset":0,"level":"","traceID":"","spanID":"","content":"{\"payload\":\"foo\"}"}
 ```

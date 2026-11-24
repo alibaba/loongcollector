@@ -40,6 +40,11 @@ func newProcessor() (*ProcessorCSVDecoder, error) {
 	return processor, err
 }
 
+func TestProcessorCSVDecoderInitRequiresSourceKey(t *testing.T) {
+	processor := &ProcessorCSVDecoder{SplitSep: ","}
+	require.ErrorContains(t, processor.Init(mock.NewEmptyContext("p", "l", "c")), "SourceKey")
+}
+
 func TestProcessorCSVDecoder(t *testing.T) {
 	Convey("Given a csv decoder with 3 DstKeys, and without preserving others", t, func() {
 		processor, err := newProcessor()

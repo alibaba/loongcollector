@@ -29,12 +29,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alibaba/ilogtail/pkg/helper"
-	"github.com/alibaba/ilogtail/pkg/models"
-
 	"github.com/coreos/go-systemd/sdjournal"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
@@ -336,40 +334,38 @@ func (sj *ServiceJournal) run(c pipeline.PipelineCollector, shutdown chan struct
 	}()
 
 	for rawEvent := range sj.Follow(sj.journal, shutdown) {
-		// type JournalEntry struct {
-		// 	Fields             map[string]string
-		// 	Cursor             string
-		// 	RealtimeTimestamp  uint64
-		// 	MonotonicTimestamp uint64
-		// }
-		// logger.Debug("on journal event", *rawEvent)
-
-		if sj.ParsePriority {
-			if val, ok := rawEvent.Fields[sdjournal.SD_JOURNAL_FIELD_PRIORITY]; ok {
-				rawEvent.Fields[sdjournal.SD_JOURNAL_FIELD_PRIORITY] = PriorityConversionMap[val]
-			}
-		}
-		if sj.ParseSyslogFacility {
-			if val, ok := rawEvent.Fields[sdjournal.SD_JOURNAL_FIELD_SYSLOG_FACILITY]; ok {
-				rawEvent.Fields[sdjournal.SD_JOURNAL_FIELD_SYSLOG_FACILITY] = SyslogFacilityString[val]
-			}
-		}
-
-		var eventTime time.Time
-		if sj.UseJournalEventTime {
-			eventTime = time.Unix(0, int64(rawEvent.RealtimeTimestamp)*1000)
-		} else {
-			eventTime = time.Now()
-		}
-		contents := models.NewOrderedLogContents(2)
-		contents.Add("_realtime_timestamp_", strconv.FormatUint(rawEvent.RealtimeTimestamp, 10))
-		contents.Add("_monotonic_timestamp_", strconv.FormatUint(rawEvent.MonotonicTimestamp, 10))
-		event := helper.NewInputLog(rawEvent.Fields, nil, eventTime)
-		event.Contents = contents
-		c.Collect(models.NewGroup(models.NewMetadata(), models.NewTags()), event)
+		c.Collect(models.NewGroup(models.NewMetadata(), models.NewTags()), sj.newLogEvent(rawEvent))
 		sj.SaveCheckpoint(false)
 	}
 	logger.Info(sj.context.GetRuntimeContext(), "service journal sync", "done")
+}
+
+func (sj *ServiceJournal) newLogEvent(entry *sdjournal.JournalEntry) *models.Log {
+	var eventTime time.Time
+	if sj.UseJournalEventTime {
+		eventTime = time.UnixMicro(int64(entry.RealtimeTimestamp))
+	} else {
+		eventTime = time.Now()
+	}
+
+	event := models.NewLogWithOrderedContents(len(entry.Fields) + 2)
+	event.Timestamp = uint64(eventTime.UnixNano())
+	for key, value := range entry.Fields {
+		event.Contents.Add(key, value)
+	}
+	if sj.ParsePriority {
+		if value, ok := entry.Fields[sdjournal.SD_JOURNAL_FIELD_PRIORITY]; ok {
+			event.Contents.Add(sdjournal.SD_JOURNAL_FIELD_PRIORITY, PriorityConversionMap[value])
+		}
+	}
+	if sj.ParseSyslogFacility {
+		if value, ok := entry.Fields[sdjournal.SD_JOURNAL_FIELD_SYSLOG_FACILITY]; ok {
+			event.Contents.Add(sdjournal.SD_JOURNAL_FIELD_SYSLOG_FACILITY, SyslogFacilityString[value])
+		}
+	}
+	event.Contents.Add("_realtime_timestamp_", strconv.FormatUint(entry.RealtimeTimestamp, 10))
+	event.Contents.Add("_monotonic_timestamp_", strconv.FormatUint(entry.MonotonicTimestamp, 10))
+	return event
 }
 
 func init() {

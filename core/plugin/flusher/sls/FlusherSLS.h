@@ -142,11 +142,8 @@ private:
     bool SerializeAndPush(BatchedEventsList&& groupList);
     bool SerializeAndPush(PipelineEventGroup&& g); // for exactly once only
     bool PushToQueue(QueueKey key, std::unique_ptr<SenderQueueItem>&& item, uint32_t retryTimes = 500);
-    bool sendGoSerializedGroup(std::string&& data,
-                               const std::string& shardHashKey,
-                               const std::string& logstore,
-                               bool* exceedsSizeLimit);
-    // Compress and enqueue the SLS payload produced by the C++ serializer.
+    bool compressEventGroup(std::string& data, std::string& compressedData);
+    // Send one serialized group through the same queue for native and Go inputs.
     bool sendSerializedGroup(std::string&& data, const std::string& shardHashKey, const std::string& logstore);
     bool sendPBLogs(const models::PipelineEventGroup& group,
                     const std::string& shardHashKey,
@@ -154,8 +151,8 @@ private:
                     const SLSLogGroupWireView* wire,
                     bool* exceedsSizeLimit);
     std::string GetShardHashKey(const GroupTags& tags) const;
-    std::string generatePackId(StringView prefix) const;
-    void AddPackId(BatchedEvents& g) const;
+    SLSLogGroupOptions makeLogGroupOptions(StringView sourceId, const std::string& logstore, bool canSplit) const;
+    bool reportSerializationFailure(const std::string& errorMsg) const;
 
     std::unique_ptr<HttpSinkRequest> CreatePostLogStoreLogsRequest(const std::string& accessKeyId,
                                                                    const std::string& accessKeySecret,

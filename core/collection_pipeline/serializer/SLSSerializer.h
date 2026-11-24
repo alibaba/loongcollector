@@ -45,6 +45,14 @@ struct SLSLogGroupWireView {
     size_t mLogInputSize = 0;
 };
 
+struct SLSLogGroupOptions {
+    StringView mPackIdPrefix;
+    StringView mProject;
+    StringView mLogstore;
+    bool mCanSplit = false;
+    bool mExceedsSizeLimit = false;
+};
+
 struct MetricEventContentCacheItem {
     std::vector<std::string> mMetricEventContentCache;
     size_t mLabelSize = 0;
@@ -58,20 +66,21 @@ public:
                            size_t originalTagSize,
                            std::string& res,
                            std::string& errorMsg,
-                           bool* exceedsSizeLimit = nullptr);
+                           SLSLogGroupOptions* options = nullptr);
 
     bool DoSerializePBLogWire(const SLSLogGroupWireView& group,
                               const GroupTags& tags,
                               size_t originalTagSize,
                               std::string& res,
                               std::string& errorMsg,
-                              bool* exceedsSizeLimit = nullptr);
+                              SLSLogGroupOptions* options = nullptr);
 
-    bool DoSerializeGoEvents(BatchedEvents&& group, std::string& res, std::string& errorMsg, bool* exceedsSizeLimit);
+    bool
+    DoSerializeEventGroup(BatchedEvents& group, std::string& res, std::string& errorMsg, SLSLogGroupOptions& options);
 
 private:
     bool Serialize(BatchedEvents&& p, std::string& res, std::string& errorMsg) override;
-    bool SerializeGroup(BatchedEvents& group, std::string& res, std::string& errorMsg, bool* exceedsSizeLimit);
+    bool SerializeGroup(BatchedEvents& group, std::string& res, std::string& errorMsg, SLSLogGroupOptions* options);
 
     void CalculateLogEventSize(const BatchedEvents& group,
                                size_t& logGroupSZ,

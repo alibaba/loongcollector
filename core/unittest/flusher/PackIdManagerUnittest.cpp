@@ -28,10 +28,11 @@ protected:
 };
 
 void PackIdManagerUnittest::TestGetSeq() {
-    // key not existed
-    APSARA_TEST_EQUAL(0, PackIdManager::GetInstance()->GetAndIncPackSeq(0));
-    // key existed
-    APSARA_TEST_EQUAL(1, PackIdManager::GetInstance()->GetAndIncPackSeq(0));
+    auto* manager = PackIdManager::GetInstance();
+    EXPECT_EQ(0U, manager->TryGetAndIncPackSeq(0, 0));
+    EXPECT_FALSE(manager->TryGetAndIncPackSeq(0, 0));
+    EXPECT_EQ(1U, manager->TryGetAndIncPackSeq(0, 1));
+    EXPECT_EQ(2U, manager->TryGetAndIncPackSeq(0, 2));
 }
 
 UNIT_TEST_CASE(PackIdManagerUnittest, TestGetSeq)

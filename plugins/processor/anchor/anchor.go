@@ -15,6 +15,7 @@
 package anchor
 
 import (
+	"errors"
 	"strings"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
@@ -58,7 +59,6 @@ type Anchor struct {
 
 // ProcessorAnchor is a processor plugin to process field with anchors.
 // Field specified by SourceKey will be processed by all Anchors.
-// If no SourceKey is specified, the first field in log contents will be processed.
 type ProcessorAnchor struct {
 	Anchors       []Anchor
 	NoKeyError    bool
@@ -72,6 +72,9 @@ type ProcessorAnchor struct {
 
 // Init called for init some system resources, like socket, mutex...
 func (p *ProcessorAnchor) Init(context pipeline.Context) error {
+	if p.SourceKey == "" {
+		return errors.New("parameter SourceKey should not be empty")
+	}
 	p.context = context
 	for i := range p.Anchors {
 		switch p.Anchors[i].FieldType {

@@ -27,9 +27,8 @@ import (
 	"time"
 
 	"github.com/alibaba/ilogtail/pkg/helper"
-	"github.com/alibaba/ilogtail/pkg/models"
-
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pkg/util"
@@ -61,7 +60,6 @@ type Response struct {
 	compiledStringMatch *regexp.Regexp
 	client              *http.Client
 	context             pipeline.Context
-	tags                map[string]string
 	lastLoadAddressTime time.Time
 }
 
@@ -127,8 +125,6 @@ func (h *Response) Init(context pipeline.Context) (int, error) {
 		return 0, err
 	}
 
-	// Prepare data
-	h.tags = map[string]string{"_method_": h.Method}
 	if h.client == nil {
 		client, err := h.createHTTPClient()
 		if err != nil {
@@ -213,7 +209,7 @@ func (h *Response) createHTTPClient() (*http.Client, error) {
 // httpGather gathers all fields and returns any errors it encounters.
 func (h *Response) httpGather(address string) (map[string]string, error) {
 	// Prepare fields
-	fields := map[string]string{"_address_": address}
+	fields := map[string]string{"_address_": address, "_method_": h.Method}
 
 	var body io.Reader
 	if h.Body != "" {
@@ -296,11 +292,11 @@ func (h *Response) httpGather(address string) (map[string]string, error) {
 	return fields, nil
 }
 
-// Read gets all metric fields and tags and returns any errors it encounters
+// Read gets all metric fields and returns any errors it encounters.
 func (h *Response) Read(ctx pipeline.PipelineContext) error {
 	collector := ctx.Collector()
 	// should not occur
-	if h.tags == nil || h.client == nil {
+	if h.client == nil {
 		return nil
 	}
 
@@ -322,7 +318,7 @@ func (h *Response) Read(ctx pipeline.PipelineContext) error {
 		}
 		if len(fields) > 0 {
 			// Add metrics
-			collector.Collect(models.NewGroup(models.NewMetadata(), models.NewTags()), helper.NewInputLog(h.tags, fields))
+			collector.Collect(models.NewGroup(models.NewMetadata(), models.NewTags()), helper.NewInputLog(nil, fields))
 		}
 	}
 

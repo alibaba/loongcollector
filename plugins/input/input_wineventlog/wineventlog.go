@@ -24,9 +24,8 @@ import (
 	"time"
 
 	"github.com/alibaba/ilogtail/pkg/helper"
-	"github.com/alibaba/ilogtail/pkg/models"
-
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pkg/util"
@@ -195,7 +194,7 @@ func (w *WinEventLog) run() bool {
 
 		for _, r := range records {
 			values := r.ToEvent(w.IgnoreZeroValue)
-			w.collector.Collect(models.NewGroup(models.NewMetadata(), models.NewTags()), helper.NewInputLog(values, nil, r.TimeCreated.SystemTime))
+			w.collector.Collect(models.NewGroup(models.NewMetadata(), models.NewTags()), helper.NewInputLog(nil, values, r.TimeCreated.SystemTime))
 			w.checkpoint = r.Offset
 			curTime := time.Now()
 			if curTime.Sub(w.lastCheckpointTime) > time.Duration(3)*time.Second {

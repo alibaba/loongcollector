@@ -2,7 +2,7 @@
 
 ## 简介
 
-`processor_split_log_string`插件可以按照指定分隔符，将单条日志的某个字段切分为多条日志。默认分隔符为换行符 `\n`（未配置时使用 `\0`）。[源代码](https://github.com/alibaba/loongcollector/blob/main/plugins/processor/split/logstring/split_log_string.go)
+`processor_split_log_string` 按指定分隔符切分日志正文。正文为空时，使用 `SplitKey` 指定的事件标签。每个非空片段写入一条新日志的正文，其他日志内容随每条输出保留。[源代码](https://github.com/alibaba/loongcollector/blob/main/plugins/processor/split/logstring/split_log_string.go)
 
 ## 事件能力
 
@@ -24,17 +24,18 @@
 
 ## 配置参数
 
-| 参数           | 类型   | 是否必选 | 说明                                                                                 |
-| -------------- | ------ | -------- | ------------------------------------------------------------------------------------ |
-| Type           | string | 是       | 插件类型，固定为 `processor_split_log_string`。                                       |
-| SplitKey       | string | 是       | 待切分的字段名。                                                                      |
-| SplitSep       | string | 否       | 分隔符。未配置时默认使用 `\0`。                                                       |
-| PreserveOthers | bool   | 否       | 是否保留其它字段。默认 `false`。                                                      |
-| NoKeyError     | bool   | 否       | 找不到 SplitKey 时是否告警。默认 `false`，表示不告警。                                |
+| 参数                  | 类型   | 是否必选 | 说明 |
+| --------------------- | ------ | -------- | ---- |
+| Type                  | string | 是       | 插件类型，固定为 `processor_split_log_string`。 |
+| SplitKey              | string | 否       | 正文为空时，用作切分来源的事件标签名。 |
+| SplitSep              | string | 否       | 分隔符。默认使用换行符 `\n`，显式配置空字符串时使用 `\0`。 |
+| PreserveOthers        | bool   | 否       | 是否保留未用作切分来源的事件标签。默认 `true`。正文和标签都无法提供待切分内容时，开启则保留日志，关闭则丢弃。 |
+| NoKeyError            | bool   | 否       | 无待切分内容时是否告警。默认 `false`。 |
+| EnableLogPositionMeta | bool   | 否       | 旧版 V1 选项。V2 始终输出从零开始的相对字节偏移，仅累加非空片段及其分隔符的长度。 |
 
 ## 样例
 
-采集 `/home/test-log/` 路径下的 `test.log` 文件，将字段 `content` 按换行符切分为多条日志。
+采集 `/home/test-log/` 路径下的 `test.log` 文件，将日志正文按换行符切分为多条日志。
 
 * 输入
 
@@ -52,7 +53,6 @@ inputs:
       - /home/test-log/*.log
 processors:
   - Type: processor_split_log_string
-    SplitKey: content
     SplitSep: "\n"
 flushers:
   - Type: flusher_stdout

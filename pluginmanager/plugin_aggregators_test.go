@@ -383,7 +383,7 @@ func TestSplitterPreservesDistinctBodiesAndSourceRouting(t *testing.T) {
 		},
 		{
 			name: "string-preserve-first", processor: `{"type":"processor_split_log_string","detail":{"SplitKey":"content","SplitSep":"|","PreserveOthers":true}}`,
-			keys: []string{"content", "z"}, values: []string{"first|second", "route"}, field: "content",
+			keys: []string{"z", "content"}, values: []string{"route", "first|second"}, field: "content",
 			want: map[string]string{"first": "preserved", "second": "preserved"},
 		},
 		{
@@ -416,5 +416,47 @@ func TestSplitterPreservesDistinctBodiesAndSourceRouting(t *testing.T) {
 			}
 			require.Equal(t, tt.want, got)
 		})
+	}
+}
+
+func TestSplitterUsesBodyAndEventTagInExplicitV2(t *testing.T) {
+	cfg, err := createLogstoreConfig("project", "logstore", "explicit-v2-string-split", 0, `{
+		"global":{"StructureType":"v2","AggregatIntervalMs":3600000},
+		"processors":[{"type":"processor_split_log_string","detail":{"SplitKey":"source","SplitSep":"|"}}],
+		"flushers":[{"type":"flusher_checker"}]
+	}`)
+	require.NoError(t, err)
+	clock := time.Unix(1700000000, 123456789)
+	body, err := helper.NewInputLogRow(map[string]string{"source": "unused|tag", "tenant": "test"},
+		[]string{"source", "content"}, []string{"indexed|field", "first|second"}, clock)
+	require.NoError(t, err)
+	fromTag, err := helper.NewInputLogRow(map[string]string{"source": "third|fourth", "tenant": "test"},
+		[]string{"source"}, []string{"indexed|field"}, clock)
+	require.NoError(t, err)
+	body.SetOffset(100)
+	fromTag.SetOffset(200)
+
+	cfg.Start()
+	run := cfg.PluginRunner.(*pluginRunner)
+	run.InputPipeContext.Collector().Collect(models.NewGroup(nil, models.NewTagsWithKeyValues("host", "agent")), body, fromTag)
+	require.NoError(t, cfg.Stop(true))
+
+	groups := aggregatorTestFlusher(cfg).GroupEvents
+	require.Len(t, groups, 1)
+	require.Equal(t, "agent", groups[0].Group.GetTags().Get("host"))
+	events := groups[0].Events
+	require.Len(t, events, 4)
+	for i, want := range []string{"first", "second", "third", "fourth"} {
+		log := events[i].(*models.Log)
+		require.Equal(t, want, string(log.GetBody()))
+		require.Equal(t, "indexed|field", log.GetIndices().Get("source"))
+		require.Equal(t, "test", log.GetTags().Get("tenant"))
+		require.Equal(t, uint64(clock.UnixNano()), log.GetTimestamp())
+		require.Equal(t, uint64(i%2*6), log.GetOffset())
+		if i < 2 {
+			require.Equal(t, "unused|tag", log.GetTags().Get("source"))
+		} else {
+			require.False(t, log.GetTags().Contains("source"))
+		}
 	}
 }

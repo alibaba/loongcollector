@@ -16,7 +16,6 @@ package logstring
 
 import (
 	"context"
-	"fmt"
 	"strconv"
 	"testing"
 
@@ -54,8 +53,6 @@ func TestDefault(t *testing.T) {
 		require.Equal(t, "test", pipeline.GetStringValue(l.Contents.Get("__log_topic__")))
 		require.Equal(t, "hello"+strconv.Itoa(idx+1), pipeline.GetStringValue(l.Contents.Get("content")))
 	}
-
-	fmt.Println(processortest.Apply(p, log))
 }
 
 type processorTestSuite struct {
@@ -94,123 +91,62 @@ func (s *processorTestSuite) TestDefault(c *check.C) {
 }
 
 func (s *processorTestSuite) TestNormal(c *check.C) {
-	{
-		processor, _ := s.processor.(*ProcessorSplit)
-		processor.PreserveOthers = false
-		processor.NoKeyError = true
-		processor.SplitSep = "你好"
-		processor.SplitKey = "content"
-		_ = s.processor.Init(mock.NewEmptyContext("p", "l", "c"))
+	processor := s.processor.(*ProcessorSplit)
+	processor.SplitSep = "你好"
+	processor.SplitKey = "source"
+	processor.NoKeyError = true
 
-		var log = "你好[2017-12-12 00:00:00] 你好\n  hello\n\t\n[2017xxxxxx]yyyy\nzzzz\n\t你好[你好"
-		logEvent := processortest.Log("preserve_1", "1", "content", log, "preserve_2", "2")
-		outLogs := processortest.Apply(s.processor, logEvent)
-		c.Assert(len(outLogs), check.Equals, 3)
-		c.Assert(outLogs[0].Contents.Len(), check.Equals, 1)
-		c.Assert(outLogs[1].Contents.Len(), check.Equals, 1)
-		c.Assert(outLogs[2].Contents.Len(), check.Equals, 1)
-		c.Assert(pipeline.GetStringValue(outLogs[0].Contents.Get("content")), check.Equals, "[2017-12-12 00:00:00] ")
-		c.Assert(pipeline.GetStringValue(outLogs[1].Contents.Get("content")), check.Equals, "\n  hello\n\t\n[2017xxxxxx]yyyy\nzzzz\n\t")
-		c.Assert(pipeline.GetStringValue(outLogs[2].Contents.Get("content")), check.Equals, "[")
-	}
+	const payload = "你好[2017-12-12 00:00:00] 你好\n  hello\n\t\n[2017xxxxxx]yyyy\nzzzz\n\t你好[你好"
+	log := processortest.Log("preserve_1", "1", "preserve_2", "2")
+	log.GetTags().Add("source", payload)
+	log.GetTags().Add("tenant", "keep")
 
-	{
-		processor, _ := s.processor.(*ProcessorSplit)
-		processor.PreserveOthers = true
-		processor.NoKeyError = true
-		processor.SplitSep = "你好"
-		processor.SplitKey = "content"
-		_ = s.processor.Init(mock.NewEmptyContext("p", "l", "c"))
-
-		var log = "[2017-12-12 00:00:00] 你好\n  hello\n\t\n[2017xxxxxx]yyyy\nzzzz\n\t你好["
-		logEvent := processortest.Log("preserve_1", "1", "content", log, "preserve_2", "2")
-		outLogs := processortest.Apply(s.processor, logEvent)
-		c.Assert(len(outLogs), check.Equals, 3)
-		c.Assert(outLogs[0].Contents.Len(), check.Equals, 3)
-		c.Assert(outLogs[1].Contents.Len(), check.Equals, 3)
-		c.Assert(outLogs[2].Contents.Len(), check.Equals, 3)
-		c.Assert(pipeline.GetStringValue(outLogs[0].Contents.Get("preserve_1")), check.Equals, "1")
-		c.Assert(pipeline.GetStringValue(outLogs[0].Contents.Get("preserve_2")), check.Equals, "2")
-		c.Assert(pipeline.GetStringValue(outLogs[0].Contents.Get("content")), check.Equals, "[2017-12-12 00:00:00] ")
-		c.Assert(pipeline.GetStringValue(outLogs[1].Contents.Get("preserve_1")), check.Equals, "1")
-		c.Assert(pipeline.GetStringValue(outLogs[1].Contents.Get("preserve_2")), check.Equals, "2")
-		c.Assert(pipeline.GetStringValue(outLogs[1].Contents.Get("content")), check.Equals, "\n  hello\n\t\n[2017xxxxxx]yyyy\nzzzz\n\t")
-		c.Assert(pipeline.GetStringValue(outLogs[2].Contents.Get("preserve_1")), check.Equals, "1")
-		c.Assert(pipeline.GetStringValue(outLogs[2].Contents.Get("preserve_2")), check.Equals, "2")
-		c.Assert(pipeline.GetStringValue(outLogs[2].Contents.Get("content")), check.Equals, "[")
+	for _, preserve := range []bool{false, true} {
+		processor.PreserveOthers = preserve
+		logs := processortest.Apply(processor, log)
+		c.Assert(len(logs), check.Equals, 3)
+		for i, body := range []string{"[2017-12-12 00:00:00] ", "\n  hello\n\t\n[2017xxxxxx]yyyy\nzzzz\n\t", "["} {
+			c.Assert(string(logs[i].GetBody()), check.Equals, body)
+			c.Assert(logs[i].Contents.Len(), check.Equals, 3)
+			c.Assert(logs[i].Contents.Get("preserve_1"), check.Equals, "1")
+			c.Assert(logs[i].Contents.Get("preserve_2"), check.Equals, "2")
+			c.Assert(logs[i].GetTags().Contains("source"), check.Equals, false)
+			c.Assert(logs[i].GetTags().Contains("tenant"), check.Equals, preserve)
+		}
 	}
 }
 
 func (s *processorTestSuite) TestNoKeyAlarmAndPreserve(c *check.C) {
-	{
-		processor, _ := s.processor.(*ProcessorSplit)
-		processor.PreserveOthers = false
-		processor.NoKeyError = true
-		processor.SplitSep = "\\S+.*"
-		processor.SplitKey = "no_this_key"
-		_ = s.processor.Init(mock.NewEmptyContext("p", "l", "c"))
+	processor := s.processor.(*ProcessorSplit)
+	processor.NoKeyError = true
+	processor.SplitKey = "source"
+	log := processortest.Log("source", "indexed\nvalue")
 
-		var log = "[2017-12-12 00:00:00] 你好\n  hello\n\t\n[2017xxxxxx]yyyy\nzzzz\n\t["
-		logEvent := processortest.Log("preserve_1", "1", "content", log, "preserve_2", "2")
-		outLogs := processortest.Apply(s.processor, logEvent)
-		c.Assert(len(outLogs), check.Equals, 0)
-	}
+	processor.PreserveOthers = false
+	c.Assert(len(processortest.Apply(processor, log)), check.Equals, 0)
 
-	{
-		processor, _ := s.processor.(*ProcessorSplit)
-		processor.PreserveOthers = true
-		processor.NoKeyError = true
-		processor.SplitSep = "\\S+.*"
-		processor.SplitKey = "no_this_key"
-		_ = s.processor.Init(mock.NewEmptyContext("p", "l", "c"))
-
-		var log = "[2017-12-12 00:00:00] 你好\n  hello\n\t\n[2017xxxxxx]yyyy\nzzzz\n\t["
-		logEvent := processortest.Log("preserve_1", "1", "content", log, "preserve_2", "2")
-		outLogs := processortest.Apply(s.processor, logEvent)
-		c.Assert(len(outLogs), check.Equals, 1)
-		c.Assert(pipeline.GetStringValue(outLogs[0].Contents.Get("preserve_1")), check.Equals, "1")
-		c.Assert(pipeline.GetStringValue(outLogs[0].Contents.Get("content")), check.Equals, "[2017-12-12 00:00:00] 你好\n  hello\n\t\n[2017xxxxxx]yyyy\nzzzz\n\t[")
-		c.Assert(pipeline.GetStringValue(outLogs[0].Contents.Get("preserve_2")), check.Equals, "2")
-	}
+	processor.PreserveOthers = true
+	logs := processortest.Apply(processor, log)
+	c.Assert(len(logs), check.Equals, 1)
+	c.Assert(len(logs[0].GetBody()), check.Equals, 0)
+	c.Assert(logs[0].Contents.Get("source"), check.Equals, "indexed\nvalue")
 }
 
-func (s *processorTestSuite) TestEnableLogPositionMeta(c *check.C) {
-
-	{
-		processor, _ := s.processor.(*ProcessorSplit)
-		processor.EnableLogPositionMeta = true
-		var log = "xxxx\nyyyy\nzzzz\n"
-		logEvent := processortest.Log("content", log)
-		logEvent.SetOffset(1000)
-		outLogs := processortest.Apply(processor, logEvent)
-		c.Assert(len(outLogs), check.Equals, 3)
-		for i := 0; i < len(outLogs); i++ {
-			c.Assert(outLogs[i].GetOffset(), check.Equals, uint64(1000+i*5))
-		}
-	}
-
-	{
-		processor, _ := s.processor.(*ProcessorSplit)
-		processor.EnableLogPositionMeta = true
-		var log = "xxxx\nyyyy\nzzzz\n"
-		logEvent := processortest.Log("content", log)
-		outLogs := processortest.Apply(processor, logEvent)
-		c.Assert(len(outLogs), check.Equals, 3)
-		for i := 0; i < len(outLogs); i++ {
-			c.Assert(outLogs[i].GetOffset(), check.Equals, uint64(0))
-		}
-	}
-
-	{
-		processor, _ := s.processor.(*ProcessorSplit)
-		processor.EnableLogPositionMeta = false
-		var log = "xxxx\nyyyy\nzzzz\n"
-		logEvent := processortest.Log("content", log)
-		logEvent.SetOffset(1000)
-		outLogs := processortest.Apply(processor, logEvent)
-		c.Assert(len(outLogs), check.Equals, 3)
-		for i := 0; i < len(outLogs); i++ {
-			c.Assert(outLogs[i].GetOffset(), check.Equals, uint64(1000))
+func TestProcessorSplitLogStringEmitsRelativeOffsets(t *testing.T) {
+	processor := &ProcessorSplit{SplitSep: "你好"}
+	require.NoError(t, processor.Init(mock.NewEmptyContext("p", "l", "c")))
+	log := processortest.Log("content", "你好甲你好你好乙你好丙你好")
+	log.SetOffset(1000)
+	log.SetRawSize(123)
+	log.SetObservedTimestamp(456)
+	for _, enabled := range []bool{false, true} {
+		processor.EnableLogPositionMeta = enabled
+		logs := processortest.Apply(processor, log)
+		require.Len(t, logs, 3)
+		for i, want := range []uint64{0, 9, 18} {
+			assert.Equal(t, want, logs[i].GetOffset())
+			assert.Zero(t, logs[i].GetRawSize())
+			assert.Zero(t, logs[i].GetObservedTimestamp())
 		}
 	}
 }
@@ -240,34 +176,69 @@ func TestProcessorSplitLogString_ProcessSplitsLog(t *testing.T) {
 	assert.Equal(t, 3, logs, "input log must be split into 3 logs")
 }
 
-func TestProcessorSplitLogStringSplitsConfiguredField(t *testing.T) {
-	processor := &ProcessorSplit{SplitKey: "payload", SplitSep: "|", EnableLogPositionMeta: true}
-	require.NoError(t, processor.Init(mock.NewEmptyContext("p", "l", "c")))
-
-	log := processortest.Log("content", "raw body", "payload", "first|second")
-	log.GetTags().Add("tenant", "example")
-	log.Timestamp = 1700000000123456789
-	log.SetOffset(100)
-	logs := processortest.Apply(processor, log)
-	require.Len(t, logs, 2)
-	assert.Equal(t, map[string]interface{}{"payload": "first"}, logs[0].GetIndices().Iterator())
-	assert.Equal(t, map[string]interface{}{"payload": "second"}, logs[1].GetIndices().Iterator())
-	assert.Equal(t, uint64(100), logs[0].GetOffset())
-	assert.Equal(t, uint64(106), logs[1].GetOffset())
-	assert.Equal(t, log.GetTimestamp(), logs[0].GetTimestamp())
-	assert.Equal(t, log.GetTimestamp(), logs[1].GetTimestamp())
-	assert.Empty(t, logs[0].GetTags().Iterator())
-	assert.Equal(t, "first|second", log.GetIndices().Get("payload"))
-}
-
-func TestProcessorSplitLogStringDiscardsEmptySplitField(t *testing.T) {
+func TestProcessorSplitLogStringPrefersBodyAndClonesOutputs(t *testing.T) {
 	processor := &ProcessorSplit{SplitKey: "payload", SplitSep: "|", PreserveOthers: true}
 	require.NoError(t, processor.Init(mock.NewEmptyContext("p", "l", "c")))
 
-	log := processortest.Log("payload", "", "other", "keep")
-	log.SetBody([]byte("original body"))
+	log := processortest.Log("leading", "keep", "content", "first|second", "payload", "indexed|value")
+	log.GetIndices().Add("bytes", []byte("bytes"))
+	log.GetTags().Add("payload", "event|tag")
+	log.GetTags().Add("tenant", "example")
+	log.Timestamp = 1700000000123456789
 	logs := processortest.Apply(processor, log)
-	require.Empty(t, logs)
+	require.Len(t, logs, 2)
+	for i, want := range []string{"first", "second"} {
+		assert.Equal(t, want, string(logs[i].GetBody()))
+		assert.Equal(t, "indexed|value", logs[i].GetIndices().Get("payload"))
+		assert.Equal(t, "event|tag", logs[i].GetTags().Get("payload"))
+		assert.Equal(t, log.GetTimestamp(), logs[i].GetTimestamp())
+	}
+
+	logs[0].GetBody()[0] = 'F'
+	logs[0].GetIndices().Get("bytes").([]byte)[0] = 'B'
+	logs[0].GetIndices().Delete("leading")
+	logs[0].GetTags().Delete("tenant")
+	assert.Equal(t, "first|second", string(log.GetBody()))
+	assert.Equal(t, "second", string(logs[1].GetBody()))
+	for _, unchanged := range []*models.Log{log, logs[1]} {
+		assert.Equal(t, "bytes", string(unchanged.GetIndices().Get("bytes").([]byte)))
+		assert.Equal(t, "keep", unchanged.GetIndices().Get("leading"))
+		assert.Equal(t, "example", unchanged.GetTags().Get("tenant"))
+	}
+}
+
+func TestProcessorSplitLogStringUsesEventTagWhenBodyIsEmpty(t *testing.T) {
+	processor := &ProcessorSplit{SplitKey: "payload", SplitSep: "|", PreserveOthers: true}
+	require.NoError(t, processor.Init(mock.NewEmptyContext("p", "l", "c")))
+	log := processortest.Log("content", "", "payload", "indexed|value", "other", "keep")
+	log.GetTags().Add("payload", "first|second")
+	log.GetTags().Add("tenant", "keep")
+
+	logs := processortest.Apply(processor, log)
+	require.Len(t, logs, 2)
+	assert.Positive(t, logs[0].GetTimestamp())
+	assert.Equal(t, logs[0].GetTimestamp(), logs[1].GetTimestamp())
+	for i, want := range []string{"first", "second"} {
+		assert.Equal(t, want, string(logs[i].GetBody()))
+		assert.Equal(t, "indexed|value", logs[i].GetIndices().Get("payload"))
+		assert.Equal(t, map[string]string{"tenant": "keep"}, logs[i].GetTags().Iterator())
+	}
+	assert.Empty(t, log.GetBody())
+	assert.Equal(t, "first|second", log.GetTags().Get("payload"))
+}
+
+func TestProcessorSplitLogStringEmptySourcePreservesOtherFieldsAndTags(t *testing.T) {
+	processor := &ProcessorSplit{SplitKey: "payload", SplitSep: "|", PreserveOthers: true}
+	require.NoError(t, processor.Init(mock.NewEmptyContext("p", "l", "c")))
+	log := processortest.Log("payload", "indexed|value", "other", "keep")
+	log.GetTags().Add("payload", "")
+	log.GetTags().Add("tenant", "keep")
+	logs := processortest.Apply(processor, log)
+	require.Len(t, logs, 1)
+	assert.Empty(t, logs[0].GetBody())
+	assert.Equal(t, "indexed|value", logs[0].GetIndices().Get("payload"))
+	assert.Equal(t, map[string]string{"tenant": "keep"}, logs[0].GetTags().Iterator())
+	assert.True(t, log.GetTags().Contains("payload"))
 
 	processor.PreserveOthers = false
 	require.Empty(t, processortest.Apply(processor, log))

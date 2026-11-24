@@ -26,7 +26,7 @@
 | 参数                 | 类型                | 是否必选 | 说明                                                                                                                                                                                                                     |
 |--------------------|-------------------|------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | Type               | string            | 是    | 插件类型，固定为`service_http_server`                                                                                                                                                                                          |
-| Format | string | 否 | 支持 `sls`、`prometheus`、`influxdb`、`otlp_logv1`、`otlp_metricv1`、`otlp_tracev1`、`pyroscope`、`statsd` 和 `raw`。`raw` 提交原始字节事件，`sls` 保留日志时间、内容、来源及组标签。 |
+| Format | string | 否 | 支持 `sls`、`prometheus`、`influxdb`、`otlp_logv1`、`otlp_metricv1`、`otlp_tracev1`、`pyroscope`、`statsd` 和 `raw`。`raw` 将请求正文写入日志的 `content` 字段，`sls` 保留日志时间、内容、来源及组标签。 |
 | Address            | string            | 否    | <p>监听地址。</p><p></p>                                                                                                                                                                                                    |
 | Path               | string            | 否    | <p>接收端点, 如Format 为 `otlp_logv1` 时, 默认端点为`/v1/logs` 。</p><p></p>                                                                                                                                                        |
 | ReadTimeoutSec     | string            | 否    | <p>读取超时时间。</p><p>默认取值为:`10s`。</p>                                                                                                                                                                                      |
@@ -190,12 +190,16 @@ curl --location --request POST 'http://127.0.0.1:12345?QueryKey=queryValue' --he
 
 ```json
 {
-    "eventType": "byteArray",
+    "eventType": "log",
     "name": "",
-    "timestamp": 0,
+    "timestamp": 1700000000000000000,
     "observedTimestamp": 0,
     "tags": {},
-    "byteArray": "test_measurement,host=server01,region=cn value=0.5"
+    "offset": 0,
+    "level": "",
+    "traceID": "",
+    "spanID": "",
+    "content": "test_measurement,host=server01,region=cn value=0.5"
 }
 ```
 

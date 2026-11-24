@@ -18,17 +18,18 @@ using namespace std;
 
 namespace logtail {
 
-int64_t PackIdManager::GetAndIncPackSeq(int64_t key) {
+optional<uint32_t> PackIdManager::TryGetAndIncPackSeq(int64_t key, uint32_t maxSequence) {
     lock_guard<mutex> lock(mMux);
     auto it = mPackIdSeq.find(key);
     if (it == mPackIdSeq.end()) {
         mPackIdSeq[key] = {1, time(nullptr)};
         return 0;
-    } else {
-        int64_t res = it->second.first++;
-        it->second.second = time(nullptr);
-        return res;
     }
+    if (it->second.first > maxSequence) {
+        return nullopt;
+    }
+    it->second.second = time(nullptr);
+    return it->second.first++;
 }
 
 void PackIdManager::CleanTimeoutEntry() {

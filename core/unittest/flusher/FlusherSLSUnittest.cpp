@@ -33,6 +33,7 @@
 #include "common/LogtailCommonFlags.h"
 #include "common/compression/CompressorFactory.h"
 #include "common/http/Constant.h"
+#include "monitor/Monitor.h"
 #include "plugin/flusher/sls/FlusherSLS.h"
 #include "plugin/flusher/sls/PackIdManager.h"
 #include "plugin/flusher/sls/SLSClientManager.h"
@@ -79,7 +80,6 @@ public:
     void TestSend();
     void TestFlush();
     void TestFlushAll();
-    void TestAddPackId();
     void TestSerializeAndPushAllEmptyGroups();
     void TestSerializeAndPushGroupListSerializeFail();
     void OnGoPipelineSend();
@@ -1962,18 +1962,6 @@ void FlusherSLSUnittest::TestFlushAll() {
     APSARA_TEST_EQUAL(1U, res.size());
 }
 
-void FlusherSLSUnittest::TestAddPackId() {
-    FlusherSLS flusher;
-    flusher.mProject = "test_project";
-    flusher.mLogstore = "test_logstore";
-
-    BatchedEvents batch;
-    batch.mPackIdPrefix = "source-id";
-    batch.mSourceBuffers.emplace_back(make_shared<SourceBuffer>());
-    flusher.AddPackId(batch);
-    APSARA_TEST_STREQ("34451096883514E2-0", batch.mTags.mInner["__pack_id__"].data());
-}
-
 void FlusherSLSUnittest::TestSerializeAndPushAllEmptyGroups() {
     // package list is enabled when there are more than 1 group in the batch. if all of them fail to be serialized
     // (e.g. logs with empty content only), nothing should be pushed to the sender queue, otherwise a request with
@@ -2278,7 +2266,11 @@ void FlusherSLSUnittest::TestSendPipelineEventGroupProfile() {
     (*pb.mutable_tags())[LOG_RESERVED_KEY_PACKAGE_ID] = "incoming-pack";
     ASSERT_TRUE(flusher.InitForProfile(ctx));
     ASSERT_TRUE(flusher.HasContext());
-    ASSERT_TRUE(flusher.Send(pb, "profile-hash", "profile-override"));
+    const string previousIp = LoongCollectorMonitor::mIpAddr;
+    LoongCollectorMonitor::mIpAddr = "192.0.2.1";
+    const bool sent = flusher.Send(pb, "profile-hash", "profile-override");
+    LoongCollectorMonitor::mIpAddr = previousIp;
+    ASSERT_TRUE(sent);
     vector<SenderQueueItem*> items;
     SenderQueueManager::GetInstance()->GetAvailableItems(items, 80);
     ASSERT_EQ(1U, items.size());
@@ -2289,6 +2281,7 @@ void FlusherSLSUnittest::TestSendPipelineEventGroupProfile() {
     ASSERT_TRUE(result.ParseFromString(item->mData));
     ASSERT_EQ(1, result.logs_size());
     EXPECT_EQ("profile-container", result.logs(0).contents(0).value());
+    EXPECT_EQ("192.0.2.1", result.source());
     ASSERT_EQ(2, result.logtags_size());
     EXPECT_EQ(LOG_RESERVED_KEY_PACKAGE_ID, result.logtags(0).key());
     EXPECT_EQ("34451096883514E2-0", result.logtags(0).value());
@@ -2303,7 +2296,7 @@ void FlusherSLSUnittest::TestSendPipelineEventGroupProfile() {
     EXPECT_EQ("logtail_containers", item->mLogstore);
     ASSERT_TRUE(result.ParseFromString(item->mData));
     ASSERT_EQ(2, result.logtags_size());
-    EXPECT_EQ("34451096883514E2-1", result.logtags(0).value());
+    EXPECT_EQ("34451096883514E2-0", result.logtags(0).value());
     SenderQueueManager::GetInstance()->RemoveItem(item->mQueueKey, item);
 
     flusher.mShardHashKeys = {"route", "missing", LOG_RESERVED_KEY_PACKAGE_ID};
@@ -2315,7 +2308,7 @@ void FlusherSLSUnittest::TestSendPipelineEventGroupProfile() {
     EXPECT_EQ(CalcMD5("configured-route__incoming-pack"), item->mShardHashKey);
     ASSERT_TRUE(result.ParseFromString(item->mData));
     ASSERT_EQ(2, result.logtags_size());
-    EXPECT_EQ("34451096883514E2-2", result.logtags(0).value());
+    EXPECT_EQ("34451096883514E2-1", result.logtags(0).value());
     SenderQueueManager::GetInstance()->RemoveItem(item->mQueueKey, item);
 }
 
@@ -2328,7 +2321,6 @@ UNIT_TEST_CASE(FlusherSLSUnittest, TestBuildRequest)
 UNIT_TEST_CASE(FlusherSLSUnittest, TestSend)
 UNIT_TEST_CASE(FlusherSLSUnittest, TestFlush)
 UNIT_TEST_CASE(FlusherSLSUnittest, TestFlushAll)
-UNIT_TEST_CASE(FlusherSLSUnittest, TestAddPackId)
 UNIT_TEST_CASE(FlusherSLSUnittest, TestSerializeAndPushAllEmptyGroups)
 UNIT_TEST_CASE(FlusherSLSUnittest, TestSerializeAndPushGroupListSerializeFail)
 UNIT_TEST_CASE(FlusherSLSUnittest, OnGoPipelineSend)
