@@ -23,7 +23,9 @@
 #include "common/JsonUtil.h"
 #include "forward/GrpcInputManager.h"
 #include "plugin/input/InputForward.h"
+#include "plugin/processor/inner/ProcessorParseFromPBNative.h"
 #include "unittest/Unittest.h"
+#include "unittest/forward/MockServiceImpl.h"
 
 using namespace std;
 
@@ -59,7 +61,7 @@ protected:
     static void TearDownTestCase() { PluginRegistry::GetInstance()->UnloadPlugins(); }
 
 private:
-    CollectionPipeline p;
+    CollectionPipeline p{};
     CollectionPipelineContext ctx;
 };
 
@@ -205,7 +207,7 @@ void InputForwardUnittest::TestStartMethod() {
         {
             "Type": "input_forward",
             "Protocol": "LoongSuite",
-            "Endpoint": "127.0.0.1:18080"
+            "Endpoint": "127.0.0.1:0"
         }
     )";
     APSARA_TEST_TRUE_FATAL(ParseJsonTable(configStr, configJson, errorMsg));
@@ -214,9 +216,27 @@ void InputForwardUnittest::TestStartMethod() {
     input->CreateMetricsRecordRef("test", "12");
     APSARA_TEST_TRUE_FATAL(input->Init(configJson, optionalGoPipeline));
 
-    // Test Start method
-    bool startResult = input->Start();
-    APSARA_TEST_TRUE_FATAL(startResult);
+    auto& processors = input->GetInnerProcessors();
+    APSARA_TEST_EQUAL_FATAL(1U, processors.size());
+    APSARA_TEST_EQUAL(ProcessorParseFromPBNative::sName, processors.front()->Name());
+    const auto* decoder = processors.front().get();
+
+    auto* grpcManager = GrpcInputManager::GetInstance();
+    APSARA_TEST_TRUE_FATAL(grpcManager->AddListenInput<MockServiceImpl>("mock", input->mEndpoint, Json::Value()));
+    APSARA_TEST_FALSE(input->Start());
+    APSARA_TEST_TRUE(input->Stop(false));
+    APSARA_TEST_TRUE(grpcManager->HasRegisteredPlugins());
+    APSARA_TEST_TRUE_FATAL(grpcManager->RemoveListenInput("mock", input->mEndpoint, Json::Value()));
+
+    for (int i = 0; i < 2; ++i) {
+        APSARA_TEST_TRUE_FATAL(input->Start());
+        APSARA_TEST_TRUE_FATAL(input->Start());
+        APSARA_TEST_TRUE(grpcManager->HasRegisteredPlugins());
+        APSARA_TEST_EQUAL_FATAL(1U, processors.size());
+        APSARA_TEST_TRUE(decoder == processors.front().get());
+        APSARA_TEST_TRUE_FATAL(input->Stop(false));
+        APSARA_TEST_FALSE(grpcManager->HasRegisteredPlugins());
+    }
 
     input->CommitMetricsRecordRef();
 }

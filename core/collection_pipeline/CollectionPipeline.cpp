@@ -148,6 +148,22 @@ bool CollectionPipeline::Init(CollectionConfig&& config) {
         }
     }
 
+    // Validate all expanded inputs before flusher initialization can update live sender queues.
+    // TODO: support queue-type selection for Go inputs; they currently use count-bounded queues.
+    const QueueType queueType = mInputs.empty() ? QueueType::COUNT_BOUNDED : mInputs.front()->GetProcessQueueType();
+    for (const auto& input : mInputs) {
+        if (input->GetProcessQueueType() != queueType) {
+            PARAM_ERROR_RETURN(mContext.GetLogger(),
+                               mContext.GetAlarm(),
+                               "not all inputs' queue type are the same",
+                               noModule,
+                               mName,
+                               mContext.GetProjectName(),
+                               mContext.GetLogstoreName(),
+                               mContext.GetRegion());
+        }
+    }
+
     for (size_t i = 0; i < config.mProcessors.size(); ++i) {
         const Json::Value& detail = *config.mProcessors[i];
         string pluginType = detail["Type"].asString();
@@ -303,24 +319,6 @@ bool CollectionPipeline::Init(CollectionConfig&& config) {
             PARAM_ERROR_RETURN(mContext.GetLogger(),
                                mContext.GetAlarm(),
                                "exactly once enabled when not in native mode",
-                               noModule,
-                               mName,
-                               mContext.GetProjectName(),
-                               mContext.GetLogstoreName(),
-                               mContext.GetRegion());
-        }
-    }
-
-    // Validate input queue compatibility before LoadGoPipelines: a failed Init
-    // must not leave a newly loaded Go configuration pending for the next start.
-    // TODO: support queue-type selection for Go inputs; they currently use count-bounded queues.
-    // Determine process queue type based on input plugins
-    QueueType queueType = mInputs.empty() ? QueueType::COUNT_BOUNDED : mInputs[0]->GetProcessQueueType();
-    for (auto& input : mInputs) {
-        if (input->GetProcessQueueType() != queueType) {
-            PARAM_ERROR_RETURN(mContext.GetLogger(),
-                               mContext.GetAlarm(),
-                               "not all inputs' queue type are the same",
                                noModule,
                                mName,
                                mContext.GetProjectName(),

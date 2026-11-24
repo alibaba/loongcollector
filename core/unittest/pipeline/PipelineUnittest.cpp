@@ -26,6 +26,7 @@
 #include "collection_pipeline/queue/CountBoundedProcessQueue.h"
 #include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "collection_pipeline/queue/QueueKeyManager.h"
+#include "collection_pipeline/queue/SenderQueueManager.h"
 #include "common/JsonUtil.h"
 #include "config/CollectionConfig.h"
 #include "plugin/input/InputFeedbackInterfaceRegistry.h"
@@ -44,7 +45,7 @@ public:
     void OnFailedInit() const;
     void OnInitVariousTopology() const;
     void TestProcessQueue() const;
-    void RejectMixedInputQueuesBeforeGoLoad() const;
+    void RejectMixedInputQueuesBeforeFlusherInit() const;
     void OnInputFileWithJsonMultiline() const;
     void OnInputFileWithContainerDiscovery() const;
     void TestProcess() const;
@@ -68,6 +69,7 @@ protected:
         TimeoutFlushManager::GetInstance()->mTimeoutRecords.clear();
         QueueKeyManager::GetInstance()->Clear();
         ProcessQueueManager::GetInstance()->Clear();
+        SenderQueueManager::GetInstance()->Clear();
     }
 
     unique_ptr<ProcessQueueItem> GenerateProcessItem(shared_ptr<CollectionPipeline> pipeline) const {
@@ -2507,16 +2509,32 @@ void PipelineUnittest::TestProcessQueue() const {
     APSARA_TEST_EQUAL("", QueueKeyManager::GetInstance()->GetName(key));
 }
 
-void PipelineUnittest::RejectMixedInputQueuesBeforeGoLoad() const {
+void PipelineUnittest::RejectMixedInputQueuesBeforeFlusherInit() const {
+    Json::Value slsFlusher;
+    slsFlusher["Type"] = "flusher_sls";
+    slsFlusher["Project"] = "test_project";
+    slsFlusher["Logstore"] = "test_logstore";
+    slsFlusher["Region"] = "test_region";
+    slsFlusher["Endpoint"] = "test_endpoint";
+    constexpr uint32_t kPreviousSendRate = 100;
+    slsFlusher["MaxSendRate"] = kPreviousSendRate;
+
     auto previousDetail = make_unique<Json::Value>();
     (*previousDetail)["inputs"][0]["Type"] = "input_mock";
-    (*previousDetail)["flushers"][0]["Type"] = "flusher_mock";
+    (*previousDetail)["flushers"].append(slsFlusher);
     CollectionConfig previousConfig(configName, std::move(previousDetail), filepath);
-    APSARA_TEST_TRUE(previousConfig.Parse());
+    APSARA_TEST_TRUE_FATAL(previousConfig.Parse());
     CollectionPipeline previousPipeline;
-    APSARA_TEST_TRUE(previousPipeline.Init(std::move(previousConfig)));
+    APSARA_TEST_TRUE_FATAL(previousPipeline.Init(std::move(previousConfig)));
     const auto key = previousPipeline.GetContext().GetProcessQueueKey();
     const auto previousQueue = ProcessQueueManager::GetInstance()->mQueues.at(key).first;
+    const auto senderQueueKey = previousPipeline.GetFlushers().front()->GetQueueKey();
+    auto* senderQueue = SenderQueueManager::GetInstance()->GetQueue(senderQueueKey);
+    APSARA_TEST_TRUE_FATAL(senderQueue != nullptr);
+    APSARA_TEST_TRUE_FATAL(senderQueue->GetRateLimiter().has_value());
+    APSARA_TEST_EQUAL(kPreviousSendRate, senderQueue->GetRateLimiter()->mMaxSendBytesPerSecond);
+
+    slsFlusher["MaxSendRate"] = 200;
     for (bool bytesFirst : {false, true}) {
         auto detail = make_unique<Json::Value>();
         auto& inputs = (*detail)["inputs"];
@@ -2528,7 +2546,7 @@ void PipelineUnittest::RejectMixedInputQueuesBeforeGoLoad() const {
             inputs.append(input);
         }
         (*detail)["processors"][0]["Type"] = "processor_add_fields";
-        (*detail)["flushers"][0]["Type"] = "flusher_mock";
+        (*detail)["flushers"].append(slsFlusher);
         CollectionConfig config(configName, std::move(detail), filepath);
         APSARA_TEST_TRUE(config.Parse());
         CollectionPipeline pipeline;
@@ -2537,6 +2555,9 @@ void PipelineUnittest::RejectMixedInputQueuesBeforeGoLoad() const {
         APSARA_TEST_TRUE(previousQueue == ProcessQueueManager::GetInstance()->mQueues.at(key).first);
         APSARA_TEST_EQUAL(QueueType::COUNT_BOUNDED, ProcessQueueManager::GetInstance()->mQueues.at(key).second);
         APSARA_TEST_EQUAL(-1, pipeline.GetContext().GetProcessQueueKey());
+        APSARA_TEST_TRUE(senderQueue == SenderQueueManager::GetInstance()->GetQueue(senderQueueKey));
+        APSARA_TEST_TRUE_FATAL(senderQueue->GetRateLimiter().has_value());
+        APSARA_TEST_EQUAL(kPreviousSendRate, senderQueue->GetRateLimiter()->mMaxSendBytesPerSecond);
     }
 }
 
@@ -3141,7 +3162,7 @@ void PipelineUnittest::TestMultiFlusherAndRouter() const {
 UNIT_TEST_CASE(PipelineUnittest, OnSuccessfulInit)
 UNIT_TEST_CASE(PipelineUnittest, OnFailedInit)
 UNIT_TEST_CASE(PipelineUnittest, TestProcessQueue)
-UNIT_TEST_CASE(PipelineUnittest, RejectMixedInputQueuesBeforeGoLoad)
+UNIT_TEST_CASE(PipelineUnittest, RejectMixedInputQueuesBeforeFlusherInit)
 UNIT_TEST_CASE(PipelineUnittest, OnInitVariousTopology)
 UNIT_TEST_CASE(PipelineUnittest, OnInputFileWithJsonMultiline)
 UNIT_TEST_CASE(PipelineUnittest, OnInputFileWithContainerDiscovery)

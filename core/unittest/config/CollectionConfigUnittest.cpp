@@ -41,6 +41,7 @@ public:
     void SelfMonitorInputWithGoFlusher() const;
     void NativeInputWithGoPlugin() const;
     void MultiInputAndFlusherCoexistence() const;
+    void NativeFlusherBehindGoPipeline() const;
 
 protected:
     static void SetUpTestCase() { PluginRegistry::GetInstance()->LoadPlugins(); }
@@ -2617,10 +2618,40 @@ void CollectionConfigUnittest::MultiInputAndFlusherCoexistence() const {
     APSARA_TEST_FALSE(config->Parse());
 }
 
+void CollectionConfigUnittest::NativeFlusherBehindGoPipeline() const {
+    Json::Value detail;
+    detail["inputs"][0]["Type"] = "input_file";
+    detail["processors"][0]["Type"] = "processor_add_fields";
+    detail["flushers"][0]["Type"] = "flusher_file";
+
+    CollectionConfig fileFlusher(configName, make_unique<Json::Value>(detail), filepath);
+    APSARA_TEST_FALSE(fileFlusher.Parse());
+
+    detail["flushers"][1]["Type"] = "flusher_sls";
+    CollectionConfig multipleNativeFlushers(configName, make_unique<Json::Value>(detail), filepath);
+    APSARA_TEST_FALSE(multipleNativeFlushers.Parse());
+
+    detail["flushers"].resize(1);
+    detail["flushers"][0]["Type"] = "flusher_sls";
+    CollectionConfig slsFlusher(configName, make_unique<Json::Value>(detail), filepath);
+    APSARA_TEST_TRUE(slsFlusher.Parse());
+
+    detail["flushers"][0]["Type"] = "flusher_http";
+    CollectionConfig goFlusher(configName, make_unique<Json::Value>(detail), filepath);
+    APSARA_TEST_TRUE(goFlusher.Parse());
+
+    detail.removeMember("processors");
+    detail["flushers"][0]["Type"] = "flusher_file";
+    detail["flushers"][1]["Type"] = "flusher_sls";
+    CollectionConfig nativePipeline(configName, make_unique<Json::Value>(detail), filepath);
+    APSARA_TEST_TRUE(nativePipeline.Parse());
+}
+
 UNIT_TEST_CASE(CollectionConfigUnittest, HandleValidConfig)
 UNIT_TEST_CASE(CollectionConfigUnittest, SelfMonitorInputWithGoFlusher)
 UNIT_TEST_CASE(CollectionConfigUnittest, NativeInputWithGoPlugin)
 UNIT_TEST_CASE(CollectionConfigUnittest, MultiInputAndFlusherCoexistence)
+UNIT_TEST_CASE(CollectionConfigUnittest, NativeFlusherBehindGoPipeline)
 UNIT_TEST_CASE(CollectionConfigUnittest, HandleInvalidCreateTime)
 UNIT_TEST_CASE(CollectionConfigUnittest, HandleInvalidGlobal)
 UNIT_TEST_CASE(CollectionConfigUnittest, HandleInvalidInputs)

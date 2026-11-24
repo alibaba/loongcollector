@@ -39,6 +39,7 @@ private:
     std::string mProtocol;
     std::string mEndpoint;
     Json::Value mForwardConfig;
+    bool mStarted = false;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class InputForwardUnittest;

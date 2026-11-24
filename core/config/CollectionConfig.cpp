@@ -486,7 +486,6 @@ bool CollectionConfig::Parse() {
             mHasGoFlusher = true;
         } else if (PluginRegistry::GetInstance()->IsValidNativeFlusherPlugin(pluginType)) {
             mHasNativeFlusher = true;
-            // TODO: remove these special restrictions
             ++nativeFlusherCnt;
             if (pluginType == "flusher_sls") {
                 hasFlusherSLS = true;
@@ -498,25 +497,11 @@ bool CollectionConfig::Parse() {
         mFlushers.push_back(&plugin);
     }
     // TODO: relax this restriction once the Go-to-native bridge can address additional native flusher instances.
-    // Native + Go flusher coexistence rule (intentional, not part of the removed input whitelist):
-    // when a Go (extended) flusher is present the native flushers are fed by the Go pipeline
-    // (see ShouldNativeFlusherConnectedByGoPipeline), and flusher_sls is currently the only native
-    // flusher able to consume that output. Therefore at most one native flusher may coexist with Go
-    // flushers, and it must be flusher_sls.
-    if (mHasGoFlusher && nativeFlusherCnt > 1) {
+    if (nativeFlusherCnt > 0 && ShouldNativeFlusherConnectedByGoPipeline()
+        && (nativeFlusherCnt != 1 || !hasFlusherSLS)) {
         PARAM_ERROR_RETURN(sLogger,
                            alarm,
-                           "more than 1 native flusher plugins coexist with extended flusher plugins",
-                           noModule,
-                           mName,
-                           mProject,
-                           mLogstore,
-                           mRegion);
-    }
-    if (mHasGoFlusher && nativeFlusherCnt == 1 && !hasFlusherSLS) {
-        PARAM_ERROR_RETURN(sLogger,
-                           alarm,
-                           "native flusher plugins other than flusher_sls coexist with extended flusher plugins",
+                           "Go pipeline can only forward to a single native flusher_sls",
                            noModule,
                            mName,
                            mProject,
