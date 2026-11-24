@@ -42,8 +42,5 @@ Feature: input http
     _address_: "http://www.baidu.com"
     _result_: "success"
     _http_response_code_: "200"
-    """
-    Then the log tags match kv
-    """
     _method_: "GET"
     """
