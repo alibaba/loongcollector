@@ -138,3 +138,28 @@ func TestReserveCompactLogContentsPreservesFieldOrder(t *testing.T) {
 	fields.Iterator()["message"] = "updated"
 	require.Equal(t, "updated", fields.Get("message"))
 }
+
+func TestOrderedLogContentsEditsTheExtraField(t *testing.T) {
+	fields := NewOrderedLogContents(4)
+	for _, key := range []string{"a", "b", "c", "d", "e"} {
+		fields.Add(key, key)
+	}
+	RenameLogContent(fields, "e", "renamed")
+	fields.Add("renamed", "updated")
+	fields.Delete("b")
+	fields.Add("last", "last")
+	var keys []string
+	for key := range LogContentEntries(fields) {
+		keys = append(keys, key)
+	}
+	require.Equal(t, []string{"a", "c", "d", "renamed", "last"}, keys)
+	require.Equal(t, "updated", fields.Get("renamed"))
+	require.Equal(t, "last", fields.SortTo(nil)[3].Key)
+
+	ReserveLogContentKeys(fields, 2)
+	fields.Add("f", "f")
+	fields.Add("g", "g")
+	require.Len(t, fields.Iterator(), 7)
+	require.Equal(t, "updated", fields.Get("renamed"))
+	require.Equal(t, "last", fields.Get("last"))
+}

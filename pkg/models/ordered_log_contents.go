@@ -35,6 +35,7 @@ func (m *orderedLogMap) init(capacity int) {
 
 type orderedLogContents struct {
 	packed    []KeyValue[any]
+	extra     *KeyValue[any] // One more field after the full inline row.
 	mapped    atomic.Pointer[orderedLogMap]
 	bodyOwned atomic.Bool
 }
@@ -123,12 +124,21 @@ func ReserveLogContentKeys(contents LogContents, count int) {
 	if ordered, ok := contents.(*orderedLogContents); ok {
 		if mapped := ordered.mapped.Load(); mapped != nil {
 			mapped.keys = slices.Grow(mapped.keys, count)
-		} else if count > cap(ordered.packed)-len(ordered.packed) &&
-			count <= maxReservedPackedFields-len(ordered.packed) {
-			fields := make([]KeyValue[any], len(ordered.packed), len(ordered.packed)+count)
+			return
+		}
+		length := ordered.packedLen()
+		capacity := cap(ordered.packed)
+		if capacity == smallLogFieldCount {
+			// The next field can keep the original four inline slots.
+			capacity++
+		}
+		if count > capacity-length && count <= maxReservedPackedFields-length {
+			fields := make([]KeyValue[any], length, length+count)
 			copy(fields, ordered.packed)
-			// The inline slots are still part of the log allocation.
-			clear(ordered.packed)
+			if ordered.extra != nil {
+				fields[length-1] = *ordered.extra
+			}
+			ordered.clearPacked()
 			ordered.packed = fields
 		}
 	}
@@ -178,6 +188,9 @@ func (c *orderedLogContents) entries(yield func(string, any) bool) {
 			return
 		}
 	}
+	if field := c.extra; field != nil {
+		yield(field.Key, field.Value)
+	}
 }
 
 // RenameLogContent changes a field name while keeping its position in ordered contents.
@@ -195,7 +208,7 @@ func RenameLogContent(contents LogContents, source, destination string) {
 				delete(mapped.values, source)
 			}
 		} else if index := c.packedIndex(source); index >= 0 {
-			c.packed[index].Key = destination
+			c.packedField(index).Key = destination
 		}
 		return
 	}
@@ -215,7 +228,24 @@ func (c *orderedLogContents) packedIndex(key string) int {
 			return i
 		}
 	}
+	if c.extra != nil && c.extra.Key == key {
+		return len(c.packed)
+	}
 	return -1
+}
+
+func (c *orderedLogContents) packedLen() int {
+	if c.extra != nil {
+		return len(c.packed) + 1
+	}
+	return len(c.packed)
+}
+
+func (c *orderedLogContents) packedField(index int) *KeyValue[any] {
+	if index == len(c.packed) {
+		return c.extra
+	}
+	return &c.packed[index]
 }
 
 func (c *orderedLogContents) lookup(key string) (any, bool) {
@@ -224,7 +254,7 @@ func (c *orderedLogContents) lookup(key string) (any, bool) {
 		return value, found
 	}
 	if index := c.packedIndex(key); index >= 0 {
-		return c.packed[index].Value, true
+		return c.packedField(index).Value, true
 	}
 	return nil, false
 }
@@ -246,7 +276,7 @@ func (c *orderedLogContents) Len() int {
 	if mapped := c.mapped.Load(); mapped != nil {
 		return len(mapped.values)
 	}
-	return len(c.packed)
+	return c.packedLen()
 }
 
 func (*orderedLogContents) IsNil() bool { return false }
@@ -263,6 +293,10 @@ func (c *orderedLogContents) materializeMap(capacity int) *orderedLogMap {
 		mapped.keys = append(mapped.keys, field.Key)
 		mapped.values[field.Key] = field.Value
 	}
+	if field := c.extra; field != nil {
+		mapped.keys = append(mapped.keys, field.Key)
+		mapped.values[field.Key] = field.Value
+	}
 	if c.mapped.CompareAndSwap(nil, mapped) {
 		return mapped
 	}
@@ -271,7 +305,7 @@ func (c *orderedLogContents) materializeMap(capacity int) *orderedLogMap {
 
 func (c *orderedLogContents) Iterator() map[string]any {
 	c.releaseBodyOwnership()
-	return c.materializeMap(len(c.packed)).values
+	return c.materializeMap(c.packedLen()).values
 }
 
 func (c *orderedLogContents) SortTo(buf []KeyValue[any]) []KeyValue[any] {
@@ -288,6 +322,9 @@ func (c *orderedLogContents) SortTo(buf []KeyValue[any]) []KeyValue[any] {
 		}
 	} else {
 		buf = append(buf, c.packed...)
+		if c.extra != nil {
+			buf = append(buf, *c.extra)
+		}
 	}
 	sort.Sort(KeyValueSlice[any](buf))
 	return buf
@@ -300,14 +337,18 @@ func (c *orderedLogContents) Add(key string, value any) {
 	mapped := c.mapped.Load()
 	if mapped == nil {
 		if index := c.packedIndex(key); index >= 0 {
-			c.packed[index].Value = value
+			c.packedField(index).Value = value
 			return
 		}
 		if len(c.packed) < cap(c.packed) {
 			c.packed = append(c.packed, KeyValue[any]{Key: key, Value: value})
 			return
 		}
-		mapped = c.materializeMap(len(c.packed) + 1)
+		if len(c.packed) == smallLogFieldCount && c.extra == nil {
+			c.extra = &KeyValue[any]{Key: key, Value: value}
+			return
+		}
+		mapped = c.materializeMap(c.packedLen() + 1)
 	}
 	c.clearPacked()
 	if _, found := mapped.values[key]; !found {
@@ -321,6 +362,7 @@ func (c *orderedLogContents) clearPacked() {
 	// references on the next mutation, when there are no concurrent readers.
 	clear(c.packed)
 	c.packed = nil
+	c.extra = nil
 }
 
 func (c *orderedLogContents) AddAll(items map[string]any) {
@@ -356,6 +398,12 @@ func (c *orderedLogContents) Delete(key string) {
 		}
 		delete(mapped.values, key)
 	} else if index := c.packedIndex(key); index >= 0 {
-		c.packed = slices.Delete(c.packed, index, index+1)
+		if index < len(c.packed) {
+			c.packed = slices.Delete(c.packed, index, index+1)
+			if c.extra != nil {
+				c.packed = append(c.packed, *c.extra)
+			}
+		}
+		c.extra = nil
 	}
 }
