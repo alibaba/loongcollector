@@ -116,12 +116,20 @@ func LookupLogContentForReplacement(contents LogContents, key string) (value any
 	return contents.Get(key), contents.Contains(key), false
 }
 
-// ReserveLogContentKeys avoids growing the ordered key slice for each new
-// field when a processor has determined how many fields it will add.
+// ReserveLogContentKeys reserves fields that a processor is about to add.
+// Modest growth can stay compact instead of creating a key slice and a map.
 func ReserveLogContentKeys(contents LogContents, count int) {
+	const maxReservedPackedFields = 8
 	if ordered, ok := contents.(*orderedLogContents); ok {
 		if mapped := ordered.mapped.Load(); mapped != nil {
 			mapped.keys = slices.Grow(mapped.keys, count)
+		} else if count > cap(ordered.packed)-len(ordered.packed) &&
+			count <= maxReservedPackedFields-len(ordered.packed) {
+			fields := make([]KeyValue[any], len(ordered.packed), len(ordered.packed)+count)
+			copy(fields, ordered.packed)
+			// The inline slots are still part of the log allocation.
+			clear(ordered.packed)
+			ordered.packed = fields
 		}
 	}
 }

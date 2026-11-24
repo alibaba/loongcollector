@@ -118,3 +118,23 @@ func TestNativeLogTagsKeepWritableMap(t *testing.T) {
 	tags.Add("key", "updated")
 	require.Equal(t, "updated", fields["key"])
 }
+
+func TestReserveCompactLogContentsPreservesFieldOrder(t *testing.T) {
+	fields := NewOrderedLogContents(3).(*orderedLogContents)
+	fields.Add("content", "message")
+	fields.Add("_time_", "time")
+	fields.Add("_source_", "stdout")
+	fields.Delete("content")
+	ReserveLogContentKeys(fields, 3)
+	for _, key := range []string{"id", "level", "message"} {
+		fields.Add(key, key)
+	}
+	require.Nil(t, fields.mapped.Load())
+	var keys []string
+	for key := range LogContentEntries(fields) {
+		keys = append(keys, key)
+	}
+	require.Equal(t, []string{"_time_", "_source_", "id", "level", "message"}, keys)
+	fields.Iterator()["message"] = "updated"
+	require.Equal(t, "updated", fields.Get("message"))
+}

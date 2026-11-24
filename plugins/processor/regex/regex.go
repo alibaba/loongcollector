@@ -19,6 +19,7 @@ import (
 	"regexp"
 	"regexp/syntax"
 	"strings"
+	"unicode"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
@@ -45,6 +46,7 @@ type ProcessorRegex struct {
 	logPairMetric         selfmonitor.CounterMetric
 	re                    *regexp.Regexp
 	trailingCapturePrefix *regexp.Regexp
+	prefixEndLiteral      string
 	requiredPrefix        string
 }
 
@@ -65,7 +67,7 @@ func (p *ProcessorRegex) Init(context pipeline.Context) error {
 		return err
 	}
 
-	p.trailingCapturePrefix = compileTrailingCapturePrefix(expression, p.re.NumSubexp())
+	p.trailingCapturePrefix, p.prefixEndLiteral = compileTrailingCapturePrefix(expression, p.re.NumSubexp())
 	p.requiredPrefix = ""
 	if p.trailingCapturePrefix != nil {
 		p.requiredPrefix, _ = p.re.LiteralPrefix()
@@ -79,27 +81,56 @@ func (p *ProcessorRegex) Init(context pipeline.Context) error {
 // compileTrailingCapturePrefix strips a final anchored dot-all capture.
 // Every suffix after the prefix is a valid match for this capture, so the
 // regular expression engine only needs to find the preceding fields.
-func compileTrailingCapturePrefix(expression string, captures int) *regexp.Regexp {
+func compileTrailingCapturePrefix(expression string, captures int) (*regexp.Regexp, string) {
 	tree, err := syntax.Parse(expression, syntax.Perl)
 	if err != nil || tree.Op != syntax.OpConcat || len(tree.Sub) < 4 {
-		return nil
+		return nil, ""
 	}
 	parts := tree.Sub
 	tail := parts[len(parts)-2]
 	if parts[0].Op != syntax.OpBeginText || parts[len(parts)-1].Op != syntax.OpEndText ||
 		tail.Op != syntax.OpCapture || tail.Cap != captures {
-		return nil
+		return nil, ""
 	}
 	star := tail.Sub[0]
 	if star.Op != syntax.OpStar || star.Sub[0].Op != syntax.OpAnyChar {
-		return nil
+		return nil, ""
 	}
 	tree.Sub = parts[:len(parts)-2]
 	prefix, err := regexp.Compile(tree.String())
 	if err != nil || prefix.NumSubexp()+1 != captures {
-		return nil
+		return nil, ""
 	}
-	return prefix
+
+	end := tree.Sub[len(tree.Sub)-1]
+	if end.Op != syntax.OpLiteral || end.Flags&syntax.FoldCase != 0 {
+		return prefix, ""
+	}
+	for _, r := range end.Rune {
+		if r > unicode.MaxASCII {
+			return prefix, ""
+		}
+	}
+	return prefix, string(end.Rune)
+}
+
+func (p *ProcessorRegex) matchInputLength(input string) int {
+	if !strings.HasPrefix(input, p.requiredPrefix) {
+		return -1
+	}
+	// A case-sensitive ASCII literal at the end of the prefix is part of
+	// every match. Nothing after its last occurrence can affect those
+	// captures. Bound short inputs to shrink the regexp scratch space;
+	// avoid scanning the entire payload of long logs for this optimization.
+	const maxSearchBytes = 4 << 10
+	if p.prefixEndLiteral != "" && len(input) <= maxSearchBytes {
+		last := strings.LastIndex(input, p.prefixEndLiteral)
+		if last < 0 {
+			return -1
+		}
+		return last + len(p.prefixEndLiteral)
+	}
+	return len(input)
 }
 
 func (*ProcessorRegex) Description() string {
@@ -187,8 +218,8 @@ func (p *ProcessorRegex) processLogEvent(log *models.Log) {
 	var captures []int
 	if body, ok := value.([]byte); ok {
 		var indices []int
-		if strings.HasPrefix(util.ZeroCopyBytesToString(body), p.requiredPrefix) {
-			indices = matcher.FindSubmatchIndex(body)
+		if length := p.matchInputLength(util.ZeroCopyBytesToString(body)); length >= 0 {
+			indices = matcher.FindSubmatchIndex(body[:length])
 		}
 		captures = p.configuredCaptures(indices, len(body), offsets[:0], func() string {
 			return string(body[:min(len(body), 512)])
@@ -197,8 +228,8 @@ func (p *ProcessorRegex) processLogEvent(log *models.Log) {
 	} else {
 		val = pipeline.GetStringValue(value)
 		var indices []int
-		if strings.HasPrefix(val, p.requiredPrefix) {
-			indices = matcher.FindStringSubmatchIndex(val)
+		if length := p.matchInputLength(val); length >= 0 {
+			indices = matcher.FindStringSubmatchIndex(val[:length])
 		}
 		captures = p.configuredCaptures(indices, len(val), offsets[:0], func() string {
 			return util.CutString(val, 512)

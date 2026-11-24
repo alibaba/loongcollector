@@ -17,6 +17,7 @@ package regex
 import (
 	"context"
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/alibaba/ilogtail/plugins/processor/internal/processortest"
@@ -424,9 +425,15 @@ func TestTrailingCapturePrefixMatchesOriginal(t *testing.T) {
 		"id=load,7 level=INFO msg=", "id=load,7 level=INFO msg=line1\nline2",
 		"id=load,7 level=INFO msg=\xff", "id=load,7 level=WARN msg=x",
 		"aaa", "a", "ab-tail", "含中文",
+		"id=load,7 level=INFO msg=a msg=b", "id=load,7 level=INFO missing",
+		"id=load,7 level=INFO MSG=case fold", "id=load,7 level=INFO 标记=unicode",
+		"id=load,7 level=INFO msg=" + strings.Repeat("x", 5000),
 	}
 	expressions := []string{
 		`^id=(\w+,\d+) level=(INFO) msg=(.*)$`,
+		`^id=(.+) msg=(.*)$`,
+		`^id=(\w+,\d+) level=(INFO)(?i: msg=)(.*)$`,
+		`^id=(\w+,\d+) level=(INFO) 标记=(.*)$`,
 		`^(a+?)(b)?(.*)$`,
 		`^(?P<prefix>[a-z]+)(?P<tail>.*)\z`,
 	}
@@ -434,17 +441,21 @@ func TestTrailingCapturePrefixMatchesOriginal(t *testing.T) {
 		t.Run(expression, func(t *testing.T) {
 			pattern := "(?s)" + expression
 			original := regexp.MustCompile(pattern)
-			prefix := compileTrailingCapturePrefix(pattern, original.NumSubexp())
+			prefix, endLiteral := compileTrailingCapturePrefix(pattern, original.NumSubexp())
 			require.NotNil(t, prefix)
 			keys := make([]string, original.NumSubexp())
-			p := ProcessorRegex{Keys: keys, FullMatch: true, trailingCapturePrefix: prefix}
+			p := ProcessorRegex{Keys: keys, FullMatch: true, trailingCapturePrefix: prefix, prefixEndLiteral: endLiteral}
 			for _, input := range inputs {
 				want := original.FindStringSubmatchIndex(input)
 				if want != nil {
 					want = want[2:]
 				}
+				var match []int
+				if length := p.matchInputLength(input); length >= 0 {
+					match = prefix.FindStringSubmatchIndex(input[:length])
+				}
 				var offsets [16]int
-				got := p.configuredCaptures(prefix.FindStringSubmatchIndex(input), len(input), offsets[:0], func() string {
+				got := p.configuredCaptures(match, len(input), offsets[:0], func() string {
 					t.Fatal("unexpected alarm preview")
 					return ""
 				})
