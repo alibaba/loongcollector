@@ -22,13 +22,16 @@ import (
 // GroupInfoTemplate holds defaults for groups from the same source. Each group
 // keeps its own writable tags and metadata while sharing the initial values.
 type GroupInfoTemplate struct {
-	metadata map[string]string
-	tags     map[string]string
+	metadata groupValueDefaults
+	tags     groupValueDefaults
 }
 
 // NewGroupInfoTemplate snapshots the supplied default metadata and tags.
 func NewGroupInfoTemplate(metadata, tags map[string]string) *GroupInfoTemplate {
-	return &GroupInfoTemplate{metadata: maps.Clone(metadata), tags: maps.Clone(tags)}
+	return &GroupInfoTemplate{
+		metadata: groupValueDefaults{values: maps.Clone(metadata)},
+		tags:     groupValueDefaults{values: maps.Clone(tags), canEnrich: true},
+	}
 }
 
 // NewSingleEventGroup keeps the group, its values, and the one-event slice
@@ -51,10 +54,21 @@ func (t *GroupInfoTemplate) NewSingleEventGroup(event PipelineEvent) *PipelineGr
 	return &one.group
 }
 
+type groupValueDefaults struct {
+	values    map[string]string
+	enriched  atomic.Pointer[groupTagEnrichment]
+	canEnrich bool
+}
+
+type groupTagEnrichment struct {
+	additions map[string]string
+	merged    groupValueDefaults
+}
+
 // groupDefaultValues clones the defaults before mutation or providing the
 // writable Iterator map. Reads can use the source template directly.
 type groupDefaultValues struct {
-	defaults *map[string]string
+	defaults *groupValueDefaults
 	owned    atomic.Pointer[keyValuesImpl[string]]
 }
 
@@ -62,7 +76,7 @@ func (v *groupDefaultValues) read() map[string]string {
 	if owned := v.owned.Load(); owned != nil {
 		return owned.keyValues
 	}
-	return *v.defaults
+	return v.defaults.values
 }
 
 func (v *groupDefaultValues) mutable() *keyValuesImpl[string] {
@@ -70,10 +84,10 @@ func (v *groupDefaultValues) mutable() *keyValuesImpl[string] {
 		return owned
 	}
 	var values map[string]string
-	if len(*v.defaults) == 0 {
+	if len(v.defaults.values) == 0 {
 		values = make(map[string]string)
 	} else {
-		values = maps.Clone(*v.defaults)
+		values = maps.Clone(v.defaults.values)
 	}
 	owned := &keyValuesImpl[string]{keyValues: values}
 	if v.owned.CompareAndSwap(nil, owned) {
@@ -122,6 +136,35 @@ func (v *groupDefaultValues) SortTo(buf []KeyValue[string]) []KeyValue[string] {
 func (v *groupDefaultValues) Len() int { return len(v.read()) }
 
 func (*groupDefaultValues) IsNil() bool { return false }
+
+// TryApplyGroupTagDefaults applies the runner's tags to a group whose original
+// container defaults have not been exposed for writing. Later writes still
+// obtain a private map. Other tag containers should receive the ordinary adds.
+func TryApplyGroupTagDefaults(tags Tags, additions map[string]string) bool {
+	if len(additions) == 0 {
+		return true
+	}
+	values, ok := tags.(*groupDefaultValues)
+	if !ok || values.owned.Load() != nil || !values.defaults.canEnrich {
+		return false
+	}
+	base := values.defaults
+	cached := base.enriched.Load()
+	if cached == nil || !maps.Equal(cached.additions, additions) {
+		merged := make(map[string]string, len(base.values)+len(additions))
+		maps.Copy(merged, base.values)
+		maps.Copy(merged, additions)
+		cached = &groupTagEnrichment{
+			additions: maps.Clone(additions),
+			merged:    groupValueDefaults{values: merged},
+		}
+		// Keep only the latest result for this container template. Previously
+		// emitted groups still refer to their own immutable snapshot.
+		base.enriched.Store(cached)
+	}
+	values.defaults = &cached.merged
+	return true
+}
 
 // EqualStringValues compares group fields without turning shared defaults into
 // per-group maps. Iterator still supplies a writable map to plugins.

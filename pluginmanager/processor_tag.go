@@ -59,19 +59,21 @@ func (p *ProcessorTag) Process(in *models.PipelineGroupEvents) {
 	}
 	tagsMap := make(map[string]string)
 	p.addAllConfigurableTags(tagsMap)
-	for k, v := range tagsMap {
-		in.Group.Tags.Add(k, v)
-	}
-	// env tags
+	// Environment tags follow the configured host tags and take precedence.
 	for i := 0; i < len(helper.EnvTags); i += 2 {
 		if len(p.agentEnvMetaTagKey) == 0 && p.appendingAllEnvMetaTag {
-			in.Group.Tags.Add(helper.EnvTags[i], helper.EnvTags[i+1])
+			tagsMap[helper.EnvTags[i]] = helper.EnvTags[i+1]
 		} else {
 			if customKey, ok := p.agentEnvMetaTagKey[helper.EnvTags[i]]; ok {
 				if customKey != "" {
-					in.Group.Tags.Add(customKey, helper.EnvTags[i+1])
+					tagsMap[customKey] = helper.EnvTags[i+1]
 				}
 			}
+		}
+	}
+	if !models.TryApplyGroupTagDefaults(in.Group.Tags, tagsMap) {
+		for key, value := range tagsMap {
+			in.Group.Tags.Add(key, value)
 		}
 	}
 }

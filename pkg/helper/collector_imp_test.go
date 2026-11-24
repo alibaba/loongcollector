@@ -62,3 +62,28 @@ func TestGroupedPipelineCollectorForwardAndMerge(t *testing.T) {
 	require.Equal(t, []models.PipelineEvent{first, second}, merged[0].Events)
 	require.Equal(t, []models.PipelineEvent{first}, in.Events)
 }
+
+func TestAppendDrainedPipelineGroupsReusesSingleGroupStorage(t *testing.T) {
+	collector := NewGroupedPipelineContext().Collector()
+	first := &models.PipelineGroupEvents{
+		Group:  new(models.GroupInfo),
+		Events: []models.PipelineEvent{&models.Log{Name: "first"}},
+	}
+	second := &models.PipelineGroupEvents{
+		Group:  new(models.GroupInfo),
+		Events: []models.PipelineEvent{&models.Log{Name: "second"}},
+	}
+	var storage [1]*models.PipelineGroupEvents
+	collector.CollectList(first)
+	got := AppendDrainedPipelineGroups(collector, storage[:0])
+	require.Same(t, first, got[0])
+	require.Same(t, &storage[0], &got[0])
+	require.Empty(t, collector.ToArray())
+
+	clear(got)
+	collector.CollectList(first, second)
+	got = AppendDrainedPipelineGroups(collector, got[:0])
+	require.Len(t, got, 2)
+	require.Nil(t, storage[0])
+	require.ElementsMatch(t, []*models.PipelineGroupEvents{first, second}, got)
+}

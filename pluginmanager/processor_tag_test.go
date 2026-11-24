@@ -125,3 +125,34 @@ func TestTagNilDefense(t *testing.T) {
 	assert.False(t, in.Group.Tags.IsNil())
 	assert.Equal(t, util.GetHostName(), in.Group.Tags.Get(hostNameDefaultTagKey))
 }
+
+func TestProcessorTagRefreshesContainerDefaults(t *testing.T) {
+	previous := helper.EnvTags
+	t.Cleanup(func() { helper.EnvTags = previous })
+	helper.EnvTags = []string{"env", "first"}
+	tag := NewProcessorTag(nil, false, map[string]string{"env": hostNameDefaultTagKey})
+	template := models.NewGroupInfoTemplate(nil, map[string]string{
+		hostNameDefaultTagKey: "container", "same": "original",
+	})
+
+	first := template.NewSingleEventGroup(new(models.Log))
+	tag.Process(first)
+	second := template.NewSingleEventGroup(new(models.Log))
+	tag.Process(second)
+	assert.True(t, models.EqualStringValues(first.Group.Tags, second.Group.Tags))
+	assert.Equal(t, "first", first.Group.Tags.Get(hostNameDefaultTagKey))
+
+	helper.EnvTags = []string{"env", "second"}
+	third := template.NewSingleEventGroup(new(models.Log))
+	tag.Process(third)
+	assert.Equal(t, "second", third.Group.Tags.Get(hostNameDefaultTagKey))
+	assert.Equal(t, "first", first.Group.Tags.Get(hostNameDefaultTagKey))
+	first.Group.Tags.Iterator()["same"] = "changed"
+	assert.Equal(t, "original", second.Group.Tags.Get("same"))
+
+	fourth := template.NewSingleEventGroup(new(models.Log))
+	fourth.Group.Tags.Add("custom", "kept")
+	tag.Process(fourth)
+	assert.Equal(t, "kept", fourth.Group.Tags.Get("custom"))
+	assert.Equal(t, "second", fourth.Group.Tags.Get(hostNameDefaultTagKey))
+}

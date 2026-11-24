@@ -248,6 +248,7 @@ func (p *pluginRunner) runProcessor() {
 func (p *pluginRunner) runProcessorInternal(cc *pipeline.AsyncControl) {
 	defer panicRecover(p.LogstoreConfig.ConfigName)
 	pipeContext := p.ProcessPipeContext
+	var singleGroup [1]*models.PipelineGroupEvents
 	pipeChan := p.InputPipeContext.Collector().Observe()
 	inputQueue, _ := p.InputPipeContext.(*reservedInputQueue)
 	var processorTag *ProcessorTag
@@ -267,12 +268,13 @@ func (p *pluginRunner) runProcessorInternal(cc *pipeline.AsyncControl) {
 			if processorTag != nil {
 				processorTag.Process(group)
 			}
-			pipeEvents := []*models.PipelineGroupEvents{group}
+			pipeEvents := append(singleGroup[:0], group)
 			for _, processor := range p.ProcessorPlugins {
 				for _, in := range pipeEvents {
 					processor.Process(in, pipeContext)
 				}
-				pipeEvents = pipeContext.Collector().ToArray()
+				clear(pipeEvents)
+				pipeEvents = helper.AppendDrainedPipelineGroups(pipeContext.Collector(), pipeEvents[:0])
 				if len(pipeEvents) == 0 {
 					break
 				}
@@ -288,6 +290,7 @@ func (p *pluginRunner) runProcessorInternal(cc *pipeline.AsyncControl) {
 						p.AggregatePipeContext.Collector().CollectList(group)
 					}
 				}
+				clear(pipeEvents)
 				continue
 			}
 			for _, aggregator := range p.AggregatorPlugins {
@@ -308,6 +311,7 @@ func (p *pluginRunner) runProcessorInternal(cc *pipeline.AsyncControl) {
 					}
 				}
 			}
+			clear(pipeEvents)
 		}
 	}
 }

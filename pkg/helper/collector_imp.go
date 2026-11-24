@@ -15,6 +15,8 @@
 package helper
 
 import (
+	"slices"
+
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 )
@@ -81,38 +83,55 @@ func (p *groupedPipeCollector) Collect(group *models.GroupInfo, events ...models
 
 func (p *groupedPipeCollector) CollectList(groups ...*models.PipelineGroupEvents) {
 	for _, group := range groups {
-		if len(group.Events) == 0 {
-			continue
-		}
-		if p.firstGroup == nil && len(p.groupEvents) == 0 {
-			// An in-place processor can forward the group it received.
-			p.firstGroup = group
-			continue
-		}
-		p.Collect(group.Group, group.Events...)
+		p.CollectGroup(group)
 	}
 }
 
+func (p *groupedPipeCollector) CollectGroup(group *models.PipelineGroupEvents) {
+	if len(group.Events) == 0 {
+		return
+	}
+	if p.firstGroup == nil && len(p.groupEvents) == 0 {
+		// An in-place processor can forward the group it received.
+		p.firstGroup = group
+		return
+	}
+	p.Collect(group.Group, group.Events...)
+}
+
 func (p *groupedPipeCollector) ToArray() []*models.PipelineGroupEvents {
+	return p.appendDrained(make([]*models.PipelineGroupEvents, 0, len(p.groupEvents)))
+}
+
+// AppendDrainedPipelineGroups lets the runner reuse its output slice between
+// processors. It retains the ordering and ownership of the collected groups.
+func AppendDrainedPipelineGroups(collector pipeline.PipelineCollector, dst []*models.PipelineGroupEvents) []*models.PipelineGroupEvents {
+	if grouped, ok := collector.(*groupedPipeCollector); ok {
+		return grouped.appendDrained(dst)
+	}
+	return append(dst, collector.ToArray()...)
+}
+
+func (p *groupedPipeCollector) appendDrained(dst []*models.PipelineGroupEvents) []*models.PipelineGroupEvents {
 	if group := p.firstGroup; group != nil {
 		p.firstGroup = nil
-		return []*models.PipelineGroupEvents{group}
+		return append(dst, group)
 	}
-	results := make([]*models.PipelineGroupEvents, 0, len(p.groupEvents))
+	dst = slices.Grow(dst, len(p.groupEvents))
 	for group, events := range p.groupEvents {
-		results = append(results, &models.PipelineGroupEvents{
+		dst = append(dst, &models.PipelineGroupEvents{
 			Group:  group,
 			Events: events,
 		})
 	}
-	switch len(results) {
+	switch len(p.groupEvents) {
 	case 0, 1:
 		clear(p.groupEvents)
 	default:
 		// Keep the common single-group map, but release storage after fan-out.
 		p.groupEvents = make(map[*models.GroupInfo][]models.PipelineEvent)
 	}
-	return results
+	return dst
 }
 
 func (p *groupedPipeCollector) Observe() chan *models.PipelineGroupEvents {
