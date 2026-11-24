@@ -28,7 +28,6 @@ import (
 	"github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/flags"
 	"github.com/alibaba/ilogtail/pkg/helper"
-	"github.com/alibaba/ilogtail/pkg/helper/containercenter"
 	"github.com/alibaba/ilogtail/pkg/helper/k8smeta"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/protocol"
@@ -39,30 +38,6 @@ import (
 
 /*
 #include <stdlib.h>
-static char**makeCharArray(int size) {
-        return malloc(sizeof(char*) * size);
-}
-
-static void setArrayString(char **a, char *s, int n) {
-        a[n] = s;
-}
-
-struct containerMeta{
-	char* podName;
-	char* k8sNamespace;
-	char* containerName;
-	char* image;
-	int k8sLabelsSize;
-	int containerLabelsSize;
-	int envSize;
-	char** k8sLabelsKey;
-	char** k8sLabelsVal;
-	char** containerLabelsKey;
-	char** containerLabelsVal;
-	char** envsKey;
-	char** envsVal;
-};
-
 // PBBuffer carries a serialized PipelineEventGroup protobuf that the C++ self-monitor
 // timer pulls from Go via GetGoSelfMonitor*PB. Go marshals directly into data
 // allocated inside libGoPluginBase.so; after C++ finishes parsing the borrowed bytes it must
@@ -216,56 +191,6 @@ func GetAllContainers() *C.char {
 //export GetDiffContainers
 func GetDiffContainers() *C.char {
 	return C.CString(pluginmanager.GetDiffContainers())
-}
-
-//export GetContainerMeta
-func GetContainerMeta(containerID string) *C.struct_containerMeta {
-	meta := containercenter.GetContainerMeta(containerID)
-	if meta == nil {
-		return nil
-	}
-	returnStruct := (*C.struct_containerMeta)(C.calloc(1, C.size_t(unsafe.Sizeof(C.struct_containerMeta{}))))
-	returnStruct.podName = C.CString(meta.PodName)
-	returnStruct.k8sNamespace = C.CString(meta.K8sNamespace)
-	returnStruct.containerName = C.CString(meta.ContainerName)
-	returnStruct.image = C.CString(meta.Image)
-
-	returnStruct.k8sLabelsSize = C.int(len(meta.K8sLabels))
-	if len(meta.K8sLabels) > 0 {
-		returnStruct.k8sLabelsKey = C.makeCharArray(returnStruct.k8sLabelsSize)
-		returnStruct.k8sLabelsVal = C.makeCharArray(returnStruct.k8sLabelsSize)
-		count := 0
-		for k, v := range meta.K8sLabels {
-			C.setArrayString(returnStruct.k8sLabelsKey, C.CString(k), C.int(count))
-			C.setArrayString(returnStruct.k8sLabelsVal, C.CString(v), C.int(count))
-			count++
-		}
-	}
-
-	returnStruct.containerLabelsSize = C.int(len(meta.ContainerLabels))
-	if len(meta.ContainerLabels) > 0 {
-		returnStruct.containerLabelsKey = C.makeCharArray(returnStruct.containerLabelsSize)
-		returnStruct.containerLabelsVal = C.makeCharArray(returnStruct.containerLabelsSize)
-		count := 0
-		for k, v := range meta.ContainerLabels {
-			C.setArrayString(returnStruct.containerLabelsKey, C.CString(k), C.int(count))
-			C.setArrayString(returnStruct.containerLabelsVal, C.CString(v), C.int(count))
-			count++
-		}
-	}
-
-	returnStruct.envSize = C.int(len(meta.Env))
-	if len(meta.Env) > 0 {
-		returnStruct.envsKey = C.makeCharArray(returnStruct.envSize)
-		returnStruct.envsVal = C.makeCharArray(returnStruct.envSize)
-		count := 0
-		for k, v := range meta.Env {
-			C.setArrayString(returnStruct.envsKey, C.CString(k), C.int(count))
-			C.setArrayString(returnStruct.envsVal, C.CString(v), C.int(count))
-			count++
-		}
-	}
-	return returnStruct
 }
 
 // buildAlarmsPB sends business fields to C++; the final sender adds ip/os/ver.
