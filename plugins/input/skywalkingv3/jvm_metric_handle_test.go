@@ -19,14 +19,15 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/alibaba/ilogtail/pkg/models"
-
 	"github.com/alibaba/ilogtail/pkg/helper"
-	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/models"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	common "github.com/alibaba/ilogtail/plugins/input/skywalkingv3/skywalking/network/common/v3"
 	v3 "github.com/alibaba/ilogtail/plugins/input/skywalkingv3/skywalking/network/language/agent/v3"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
@@ -50,13 +51,51 @@ func validate(expectedResultPath string, groups []*models.PipelineGroupEvents, t
 	t.Helper()
 	raw, err := os.ReadFile(filepath.Clean(expectedResultPath))
 	require.NoError(t, err)
-	var expected []*protocol.Log
+	var expected []struct {
+		Time     uint32
+		TimeNs   uint32 `json:"Time_ns"`
+		Contents []struct {
+			Key   string
+			Value string
+		}
+	}
 	require.NoError(t, json.Unmarshal(raw, &expected))
 	require.Len(t, groups, len(expected))
 	for i, group := range groups {
 		require.Len(t, group.Events, 1)
-		want := helper.InputEventFromProtocolLog(expected[i])
-		require.Equal(t, want, group.Events[0], "event %d", i)
+		fields := make(map[string]string, len(expected[i].Contents))
+		for _, field := range expected[i].Contents {
+			fields[field.Key] = field.Value
+		}
+		if name := fields["__name__"]; name != "" {
+			metric, ok := group.Events[0].(*models.Metric)
+			require.True(t, ok, "event %d should be a metric", i)
+			sample, err := strconv.ParseFloat(fields["__value__"], 64)
+			require.NoError(t, err)
+			timestamp, err := strconv.ParseUint(fields["__time_nano__"], 10, 64)
+			require.NoError(t, err)
+			tags := make(map[string]string)
+			for _, label := range strings.Split(fields["__labels__"], "|") {
+				if key, value, found := strings.Cut(label, "#$#"); found {
+					tags[key] = value
+				}
+			}
+			require.Equal(t, name, metric.GetName())
+			require.Equal(t, models.MetricTypeUntyped, metric.GetMetricType())
+			require.Equal(t, timestamp, metric.GetTimestamp())
+			require.Equal(t, sample, metric.GetValue().GetSingleValue())
+			require.Equal(t, tags, metric.GetTags().Iterator())
+			continue
+		}
+		log, ok := group.Events[0].(*models.Log)
+		require.True(t, ok, "event %d should be a log", i)
+		require.Equal(t, uint64(expected[i].Time)*1e9+uint64(expected[i].TimeNs), log.GetTimestamp())
+		got := make(map[string]string, log.GetIndices().Len())
+		for key, value := range models.LogContentEntries(log.GetIndices()) {
+			got[key] = pipeline.GetStringValue(value)
+		}
+		require.Equal(t, fields, got)
+		require.Empty(t, log.GetTags().Iterator())
 	}
 }
 

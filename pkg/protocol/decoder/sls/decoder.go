@@ -22,7 +22,6 @@ import (
 
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/protocol/decoder/common"
 )
 
@@ -72,17 +71,17 @@ func (d *Decoder) Decode(data []byte, _ *http.Request) ([]*models.PipelineGroupE
 		data = data[consumed:]
 		switch field {
 		case logField:
-			var log protocol.Log
-			if err := log.Unmarshal(value); err != nil {
+			log, err := decodeLog(value)
+			if err != nil {
 				return nil, fmt.Errorf("read SLS log: %w", err)
 			}
-			result.Events = append(result.Events, common.WireLogToEvent(&log))
+			result.Events = append(result.Events, log)
 		case tagField:
-			var tag protocol.LogTag
-			if err := tag.Unmarshal(value); err != nil {
+			key, value, err := decodeKeyValue(value)
+			if err != nil {
 				return nil, fmt.Errorf("read SLS log tag: %w", err)
 			}
-			result.Group.Tags.Add(tag.GetKey(), tag.GetValue())
+			result.Group.Tags.Add(key, value)
 		case categoryField:
 			setMetadata(result.Group.Metadata, "sls.category", value)
 		case sourceField:

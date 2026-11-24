@@ -15,39 +15,10 @@
 package helper
 
 import (
-	"math"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
-
-	"github.com/alibaba/ilogtail/pkg/models"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 )
-
-func TestInputEventFromProtocolLog(t *testing.T) {
-	ns := uint32(123)
-	log := InputEventFromProtocolLog(&protocol.Log{Time: 10, TimeNs: &ns, Contents: []*protocol.Log_Content{
-		{Key: "content", Value: "body"},
-		{Key: "__tag__:__file_offset__", Value: "10"},
-		{Key: "__tag__:tenant", Value: "default"},
-	}}).(*models.Log)
-	require.Equal(t, uint64(10_000_000_123), log.GetTimestamp())
-	require.Equal(t, uint64(10), log.GetOffset())
-	require.Equal(t, []byte("body"), log.GetBody())
-	require.Equal(t, "default", log.GetTags().Get("tenant"))
-	require.Equal(t, 1, log.GetIndices().Len())
-
-	labels := &MetricLabels{}
-	labels.Append("city", "hz")
-	metric := InputEventFromProtocolLog(NewMetricLog("counter", time.Unix(10, 20).UnixNano(), 42, labels)).(*models.Metric)
-	require.Equal(t, "counter", metric.Name)
-	require.Equal(t, "hz", metric.GetTags().Get("city"))
-	require.Equal(t, float64(42), metric.Value.GetSingleValue())
-
-	stale := InputEventFromProtocolLog(NewMetricLog("stale", time.Now().UnixNano(), math.Float64frombits(StaleNaN), &MetricLabels{})).(*models.Metric)
-	require.Equal(t, StaleNaN, math.Float64bits(stale.Value.GetSingleValue()))
-}
 
 func TestNewInputLogRowRejectsMismatchedColumns(t *testing.T) {
 	for _, values := range [][]string{nil, {"one", "extra"}} {

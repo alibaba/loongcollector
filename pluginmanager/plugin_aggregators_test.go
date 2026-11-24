@@ -24,7 +24,6 @@ import (
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/util"
 	_ "github.com/alibaba/ilogtail/plugins/aggregator"
 	"github.com/alibaba/ilogtail/plugins/aggregator/baseagg"
@@ -272,9 +271,11 @@ func TestRouterUsesInputFieldOrderAfterProcessors(t *testing.T) {
 				require.NoError(t, err)
 				return log
 			}},
-		{name: "wire-rename", processor: `{"type":"processor_rename","detail":{"SourceKeys":["z"],"DestKeys":["y"]}}`, store: "first",
+		{name: "ordered-input-rename", processor: `{"type":"processor_rename","detail":{"SourceKeys":["z"],"DestKeys":["y"]}}`, store: "first",
 			input: func(t *testing.T) models.PipelineEvent {
-				return helper.InputEventFromProtocolLog(&protocol.Log{Contents: []*protocol.Log_Content{{Key: "z", Value: "first"}, {Key: "b", Value: "second"}, {Key: "a", Value: "third"}}})
+				log, err := helper.NewInputLogRow(nil, []string{"z", "b", "a"}, []string{"first", "second", "third"})
+				require.NoError(t, err)
+				return log
 			}},
 		{name: "typed-metric", processor: "", store: "metric",
 			input: func(t *testing.T) models.PipelineEvent {

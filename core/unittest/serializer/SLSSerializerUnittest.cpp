@@ -896,15 +896,20 @@ void SLSSerializerUnittest::TestSerializeEventGroupList() {
     {
         vector<CompressedLogGroup> v;
         v.emplace_back("data1", 10);
+        const string binaryData = string(32, 'x') + string("\0data2", 6);
+        v.emplace_back(string(binaryData), 100);
 
         string res, errorMsg;
         APSARA_TEST_TRUE(serializer.DoSerialize(std::move(v), res, errorMsg));
         sls_logs::SlsLogPackageList logPackageList;
         APSARA_TEST_TRUE(logPackageList.ParseFromString(res));
-        APSARA_TEST_EQUAL(1, logPackageList.packages_size());
+        APSARA_TEST_EQUAL_FATAL(2, logPackageList.packages_size());
         APSARA_TEST_STREQ("data1", logPackageList.packages(0).data().c_str());
         APSARA_TEST_EQUAL(10, logPackageList.packages(0).uncompress_size());
         APSARA_TEST_EQUAL(sls_logs::SlsCompressType::SLS_CMP_NONE, logPackageList.packages(0).compress_type());
+        APSARA_TEST_EQUAL(binaryData, logPackageList.packages(1).data());
+        APSARA_TEST_EQUAL(100, logPackageList.packages(1).uncompress_size());
+        APSARA_TEST_EQUAL(sls_logs::SlsCompressType::SLS_CMP_NONE, logPackageList.packages(1).compress_type());
     }
     {
         // empty package list should not be serialized, otherwise an empty request would be sent

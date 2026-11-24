@@ -765,9 +765,9 @@ bool SLSEventGroupListSerializer::Serialize(vector<CompressedLogGroup>&& v, stri
         return false;
     }
     sls_logs::SlsLogPackageList logPackageList;
-    for (const auto& item : v) {
+    for (auto& item : v) {
         auto package = logPackageList.add_packages();
-        package->set_data(item.mData);
+        package->set_data(std::move(item.mData));
         package->set_uncompress_size(item.mRawSize);
 
         CompressType compressType = static_cast<const FlusherSLS*>(mFlusher)->GetCompressType();

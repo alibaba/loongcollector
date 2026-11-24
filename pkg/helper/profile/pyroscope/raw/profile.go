@@ -28,14 +28,12 @@ import (
 
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/helper/profile"
-	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/models"
 )
 
 type Profile struct {
 	RawData []byte
 	Format  profile.Format
-
-	logs []*protocol.Log // v1 result
 }
 
 func NewRawProfile(data []byte, format profile.Format) *Profile {
@@ -45,12 +43,12 @@ func NewRawProfile(data []byte, format profile.Format) *Profile {
 	}
 }
 
-func (p *Profile) Parse(ctx context.Context, meta *profile.Meta, tags map[string]string) (logs []*protocol.Log, err error) {
-	cb := p.extractProfileV1(meta, tags)
-	if err := p.doParse(cb); err != nil {
+func (p *Profile) Parse(_ context.Context, meta *profile.Meta, tags map[string]string) ([]models.PipelineEvent, error) {
+	var events []models.PipelineEvent
+	if err := p.doParse(p.profileLogCallback(meta, tags, &events)); err != nil {
 		return nil, err
 	}
-	return p.logs, nil
+	return events, nil
 }
 
 func (p *Profile) doParse(cb func([]byte, int)) error {
@@ -84,83 +82,41 @@ func (p *Profile) doParse(cb func([]byte, int)) error {
 	return nil
 }
 
-func (p *Profile) extractProfileV1(meta *profile.Meta, tags map[string]string) func([]byte, int) {
+func (p *Profile) profileLogCallback(meta *profile.Meta, tags map[string]string, events *[]models.PipelineEvent) func([]byte, int) {
 	profileID := profile.GetProfileID(meta)
-	for k, v := range tags {
-		meta.Tags[k] = v
+	for key, value := range tags {
+		meta.Tags[key] = value
 	}
 	labels, _ := json.Marshal(meta.Tags)
-	return func(k []byte, v int) {
-		name, stack := p.extractNameAndStacks(k, meta.SpyName)
-		stackID := strconv.FormatUint(xxhash.Sum64(k), 16)
-		var content []*protocol.Log_Content
-		u := meta.Units
-		if meta.Units == profile.SamplesUnits {
-			u = profile.NanosecondsUnit
-			v *= int(time.Second.Nanoseconds() / int64(meta.SampleRate))
+	labelText := string(labels)
+	valueType := meta.Units.DetectValueType()
+	profileType := profile.DetectProfileType(valueType).Kind
+	timestamp := profile.LogTimestamp(meta.StartTime.Unix(), int64(meta.StartTime.Nanosecond()))
+	duration := strconv.FormatInt(meta.EndTime.Sub(meta.StartTime).Nanoseconds(), 10)
+	return func(key []byte, value int) {
+		name, stack := p.extractNameAndStacks(key, meta.SpyName)
+		units := meta.Units
+		if units == profile.SamplesUnits {
+			units = profile.NanosecondsUnit
+			value *= int(time.Second.Nanoseconds() / int64(meta.SampleRate))
 		}
-		content = append(content,
-			&protocol.Log_Content{
-				Key:   "name",
-				Value: name,
-			},
-			&protocol.Log_Content{
-				Key:   "stack",
-				Value: strings.Join(stack, "\n"),
-			},
-			&protocol.Log_Content{
-				Key:   "stackID",
-				Value: stackID,
-			},
-			&protocol.Log_Content{
-				Key:   "language",
-				Value: meta.SpyName,
-			},
-			&protocol.Log_Content{
-				Key:   "type",
-				Value: profile.DetectProfileType(meta.Units.DetectValueType()).Kind,
-			},
-			&protocol.Log_Content{
-				Key:   "units",
-				Value: string(u),
-			},
-			&protocol.Log_Content{
-				Key:   "valueTypes",
-				Value: meta.Units.DetectValueType(),
-			},
-			&protocol.Log_Content{
-				Key:   "aggTypes",
-				Value: string(meta.AggregationType),
-			},
-			&protocol.Log_Content{
-				Key:   "dataType",
-				Value: "CallStack",
-			},
-			&protocol.Log_Content{
-				Key:   "durationNs",
-				Value: strconv.FormatInt(meta.EndTime.Sub(meta.StartTime).Nanoseconds(), 10),
-			},
-			&protocol.Log_Content{
-				Key:   "profileID",
-				Value: profileID,
-			},
-			&protocol.Log_Content{
-				Key:   "labels",
-				Value: string(labels),
-			},
-			&protocol.Log_Content{
-				Key:   "val",
-				Value: strconv.FormatFloat(float64(v), 'f', 2, 64),
-			},
-		)
-
-		log := &protocol.Log{
-			Contents: content,
-		}
-		protocol.SetLogTimeWithNano(log, uint32(meta.StartTime.Unix()), uint32(meta.StartTime.Nanosecond()))
-		p.logs = append(p.logs, log)
+		log := models.NewLogWithOrderedContents(13)
+		log.Timestamp = timestamp
+		log.Contents.Add("name", name)
+		log.Contents.Add("stack", strings.Join(stack, "\n"))
+		log.Contents.Add("stackID", strconv.FormatUint(xxhash.Sum64(key), 16))
+		log.Contents.Add("language", meta.SpyName)
+		log.Contents.Add("type", profileType)
+		log.Contents.Add("units", string(units))
+		log.Contents.Add("valueTypes", valueType)
+		log.Contents.Add("aggTypes", string(meta.AggregationType))
+		log.Contents.Add("dataType", "CallStack")
+		log.Contents.Add("durationNs", duration)
+		log.Contents.Add("profileID", profileID)
+		log.Contents.Add("labels", labelText)
+		log.Contents.Add("val", strconv.FormatFloat(float64(value), 'f', 2, 64))
+		*events = append(*events, log)
 	}
-
 }
 
 func (p *Profile) extractNameAndStacks(k []byte, spyName string) (name string, stack []string) {

@@ -23,7 +23,6 @@ import (
 	"github.com/aliyun/aliyun-odps-go-sdk/odps/tableschema"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	converter "github.com/alibaba/ilogtail/pkg/protocol/converter"
 )
 
@@ -34,13 +33,10 @@ func TestGenRecordWithoutParse(t *testing.T) {
 		extraLevel: 1,
 	}
 
-	log := &protocol.Log{
-		Time: 1733205626,
-	}
-	log.Contents = []*protocol.Log_Content{
-		{
-			Key:   "content",
-			Value: "value",
+	row := converter.EventRecord{
+		Timestamp: 1733205626 * 1e9,
+		Fields: map[string]string{
+			"content": "value",
 		},
 	}
 
@@ -48,7 +44,7 @@ func TestGenRecordWithoutParse(t *testing.T) {
 	schemaBuilder.Column(tableschema.Column{Name: "content", Type: datatype.StringType})
 	schema := schemaBuilder.Build()
 
-	record, err := builder.Build(rowFromLogFixture(log), &schema)
+	record, err := builder.Build(row, &schema)
 	assert.Nil(t, err)
 	assert.Equal(t, 1, record.Len())
 	assert.Equal(t, "[value]", record.String())
@@ -60,73 +56,25 @@ func TestGenRecordWithParse(t *testing.T) {
 		hostname: "hostname",
 	}
 
-	log := &protocol.Log{
-		Time: 1733205626,
-	}
-	log.Contents = []*protocol.Log_Content{
-		{
-			Key:   "f1",
-			Value: "true",
-		},
-		{
-			Key:   "f2",
-			Value: "1",
-		},
-		{
-			Key:   "f3",
-			Value: "123",
-		},
-		{
-			Key:   "f4",
-			Value: "123456",
-		},
-		{
-			Key:   "f5",
-			Value: "123456789",
-		},
-		{
-			Key:   "f6",
-			Value: "3.14",
-		},
-		{
-			Key:   "f7",
-			Value: "123.456",
-		},
-		{
-			Key:   "f8",
-			Value: "2024-12-04",
-		},
-		{
-			Key:   "f9",
-			Value: "2024-12-04 10:00:00",
-		},
-		{
-			Key:   "f10",
-			Value: "2024-12-04 10:00:00.000",
-		},
-		{
-			Key:   "f11",
-			Value: "2024-12-04 10:00:00.000",
-		},
-		{
-			Key:   "f12",
-			Value: "aaaa",
-		},
-		{
-			Key:   "f13",
-			Value: "bbbb",
-		},
-		{
-			Key:   "f14",
-			Value: "cccc",
-		},
-		{
-			Key:   "f15",
-			Value: "dddd",
-		},
-		{
-			Key:   "f16",
-			Value: "xxxx",
+	row := converter.EventRecord{
+		Timestamp: 1733205626 * 1e9,
+		Fields: map[string]string{
+			"f1":  "true",
+			"f2":  "1",
+			"f3":  "123",
+			"f4":  "123456",
+			"f5":  "123456789",
+			"f6":  "3.14",
+			"f7":  "123.456",
+			"f8":  "2024-12-04",
+			"f9":  "2024-12-04 10:00:00",
+			"f10": "2024-12-04 10:00:00.000",
+			"f11": "2024-12-04 10:00:00.000",
+			"f12": "aaaa",
+			"f13": "bbbb",
+			"f14": "cccc",
+			"f15": "dddd",
+			"f16": "xxxx",
 		},
 	}
 
@@ -149,7 +97,7 @@ func TestGenRecordWithParse(t *testing.T) {
 	schemaBuilder.Column(tableschema.Column{Name: "f16", Type: datatype.NewJsonType()})
 	schema := schemaBuilder.Build()
 
-	record, err := builder.Build(rowFromLogFixture(log), &schema)
+	record, err := builder.Build(row, &schema)
 	assert.Nil(t, err)
 	assert.Equal(t, 16, record.Len())
 	expect := "[true, 1, 123, 123456, 123456789, 3.140000E+00, 1.234560E+02, 2024-12-04, 2024-12-04 10:00:00, 2024-12-04 10:00:00.000, 2024-12-04 10:00:00.000, aaaa, bbbb, cccc, unhex('64646464'), \"xxxx\"]"
@@ -171,8 +119,8 @@ func TestGenRecordDoublePrecisionAndRange(t *testing.T) {
 		{input: "1e-100", want: data.Double(1e-100)},
 	} {
 		t.Run(tt.input, func(t *testing.T) {
-			log := &protocol.Log{Contents: []*protocol.Log_Content{{Key: "value", Value: tt.input}}}
-			record, err := builder.Build(rowFromLogFixture(log), &schema)
+			row := converter.EventRecord{Fields: map[string]string{"value": tt.input}}
+			record, err := builder.Build(row, &schema)
 			if assert.NoError(t, err) && assert.Len(t, record, 1) {
 				assert.Equal(t, tt.want, record[0])
 			}
@@ -211,13 +159,10 @@ func TestGenRecordWithExtraInfo(t *testing.T) {
 		extraLevel: 1,
 	}
 
-	log := &protocol.Log{
-		Time: 1733205626,
-	}
-	log.Contents = []*protocol.Log_Content{
-		{
-			Key:   "content",
-			Value: "value",
+	row := converter.EventRecord{
+		Timestamp: 1733205626 * 1e9,
+		Fields: map[string]string{
+			"content": "value",
 		},
 	}
 
@@ -226,23 +171,15 @@ func TestGenRecordWithExtraInfo(t *testing.T) {
 	schemaBuilder.Column(tableschema.Column{Name: "__dwarf_info__", Type: datatype.NewJsonType()})
 	schema := schemaBuilder.Build()
 
-	record, err := builder.Build(rowFromLogFixture(log), &schema)
+	record, err := builder.Build(row, &schema)
 	assert.Nil(t, err)
 	assert.Equal(t, 2, record.Len())
 	assert.Equal(t, "[value, {\"host_ip\":\"127.0.0.1\"}]", record.String())
 
 	builder.extraLevel = 2
-	record, err = builder.Build(rowFromLogFixture(log), &schema)
+	record, err = builder.Build(row, &schema)
 	assert.Nil(t, err)
 	assert.Equal(t, 2, record.Len())
 	re := regexp.MustCompile(`\[value, \{"host_ip":"127\.0\.0\.1","hostname":"hostname","collect_time":"1733205626","flush_time":"\d+"\}\]`)
 	assert.Truef(t, re.MatchString(record.String()), "regexp match failed, result:%s", record.String())
-}
-
-func rowFromLogFixture(log *protocol.Log) converter.EventRecord {
-	fields := make(map[string]string, len(log.Contents))
-	for _, item := range log.Contents {
-		fields[item.Key] = item.Value
-	}
-	return converter.EventRecord{Fields: fields, Timestamp: uint64(log.Time)*1e9 + uint64(log.GetTimeNs())}
 }

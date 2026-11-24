@@ -15,7 +15,6 @@
 package helper
 
 import (
-	"fmt"
 	"math"
 	"sort"
 	"strconv"
@@ -24,8 +23,6 @@ import (
 
 	"github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/models"
-	"github.com/alibaba/ilogtail/pkg/protocol"
-	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
 
@@ -38,79 +35,6 @@ const (
 	StaleNan                                     = "__STALE_NAN__"
 	SlsMetricstoreInvalidReplaceCharacter        = '_'
 )
-
-func CreateLog(t time.Time, enableTimestampNano bool, configTag map[string]string, logTags map[string]string, fields map[string]string) (*protocol.Log, error) {
-	var slsLog protocol.Log
-	slsLog.Contents = make([]*protocol.Log_Content, 0, len(configTag)+len(logTags)+len(fields))
-	for key, val := range configTag {
-		cont := &protocol.Log_Content{
-			Key:   key,
-			Value: val,
-		}
-		slsLog.Contents = append(slsLog.Contents, cont)
-	}
-
-	for key, val := range logTags {
-		cont := &protocol.Log_Content{
-			Key:   key,
-			Value: val,
-		}
-		slsLog.Contents = append(slsLog.Contents, cont)
-	}
-
-	for key, val := range fields {
-		cont := &protocol.Log_Content{
-			Key:   key,
-			Value: val,
-		}
-		slsLog.Contents = append(slsLog.Contents, cont)
-	}
-	if enableTimestampNano {
-		protocol.SetLogTimeWithNano(&slsLog, uint32(t.Unix()), uint32(t.Nanosecond()))
-	} else {
-		protocol.SetLogTime(&slsLog, uint32(t.Unix()))
-	}
-	return &slsLog, nil
-}
-
-func CreateLogByArray(t time.Time, enableTimestampNano bool, configTag map[string]string, logTags map[string]string, columns []string, values []string) (*protocol.Log, error) {
-	var slsLog protocol.Log
-	slsLog.Contents = make([]*protocol.Log_Content, 0, len(configTag)+len(logTags)+len(columns))
-
-	for key, val := range configTag {
-		cont := &protocol.Log_Content{
-			Key:   key,
-			Value: val,
-		}
-		slsLog.Contents = append(slsLog.Contents, cont)
-	}
-
-	for key, val := range logTags {
-		cont := &protocol.Log_Content{
-			Key:   key,
-			Value: val,
-		}
-		slsLog.Contents = append(slsLog.Contents, cont)
-	}
-
-	if len(columns) != len(values) {
-		return nil, fmt.Errorf("columns and values not equal")
-	}
-
-	for index := range columns {
-		cont := &protocol.Log_Content{
-			Key:   columns[index],
-			Value: values[index],
-		}
-		slsLog.Contents = append(slsLog.Contents, cont)
-	}
-	if enableTimestampNano {
-		protocol.SetLogTimeWithNano(&slsLog, uint32(t.Unix()), uint32(t.Nanosecond()))
-	} else {
-		protocol.SetLogTime(&slsLog, uint32(t.Unix()))
-	}
-	return &slsLog, nil
-}
 
 // Label for metric label
 type MetricLabel struct {
@@ -241,25 +165,6 @@ type HistogramData struct {
 	Sum     float64
 }
 
-// ToMetricLogs ..
-func (hd *HistogramData) ToMetricLogs(name string, timeMs int64, labels *MetricLabels) []*protocol.Log {
-	logs := make([]*protocol.Log, 0, len(hd.Buckets)+2)
-	logs = append(logs, NewMetricLog(name+"_count", timeMs, float64(hd.Count), labels))
-	logs = append(logs, NewMetricLog(name+"_sum", timeMs, hd.Sum, labels))
-	for _, v := range hd.Buckets {
-		labels.Replace("le", strconv.FormatFloat(v.Le, 'g', -1, 64))
-		logs = append(logs, NewMetricLog(name+"_bucket", timeMs, float64(v.Count), labels))
-	}
-
-	return logs
-}
-
-// NewMetricLog create a metric log, time support unix milliseconds and unix nanoseconds.
-// Note: must pass safe string
-func NewMetricLog(name string, t int64, value float64, labels *MetricLabels) *protocol.Log {
-	return NewMetricLogStringVal(name, t, FormatMetricLogValue(value), labels)
-}
-
 // NewInputMetric builds an untyped metric from the labels and timestamp used by SLS metric inputs.
 func NewInputMetric(name string, timestamp int64, value float64, labels *MetricLabels) *models.Metric {
 	var timestampBuffer [20]byte
@@ -285,30 +190,6 @@ func FormatMetricLogValue(value float64) string {
 		return StaleNan
 	}
 	return strconv.FormatFloat(value, 'g', -1, 64)
-}
-
-// NewMetricLogStringVal create a metric log with val string, time support unix milliseconds and unix nanoseconds.
-// Note: must pass safe string
-func NewMetricLogStringVal(name string, t int64, value string, labels *MetricLabels) *protocol.Log {
-	strTime := strconv.FormatInt(t, 10)
-	metric := &protocol.Log{}
-	switch len(strTime) {
-	case 13:
-		protocol.SetLogTimeWithNano(metric, uint32(t/1000), uint32((t*1e6)%1e9))
-		strTime += "000000"
-	case 19:
-		protocol.SetLogTimeWithNano(metric, uint32(t/1e9), uint32(t%1e9))
-	default:
-		t = int64(float64(t) * math.Pow10(19-len(strTime)))
-		strTime = strconv.FormatInt(t, 10)
-		protocol.SetLogTimeWithNano(metric, uint32(t/1e9), uint32(t%1e9))
-	}
-	metric.Contents = make([]*protocol.Log_Content, 0, 4)
-	metric.Contents = append(metric.Contents, &protocol.Log_Content{Key: "__name__", Value: FormatMetricLogName(name)})
-	metric.Contents = append(metric.Contents, &protocol.Log_Content{Key: "__time_nano__", Value: strTime})
-	metric.Contents = append(metric.Contents, &protocol.Log_Content{Key: "__labels__", Value: labels.String()})
-	metric.Contents = append(metric.Contents, &protocol.Log_Content{Key: "__value__", Value: value})
-	return metric
 }
 
 func formatLabelKey(key string) string {
@@ -397,21 +278,4 @@ func ReplaceInvalidChars(in *string) {
 			*in = (*in)[:charIndex] + "_" + (*in)[charIndex+1:]
 		}
 	}
-}
-
-func GetMetricName(log *protocol.Log) string {
-	for _, cnt := range log.Contents {
-		if cnt.GetKey() == selfmonitor.SelfMetricNameKey {
-			return cnt.GetValue()
-		}
-	}
-	return ""
-}
-
-func LogContentsToMap(contents []*protocol.Log_Content) map[string]string {
-	result := make(map[string]string)
-	for _, content := range contents {
-		result[content.GetKey()] = content.GetValue()
-	}
-	return result
 }

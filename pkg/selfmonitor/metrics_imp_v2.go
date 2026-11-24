@@ -22,7 +22,6 @@ import (
 	"time"
 
 	"github.com/alibaba/ilogtail/pkg/helper/math"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
 var (
@@ -97,11 +96,6 @@ func (c *cumulativeCounterImp) Clear() {
 	atomic.StoreInt64(&c.value, 0)
 }
 
-func (c *cumulativeCounterImp) Serialize(log *protocol.Log) {
-	metricValue := c.Collect()
-	c.Series.SerializeWithStr(log, metricValue.Name, strconv.FormatFloat(metricValue.Value, 'f', 4, 64))
-}
-
 func (c *cumulativeCounterImp) Export() map[string]string {
 	metricValue := c.Collect()
 	return c.Series.Export(metricValue.Name, strconv.FormatFloat(metricValue.Value, 'f', 4, 64))
@@ -138,11 +132,6 @@ func (c *counterImp) Clear() {
 	atomic.StoreInt64(&c.value, 0)
 }
 
-func (c *counterImp) Serialize(log *protocol.Log) {
-	metricValue := c.Collect()
-	c.Series.SerializeWithStr(log, metricValue.Name, strconv.FormatFloat(metricValue.Value, 'f', 4, 64))
-}
-
 func (c *counterImp) Export() map[string]string {
 	metricValue := c.Collect()
 	return c.Series.Export(metricValue.Name, strconv.FormatFloat(metricValue.Value, 'f', 4, 64))
@@ -175,11 +164,6 @@ func (g *gaugeImp) Collect() MetricValue[float64] {
 
 func (g *gaugeImp) Clear() {
 	math.AtomicStoreFloat64(&g.value, 0)
-}
-
-func (g *gaugeImp) Serialize(log *protocol.Log) {
-	metricValue := g.Collect()
-	g.Series.SerializeWithStr(log, metricValue.Name, strconv.FormatFloat(metricValue.Value, 'f', 4, 64))
 }
 
 func (g *gaugeImp) Export() map[string]string {
@@ -232,11 +216,6 @@ func (a *averageImp) Clear() {
 	a.count = 0
 	a.prevAvg = 0
 	a.Unlock()
-}
-
-func (a *averageImp) Serialize(log *protocol.Log) {
-	metricValue := a.Collect()
-	a.Series.SerializeWithStr(log, metricValue.Name, strconv.FormatFloat(metricValue.Value, 'f', 4, 64))
 }
 
 func (a *averageImp) Export() map[string]string {
@@ -332,11 +311,6 @@ func (l *latencyImp) Clear() {
 	l.latencySum = 0
 }
 
-func (l *latencyImp) Serialize(log *protocol.Log) {
-	metricValue := l.Collect()
-	l.Series.SerializeWithStr(log, metricValue.Name, strconv.FormatFloat(metricValue.Value/1000, 'f', 4, 64)) // ns to us
-}
-
 func (l *latencyImp) Export() map[string]string {
 	metricValue := l.Collect()
 	return l.Series.Export(metricValue.Name, strconv.FormatFloat(metricValue.Value/1000, 'f', 4, 64)) // ns to us
@@ -378,11 +352,6 @@ func (s *strMetricImp) Clear() {
 	s.Unlock()
 }
 
-func (s *strMetricImp) Serialize(log *protocol.Log) {
-	metricValue := s.Collect()
-	s.Series.SerializeWithStr(log, metricValue.Name, metricValue.Value)
-}
-
 func (s *strMetricImp) Export() map[string]string {
 	metricValue := s.Collect()
 	return s.Series.Export(metricValue.Name, metricValue.Value)
@@ -407,21 +376,6 @@ func newSeries(ms MetricSet, labelValues []string) Series {
 	return Series{
 		MetricSet:   ms,
 		labelValues: indexToStore,
-	}
-}
-
-func (s Series) SerializeWithStr(log *protocol.Log, metricName, metricValueStr string) {
-	log.Contents = append(log.Contents,
-		&protocol.Log_Content{Key: metricName, Value: metricValueStr},
-		&protocol.Log_Content{Key: SelfMetricNameKey, Value: metricName})
-
-	for _, v := range s.ConstLabels() {
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: v.Key, Value: v.Value})
-	}
-
-	labelNames := s.LabelKeys()
-	for i, v := range s.labelValues {
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: labelNames[i], Value: v})
 	}
 }
 
@@ -459,8 +413,6 @@ func (e *errorNumericMetric) Set(f float64) {
 func (e *errorNumericMetric) Observe(f float64) {
 	// logger.Warning(context.Background(), "METRIC_WITH_LABEL_ALARM", "observe", e.err)
 }
-
-func (e *errorNumericMetric) Serialize(log *protocol.Log) {}
 
 func (e *errorNumericMetric) Export() map[string]string {
 	return nil

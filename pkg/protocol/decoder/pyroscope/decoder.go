@@ -49,13 +49,13 @@ func (d *Decoder) Decode(data []byte, req *http.Request) ([]*models.PipelineGrou
 	if err != nil {
 		return nil, err
 	}
-	logs, err := in.Profile.Parse(context.Background(), &in.Metadata, d.Tags)
-	if err != nil || len(logs) == 0 {
+	events, err := in.Profile.Parse(context.Background(), &in.Metadata, d.Tags)
+	if err != nil || len(events) == 0 {
 		return nil, err
 	}
 	return []*models.PipelineGroupEvents{{
 		Group:  models.NewGroup(models.NewMetadata(), models.NewTags()),
-		Events: common.WireLogsToEvents(logs),
+		Events: events,
 	}}, nil
 }
 

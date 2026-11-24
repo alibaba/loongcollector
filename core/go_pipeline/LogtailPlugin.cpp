@@ -62,7 +62,6 @@ LogtailPlugin::LogtailPlugin() {
     mStopAllPipelinesFun = NULL;
     mStopFun = NULL;
     mStartFun = NULL;
-    mLoadGlobalConfigFun = NULL;
     mPluginValid = false;
     mPluginContainerConfig.mLogstore = "logtail_containers";
     mPluginContainerContext.SetConfigName("logtail_containers");
@@ -306,8 +305,8 @@ int LogtailPlugin::SendPipelineEventGroup(const char* configName,
 }
 
 bool LogtailPlugin::LoadPluginBase() {
-    if (mPluginValid) {
-        return true;
+    if (mPluginValid || mPluginBasePtr != nullptr) {
+        return mPluginValid;
     }
 
     // load plugin adapter
@@ -350,7 +349,6 @@ bool LogtailPlugin::LoadPluginBase() {
         mPluginAdapterPtr = loader.Release();
     }
 
-    InitPluginBaseFun initBase = NULL;
     InitPluginBaseV2Fun initBaseV2 = NULL;
     // load plugin base
     if (mPluginBasePtr == NULL) {
@@ -362,21 +360,9 @@ bool LogtailPlugin::LoadPluginBase() {
             return mPluginValid;
         }
 
-        // Try V2 -> V1.
         initBaseV2 = (InitPluginBaseV2Fun)loader.LoadMethod("InitPluginBaseV2", error);
         if (!error.empty()) {
-            LOG_WARNING(sLogger, ("load InitPluginBaseFunV2 error", error)("try to load V1", ""));
-
-            initBase = (InitPluginBaseFun)loader.LoadMethod("InitPluginBase", error);
-            if (!error.empty()) {
-                LOG_ERROR(sLogger, ("load InitPluginBase error", error));
-                return mPluginValid;
-            }
-        }
-        // 加载全局配置，目前应该没有调用点
-        mLoadGlobalConfigFun = (LoadGlobalConfigFun)loader.LoadMethod("LoadGlobalConfig", error);
-        if (!error.empty()) {
-            LOG_ERROR(sLogger, ("load LoadGlobalConfig error, Message", error));
+            LOG_ERROR(sLogger, ("load InitPluginBaseV2 failed", error));
             return mPluginValid;
         }
         // 加载单个配置
@@ -413,12 +399,6 @@ bool LogtailPlugin::LoadPluginBase() {
         mStartFun = (StartFun)loader.LoadMethod("Start", error);
         if (!error.empty()) {
             LOG_ERROR(sLogger, ("load Start error, Message", error));
-            return mPluginValid;
-        }
-        // C++获取单个容器信息的
-        mGetContainerMetaFun = (GetContainerMetaFun)loader.LoadMethod("GetContainerMeta", error);
-        if (!error.empty()) {
-            LOG_ERROR(sLogger, ("load GetContainerMeta error, Message", error));
             return mPluginValid;
         }
         // C++获取全量容器信息的
@@ -461,17 +441,11 @@ bool LogtailPlugin::LoadPluginBase() {
         mPluginBasePtr = loader.Release();
     }
 
-    GoInt initRst = 0;
-    if (initBaseV2) {
-        std::string cfgStr = mPluginCfg.toStyledString();
-        GoString goCfgStr;
-        goCfgStr.p = cfgStr.c_str();
-        goCfgStr.n = cfgStr.length();
-
-        initRst = initBaseV2(goCfgStr);
-    } else {
-        initRst = initBase();
-    }
+    const std::string cfgStr = mPluginCfg.toStyledString();
+    GoString goCfgStr;
+    goCfgStr.p = cfgStr.c_str();
+    goCfgStr.n = cfgStr.length();
+    const GoInt initRst = initBaseV2(goCfgStr);
     if (initRst != 0) {
         LOG_ERROR(sLogger, ("Go plugin system init", "failed")("res", initRst));
         mPluginValid = false;
@@ -568,75 +542,4 @@ std::string LogtailPlugin::GetDiffContainersMeta() {
 #else
     return LogtailPluginMock::GetInstance()->GetDiffContainersMeta();
 #endif
-}
-
-K8sContainerMeta LogtailPlugin::GetContainerMeta(const string& containerID) {
-    return GetContainerMeta(StringView(containerID));
-}
-K8sContainerMeta LogtailPlugin::GetContainerMeta(StringView containerID) {
-    if (mPluginValid && mGetContainerMetaFun != nullptr) {
-        GoString id;
-        id.n = containerID.size();
-        id.p = containerID.data();
-        auto* innerMeta = mGetContainerMetaFun(id);
-        if (innerMeta != NULL) {
-            K8sContainerMeta meta;
-            meta.ContainerName.assign(innerMeta->containerName);
-            meta.Image.assign(innerMeta->image);
-            meta.K8sNamespace.assign(innerMeta->k8sNamespace);
-            meta.PodName.assign(innerMeta->podName);
-            for (int i = 0; i < innerMeta->containerLabelsSize; ++i) {
-                std::string key;
-                std::string value;
-                key.assign(innerMeta->containerLabelsKey[i]);
-                value.assign(innerMeta->containerLabelsVal[i]);
-                meta.containerLabels.insert(std::make_pair(std::move(key), std::move(key)));
-            }
-            for (int i = 0; i < innerMeta->k8sLabelsSize; ++i) {
-                std::string key;
-                std::string value;
-                key.assign(innerMeta->k8sLabelsKey[i]);
-                value.assign(innerMeta->k8sLabelsVal[i]);
-                meta.k8sLabels.insert(std::make_pair(std::move(key), std::move(key)));
-            }
-            for (int i = 0; i < innerMeta->envSize; ++i) {
-                std::string key;
-                std::string value;
-                key.assign(innerMeta->envsKey[i]);
-                value.assign(innerMeta->envsVal[i]);
-                meta.envs.insert(std::make_pair(std::move(key), std::move(key)));
-            }
-            free(innerMeta->containerName);
-            free(innerMeta->image);
-            free(innerMeta->k8sNamespace);
-            free(innerMeta->podName);
-            if (innerMeta->containerLabelsSize > 0) {
-                for (int i = 0; i < innerMeta->containerLabelsSize; ++i) {
-                    free(innerMeta->containerLabelsKey[i]);
-                    free(innerMeta->containerLabelsVal[i]);
-                }
-                free(innerMeta->containerLabelsKey);
-                free(innerMeta->containerLabelsVal);
-            }
-            if (innerMeta->k8sLabelsSize > 0) {
-                for (int i = 0; i < innerMeta->k8sLabelsSize; ++i) {
-                    free(innerMeta->k8sLabelsKey[i]);
-                    free(innerMeta->k8sLabelsVal[i]);
-                }
-                free(innerMeta->k8sLabelsKey);
-                free(innerMeta->k8sLabelsVal);
-            }
-            if (innerMeta->envSize > 0) {
-                for (int i = 0; i < innerMeta->envSize; ++i) {
-                    free(innerMeta->envsKey[i]);
-                    free(innerMeta->envsVal[i]);
-                }
-                free(innerMeta->envsKey);
-                free(innerMeta->envsVal);
-            }
-            free(innerMeta);
-            return meta;
-        }
-    }
-    return K8sContainerMeta();
 }

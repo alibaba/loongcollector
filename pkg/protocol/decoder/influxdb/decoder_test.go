@@ -19,6 +19,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/alibaba/ilogtail/pkg/models"
 )
@@ -109,18 +110,46 @@ func TestDecode(t *testing.T) {
 func TestDecodeExtendedFieldsIntoEvents(t *testing.T) {
 	decoder := &Decoder{FieldsExtend: true}
 	request := &http.Request{Form: map[string][]string{"db": {"mydb"}}}
-	groups, err := decoder.Decode([]byte("weather,city=hz value=32"), request)
-	assert.NoError(t, err)
-	if !assert.Len(t, groups, 1) || !assert.Len(t, groups[0].Events, 1) {
-		return
+	data := []byte(`weather,region=west,city=hz value=32,days=3i,sunny=true,note="rain" 1434055562000000035`)
+	groups, err := decoder.Decode(data, request)
+	require.NoError(t, err)
+	require.Len(t, groups, 1)
+	require.Len(t, groups[0].Events, 4)
+
+	want := map[string]struct{ name, kind, value string }{
+		"value": {"weather", "float", "32"},
+		"days":  {"weather:days", "int", "3"},
+		"sunny": {"weather:sunny", "bool", "1"},
+		"note":  {"weather:note", "string", "rain"},
 	}
-	log, ok := groups[0].Events[0].(*models.Log)
-	if !assert.True(t, ok) {
-		return
+	for _, event := range groups[0].Events {
+		log := event.(*models.Log)
+		field := log.Contents.Get("__field__").(string)
+		expected, ok := want[field]
+		require.True(t, ok)
+		delete(want, field)
+		assert.Equal(t, expected.name, log.Contents.Get("__name__"))
+		assert.Equal(t, expected.value, log.Contents.Get("__value__"))
+		assert.Equal(t, expected.kind, log.Contents.Get("__type__"))
+		assert.Equal(t, "mydb", log.Contents.Get("__tag__:db"))
+		assert.Equal(t, "city#$#hz|region#$#west", log.Contents.Get("__labels__"))
+		assert.Equal(t, uint64(1434055562000000035), log.GetTimestamp())
+		assert.Equal(t, "1434055562000000035", log.Contents.Get("__time_nano__"))
+		var keys []string
+		for key := range models.LogContentEntries(log.Contents) {
+			keys = append(keys, key)
+		}
+		assert.Equal(t, []string{"__name__", "__time_nano__", "__labels__", "__value__", "__type__", "__field__", "__tag__:db"}, keys)
 	}
-	assert.Equal(t, "weather", log.Contents.Get("__name__"))
-	assert.Equal(t, "32", log.Contents.Get("__value__"))
-	assert.Equal(t, "float", log.Contents.Get("__type__"))
-	assert.Equal(t, "mydb", log.Contents.Get("__tag__:db"))
-	assert.Equal(t, "city#$#hz", log.Contents.Get("__labels__"))
+}
+
+func TestDecodeExtendedFieldsKeepsLegacyTimestamp(t *testing.T) {
+	decoder := &Decoder{FieldsExtend: true}
+	groups, err := decoder.Decode([]byte("weather value=32 1434055562035"), &http.Request{})
+	require.NoError(t, err)
+	require.Len(t, groups, 1)
+	require.Len(t, groups[0].Events, 1)
+	log := groups[0].Events[0].(*models.Log)
+	assert.Equal(t, uint64(1434055562035000000), log.GetTimestamp())
+	assert.Equal(t, "1434055562035000000", log.Contents.Get("__time_nano__"))
 }

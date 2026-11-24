@@ -97,7 +97,7 @@ func TestHangConfigWhenStop(t *testing.T) {
 	shutdown := make(chan int)
 
 	// Initialize plugin and run config.
-	require.Equal(t, 0, InitPluginBase())
+	require.Equal(t, 0, InitPluginBaseV2(""))
 	require.Equal(t, 0, LoadPipeline("project", "logstore", configName, 0, badConfigStr))
 	config := pluginmanager.ToStartPipelineConfigWithoutInput
 	require.NotNil(t, config)
@@ -176,7 +176,7 @@ func TestSlowConfigWhenStop(t *testing.T) {
 	configName := "configName"
 
 	// Initialize plugin and run config.
-	require.Equal(t, 0, InitPluginBase())
+	require.Equal(t, 0, InitPluginBaseV2(""))
 	require.Equal(t, 0, LoadPipeline("project", "logstore", configName, 0, badConfigStr))
 	config := pluginmanager.ToStartPipelineConfigWithoutInput
 	require.NotNil(t, config)

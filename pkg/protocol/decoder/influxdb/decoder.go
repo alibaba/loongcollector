@@ -16,6 +16,7 @@ package influxdb
 
 import (
 	"fmt"
+	"math"
 	"net/http"
 	"strconv"
 	"time"
@@ -195,8 +196,13 @@ func (d *Decoder) parsePointsToExtendedEvents(points []models.Point, req *http.R
 				labels.Append(util.ZeroCopyBytesToString(v.Key), util.ZeroCopyBytesToString(v.Value))
 			}
 
-			metricLog := helper.NewMetricLogStringVal(name, s.UnixNano(), value, &labels)
-			log := common.WireLogToEvent(metricLog)
+			timestamp, timestampText := extendedLogTimestamp(s.UnixNano())
+			log := imodels.NewLogWithOrderedContents(7)
+			log.Timestamp = timestamp
+			log.Contents.Add("__name__", helper.FormatMetricLogName(name))
+			log.Contents.Add("__time_nano__", timestampText)
+			log.Contents.Add("__labels__", labels.String())
+			log.Contents.Add("__value__", value)
 			log.Contents.Add(typeKey, valueType)
 			log.Contents.Add(fieldNameKey, field)
 			if db != "" {
@@ -206,4 +212,21 @@ func (d *Decoder) parsePointsToExtendedEvents(points []models.Point, req *http.R
 		}
 	}
 	return events
+}
+
+// extendedLogTimestamp keeps the original SLS metric row timestamp encoding.
+func extendedLogTimestamp(timestamp int64) (uint64, string) {
+	timestampText := strconv.FormatInt(timestamp, 10)
+	if len(timestampText) == 13 {
+		seconds := uint32(timestamp / 1000)
+		nanos := uint32((timestamp * int64(time.Millisecond)) % int64(time.Second))
+		return uint64(seconds)*uint64(time.Second) + uint64(nanos), timestampText + "000000"
+	}
+	if len(timestampText) != 19 {
+		timestamp = int64(float64(timestamp) * math.Pow10(19-len(timestampText)))
+		timestampText = strconv.FormatInt(timestamp, 10)
+	}
+	seconds := uint32(timestamp / int64(time.Second))
+	nanos := uint32(timestamp % int64(time.Second))
+	return uint64(seconds)*uint64(time.Second) + uint64(nanos), timestampText
 }

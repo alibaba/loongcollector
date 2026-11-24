@@ -21,7 +21,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/alibaba/ilogtail/pkg/protocol"
+	converter "github.com/alibaba/ilogtail/pkg/protocol/converter"
 )
 
 func TestPartitionHelperInit(t *testing.T) {
@@ -124,26 +124,10 @@ func TestGenPartition(t *testing.T) {
 
 	loc := time.Local
 	curTime, _ := time.ParseInLocation(layout, timeStr, loc)
-	timestamp := curTime.Unix()
-
-	log := protocol.Log{
-		Time: uint32(timestamp),
+	row := converter.EventRecord{
+		Timestamp: uint64(curTime.UnixNano()),
+		Fields:    map[string]string{"col1": "value1", "col2": "value2", "col3": "value3"},
 	}
-
-	log.Contents = make([]*protocol.Log_Content, 0)
-	log.Contents = append(log.Contents, &protocol.Log_Content{
-		Key:   "col1",
-		Value: "value1",
-	})
-	log.Contents = append(log.Contents, &protocol.Log_Content{
-		Key:   "col2",
-		Value: "value2",
-	})
-	log.Contents = append(log.Contents, &protocol.Log_Content{
-		Key:   "col3",
-		Value: "value3",
-	})
-
-	str := ph.GenPartition(rowFromLogFixture(&log))
+	str := ph.GenPartition(row)
 	assert.Equal(t, "pt1=test1,pt2=value1,pt3=test_value2,pt4=20250321,pt5=test_1515aaa", str)
 }

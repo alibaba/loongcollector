@@ -21,8 +21,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alibaba/ilogtail/pkg/models"
-
 	"github.com/mitchellh/mapstructure"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/pyroscope-io/pyroscope/pkg/ingestion"
@@ -38,6 +36,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/helper/profile"
 	"github.com/alibaba/ilogtail/pkg/helper/profile/pyroscope/pprof"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
@@ -80,7 +79,7 @@ func (i *Ingestion) Ingest(ctx context.Context, input *ingestion.IngestInput) er
 		}
 
 	}
-	logs, err := p.Parse(ctx, &profile.Meta{
+	events, err := p.Parse(ctx, &profile.Meta{
 		StartTime:       input.Metadata.StartTime,
 		EndTime:         input.Metadata.EndTime,
 		SpyName:         "go",
@@ -93,10 +92,8 @@ func (i *Ingestion) Ingest(ctx context.Context, input *ingestion.IngestInput) er
 		logger.Debug(context.Background(), "parse pprof fail err", err.Error())
 		return err
 	}
-	for _, log := range logs {
-		if event := helper.InputEventFromProtocolLog(log); event != nil {
-			i.collector.Collect(models.NewGroup(models.NewMetadata(), models.NewTags()), event)
-		}
+	for _, event := range events {
+		i.collector.Collect(models.NewGroup(models.NewMetadata(), models.NewTags()), event)
 	}
 	return nil
 }

@@ -24,9 +24,9 @@ import (
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/protocol/decoder"
 	"github.com/alibaba/ilogtail/pkg/protocol/decoder/common"
+	"github.com/alibaba/ilogtail/plugins/test"
 )
 
 func TestSharedUDPServerRoutesStatsDMetrics(t *testing.T) {
@@ -81,24 +81,12 @@ func TestUDPDatagramPreservesRawLogAndSLSTags(t *testing.T) {
 	sls, err := decoder.GetDecoder(common.ProtocolSLS)
 	require.NoError(t, err)
 	nanos := uint32(123456789)
-	wire := &protocol.Log{
-		Time: 1700000000, TimeNs: &nanos,
-		Contents: []*protocol.Log_Content{{Key: "content", Value: "message"}},
-	}
-	wireLog, err := wire.Marshal()
-	require.NoError(t, err)
-	encoded := protowire.AppendTag(nil, 1, protowire.BytesType)
-	encoded = protowire.AppendBytes(encoded, wireLog)
+	encoded := test.AppendSLSWireLog(nil, 1700000000, &nanos, [2]string{"content", "message"})
 	encoded = protowire.AppendTag(encoded, 3, protowire.BytesType)
 	encoded = protowire.AppendString(encoded, "udp-topic")
 	encoded = protowire.AppendTag(encoded, 4, protowire.BytesType)
 	encoded = protowire.AppendString(encoded, "udp-origin")
-	tag := protowire.AppendTag(nil, 1, protowire.BytesType)
-	tag = protowire.AppendString(tag, "env")
-	tag = protowire.AppendTag(tag, 2, protowire.BytesType)
-	tag = protowire.AppendString(tag, "test")
-	encoded = protowire.AppendTag(encoded, 6, protowire.BytesType)
-	encoded = protowire.AppendBytes(encoded, tag)
+	encoded = test.AppendSLSWireTag(encoded, "env", "test")
 	u = &UDPServer{Format: common.ProtocolSLS, decoder: sls}
 	groups, err = u.decodeDatagram(encoded)
 	require.NoError(t, err)

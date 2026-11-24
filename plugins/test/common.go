@@ -23,14 +23,13 @@ import (
 	"runtime"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/encoding/protowire"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pluginmanager"
 	_ "github.com/alibaba/ilogtail/plugins/aggregator"
@@ -79,26 +78,26 @@ func PluginStop() error {
 	return nil
 }
 
-func CreateLogs(kvs ...string) *protocol.Log {
-	var slsLog protocol.Log
-	for i := 0; i < len(kvs)-1; i += 2 {
-		cont := &protocol.Log_Content{Key: kvs[i], Value: kvs[i+1]}
-		slsLog.Contents = append(slsLog.Contents, cont)
+// AppendSLSWireLog adds a log to a test payload using the public SLS wire schema.
+func AppendSLSWireLog(group []byte, seconds uint32, nanos *uint32, fields ...[2]string) []byte {
+	log := protowire.AppendVarint(protowire.AppendTag(nil, 1, protowire.VarintType), uint64(seconds))
+	for _, field := range fields {
+		log = protowire.AppendBytes(protowire.AppendTag(log, 2, protowire.BytesType), slsWirePair(field[0], field[1]))
 	}
-	nowTime := time.Now()
-	protocol.SetLogTime(&slsLog, uint32(nowTime.Unix()))
-	return &slsLog
+	if nanos != nil {
+		log = protowire.AppendFixed32(protowire.AppendTag(log, 4, protowire.Fixed32Type), *nanos)
+	}
+	return protowire.AppendBytes(protowire.AppendTag(group, 1, protowire.BytesType), log)
 }
 
-func CreateLogByFields(fields map[string]string) *protocol.Log {
-	var slsLog protocol.Log
-	for key, val := range fields {
-		cont := &protocol.Log_Content{Key: key, Value: val}
-		slsLog.Contents = append(slsLog.Contents, cont)
-	}
-	nowTime := time.Now()
-	protocol.SetLogTime(&slsLog, uint32(nowTime.Unix()))
-	return &slsLog
+// AppendSLSWireTag adds a group tag to a test payload.
+func AppendSLSWireTag(group []byte, key, value string) []byte {
+	return protowire.AppendBytes(protowire.AppendTag(group, 6, protowire.BytesType), slsWirePair(key, value))
+}
+
+func slsWirePair(key, value string) []byte {
+	pair := protowire.AppendString(protowire.AppendTag(nil, 1, protowire.BytesType), key)
+	return protowire.AppendString(protowire.AppendTag(pair, 2, protowire.BytesType), value)
 }
 
 type portpair struct {
@@ -184,26 +183,6 @@ func createExclusionsList(exclusionsText string, t testing.TB) []portpair {
 		}
 	}
 	return exclusions
-}
-
-// ReadLogVal returns the log content value for the input key, and returns empty string when not found.
-func ReadLogVal(log *protocol.Log, key string) string {
-	for _, content := range log.Contents {
-		if content.Key == key {
-			return content.Value
-		}
-	}
-	return ""
-}
-
-// PickLogs select some of original logs to new res logs by the specific pickKey and pickVal.
-func PickLogs(logs []*protocol.Log, pickKey string, pickVal string) (res []*protocol.Log) {
-	for _, log := range logs {
-		if ReadLogVal(log, pickKey) == pickVal {
-			res = append(res, log)
-		}
-	}
-	return res
 }
 
 // PickEvent select one of original events by the specific event name.

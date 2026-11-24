@@ -155,7 +155,7 @@ void ProcessorParseRegexNativeUnittest::TestProcessRegex() {
     // make config
     Json::Value config;
     config["SourceKey"] = "content";
-    config["Regex"] = R"((\w+)\t(\w+).*)";
+    config["Regex"] = R"((\w+)(?:\t(\w+))?)";
     config["Keys"] = Json::arrayValue;
     config["Keys"].append("key1");
     config["Keys"].append("key2");
@@ -180,7 +180,23 @@ void ProcessorParseRegexNativeUnittest::TestProcessRegex() {
             {
                 "contents" :
                 {
-                    "content" : "value3\tvalue4"
+                    "content" : "not a match"
+                },
+                "timestamp" : 12345678901,
+                "type" : 1
+            },
+            {
+                "contents" :
+                {
+                    "content" : "value3"
+                },
+                "timestamp" : 12345678901,
+                "type" : 1
+            },
+            {
+                "contents" :
+                {
+                    "content" : "value4\tvalue5"
                 },
                 "timestamp" : 12345678901,
                 "type" : 1
@@ -213,9 +229,28 @@ void ProcessorParseRegexNativeUnittest::TestProcessRegex() {
             {
                 "contents" :
                 {
+                    "__raw_log__" : "not a match",
+                    "rawLog" : "not a match"
+                },
+                "timestamp" : 12345678901,
+                "type" : 1
+            },
+            {
+                "contents" :
+                {
                     "key1" : "value3",
-                    "key2" : "value4",
-                    "rawLog" : "value3\tvalue4"
+                    "key2" : "",
+                    "rawLog" : "value3"
+                },
+                "timestamp" : 12345678901,
+                "type" : 1
+            },
+            {
+                "contents" :
+                {
+                    "key1" : "value4",
+                    "key2" : "value5",
+                    "rawLog" : "value4\tvalue5"
                 },
                 "timestamp" : 12345678901,
                 "type" : 1
@@ -224,6 +259,7 @@ void ProcessorParseRegexNativeUnittest::TestProcessRegex() {
     })";
     std::string outJson = eventGroupList[0].ToJsonString();
     APSARA_TEST_STREQ_FATAL(CompactJson(expectJson).c_str(), CompactJson(outJson).c_str());
+    APSARA_TEST_EQUAL_FATAL(1, processor.mOutFailedEventsTotal->GetValue());
     APSARA_TEST_GE_FATAL(processorInstance.mTotalProcessTimeMs->GetValue(), 0);
 }
 

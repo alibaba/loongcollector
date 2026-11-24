@@ -16,14 +16,9 @@ package helper
 
 import (
 	"fmt"
-	"math"
-	"strconv"
-	"strings"
 	"time"
 
 	"github.com/alibaba/ilogtail/pkg/models"
-	"github.com/alibaba/ilogtail/pkg/protocol"
-	"github.com/alibaba/ilogtail/pkg/util"
 )
 
 // NewInputLog creates an event for a row of string fields and independent tags.
@@ -65,85 +60,4 @@ func setInputLogField(log *models.Log, key, value string) {
 		return
 	}
 	log.Contents.Add(key, value)
-}
-
-// InputEventFromProtocolLog decodes a single protobuf row at an input boundary.
-// The SLS metric row convention becomes a Metric; other rows become Logs.
-func InputEventFromProtocolLog(raw *protocol.Log) models.PipelineEvent {
-	if raw == nil {
-		return nil
-	}
-	// Recognize the metric row format without constructing a map or a
-	// discarded Log event on the Metric path.
-	var name, valueText, timeText, labelText string
-	for _, field := range raw.Contents {
-		if field == nil {
-			continue
-		}
-		switch field.Key {
-		case "__name__":
-			name = field.Value
-		case "__value__":
-			valueText = field.Value
-		case "__time_nano__":
-			timeText = field.Value
-		case "__labels__":
-			labelText = field.Value
-		}
-	}
-	var event models.PipelineEvent
-	if name != "" && valueText != "" && timeText != "" {
-		value, err := strconv.ParseFloat(valueText, 64)
-		if valueText == StaleNan {
-			value, err = math.Float64frombits(StaleNaN), nil
-		}
-		timestamp, timeErr := strconv.ParseInt(timeText, 10, 64)
-		if err == nil && timeErr == nil {
-			labels := models.NewTags()
-			for _, label := range strings.Split(labelText, "|") {
-				if key, value, ok := strings.Cut(label, "#$#"); ok {
-					labels.Add(key, value)
-				}
-			}
-			event = models.NewSingleValueMetric(name, models.MetricTypeUntyped, labels, timestamp, value)
-		}
-	}
-	if event == nil {
-		event = inputLogFromProtocol(raw)
-	}
-	return event
-}
-
-func inputLogFromProtocol(in *protocol.Log) *models.Log {
-	log := &models.Log{Tags: models.NewTags()}
-	if len(in.Contents) > 0 {
-		log.Contents = models.NewOrderedLogContents(len(in.Contents))
-	}
-	const tagPrefix = "__tag__:"
-	for _, content := range in.Contents {
-		if content == nil {
-			continue
-		}
-		switch {
-		case content.GetKey() == models.BodyKey:
-			log.SetBody(util.ZeroCopyStringToBytes(content.Value))
-		case content.GetKey() == tagPrefix+"__file_offset__":
-			if offset, err := strconv.ParseInt(content.Value, 10, 64); err == nil {
-				log.Offset = uint64(offset)
-			}
-		case strings.HasPrefix(content.Key, tagPrefix):
-			log.Tags.Add(content.Key[len(tagPrefix):], content.Value)
-		default:
-			log.Contents.Add(content.Key, content.Value)
-		}
-	}
-	if in.Time != 0 {
-		log.Timestamp = uint64(time.Second * time.Duration(in.Time))
-		if in.TimeNs != nil {
-			log.Timestamp += uint64(*in.TimeNs)
-		}
-	} else {
-		log.Timestamp = uint64(time.Now().UnixNano())
-	}
-	return log
 }

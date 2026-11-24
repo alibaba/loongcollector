@@ -34,7 +34,7 @@ func init() {
 }
 
 // SetNetworkIdentification updates return values of GetIPAddress and GetHostName.
-// NOTE: It is not thread-safety, this is called by plugin_manager.LoadGlobalConfig only.
+// Call during plugin initialization before concurrent readers.
 func SetNetworkIdentification(hostIP, hostname string) {
 	ipAddress = hostIP
 	hostName = hostname

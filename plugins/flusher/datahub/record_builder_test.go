@@ -19,8 +19,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/alibaba/ilogtail/pkg/protocol"
-
 	"github.com/aliyun/aliyun-datahub-sdk-go/datahub"
 )
 
@@ -67,53 +65,37 @@ func TestValidateFieldValue(t *testing.T) {
 func TestGenBlobRecord(t *testing.T) {
 	builder := RecordBuilderImpl{}
 
-	log := &protocol.Log{}
-	log.Contents = []*protocol.Log_Content{
-		{
-			Key:   "content",
-			Value: "value",
-		},
+	fields := map[string]string{
+		"content": "value",
 	}
-	record, err := builder.log2BlobRecord(fieldsFromLogFixture(log))
+	record, err := builder.log2BlobRecord(fields)
 	assert.Nil(t, err)
 	bRecord, ok := record.(*datahub.BlobRecord)
 	assert.True(t, ok)
 	assert.Equal(t, "value", string(bRecord.RawData))
 
-	log.Contents = []*protocol.Log_Content{
-		{
-			Key:   "key1",
-			Value: "val1",
-		},
-		{
-			Key:   "key2",
-			Value: "val2",
-		},
-		{
-			Key:   "content",
-			Value: "val3",
-		},
+	fields = map[string]string{
+		"key1":    "val1",
+		"key2":    "val2",
+		"content": "val3",
 	}
-	record, err = builder.log2BlobRecord(fieldsFromLogFixture(log))
+	record, err = builder.log2BlobRecord(fields)
 	assert.Nil(t, err)
 	bRecord, ok = record.(*datahub.BlobRecord)
 	assert.True(t, ok)
 	assert.Equal(t, "{\"content\":\"val3\",\"key1\":\"val1\",\"key2\":\"val2\"}", string(bRecord.RawData))
 
-	log.Contents = []*protocol.Log_Content{
-		{
-			Key:   "key1",
-			Value: "val1",
-		},
+	fields = map[string]string{
+		"key1": "val1",
 	}
-	record, err = builder.log2BlobRecord(fieldsFromLogFixture(log))
+	record, err = builder.log2BlobRecord(fields)
 	assert.Nil(t, err)
 	bRecord, ok = record.(*datahub.BlobRecord)
 	assert.True(t, ok)
 	assert.Equal(t, "{\"key1\":\"val1\"}", string(bRecord.RawData))
 
-	log.Contents = []*protocol.Log_Content{}
-	_, err = builder.log2BlobRecord(fieldsFromLogFixture(log))
+	fields = map[string]string{}
+	_, err = builder.log2BlobRecord(fields)
 	assert.NotNil(t, err)
 }
 
@@ -133,51 +115,20 @@ func TestGenTupleRecord(t *testing.T) {
 	builder.schema.AddField(datahub.Field{Name: "f9", Type: datahub.DECIMAL})
 	builder.schema.AddField(datahub.Field{Name: "f10", Type: datahub.STRING})
 
-	log := &protocol.Log{}
-	log.Contents = []*protocol.Log_Content{
-		{
-			Key:   "f1",
-			Value: "true",
-		},
-		{
-			Key:   "f2",
-			Value: "1",
-		},
-		{
-			Key:   "f3",
-			Value: "123",
-		},
-		{
-			Key:   "f4",
-			Value: "123456",
-		},
-		{
-			Key:   "f5",
-			Value: "123456789",
-		},
-		{
-			Key:   "f6",
-			Value: "1733205626",
-		},
-		{
-			Key:   "f7",
-			Value: "3.14",
-		},
-		{
-			Key:   "f8",
-			Value: "123.456",
-		},
-		{
-			Key:   "f9",
-			Value: "1234.56789",
-		},
-		{
-			Key:   "f10",
-			Value: "aaaabbbbcccc",
-		},
+	fields := map[string]string{
+		"f1":  "true",
+		"f2":  "1",
+		"f3":  "123",
+		"f4":  "123456",
+		"f5":  "123456789",
+		"f6":  "1733205626",
+		"f7":  "3.14",
+		"f8":  "123.456",
+		"f9":  "1234.56789",
+		"f10": "aaaabbbbcccc",
 	}
 
-	record, err := builder.log2TupleRecord(fieldsFromLogFixture(log))
+	record, err := builder.log2TupleRecord(fields)
 	assert.Nil(t, err)
 	tRecord, ok := record.(*datahub.TupleRecord)
 	assert.True(t, ok)
@@ -231,19 +182,12 @@ func TestGenTupleRecordWithNull(t *testing.T) {
 	builder.schema.AddField(datahub.Field{Name: "f1", Type: datahub.BOOLEAN, AllowNull: true})
 	builder.schema.AddField(datahub.Field{Name: "f2", Type: datahub.TINYINT, AllowNull: true})
 
-	log := &protocol.Log{}
-	log.Contents = []*protocol.Log_Content{
-		{
-			Key:   "f1",
-			Value: "true",
-		},
-		{
-			Key:   "f2",
-			Value: "",
-		},
+	fields := map[string]string{
+		"f1": "true",
+		"f2": "",
 	}
 
-	record, err := builder.log2TupleRecord(fieldsFromLogFixture(log))
+	record, err := builder.log2TupleRecord(fields)
 	assert.Nil(t, err)
 	tRecord, ok := record.(*datahub.TupleRecord)
 	assert.True(t, ok)
@@ -258,7 +202,7 @@ func TestGenTupleRecordWithNull(t *testing.T) {
 	builder.schema.AddField(datahub.Field{Name: "f1", Type: datahub.BOOLEAN, AllowNull: true})
 	builder.schema.AddField(datahub.Field{Name: "f2", Type: datahub.TINYINT, AllowNull: false})
 
-	_, err = builder.log2TupleRecord(fieldsFromLogFixture(log))
+	_, err = builder.log2TupleRecord(fields)
 	assert.NotNil(t, err)
 }
 
@@ -270,26 +214,11 @@ func TestGenTupleRecordWithTypeMissMatch(t *testing.T) {
 	builder.schema.AddField(datahub.Field{Name: "f1", Type: datahub.BOOLEAN, AllowNull: true})
 	builder.schema.AddField(datahub.Field{Name: "f2", Type: datahub.TINYINT, AllowNull: true})
 
-	log := &protocol.Log{}
-	log.Contents = []*protocol.Log_Content{
-		{
-			Key:   "f1",
-			Value: "123",
-		},
-		{
-			Key:   "f2",
-			Value: "2",
-		},
+	fields := map[string]string{
+		"f1": "123",
+		"f2": "2",
 	}
 
-	_, err := builder.log2TupleRecord(fieldsFromLogFixture(log))
+	_, err := builder.log2TupleRecord(fields)
 	assert.NotNil(t, err)
-}
-
-func fieldsFromLogFixture(log *protocol.Log) map[string]string {
-	fields := make(map[string]string, len(log.Contents))
-	for _, item := range log.Contents {
-		fields[item.Key] = item.Value
-	}
-	return fields
 }

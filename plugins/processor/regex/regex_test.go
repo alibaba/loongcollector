@@ -441,21 +441,17 @@ func TestTrailingCapturePrefixMatchesOriginal(t *testing.T) {
 		t.Run(expression, func(t *testing.T) {
 			pattern := "(?s)" + expression
 			original := regexp.MustCompile(pattern)
-			prefix, endLiteral := compileTrailingCapturePrefix(pattern, original.NumSubexp())
+			prefix := compileTrailingCapturePrefix(pattern, original.NumSubexp())
 			require.NotNil(t, prefix)
 			keys := make([]string, original.NumSubexp())
-			p := ProcessorRegex{Keys: keys, FullMatch: true, trailingCapturePrefix: prefix, prefixEndLiteral: endLiteral}
+			p := ProcessorRegex{Keys: keys, FullMatch: true, trailingCapturePrefix: prefix}
 			for _, input := range inputs {
 				want := original.FindStringSubmatchIndex(input)
 				if want != nil {
 					want = want[2:]
 				}
-				var match []int
-				if length := p.matchInputLength(input); length >= 0 {
-					match = prefix.FindStringSubmatchIndex(input[:length])
-				}
 				var offsets [16]int
-				got := p.configuredCaptures(match, len(input), offsets[:0], func() string {
+				got := p.configuredCaptures(prefix.FindStringSubmatchIndex(input), len(input), offsets[:0], func() string {
 					t.Fatal("unexpected alarm preview")
 					return ""
 				})

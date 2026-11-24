@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"slices"
 	"strings"
-	"sync"
-	"time"
 
 	"google.golang.org/protobuf/encoding/protowire"
 
@@ -15,76 +13,8 @@ import (
 	"github.com/alibaba/ilogtail/pkg/util"
 )
 
-var LogEventPool = sync.Pool{
-	New: func() interface{} {
-		return new(protocol.LogEvent)
-	},
-}
-
-func CreateLogEvent(t time.Time, enableTimestampNano bool, fields map[string]string) (*protocol.LogEvent, error) {
-	logEvent := LogEventPool.Get().(*protocol.LogEvent)
-	logEvent.Timestamp = uint64(t.Unix())*1e9 + uint64(t.Nanosecond())
-	if len(logEvent.Contents) < len(fields) {
-		slice := make([]*protocol.LogEvent_Content, len(logEvent.Contents), len(fields))
-		copy(slice, logEvent.Contents)
-		logEvent.Contents = slice
-	} else {
-		logEvent.Contents = logEvent.Contents[:len(fields)]
-	}
-	i := 0
-	rawSize := 0
-	for key, val := range fields {
-		if i >= len(logEvent.Contents) {
-			logEvent.Contents = append(logEvent.Contents, &protocol.LogEvent_Content{})
-		}
-		logEvent.Contents[i].Key = util.ZeroCopyStringToBytes(key)
-		logEvent.Contents[i].Value = util.ZeroCopyStringToBytes(val)
-		i++
-		rawSize += len(val)
-	}
-	logEvent.RawSize = uint64(rawSize)
-	return logEvent, nil
-}
-
-func CreateLogEventByArray(t time.Time, enableTimestampNano bool, columns []string, values []string) (*protocol.LogEvent, error) {
-	logEvent := LogEventPool.Get().(*protocol.LogEvent)
-	logEvent.Timestamp = uint64(t.Unix())*1e9 + uint64(t.Nanosecond())
-	logEvent.Contents = make([]*protocol.LogEvent_Content, 0, len(columns))
-	if len(columns) != len(values) {
-		return nil, fmt.Errorf("columns and values not equal")
-	}
-	rawSize := 0
-	for index := range columns {
-		if index >= len(logEvent.Contents) {
-			logEvent.Contents = append(logEvent.Contents, &protocol.LogEvent_Content{})
-		}
-		logEvent.Contents[index].Key = util.ZeroCopyStringToBytes(columns[index])
-		logEvent.Contents[index].Value = util.ZeroCopyStringToBytes(values[index])
-		rawSize += len(values[index])
-	}
-	logEvent.RawSize = uint64(rawSize)
-	return logEvent, nil
-}
-
-func CreateLogEventByLegacyRawLog(log *protocol.Log) (*protocol.LogEvent, error) {
-	logEvent := LogEventPool.Get().(*protocol.LogEvent)
-	logEvent.Timestamp = uint64(log.GetTime())*1e9 + uint64(log.GetTimeNs())
-	logEvent.Contents = make([]*protocol.LogEvent_Content, 0, len(log.Contents))
-	rawSize := 0
-	for i, logC := range log.Contents {
-		if i >= len(logEvent.Contents) {
-			logEvent.Contents = append(logEvent.Contents, &protocol.LogEvent_Content{})
-		}
-		logEvent.Contents[i].Key = util.ZeroCopyStringToBytes(logC.Key)
-		logEvent.Contents[i].Value = util.ZeroCopyStringToBytes(logC.Value)
-		rawSize += len(logC.Value)
-	}
-	logEvent.RawSize = uint64(rawSize)
-	return logEvent, nil
-}
-
 func TransferLogEventToPB(log *models.Log) (*protocol.LogEvent, error) {
-	logEvent := LogEventPool.Get().(*protocol.LogEvent)
+	logEvent := new(protocol.LogEvent)
 	logEvent.Timestamp = log.GetTimestamp()
 	fields := log.GetIndices()
 	contents := make([]protocol.LogEvent_Content, 0, fields.Len())
@@ -641,25 +571,6 @@ func TransferSpanEventToPB(span *models.Span) (*protocol.SpanEvent, error) {
 	}
 	spanEvent.Status = protocol.SpanEvent_StatusCode(span.GetStatus())
 	return &spanEvent, nil
-}
-
-func CreatePipelineEventGroupByLegacyRawLog(logEvents []*protocol.LogEvent, configTag map[string]string, logTags map[string]string, ctx map[string]interface{}) (*protocol.PipelineEventGroup, error) {
-	var pipelineEventGroup protocol.PipelineEventGroup
-	pipelineEventGroup.PipelineEvents = &protocol.PipelineEventGroup_Logs{Logs: &protocol.PipelineEventGroup_LogEvents{Events: logEvents}}
-	pipelineEventGroup.Tags = make(map[string][]byte, len(configTag)+len(logTags))
-	for k, v := range configTag {
-		pipelineEventGroup.Tags[k] = util.ZeroCopyStringToBytes(v)
-	}
-	for k, v := range logTags {
-		pipelineEventGroup.Tags[k] = util.ZeroCopyStringToBytes(v)
-	}
-	if ctx != nil {
-		if source, ok := ctx["source"].(string); ok {
-			pipelineEventGroup.Metadata = make(map[string][]byte)
-			pipelineEventGroup.Metadata["source_id"] = util.ZeroCopyStringToBytes(source)
-		}
-	}
-	return &pipelineEventGroup, nil
 }
 
 func TransferPipelineEventGroupToPB(groupInfo *models.GroupInfo, events []models.PipelineEvent) (*protocol.PipelineEventGroup, error) {

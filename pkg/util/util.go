@@ -31,12 +31,9 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
-	"sync/atomic"
 	"time"
 	"unicode"
 	"unsafe"
-
-	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
 const alphanum string = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
@@ -372,15 +369,6 @@ func NewPackIDPrefix(text string) string {
 	h := fnv.New64a()
 	_, _ = h.Write([]byte(text + GetIPAddress() + time.Now().String()))
 	return fmt.Sprintf("%X-", h.Sum64())
-}
-
-func NewLogTagForPackID(prefix string, seqNum *int64) *protocol.LogTag {
-	tag := &protocol.LogTag{
-		Key:   PackIDTagKey,
-		Value: fmt.Sprintf("%s%X", prefix, atomic.LoadInt64(seqNum)),
-	}
-	atomic.AddInt64(seqNum, 1)
-	return tag
 }
 
 func MinInt(a, b int) int {

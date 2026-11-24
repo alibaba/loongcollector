@@ -33,9 +33,9 @@ import (
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	pluginmanager "github.com/alibaba/ilogtail/pluginmanager"
 	_ "github.com/alibaba/ilogtail/plugins/extension/default_decoder"
+	"github.com/alibaba/ilogtail/plugins/test"
 )
 
 type ContextTest struct {
@@ -236,28 +236,13 @@ func TestInputSLS(t *testing.T) {
 	})
 	require.NoError(t, err)
 	nanos := uint32(987654321)
-	var body []byte
-	for _, log := range []*protocol.Log{
-		{
-			Time: 1700000000, TimeNs: &nanos,
-			Contents: []*protocol.Log_Content{
-				{Key: "content", Value: "message"},
-				{Key: "node", Value: "field-not-tag"},
-				{Key: "__tag__:as_content", Value: "literal"},
-			},
-		},
-		{Time: 1700000001, Contents: []*protocol.Log_Content{{Key: "empty", Value: ""}}},
-	} {
-		wire, marshalErr := log.Marshal()
-		require.NoError(t, marshalErr)
-		body = protowire.AppendBytes(protowire.AppendTag(body, 1, protowire.BytesType), wire)
-	}
+	body := test.AppendSLSWireLog(nil, 1700000000, &nanos,
+		[2]string{"content", "message"}, [2]string{"node", "field-not-tag"}, [2]string{"__tag__:as_content", "literal"})
+	body = test.AppendSLSWireLog(body, 1700000001, nil, [2]string{"empty", ""})
 	for i, value := range []string{"original-logstore", "access", "sender", "sender-id"} {
 		body = protowire.AppendString(protowire.AppendTag(body, protowire.Number(i+2), protowire.BytesType), value)
 	}
-	tag, err := (&protocol.LogTag{Key: "node", Value: "edge"}).Marshal()
-	require.NoError(t, err)
-	body = protowire.AppendBytes(protowire.AppendTag(body, 6, protowire.BytesType), tag)
+	body = test.AppendSLSWireTag(body, "node", "edge")
 	groups := collectRequestEvents(t, input, body, http.StatusOK)
 	require.Len(t, groups, 1)
 	require.Equal(t, map[string]string{"node": "edge", pipeline.TopicTagKey: "access", "__machine_uuid__": "sender-id"}, groups[0].Group.GetTags().Iterator())

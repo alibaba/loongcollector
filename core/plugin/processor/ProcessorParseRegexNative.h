@@ -47,12 +47,16 @@ protected:
 
 private:
     /// @return false if data need to be discarded
-    bool ProcessEvent(const StringView& logPath, PipelineEventPtr& e, const GroupMetadata& metadata);
+    bool ProcessEvent(const StringView& logPath,
+                      PipelineEventPtr& e,
+                      const GroupMetadata& metadata,
+                      boost::match_results<const char*>& matches);
     bool WholeLineModeParser(LogEvent& sourceEvent, const std::string& key);
     bool RegexLogLineParser(LogEvent& sourceEvent,
                             const boost::regex& reg,
                             const std::vector<std::string>& keys,
-                            const StringView& logPath);
+                            const StringView& logPath,
+                            boost::match_results<const char*>& matches);
     void AddLog(const StringView& key, const StringView& value, LogEvent& targetEvent, bool overwritten = true);
 
     const boost::regex& GetReg() const;

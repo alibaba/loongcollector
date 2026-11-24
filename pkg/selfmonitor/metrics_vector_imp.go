@@ -20,7 +20,6 @@ import (
 	"unsafe"
 
 	"github.com/alibaba/ilogtail/pkg/helper/pool"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
 const (
@@ -132,80 +131,80 @@ func NewStringMetricVectorAndRegister(mr *MetricsRecord, metricName string, cons
 }
 
 // NewCumulativeCounterMetric creates a new CounterMetric.
-func NewCumulativeCounterMetric(n string, lables ...*protocol.Log_Content) CounterMetric {
-	return NewCumulativeCounterMetricVector(n, convertLabels(lables), nil).WithLabels()
+func NewCumulativeCounterMetric(n string, labels ...LabelPair) CounterMetric {
+	return NewCumulativeCounterMetricVector(n, convertLabels(labels), nil).WithLabels()
 }
 
 // NewAverageMetric creates a new AverageMetric.
-func NewAverageMetric(n string, lables ...*protocol.Log_Content) CounterMetric {
-	return NewAverageMetricVector(n, convertLabels(lables), nil).WithLabels()
+func NewAverageMetric(n string, labels ...LabelPair) CounterMetric {
+	return NewAverageMetricVector(n, convertLabels(labels), nil).WithLabels()
 }
 
 // NewCounterMetric creates a new DeltaMetric.
-func NewCounterMetric(n string, lables ...*protocol.Log_Content) CounterMetric {
-	return NewCounterMetricVector(n, convertLabels(lables), nil).WithLabels()
+func NewCounterMetric(n string, labels ...LabelPair) CounterMetric {
+	return NewCounterMetricVector(n, convertLabels(labels), nil).WithLabels()
 }
 
 // NewGaugeMetric creates a new GaugeMetric.
-func NewGaugeMetric(n string, lables ...*protocol.Log_Content) GaugeMetric {
-	return NewGaugeMetricVector(n, convertLabels(lables), nil).WithLabels()
+func NewGaugeMetric(n string, labels ...LabelPair) GaugeMetric {
+	return NewGaugeMetricVector(n, convertLabels(labels), nil).WithLabels()
 }
 
 // NewStringMetric creates a new StringMetric.
-func NewStringMetric(n string, lables ...*protocol.Log_Content) StringMetric {
-	return NewStringMetricVector(n, convertLabels(lables), nil).WithLabels()
+func NewStringMetric(n string, labels ...LabelPair) StringMetric {
+	return NewStringMetricVector(n, convertLabels(labels), nil).WithLabels()
 }
 
 // NewLatencyMetric creates a new LatencyMetric.
-func NewLatencyMetric(n string, lables ...*protocol.Log_Content) LatencyMetric {
-	return NewLatencyMetricVector(n, convertLabels(lables), nil).WithLabels()
+func NewLatencyMetric(n string, labels ...LabelPair) LatencyMetric {
+	return NewLatencyMetricVector(n, convertLabels(labels), nil).WithLabels()
 }
 
 // NewCumulativeCounterMetricAndRegister creates a new CounterMetric and register it's metricVector to the MetricsRecord.
-func NewCumulativeCounterMetricAndRegister(c *MetricsRecord, n string, lables ...*protocol.Log_Content) CounterMetric {
-	mv := NewCumulativeCounterMetricVector(n, convertLabels(lables), nil)
+func NewCumulativeCounterMetricAndRegister(c *MetricsRecord, n string, labels ...LabelPair) CounterMetric {
+	mv := NewCumulativeCounterMetricVector(n, convertLabels(labels), nil)
 	c.RegisterMetricCollector(mv.(MetricCollector))
 	return mv.WithLabels()
 }
 
 // NewCounterMetricAndRegister creates a new DeltaMetric and register it's metricVector to the MetricsRecord.
-func NewCounterMetricAndRegister(c *MetricsRecord, n string, lables ...*protocol.Log_Content) CounterMetric {
-	mv := NewCounterMetricVector(n, convertLabels(lables), nil)
+func NewCounterMetricAndRegister(c *MetricsRecord, n string, labels ...LabelPair) CounterMetric {
+	mv := NewCounterMetricVector(n, convertLabels(labels), nil)
 	c.RegisterMetricCollector(mv.(MetricCollector))
 	return mv.WithLabels()
 }
 
 // NewAverageMetricAndRegister creates a new AverageMetric and register it's metricVector to the MetricsRecord.
-func NewAverageMetricAndRegister(c *MetricsRecord, n string, lables ...*protocol.Log_Content) CounterMetric {
-	mv := NewAverageMetricVector(n, convertLabels(lables), nil)
+func NewAverageMetricAndRegister(c *MetricsRecord, n string, labels ...LabelPair) CounterMetric {
+	mv := NewAverageMetricVector(n, convertLabels(labels), nil)
 	c.RegisterMetricCollector(mv.(MetricCollector))
 	return mv.WithLabels()
 }
 
 // NewMaxMetricAndRegister creates a new MaxMetric and register it's metricVector to the MetricsRecord.
-func NewMaxMetricAndRegister(c *MetricsRecord, n string, lables ...*protocol.Log_Content) GaugeMetric {
-	mv := NewMaxMetricVector(n, convertLabels(lables), nil)
+func NewMaxMetricAndRegister(c *MetricsRecord, n string, labels ...LabelPair) GaugeMetric {
+	mv := NewMaxMetricVector(n, convertLabels(labels), nil)
 	c.RegisterMetricCollector(mv.(MetricCollector))
 	return mv.WithLabels()
 }
 
 // NewGaugeMetricAndRegister creates a new GaugeMetric and register it's metricVector to the MetricsRecord.
-func NewGaugeMetricAndRegister(c *MetricsRecord, n string, lables ...*protocol.Log_Content) GaugeMetric {
-	mv := NewGaugeMetricVector(n, convertLabels(lables), nil)
+func NewGaugeMetricAndRegister(c *MetricsRecord, n string, labels ...LabelPair) GaugeMetric {
+	mv := NewGaugeMetricVector(n, convertLabels(labels), nil)
 	c.RegisterMetricCollector(mv.(MetricCollector))
 	return mv.WithLabels()
 }
 
 // NewLatencyMetricAndRegister creates a new LatencyMetric and register it's metricVector to the MetricsRecord.
-func NewLatencyMetricAndRegister(c *MetricsRecord, n string, lables ...*protocol.Log_Content) LatencyMetric {
-	mv := NewLatencyMetricVector(n, convertLabels(lables), nil)
+func NewLatencyMetricAndRegister(c *MetricsRecord, n string, labels ...LabelPair) LatencyMetric {
+	mv := NewLatencyMetricVector(n, convertLabels(labels), nil)
 	c.RegisterMetricCollector(mv.(MetricCollector))
 	return mv.WithLabels()
 }
 
 // NewStringMetricAndRegister creates a new StringMetric and register it's metricVector to the MetricsRecord.
-func NewStringMetricAndRegister(c *MetricsRecord, n string, lables ...*protocol.Log_Content) StringMetric {
-	mv := NewStringMetricVector(n, convertLabels(lables), nil)
+func NewStringMetricAndRegister(c *MetricsRecord, n string, labels ...LabelPair) StringMetric {
+	mv := NewStringMetricVector(n, convertLabels(labels), nil)
 	c.RegisterMetricCollector(mv.(MetricCollector))
 	return mv.WithLabels()
 }
@@ -394,7 +393,7 @@ func (v *MapCache) Collect() []Metric {
 	return res
 }
 
-func convertLabels(labels []*protocol.Log_Content) map[string]string {
+func convertLabels(labels []LabelPair) map[string]string {
 	if len(labels) == 0 {
 		return nil
 	}
