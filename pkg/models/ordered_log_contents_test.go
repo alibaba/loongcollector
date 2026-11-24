@@ -163,3 +163,34 @@ func TestOrderedLogContentsEditsTheExtraField(t *testing.T) {
 	require.Equal(t, "updated", fields.Get("renamed"))
 	require.Equal(t, "last", fields.Get("last"))
 }
+
+func TestOrderedLogContentsTracksLiveMapChanges(t *testing.T) {
+	fields := NewOrderedLogContents(2)
+	fields.Add("first", "old")
+	fields.Add("second", "kept")
+
+	live := fields.Iterator()
+	delete(live, "first")
+	live["z"] = "renamed"
+	live["a"] = "added"
+
+	key, ok := FirstLogContentKey(fields)
+	require.True(t, ok)
+	require.Equal(t, "second", key)
+	var keys []string
+	for key := range LogContentEntries(fields) {
+		keys = append(keys, key)
+	}
+	require.Equal(t, []string{"second", "a", "z"}, keys)
+
+	RenameLogContent(fields, "z", "renamed")
+	require.Equal(t, "renamed", live["renamed"])
+	require.NotContains(t, live, "z")
+
+	fields.Add("first", "readded")
+	keys = keys[:0]
+	for key := range LogContentEntries(fields) {
+		keys = append(keys, key)
+	}
+	require.Equal(t, []string{"second", "a", "renamed", "first"}, keys)
+}

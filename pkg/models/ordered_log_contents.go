@@ -24,13 +24,47 @@ import (
 const smallLogFieldCount = 4
 
 type orderedLogMap struct {
-	values map[string]any
-	keys   []string
+	values  map[string]any
+	keys    []string
+	exposed atomic.Bool
 }
 
 func (m *orderedLogMap) init(capacity int) {
 	m.values = make(map[string]any, capacity)
 	m.keys = make([]string, 0, capacity)
+}
+
+// keysInOrder preserves the order of known fields and appends keys added
+// through the writable map in lexical order. A map does not record insertion order.
+func (m *orderedLogMap) keysInOrder() []string {
+	if !m.exposed.Load() {
+		return m.keys
+	}
+	liveKeys := 0
+	for _, key := range m.keys {
+		if _, found := m.values[key]; found {
+			liveKeys++
+		}
+	}
+	if liveKeys == len(m.keys) && liveKeys == len(m.values) {
+		return m.keys
+	}
+
+	keys := make([]string, 0, len(m.values))
+	known := make(map[string]struct{}, liveKeys)
+	for _, key := range m.keys {
+		if _, found := m.values[key]; found {
+			keys = append(keys, key)
+			known[key] = struct{}{}
+		}
+	}
+	for key := range m.values {
+		if _, found := known[key]; !found {
+			keys = append(keys, key)
+		}
+	}
+	slices.Sort(keys[liveKeys:])
+	return keys
 }
 
 type orderedLogContents struct {
@@ -148,8 +182,8 @@ func ReserveLogContentKeys(contents LogContents, count int) {
 func FirstLogContentKey(contents LogContents) (string, bool) {
 	if c, ok := contents.(*orderedLogContents); ok {
 		if mapped := c.mapped.Load(); mapped != nil {
-			if len(mapped.keys) > 0 {
-				return mapped.keys[0], true
+			if keys := mapped.keysInOrder(); len(keys) > 0 {
+				return keys[0], true
 			}
 		} else if len(c.packed) > 0 {
 			return c.packed[0].Key, true
@@ -176,7 +210,7 @@ func LogContentEntries(contents LogContents) iter.Seq2[string, any] {
 func (c *orderedLogContents) entries(yield func(string, any) bool) {
 	c.releaseBodyOwnership()
 	if mapped := c.mapped.Load(); mapped != nil {
-		for _, key := range mapped.keys {
+		for _, key := range mapped.keysInOrder() {
 			if !yield(key, mapped.values[key]) {
 				return
 			}
@@ -202,6 +236,7 @@ func RenameLogContent(contents LogContents, source, destination string) {
 	if c, ok := contents.(*orderedLogContents); ok {
 		c.Delete(destination)
 		if mapped := c.mapped.Load(); mapped != nil {
+			mapped.keys = mapped.keysInOrder()
 			if index := slices.Index(mapped.keys, source); index >= 0 {
 				mapped.keys[index] = destination
 				mapped.values[destination] = value
@@ -305,7 +340,9 @@ func (c *orderedLogContents) materializeMap(capacity int) *orderedLogMap {
 
 func (c *orderedLogContents) Iterator() map[string]any {
 	c.releaseBodyOwnership()
-	return c.materializeMap(c.packedLen()).values
+	mapped := c.materializeMap(c.packedLen())
+	mapped.exposed.Store(true)
+	return mapped.values
 }
 
 func (c *orderedLogContents) SortTo(buf []KeyValue[any]) []KeyValue[any] {
@@ -352,7 +389,7 @@ func (c *orderedLogContents) Add(key string, value any) {
 	}
 	c.clearPacked()
 	if _, found := mapped.values[key]; !found {
-		mapped.keys = append(mapped.keys, key)
+		mapped.keys = append(mapped.keysInOrder(), key)
 	}
 	mapped.values[key] = value
 }

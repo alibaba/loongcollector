@@ -120,8 +120,7 @@ var (
 	SelfEnvConfigFlag bool
 
 	EnableContainerdUpperDirDetect = flag.Bool("enable_containerd_upper_dir_detect", false, "if enable containerd upper dir detect when locating rootfs")
-	FlusherConfig                  = flag.String("flusher", "./default_flusher.json", "the default flusher configuration is used not only in the plugins without flusher but also to transfer the self telemetry data.")
-	ForceSelfCollect               = flag.Bool("force-statics", false, "Compatibility flag. Normal shutdown collects the final Go self telemetry.")
+	FlusherConfig                  = flag.String("flusher", "./default_flusher.json", "the default flusher configuration for Go pipelines without an explicit flusher.")
 	AutoProfile                    = flag.Bool("prof-auto", true, "auto dump prof file when prof-flag is open.")
 	HTTPProfFlag                   = flag.Bool("prof-flag", false, "http pprof flag.")
 	Cpuprofile                     = flag.String("cpu-profile", "cpu.prof", "write cpu profile to file.")
@@ -335,7 +334,6 @@ func init() {
 	_ = util.InitFromEnvBool("enable_containerd_upper_dir_detect", EnableContainerdUpperDirDetect, *EnableContainerdUpperDirDetect)
 	_ = util.InitFromEnvBool("LOGTAIL_DEBUG_FLAG", HTTPProfFlag, *HTTPProfFlag)
 	_ = util.InitFromEnvBool("LOGTAIL_AUTO_PROF", AutoProfile, *AutoProfile)
-	_ = util.InitFromEnvBool("LOGTAIL_FORCE_COLLECT_SELF_TELEMETRY", ForceSelfCollect, *ForceSelfCollect)
 	_ = util.InitFromEnvBool("LOGTAIL_HTTP_LOAD_CONFIG", HTTPLoadFlag, *HTTPLoadFlag)
 	_ = util.InitFromEnvBool("ALICLOUD_LOG_STATEFULSET_FLAG", StatefulSetFlag, *StatefulSetFlag)
 

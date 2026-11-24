@@ -41,9 +41,9 @@ func TestConvertToSingleProtocolStreamMixedEvents(t *testing.T) {
 	// Metric is converted structurally into a canonical metric log, never a
 	// pass-through blob.
 	assert.NotContains(t, string(stream[1]), "__pipeline_passthrough__")
-	assert.Contains(t, string(stream[1]), metricNameKey)
+	assert.Contains(t, string(stream[1]), "__name__")
 	assert.Contains(t, string(stream[1]), `cpu`)
-	assert.Contains(t, string(stream[1]), metricValueKey)
+	assert.Contains(t, string(stream[1]), "__value__")
 	// Span is converted structurally with its own fields.
 	assert.NotContains(t, string(stream[2]), "__pipeline_passthrough__")
 	assert.Contains(t, string(stream[2]), "traceID")
@@ -62,8 +62,8 @@ func TestEncodeEventRecordsConvertsMetricStructurally(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, rows, 2)
 	assert.Equal(t, "hello", rows[0].Fields["content"])
-	assert.Equal(t, "m", rows[1].Fields[metricNameKey])
-	assert.Equal(t, "1", rows[1].Fields[metricValueKey])
+	assert.Equal(t, "m", rows[1].Fields["__name__"])
+	assert.Equal(t, "1", rows[1].Fields["__value__"])
 	assert.NotContains(t, rows[1].Fields, "__pipeline_passthrough__")
 }
 
@@ -96,4 +96,10 @@ func TestEventConverterSelectedFieldsAndRename(t *testing.T) {
 			require.ErrorContains(t, err, "unsupported field")
 		})
 	}
+}
+
+func TestMarshalSingleProtocolEntryDoesNotEscapeHTML(t *testing.T) {
+	data, err := marshalSingleProtocolEntry(map[string]interface{}{"contents": "<body>&text"})
+	require.NoError(t, err)
+	assert.Equal(t, `{"contents":"<body>&text"}`, string(data))
 }

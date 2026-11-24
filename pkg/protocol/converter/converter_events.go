@@ -15,10 +15,19 @@
 package protocol
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/models"
+)
+
+const (
+	protocolKeyTime    = "time"
+	protocolKeyContent = "contents"
+	protocolKeyTag     = "tags"
+	numProtocolKeys    = 3
 )
 
 // protocolRecord is one flushable record extracted from a pipeline event. A Log
@@ -225,7 +234,13 @@ func interfaceToString(v interface{}) string {
 }
 
 func marshalSingleProtocolEntry(entry map[string]interface{}) ([]byte, error) {
-	return marshalWithoutHTMLEscaped(entry)
+	var buf bytes.Buffer
+	encoder := json.NewEncoder(&buf)
+	encoder.SetEscapeHTML(false)
+	if err := encoder.Encode(entry); err != nil {
+		return nil, err
+	}
+	return bytes.TrimSuffix(buf.Bytes(), []byte{'\n'}), nil
 }
 
 // EventRecord is a string-valued output row with a Unix timestamp in nanoseconds.

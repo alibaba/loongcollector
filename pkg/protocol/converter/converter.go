@@ -38,6 +38,12 @@ const (
 	EncodingCustom   = "custom"
 )
 
+// Separators for the __labels__ field in SLS metric records.
+const (
+	KeyValueSeparator = "#$#"
+	LabelSeparator    = "|"
+)
+
 const (
 	targetContentPrefix = "content."
 	targetTagPrefix     = "tag."
