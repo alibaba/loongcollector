@@ -151,11 +151,17 @@ func TryApplyGroupTagDefaults(tags Tags, additions map[string]string) bool {
 	base := values.defaults
 	cached := base.enriched.Load()
 	if cached == nil || !maps.Equal(cached.additions, additions) {
+		// Copy the entries into storage owned by the cache. The caller's
+		// temporary map is only read and can remain on the stack.
+		snapshot := make(map[string]string, len(additions))
 		merged := make(map[string]string, len(base.values)+len(additions))
 		maps.Copy(merged, base.values)
-		maps.Copy(merged, additions)
+		for key, value := range additions {
+			snapshot[key] = value
+			merged[key] = value
+		}
 		cached = &groupTagEnrichment{
-			additions: maps.Clone(additions),
+			additions: snapshot,
 			merged:    groupValueDefaults{values: merged},
 		}
 		// Keep only the latest result for this container template. Previously
