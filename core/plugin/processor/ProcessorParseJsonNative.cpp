@@ -23,6 +23,12 @@
 #if defined(__INCLUDE_SSE4_2__)
 #include <cinttypes>
 #include <cstdio>
+#include <cstring>
+
+#include <memory>
+#include <new>
+#include <optional>
+#include <string>
 
 #include "simdjson/simdjson.h"
 
@@ -62,14 +68,17 @@ bool ProcessorParseJsonNative::Init(const Json::Value& config) {
 
     // Runtime check for SIMD support
     mUseSimdJson = false;
-#if defined(__INCLUDE_SSE4_2__)
-    auto my_implementation = simdjson::get_available_implementations()["westmere"];
-    if (my_implementation && my_implementation->supported_by_runtime_system()) {
+#if defined(__INCLUDE_SSE4_2__) && (defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86))
+    // simdjson selects the best kernel supported by the CPU at runtime (icelake, haswell, westmere, ...).
+    // SIMDJSON_FORCE_IMPLEMENTATION bypasses that check, so it is repeated here.
+    const simdjson::implementation* implementation = simdjson::get_active_implementation();
+    const std::string activeImplementation = implementation->name();
+    if (activeImplementation != "fallback" && activeImplementation != "unsupported"
+        && implementation->supported_by_runtime_system()) {
         mUseSimdJson = true;
-        simdjson::get_active_implementation() = my_implementation;
-        LOG_DEBUG(sLogger, ("simdjson active implementation : ", simdjson::get_active_implementation()->name()));
+        LOG_DEBUG(sLogger, ("simdjson active implementation : ", activeImplementation));
     } else {
-        LOG_DEBUG(sLogger, ("westmere not supported", "fallback to rapidjson"));
+        LOG_DEBUG(sLogger, ("no supported simdjson SIMD kernel", "fallback to rapidjson"));
     }
 #endif
 
@@ -259,15 +268,39 @@ bool ProcessorParseJsonNative::JsonLogLineParserSimdJson(LogEvent& sourceEvent,
     if (buffer.empty())
         return false;
 
-    simdjson::ondemand::parser parser;
-    simdjson::padded_string bufStr(buffer.data(), buffer.size());
+    // Processor threads may run the same instance concurrently, so the reused parser and buffer are per thread.
+    // Lines larger than kSimdJsonReuseMaxSize use local ones so that one huge line does not pin memory.
+    static constexpr size_t kSimdJsonReuseMaxSize = 64 * 1024;
+    thread_local simdjson::ondemand::parser sParser;
+    thread_local std::string sPaddedBuffer;
+    std::optional<simdjson::ondemand::parser> localParser;
+    simdjson::padded_string localBuffer;
+    simdjson::ondemand::parser* parser = &sParser;
+    simdjson::padded_string_view bufStr;
+    bool useLocal = buffer.size() > kSimdJsonReuseMaxSize;
+    if (!useLocal) {
+        try {
+            sPaddedBuffer.resize(buffer.size() + simdjson::SIMDJSON_PADDING);
+            memcpy(sPaddedBuffer.data(), buffer.data(), buffer.size());
+            memset(sPaddedBuffer.data() + buffer.size(), 0, simdjson::SIMDJSON_PADDING);
+            bufStr = simdjson::padded_string_view(sPaddedBuffer.data(), buffer.size(), sPaddedBuffer.size());
+        } catch (const std::bad_alloc&) {
+            useLocal = true;
+        }
+    }
+    if (useLocal) {
+        localParser.emplace();
+        parser = &*localParser;
+        localBuffer = simdjson::padded_string(buffer.data(), buffer.size());
+        bufStr = localBuffer;
+    }
     simdjson::ondemand::document doc;
     simdjson::ondemand::object object;
 
     // Use try-catch to handle all simdjson parsing errors generically
     // This maintains compatibility with rapidjson's error handling approach
     try {
-        auto error = parser.iterate(bufStr).get(doc);
+        auto error = parser->iterate(bufStr).get(doc);
         if (error) {
             if (AlarmManager::GetInstance()->IsLowLevelAlarmValid()) {
                 LOG_WARNING(
