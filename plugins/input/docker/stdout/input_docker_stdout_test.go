@@ -230,3 +230,56 @@ func TestDockerFileSynerPreservesTagModeAndSource(t *testing.T) {
 		})
 	}
 }
+
+func TestDockerFileSynerPreservesEmptyMultilineContent(t *testing.T) {
+	for _, mode := range []struct {
+		name           string
+		oldContentTags bool
+	}{
+		{"group tags", false},
+		{"content tags", true},
+	} {
+		t.Run(mode.name, func(t *testing.T) {
+			ctx := helper.NewObservePipelineContext(4)
+			input := &ServiceDockerStdout{
+				context:            stdoutTestContext{Context: mock.NewEmptyContext("project", "logstore", "config"), oldContentTags: mode.oldContentTags},
+				collector:          ctx.Collector(),
+				Stdout:             true,
+				Stderr:             true,
+				MaxLogSize:         4096,
+				BeginLineRegex:     "^",
+				BeginLineTimeoutMs: 1000,
+			}
+			info := &containercenter.DockerInfoDetail{
+				ContainerNameTag: map[string]string{"container": "test-container"},
+			}
+			info.ContainerInfo.ID = "test-id"
+			syner := NewDockerFileSyner(input, info, map[string]helper.LogFileReaderCheckPoint{
+				info.ContainerInfo.ID: {Path: "unused.log"},
+			})
+			processor := syner.dockerFileProcessor
+			for _, line := range []string{
+				"{\"log\":\"\\n\",\"time\":\"2025-01-01T00:00:00Z\",\"stream\":\"stdout\"}\n",
+				"2025-01-01T00:00:00Z stdout F \n",
+			} {
+				processor.Process([]byte(line), 0)
+				require.Empty(t, ctx.Collector().ToArray())
+				processor.Process(nil, 2*time.Second)
+				groups := ctx.Collector().ToArray()
+				require.Len(t, groups, 1)
+				require.Len(t, groups[0].Events, 1)
+				log, ok := groups[0].Events[0].(*models.Log)
+				require.True(t, ok)
+				require.True(t, log.GetIndices().Contains(models.BodyKey))
+				require.Empty(t, log.GetBody())
+				if mode.oldContentTags {
+					require.Equal(t, "test-container", log.GetIndices().Get("container"))
+					require.False(t, groups[0].Group.GetTags().Contains("container"))
+				} else {
+					require.False(t, log.GetIndices().Contains("container"))
+					require.Equal(t, "test-container", groups[0].Group.GetTags().Get("container"))
+				}
+			}
+		})
+	}
+}

@@ -1047,6 +1047,11 @@ bool FlusherSLS::sendPBLogs(const models::PipelineEventGroup& pbGroup,
         int key;
         if (StringTo(meta.first, key) && key == static_cast<int>(EventGroupMetaKey::SOURCE_ID)) {
             packIdPrefix = meta.second;
+            break;
+        }
+        // File-based Go stdout groups carry their pack source under the legacy key.
+        if (meta.first == "source") {
+            packIdPrefix = meta.second;
         }
     }
     string machineUUID;

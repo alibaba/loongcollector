@@ -299,6 +299,10 @@ func (p *DockerStdoutProcessor) newLog(body []byte, timestamp, stream string) *m
 	const tagPrefix = "__tag__:"
 	log := models.NewLogWithOrderedContents(len(p.contentTags) + 3)
 	log.Timestamp = uint64(time.Now().Truncate(time.Second).UnixNano())
+	if body == nil {
+		// File-based stdout emits a content field even when the line is empty.
+		body = []byte{}
+	}
 	// The reader already copied borrowed CRI bytes or decoded an owned JSON
 	// string. The multiline builder also owns its bytes.
 	models.SetOwnedLogBody(log, body)

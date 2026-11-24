@@ -31,6 +31,7 @@
 #include "common/HashUtil.h"
 #include "common/JsonUtil.h"
 #include "common/LogtailCommonFlags.h"
+#include "common/StringTools.h"
 #include "common/compression/CompressorFactory.h"
 #include "common/http/Constant.h"
 #include "monitor/Monitor.h"
@@ -85,6 +86,7 @@ public:
     void OnGoPipelineSend();
     void TestSendPipelineEventGroup();
     void TestSendPipelineEventGroupProfile();
+    void TestSendPipelineEventGroupSourcePackId();
 
 protected:
     static void SetUpTestCase() {
@@ -2312,7 +2314,64 @@ void FlusherSLSUnittest::TestSendPipelineEventGroupProfile() {
     SenderQueueManager::GetInstance()->RemoveItem(item->mQueueKey, item);
 }
 
+void FlusherSLSUnittest::TestSendPipelineEventGroupSourcePackId() {
+    FlusherSLS flusher;
+    flusher.mProject = "test_project";
+    flusher.mLogstore = "test_logstore";
+    ASSERT_TRUE(flusher.InitForProfile(ctx));
+
+    models::PipelineEventGroup pb;
+    auto* log = pb.mutable_logs()->add_events();
+    log->set_timestamp(1700000000000000000ULL);
+    auto* content = log->add_contents();
+    content->set_key("content");
+    content->set_value("container log");
+    const string sourceIdKey = to_string(static_cast<int>(EventGroupMetaKey::SOURCE_ID));
+    const struct {
+        const char* legacySource;
+        const char* sourceId;
+        const char* expectedSource;
+        int sequence;
+    } cases[] = {
+        {"container-a-source", nullptr, "container-a-source", 0},
+        {"container-b-source", nullptr, "container-b-source", 0},
+        {"container-a-source", nullptr, "container-a-source", 1},
+        {"container-b-source", "container-a-source", "container-a-source", 2},
+        {"container-b-source", "", "", 0},
+    };
+
+    for (const auto& test : cases) {
+        SCOPED_TRACE(test.legacySource);
+        pb.clear_metadata();
+        (*pb.mutable_metadata())["source"] = test.legacySource;
+        if (test.sourceId != nullptr) {
+            (*pb.mutable_metadata())[sourceIdKey] = test.sourceId;
+        }
+
+        const string serialized = pb.SerializeAsString();
+        auto wire = SLSLogGroupWireView::Parse(serialized, 1);
+        ASSERT_TRUE(wire.has_value());
+        models::PipelineEventGroup header;
+        ASSERT_TRUE(header.ParseFromArray(wire->mHeader.data(), wire->mHeader.size()));
+        ASSERT_TRUE(flusher.SendPBLogWire(header, *wire, "", "", nullptr));
+
+        vector<SenderQueueItem*> items;
+        SenderQueueManager::GetInstance()->GetAvailableItems(items, 80);
+        ASSERT_EQ(1U, items.size());
+        auto* item = static_cast<SLSSenderQueueItem*>(items[0]);
+        EXPECT_EQ("test_logstore", item->mLogstore);
+        sls_logs::LogGroup result;
+        ASSERT_TRUE(result.ParseFromString(item->mData));
+        ASSERT_EQ(1, result.logtags_size());
+        EXPECT_EQ(LOG_RESERVED_KEY_PACKAGE_ID, result.logtags(0).key());
+        EXPECT_EQ(ToHexString(HashString(test.expectedSource)) + "-" + ToHexString(test.sequence),
+                  result.logtags(0).value());
+        SenderQueueManager::GetInstance()->RemoveItem(item->mQueueKey, item);
+    }
+}
+
 UNIT_TEST_CASE(FlusherSLSUnittest, TestSendPipelineEventGroup)
+UNIT_TEST_CASE(FlusherSLSUnittest, TestSendPipelineEventGroupSourcePackId)
 UNIT_TEST_CASE(FlusherSLSUnittest, TestSendPipelineEventGroupProfile)
 UNIT_TEST_CASE(FlusherSLSUnittest, OnSuccessfulInit)
 UNIT_TEST_CASE(FlusherSLSUnittest, OnFailedInit)
