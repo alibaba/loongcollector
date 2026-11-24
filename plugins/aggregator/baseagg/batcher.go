@@ -230,20 +230,9 @@ func eventSize(event models.PipelineEvent) int64 {
 }
 
 func sameGroup(a, b *models.GroupInfo) bool {
-	return a == b || (a.GetDestinationLogstore() == b.GetDestinationLogstore() && equalValues(a.GetMetadata(), b.GetMetadata()) && equalValues(a.GetTags(), b.GetTags()))
-}
-
-func equalValues(a, b models.KeyValues[string]) bool {
-	if a.Len() != b.Len() {
-		return false
-	}
-	values := b.Iterator()
-	for k, v := range a.Iterator() {
-		if other, ok := values[k]; !ok || v != other {
-			return false
-		}
-	}
-	return true
+	return a == b || (a.GetDestinationLogstore() == b.GetDestinationLogstore() &&
+		models.EqualStringValues(a.GetMetadata(), b.GetMetadata()) &&
+		models.EqualStringValues(a.GetTags(), b.GetTags()))
 }
 
 // GroupForRoute adds routing metadata and group tags without changing the

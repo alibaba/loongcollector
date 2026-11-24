@@ -110,3 +110,38 @@ func BenchmarkNilKeyValueGetIterator(b *testing.B) {
 		}
 	})
 }
+
+func TestGroupInfoTemplateKeepsEachGroupWritable(t *testing.T) {
+	metadata := map[string]string{"source": "reader"}
+	tags := map[string]string{"container": "initial", "present-empty": ""}
+	template := NewGroupInfoTemplate(metadata, tags)
+	metadata["source"] = "outside"
+	tags["container"] = "outside"
+
+	firstEvent := new(Log)
+	first := template.NewSingleEventGroup(firstEvent)
+	second := template.NewSingleEventGroup(new(Log))
+	assert.Same(t, firstEvent, first.Events[0])
+	assert.NotSame(t, first.Group, second.Group)
+	assert.True(t, EqualStringValues(first.Group.Tags, second.Group.Tags))
+	assert.True(t, EqualStringValues(first.Group.Tags, NewTagsWithMap(
+		map[string]string{"container": "initial", "present-empty": ""})))
+
+	first.Group.Metadata.Iterator()["source"] = "changed"
+	first.Group.Tags.Add("container", "changed")
+	first.Group.Tags.Delete("present-empty")
+	second.Group.Tags.Merge(NewTagsWithKeyValues("another", "tag"))
+
+	assert.Equal(t, "changed", first.Group.Metadata.Get("source"))
+	assert.Equal(t, "reader", second.Group.Metadata.Get("source"))
+	assert.Equal(t, "changed", first.Group.Tags.Get("container"))
+	assert.False(t, first.Group.Tags.Contains("present-empty"))
+	assert.Equal(t, "initial", second.Group.Tags.Get("container"))
+	assert.True(t, second.Group.Tags.Contains("present-empty"))
+	assert.False(t, first.Group.Tags.Contains("another"))
+	assert.False(t, EqualStringValues(first.Group.Tags, second.Group.Tags))
+
+	empty := NewGroupInfoTemplate(nil, nil).NewSingleEventGroup(new(Log))
+	empty.Group.Tags.Iterator()["new"] = "writable"
+	assert.Equal(t, "writable", empty.Group.Tags.Get("new"))
+}

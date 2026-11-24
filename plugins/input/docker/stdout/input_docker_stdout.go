@@ -82,14 +82,15 @@ func NewDockerFileSyner(sds *ServiceDockerStdout,
 	settings := sds.context.GetPipelineScopeConfig()
 	usingOldContentTag := settings != nil && settings.UsingOldContentTag
 	tags := info.GetStdoutTags(sds.ExternalEnvTag, sds.ExternalK8sLabelTag, usingOldContentTag)
-	var contentTags map[string]string
+	var contentTags, groupTags map[string]string
 	if usingOldContentTag {
 		contentTags = tags
+	} else {
+		groupTags = tags
 	}
-	processor := NewDockerStdoutProcessor(reg, time.Duration(sds.BeginLineTimeoutMs)*time.Millisecond, sds.BeginLineCheckLength, sds.MaxLogSize, sds.Stdout, sds.Stderr, sds.context, sds.collector, contentTags, source)
-	if !usingOldContentTag {
-		processor.groupTags = tags
-	}
+	processor := newDockerStdoutProcessor(reg, time.Duration(sds.BeginLineTimeoutMs)*time.Millisecond,
+		sds.BeginLineCheckLength, sds.MaxLogSize, sds.Stdout, sds.Stderr, sds.context, sds.collector,
+		contentTags, groupTags, source)
 
 	checkpoint, ok := checkpointMap[info.ContainerInfo.ID]
 	if !ok {
