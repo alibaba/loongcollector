@@ -85,17 +85,15 @@ public:
     // Initialize the fixed container reporting endpoint without a native batcher.
     bool InitForProfile(CollectionPipelineContext& context);
 
-    // Go v2 batches are already formed. Preserve each call's routing overrides.
-    bool
-    Send(const models::PipelineEventGroup& group, const std::string& shardHashKey, const std::string& logstore = "");
+    // Go batches are already formed. Preserve each call's routing overrides.
+    bool Send(const models::PipelineEventGroup& group,
+              const std::string& shardHashKey,
+              const std::string& logstore = "");
 
     bool SendPBLogWire(const models::PipelineEventGroup& header,
                        const SLSLogGroupWireView& wire,
                        const std::string& shardHashKey,
                        const std::string& logstore);
-
-    // Legacy LogGroup wire data, for Go v1 and profile callers.
-    bool Send(std::string&& data, const std::string& shardHashKey, const std::string& logstore = "");
 
     const std::string& GetSubpath() const { return mSubpath; }
 
@@ -142,6 +140,8 @@ private:
     bool SerializeAndPush(BatchedEventsList&& groupList);
     bool SerializeAndPush(PipelineEventGroup&& g); // for exactly once only
     bool PushToQueue(QueueKey key, std::unique_ptr<SenderQueueItem>&& item, uint32_t retryTimes = 500);
+    // Compress and enqueue the SLS payload produced by the C++ serializer.
+    bool sendSerializedGroup(std::string&& data, const std::string& shardHashKey, const std::string& logstore);
     bool sendPBLogs(const models::PipelineEventGroup& group,
                     const std::string& shardHashKey,
                     const std::string& logstore,

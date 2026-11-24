@@ -28,7 +28,7 @@ LoongCollector 插件的开发主要有以下步骤：
 6. 使用 *make lint* 检查代码规范。
 7. 提交Pull Request。
 
-在开发时，[Logger 接口](plugin-debug/logger-api.md)和[自监控指标接口](plugin-debug/plugin-self-monitor-guide.md)或许能对您有所帮助。此外，可以使用[纯插件模式启动](plugin-debug/pure-plugin-start.md) LoongCollector，用于对插件进行轻量级测试。
+在开发时，[Logger 接口](plugin-debug/logger-api.md)和[自监控指标接口](plugin-debug/plugin-self-monitor-guide.md)或许能对您有所帮助。可以在[开发环境](../development-environment.md)中增量编译 Go 插件库，并用 LoongCollector 主程序进行联调。
 
 Go 侧插件注册表与 `Add*Creator` 定义见仓库 [`pkg/pipeline/plugin.go`](https://github.com/alibaba/loongcollector/blob/main/pkg/pipeline/plugin.go)；Input 和 Processor 的兼容接口见同目录下的 `input.go` 和 `processor.go`。Aggregator 和 Flusher 的事件接口分别定义于 `aggregator.go` 和 `flusher.go`。
 

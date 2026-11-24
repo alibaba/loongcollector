@@ -36,8 +36,6 @@ const (
 )
 
 const (
-	DefaultGlobalConfig                 = `{"InputIntervalMs":5000,"AggregatIntervalMs":30,"FlushIntervalMs":30,"DefaultLogQueueSize":11,"DefaultLogGroupQueueSize":12}`
-	DefaultPluginConfig                 = `{"inputs":[{"type":"metric_mock","detail":{"Tags":{"tag1":"aaaa","tag2":"bbb"},"Fields":{"Content":"xxxxx","time":"2017.09.12 20:55:36"}}}],"flushers":[{"type":"flusher_stdout"}]}`
 	DefaultFlusherConfig                = `{"type":"flusher_sls","detail":{}}`
 	LoongcollectorEnvPrefix             = "LOONG_"
 	LoongcollectorContainerLogEnvPrefix = "loong_logs_"
@@ -122,8 +120,6 @@ var (
 	SelfEnvConfigFlag bool
 
 	EnableContainerdUpperDirDetect = flag.Bool("enable_containerd_upper_dir_detect", false, "if enable containerd upper dir detect when locating rootfs")
-	GlobalConfig                   = flag.String("global", "./global.json", "global config.")
-	PluginConfig                   = flag.String("plugin", "./plugin.json", "plugin config.")
 	FlusherConfig                  = flag.String("flusher", "./default_flusher.json", "the default flusher configuration is used not only in the plugins without flusher but also to transfer the self telemetry data.")
 	ForceSelfCollect               = flag.Bool("force-statics", false, "Compatibility flag. Normal shutdown collects the final Go self telemetry.")
 	AutoProfile                    = flag.Bool("prof-auto", true, "auto dump prof file when prof-flag is open.")
@@ -131,14 +127,7 @@ var (
 	Cpuprofile                     = flag.String("cpu-profile", "cpu.prof", "write cpu profile to file.")
 	Memprofile                     = flag.String("mem-profile", "mem.prof", "write mem profile to file.")
 	HTTPAddr                       = flag.String("server", ":18689", "http server address.")
-	Doc                            = flag.Bool("doc", false, "generate plugin docs")
-	DocPath                        = flag.String("docpath", "./docs/en/plugins", "generate plugin docs")
 	HTTPLoadFlag                   = flag.Bool("http-load", false, "export http endpoint for load plugin config.")
-	FileIOFlag                     = flag.Bool("file-io", false, "use file for input or output.")
-	InputFile                      = flag.String("input-file", "./input.log", "input file")
-	InputField                     = flag.String("input-field", "content", "input file")
-	InputLineLimit                 = flag.Int("input-line-limit", 1000, "input file")
-	OutputFile                     = flag.String("output-file", "./output.log", "output file")
 	StatefulSetFlag                = flag.Bool("ALICLOUD_LOG_STATEFULSET_FLAG", false, "alibaba log export ports flag, set true if you want to use it")
 
 	DeployMode           = flag.String("DEPLOY_MODE", DeployDaemonset, "alibaba log deploy mode, daemonset or statefulset or singleton")

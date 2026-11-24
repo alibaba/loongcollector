@@ -14,56 +14,47 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-function os() {
-  if uname -s | grep Darwin; then
-    return 2
-  elif uname -s | grep Linux; then
-    return 1
-  else
-    return 3
-  fi
-}
-
 MOD=${1:-mod}
-BUILDMODE=${2:-default}
 OUT_DIR=${3:-output}
 VERSION=${4:-0.0.1}
 PLUGINS_CONFIG_FILE=${5:-${PLUGINS_CONFIG_FILE:-plugins.yml,external_plugins.yml}}
 GO_MOD_FILE=${6:-${GO_MOD_FILE:-go.mod}}
-NAME=loongcollector
 LDFLAGS="${GO_LDFLAGS:-}"' -X "github.com/alibaba/ilogtail/pkg/config.BaseVersion='$VERSION'"'
 BUILD_FLAG=${BUILD_FLAG:-}
 # BUILD_FLAG='"-gcflags=all=-N -l"' # disable optimization and inlining for debuggablity
 BUILD_TAGS=${BUILD_TAGS:-}
 
-os
-OS_FLAG=$?
+if [[ ${2:-c-shared} != "c-shared" ]]; then
+  printf 'Unsupported Go plugin build mode %s (expected c-shared)\n' "$2" >&2
+  exit 1
+fi
 
 ROOTDIR=$(cd $(dirname "${BASH_SOURCE[0]}") && cd .. && pwd)
 CURRDIR=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)
-mkdir -p "$ROOTDIR"/bin
 
-if [ $OS_FLAG = 1 ]; then
-  if uname -m | grep x86_64; then
-    LDFLAGS=$LDFLAGS' -extldflags "-Wl,--wrap=memcpy"'
-  fi
-  if [ $BUILDMODE = "c-shared" ]; then
+OS_NAME=$(uname -s)
+case "$OS_NAME" in
+  Linux)
+    if [ "$(uname -m)" = "x86_64" ]; then
+      LDFLAGS=$LDFLAGS' -extldflags "-Wl,--wrap=memcpy"'
+    fi
     if [ "${ENABLE_CORP_FEATURE:-}" = "ON" ]; then
       NAME=libPluginBase.so
       BUILD_TAGS="${BUILD_TAGS} corp"
     else
       NAME=libGoPluginBase.so
     fi
-  fi
-elif [ $OS_FLAG = 3 ]; then
-  export GOARCH=386
-  export CGO_ENABLED=1
-  if [ $BUILDMODE = "c-shared" ]; then
+    ;;
+  MINGW*|MSYS*|CYGWIN*)
+    export GOARCH=386
+    export CGO_ENABLED=1
     NAME=GoPluginBase.dll
-  fi
-elif [ $OS_FLAG = 2 ]; then
-  BUILDMODE=default
-fi
+    ;;
+  *)
+    printf 'Go plugin shared libraries are unsupported on %s\n' "$OS_NAME" >&2
+    exit 1
+    ;;
+esac
 
 # if not vendor mod, update plugin registry and go tidy
 # otherwise you should have done it and go vendor
@@ -93,4 +84,4 @@ sudo chown ${USER}:${GROUP} ${lib_name}
 cd -
 
 # make plugins stuffs
-go build -mod="$MOD" -modfile="$GO_MOD_FILE" -buildmode="$BUILDMODE" -ldflags="$LDFLAGS" $BUILD_FLAG -tags "$BUILD_TAGS" -o "$ROOTDIR/$OUT_DIR/${NAME}" "$ROOTDIR"/plugin_main
+go build -mod="$MOD" -modfile="$GO_MOD_FILE" -buildmode=c-shared -ldflags="$LDFLAGS" $BUILD_FLAG -tags "$BUILD_TAGS" -o "$ROOTDIR/$OUT_DIR/${NAME}" "$ROOTDIR"/plugin_main

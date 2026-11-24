@@ -987,7 +987,7 @@ bool FlusherSLS::Send(const models::PipelineEventGroup& pbGroup, const string& s
         LOG_WARNING(sLogger, ("failed to serialize PipelineEventGroup PB", errorMsg));
         return false;
     }
-    return Send(std::move(data), hash, logstore);
+    return sendSerializedGroup(std::move(data), hash, logstore);
 }
 
 bool FlusherSLS::SendPBLogWire(const models::PipelineEventGroup& header,
@@ -1036,10 +1036,10 @@ bool FlusherSLS::sendPBLogs(const models::PipelineEventGroup& pbGroup,
         LOG_WARNING(sLogger, ("failed to serialize PipelineEventGroup PB", errorMsg));
         return false;
     }
-    return Send(std::move(data), hash, logstore);
+    return sendSerializedGroup(std::move(data), hash, logstore);
 }
 
-bool FlusherSLS::Send(string&& data, const string& shardHashKey, const string& logstore) {
+bool FlusherSLS::sendSerializedGroup(string&& data, const string& shardHashKey, const string& logstore) {
     const auto rawSize = data.size();
     string compressedData;
     if (mCompressor) {

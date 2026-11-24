@@ -145,22 +145,6 @@ typedef void (*FreeSelfMonitorPBFun)(char* data);
 // Methods export by adapter.
 typedef int (*IsValidToSendFun)(long long logstoreKey);
 
-typedef int (*SendPbFun)(const char* configName,
-                         int configNameSize,
-                         const char* logstore,
-                         int logstoreSize,
-                         char* pbBuffer,
-                         int pbSize,
-                         int lines);
-typedef int (*SendPbV2Fun)(const char* configName,
-                           int configNameSize,
-                           const char* logstore,
-                           int logstoreSize,
-                           char* pbBuffer,
-                           int pbSize,
-                           int lines,
-                           const char* shardHash,
-                           int shardHashSize);
 typedef int (*SendPipelineEventGroupFun)(const char* configName,
                                          int configNameSize,
                                          const char* logstore,
@@ -172,8 +156,7 @@ typedef int (*SendPipelineEventGroupFun)(const char* configName,
                                          int shardHashSize);
 
 
-typedef void (*RegisterLogtailCallBack)(IsValidToSendFun checkFun, SendPbFun sendFun);
-typedef void (*RegisterLogtailCallBackV2)(IsValidToSendFun checkFun, SendPbFun sendFun, SendPbV2Fun sendV2Fun);
+typedef void (*RegisterIsValidToSendFun)(IsValidToSendFun checkFun);
 typedef void (*RegisterSendPipelineEventGroupFun)(SendPipelineEventGroupFun sendFun);
 
 typedef int (*PluginAdapterVersion)();
@@ -225,31 +208,10 @@ public:
 
     static int IsValidToSend(long long logstoreKey);
 
-    static int SendPb(const char* configName,
-                      int32_t configNameSize,
-                      const char* logstore,
-                      int logstoreSize,
-                      char* pbBuffer,
-                      int32_t pbSize,
-                      int32_t lines);
-
-    // because go pipeline supports route, but only use one flusher, so the actual logstore is given by go, not by the
-    // logstore param in FlusherSLS
-    static int SendPbV2(const char* configName,
-                        int32_t configNameSize,
-                        const char* logstore,
-                        int logstoreSize,
-                        char* pbBuffer,
-                        int32_t pbSize,
-                        int32_t lines,
-                        const char* shardHash,
-                        int shardHashSize);
-
-    // SendPipelineEventGroup is the PipelineEventGroup-PB counterpart of SendPbV2.
-    // It coexists with legacy SendPb/SendPbV2 and forwards each call's routing
-    // overrides to the typed FlusherSLS path. Return codes match SendPbV2:
-    // 0 accepted (including disabled profile reporting), -1 parse/send failure,
-    // -2 config missing or without an SLS flusher.
+    // SendPipelineEventGroup forwards events and per-call routing overrides
+    // to the native SLS flusher. It returns 0 when accepted (including disabled
+    // profile reporting), -1 on parse or send failure, and -2 if the pipeline
+    // or its SLS flusher is missing.
     static int SendPipelineEventGroup(const char* configName,
                                       int32_t configNameSize,
                                       const char* logstore,

@@ -2083,7 +2083,7 @@ void FlusherSLSUnittest::OnGoPipelineSend() {
         flusher.Init(configJson, optionalGoPipeline);
         flusher.CommitMetricsRecordRef();
         {
-            APSARA_TEST_TRUE(flusher.Send("content", "shardhash_key", "other_logstore"));
+            APSARA_TEST_TRUE(flusher.sendSerializedGroup("content", "shardhash_key", "other_logstore"));
 
             vector<SenderQueueItem*> res;
             SenderQueueManager::GetInstance()->GetAvailableItems(res, 80);
@@ -2105,7 +2105,7 @@ void FlusherSLSUnittest::OnGoPipelineSend() {
             APSARA_TEST_EQUAL("content", output);
         }
         {
-            APSARA_TEST_TRUE(flusher.Send("content", "shardhash_key", ""));
+            APSARA_TEST_TRUE(flusher.sendSerializedGroup("content", "shardhash_key", ""));
 
             vector<SenderQueueItem*> res;
             SenderQueueManager::GetInstance()->GetAvailableItems(res, 80);
@@ -2123,7 +2123,7 @@ void FlusherSLSUnittest::OnGoPipelineSend() {
         flusher.mCompressor = CompressorFactory::GetInstance()->Create(
             Json::Value(), CollectionPipelineContext(), "flusher_sls", "1", CompressType::LZ4);
 
-        APSARA_TEST_TRUE(flusher.Send("content", ""));
+        APSARA_TEST_TRUE(flusher.sendSerializedGroup("content", "", ""));
 
         auto key = QueueKeyManager::GetInstance()->GetKey("test_project-test_logstore");
 

@@ -220,71 +220,6 @@ int LogtailPlugin::IsValidToSend(long long logstoreKey) {
     return SenderQueueManager::GetInstance()->IsValidToPush(logstoreKey) ? 0 : -1;
 }
 
-int LogtailPlugin::SendPb(const char* configName,
-                          int32_t configNameSize,
-                          const char* logstoreName,
-                          int logstoreSize,
-                          char* pbBuffer,
-                          int32_t pbSize,
-                          int32_t lines) {
-    return SendPbV2(configName, configNameSize, logstoreName, logstoreSize, pbBuffer, pbSize, lines, NULL, 0);
-}
-
-int LogtailPlugin::SendPbV2(const char* configName,
-                            int32_t configNameSize,
-                            const char* logstoreName,
-                            int logstoreSize,
-                            char* pbBuffer,
-                            int32_t pbSize,
-                            int32_t /*lines*/,
-                            const char* shardHash,
-                            int shardHashSize) {
-    static FlusherSLS* containerConfig = &(LogtailPlugin::GetInstance()->mPluginContainerConfig);
-
-    string configNameStr = string(configName, configNameSize);
-
-    string logstore;
-    if (logstoreSize > 0 && logstoreName != NULL) {
-        logstore.assign(logstoreName, (size_t)logstoreSize);
-    }
-
-    // LOG_DEBUG(sLogger, ("send pb", configNameStr)("pb size", pbSize)("lines", lines));
-    FlusherSLS* pConfig = NULL;
-    if (configNameStr == containerConfig->mLogstore) {
-        auto* plugin = LogtailPlugin::GetInstance();
-        lock_guard<mutex> lock(plugin->mPluginContainerMutex);
-        pConfig = containerConfig;
-        pConfig->mProject = GetProfileSender()->GetDefaultProfileProjectName();
-        pConfig->mRegion = GetProfileSender()->GetDefaultProfileRegion();
-        if (pConfig->mProject.empty()) {
-            return 0;
-        }
-        if (!pConfig->InitForProfile(plugin->mPluginContainerContext)) {
-            return -1;
-        }
-        string hash;
-        if (shardHashSize > 0 && shardHash != nullptr) {
-            hash.assign(shardHash, static_cast<size_t>(shardHashSize));
-        }
-        return pConfig->Send(string(pbBuffer, pbSize), hash, logstore) ? 0 : -1;
-    } else {
-        shared_ptr<CollectionPipeline> p = CollectionPipelineManager::GetInstance()->FindConfigByName(configNameStr);
-        if (!p) {
-            LOG_INFO(sLogger,
-                     ("error", "SendPbV2 can not find config, maybe config updated")("config", configNameStr)(
-                         "logstore", logstore));
-            return -2;
-        }
-        // TODO: support multi-flusher
-        pConfig = const_cast<FlusherSLS*>(static_cast<const FlusherSLS*>(p->GetFlushers()[0]->GetPlugin()));
-    }
-    std::string shardHashStr;
-    if (shardHashSize > 0) {
-        shardHashStr.assign(shardHash, static_cast<size_t>(shardHashSize));
-    }
-    return pConfig->Send(std::string(pbBuffer, pbSize), shardHashStr, logstore) ? 0 : -1;
-}
-
 int LogtailPlugin::SendPipelineEventGroup(const char* configName,
                                           int32_t configNameSize,
                                           const char* logstoreName,
@@ -391,37 +326,26 @@ bool LogtailPlugin::LoadPluginBase() {
             return mPluginValid;
         }
         int version = versionFun();
-        if (!(version / 100 == 2 || version / 100 == 3 || version / 100 == 4)) {
+        if (version / 100 != 5) {
             LOG_ERROR(sLogger, ("invalid plugin adapter version, version", version));
             return mPluginValid;
         }
         LOG_INFO(sLogger, ("valid plugin adapter version, version", version));
 
-        // Be compatible with old libGoPluginAdapter.so, V2 -> V1.
-        auto registerV2Fun = (RegisterLogtailCallBackV2)loader.LoadMethod("RegisterLogtailCallBackV2", error);
-        if (error.empty()) {
-            registerV2Fun(LogtailPlugin::IsValidToSend, LogtailPlugin::SendPb, LogtailPlugin::SendPbV2);
-        } else {
-            LOG_WARNING(sLogger, ("load RegisterLogtailCallBackV2 failed", error)("try to load V1", ""));
-
-            auto registerFun = (RegisterLogtailCallBack)loader.LoadMethod("RegisterLogtailCallBack", error);
-            if (!error.empty()) {
-                LOG_WARNING(sLogger, ("load RegisterLogtailCallBack failed", error));
-                return mPluginValid;
-            }
-            registerFun(LogtailPlugin::IsValidToSend, LogtailPlugin::SendPb);
+        auto registerCheck = (RegisterIsValidToSendFun)loader.LoadMethod("RegisterIsValidToSend", error);
+        if (!error.empty()) {
+            LOG_ERROR(sLogger, ("load RegisterIsValidToSend failed", error));
+            return mPluginValid;
         }
 
-        // Additive: SendPipelineEventGroup coexists with SendPb. Old adapters
-        // without this symbol keep working; Go calls then return -1.
-        auto registerPegFun
+        auto registerSend
             = (RegisterSendPipelineEventGroupFun)loader.LoadMethod("RegisterSendPipelineEventGroup", error);
-        if (error.empty()) {
-            registerPegFun(LogtailPlugin::SendPipelineEventGroup);
-        } else {
-            LOG_WARNING(sLogger,
-                        ("load RegisterSendPipelineEventGroup failed", error)("SendPipelineEventGroup", "unavailable"));
+        if (!error.empty()) {
+            LOG_ERROR(sLogger, ("load RegisterSendPipelineEventGroup failed", error));
+            return mPluginValid;
         }
+        registerCheck(LogtailPlugin::IsValidToSend);
+        registerSend(LogtailPlugin::SendPipelineEventGroup);
 
         mPluginAdapterPtr = loader.Release();
     }

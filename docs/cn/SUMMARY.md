@@ -209,7 +209,6 @@
   * 插件调试
     * [Logger接口](developer-guide/plugin-development/plugin-debug/logger-api.md)
     * [Golang 自监控指标接口](developer-guide/plugin-development/plugin-debug/plugin-self-monitor-guide.md)
-    * [纯插件模式启动](developer-guide/plugin-development/plugin-debug/pure-plugin-start.md)
 * 测试
   * [单元测试](developer-guide/test/unit-test.md)
   * [E2E测试](developer-guide/test/e2e-test.md)
