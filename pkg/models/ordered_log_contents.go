@@ -46,7 +46,7 @@ func (m *orderedLogMap) keysInOrder() []string {
 			liveKeys++
 		}
 	}
-	if liveKeys == len(m.keys) && liveKeys == len(m.values) {
+	if liveKeys == len(m.keys) && len(m.keys) == len(m.values) {
 		return m.keys
 	}
 

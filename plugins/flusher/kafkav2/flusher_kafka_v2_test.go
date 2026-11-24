@@ -107,7 +107,8 @@ func TestKafkaExportJSONLineStreamWithoutSelectedFieldValues(t *testing.T) {
 }
 
 func TestKafkaExportContinuesAfterConversionError(t *testing.T) {
-	producer := &bufferedProducer{messages: make(chan *sarama.ProducerMessage, 1)}
+	// Allow both candidate messages to enqueue so an unexpected send fails the assertion.
+	producer := &bufferedProducer{messages: make(chan *sarama.ProducerMessage, 2)}
 	flusher := NewFlusherKafka()
 	flusher.context = mock.NewEmptyContext("project", "store", "config")
 	flusher.producer = producer
@@ -117,7 +118,7 @@ func TestKafkaExportContinuesAfterConversionError(t *testing.T) {
 	require.NoError(t, err)
 
 	require.NoError(t, flusher.Export([]*models.PipelineGroupEvents{
-		{Events: []models.PipelineEvent{models.NewSimpleLog([]byte("unsupported"), models.NewTags(), 1)}},
+		{Events: []models.PipelineEvent{&models.Metric{Name: "unsupported"}}},
 		{Events: []models.PipelineEvent{models.ByteArray("valid")}},
 	}, nil))
 	require.Len(t, producer.messages, 1)
