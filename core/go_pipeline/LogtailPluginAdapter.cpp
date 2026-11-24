@@ -35,14 +35,14 @@ int LogtailIsValidToSend(long long logstoreKey) {
 }
 
 int LogtailSendPipelineEventGroup(const char* configName,
-                                 int configNameSize,
-                                 const char* logstore,
-                                 int logstoreSize,
-                                 char* pbBuffer,
-                                 int pbSize,
-                                 int eventCount,
-                                 const char* shardHash,
-                                 int shardHashSize) {
+                                  int configNameSize,
+                                  const char* logstore,
+                                  int logstoreSize,
+                                  char* pbBuffer,
+                                  int pbSize,
+                                  int eventCount,
+                                  const char* shardHash,
+                                  int shardHashSize) {
     if (gSendPipelineEventGroup == nullptr) {
         return -1;
     }
