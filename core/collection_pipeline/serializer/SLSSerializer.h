@@ -57,16 +57,21 @@ public:
                            const GroupTags& tags,
                            size_t originalTagSize,
                            std::string& res,
-                           std::string& errorMsg);
+                           std::string& errorMsg,
+                           bool* exceedsSizeLimit = nullptr);
 
     bool DoSerializePBLogWire(const SLSLogGroupWireView& group,
                               const GroupTags& tags,
                               size_t originalTagSize,
                               std::string& res,
-                              std::string& errorMsg);
+                              std::string& errorMsg,
+                              bool* exceedsSizeLimit = nullptr);
+
+    bool DoSerializeGoEvents(BatchedEvents&& group, std::string& res, std::string& errorMsg, bool* exceedsSizeLimit);
 
 private:
     bool Serialize(BatchedEvents&& p, std::string& res, std::string& errorMsg) override;
+    bool SerializeGroup(BatchedEvents& group, std::string& res, std::string& errorMsg, bool* exceedsSizeLimit);
 
     void CalculateLogEventSize(const BatchedEvents& group,
                                size_t& logGroupSZ,

@@ -19,11 +19,13 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strconv"
 	"sync"
 	"time"
 
 	dogstatsd "github.com/narqo/go-dogstatsd-parser"
 
+	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/protocol/decoder/common"
@@ -40,14 +42,22 @@ func (d *Decoder) ParseRequest(res http.ResponseWriter, req *http.Request, maxBo
 }
 
 func (d *Decoder) Decode(data []byte, _ *http.Request) ([]*models.PipelineGroupEvents, error) {
-	timestamp := time.Now().UnixNano()
+	now := time.Now()
+	timeText := strconv.FormatInt(now.UnixNano(), 10)
+	keys := []string{"__name__", "__time_nano__", "__labels__", "__value__"}
 	var events []models.PipelineEvent
 	d.parseMetrics(data, func(metric *dogstatsd.Metric, value float64) {
-		if metric.Tags == nil {
-			metric.Tags = make(map[string]string)
-		}
-		event := models.NewSingleValueMetric(metric.Name, models.MetricTypeUntyped, models.NewTagsWithMap(metric.Tags), timestamp, value)
-		events = append(events, event)
+		// StatsD has historically exposed the metric row as ordinary log
+		// contents, including the configurable SLS name and label formatting.
+		var labels helper.MetricLabels
+		labels.AppendMap(metric.Tags)
+		log, _ := helper.NewInputLogRow(nil, keys, []string{
+			helper.FormatMetricLogName(metric.Name),
+			timeText,
+			labels.String(),
+			helper.FormatMetricLogValue(value),
+		}, now)
+		events = append(events, log)
 	})
 	if len(events) == 0 {
 		return nil, nil

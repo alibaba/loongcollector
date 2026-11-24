@@ -197,7 +197,7 @@ func (s *processorTestSuite) TestEnableLogPositionMeta(c *check.C) {
 		outLogs := processortest.Apply(processor, logEvent)
 		c.Assert(len(outLogs), check.Equals, 3)
 		for i := 0; i < len(outLogs); i++ {
-			c.Assert(outLogs[i].GetOffset(), check.Equals, uint64(i*5))
+			c.Assert(outLogs[i].GetOffset(), check.Equals, uint64(0))
 		}
 	}
 
@@ -210,7 +210,7 @@ func (s *processorTestSuite) TestEnableLogPositionMeta(c *check.C) {
 		outLogs := processortest.Apply(processor, logEvent)
 		c.Assert(len(outLogs), check.Equals, 3)
 		for i := 0; i < len(outLogs); i++ {
-			c.Assert(outLogs[i].GetOffset(), check.Equals, uint64(1000+i*5))
+			c.Assert(outLogs[i].GetOffset(), check.Equals, uint64(1000))
 		}
 	}
 }
@@ -241,7 +241,7 @@ func TestProcessorSplitLogString_ProcessSplitsLog(t *testing.T) {
 }
 
 func TestProcessorSplitLogStringSplitsConfiguredField(t *testing.T) {
-	processor := &ProcessorSplit{SplitKey: "payload", SplitSep: "|"}
+	processor := &ProcessorSplit{SplitKey: "payload", SplitSep: "|", EnableLogPositionMeta: true}
 	require.NoError(t, processor.Init(mock.NewEmptyContext("p", "l", "c")))
 
 	log := processortest.Log("content", "raw body", "payload", "first|second")
@@ -260,15 +260,14 @@ func TestProcessorSplitLogStringSplitsConfiguredField(t *testing.T) {
 	assert.Equal(t, "first|second", log.GetIndices().Get("payload"))
 }
 
-func TestProcessorSplitLogStringKeepsLogWithEmptySplitField(t *testing.T) {
+func TestProcessorSplitLogStringDiscardsEmptySplitField(t *testing.T) {
 	processor := &ProcessorSplit{SplitKey: "payload", SplitSep: "|", PreserveOthers: true}
 	require.NoError(t, processor.Init(mock.NewEmptyContext("p", "l", "c")))
 
 	log := processortest.Log("payload", "", "other", "keep")
 	log.SetBody([]byte("original body"))
 	logs := processortest.Apply(processor, log)
-	require.Len(t, logs, 1)
-	require.Same(t, log, logs[0])
+	require.Empty(t, logs)
 
 	processor.PreserveOthers = false
 	require.Empty(t, processortest.Apply(processor, log))

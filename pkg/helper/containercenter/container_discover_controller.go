@@ -16,8 +16,10 @@ package containercenter
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
@@ -32,11 +34,16 @@ var FetchAllInterval = time.Second * time.Duration(300)
 // current incremental discovery does not refresh container's lastUpdateTime, so this value must be greater than FetchAllInterval
 var fetchAllSuccessTimeout = FetchAllInterval * 20
 var ContainerCenterTimeout = time.Second * time.Duration(30)
+var MaxFetchOneTriggerPerSecond int32 = 200
 
 type ContainerDiscoverManager struct {
 	enableDockerDiscover bool // maybe changed
 	enableCRIDiscover    bool
 	enableStaticDiscover bool
+
+	fetchOneCount    int32 // only limit the frequency of FetchOne
+	lastFetchOneTime int64
+	fetchOneLock     sync.Mutex
 }
 
 func NewContainerDiscoverManager() *ContainerDiscoverManager {
@@ -66,6 +73,36 @@ func (c *ContainerDiscoverManager) FetchAll() {
 			logger.Info(context.Background(), "container CRIRuntime fetch all", err)
 		}
 	}
+}
+
+func (c *ContainerDiscoverManager) FetchOne(containerID string) error {
+	logger.Debug(context.Background(), "discover manager fetch one", containerID)
+	now := time.Now().Unix()
+	c.fetchOneLock.Lock()
+	if now > c.lastFetchOneTime {
+		c.lastFetchOneTime = now
+		c.fetchOneCount = 0
+	}
+	c.fetchOneCount++
+	if c.fetchOneCount > MaxFetchOneTriggerPerSecond {
+		logger.Debug(context.Background(), "discover manager reject because of reaching the maximum fetch count", containerID)
+		c.fetchOneLock.Unlock()
+		return fmt.Errorf("cannot fetch %s because of reaching the maximum fetch count", containerID)
+	}
+	c.fetchOneLock.Unlock()
+	var err error
+	if c.enableCRIDiscover {
+		err = criRuntimeWrapper.fetchOne(containerID)
+		logger.Debug(context.Background(), "discover manager cri fetch one status", err == nil)
+		if err == nil {
+			return nil
+		}
+	}
+	if c.enableDockerDiscover {
+		err = containerCenterInstance.fetchOne(containerID, true)
+		logger.Debug(context.Background(), "discover manager docker fetch one status", err == nil)
+	}
+	return err
 }
 
 func (c *ContainerDiscoverManager) fetchDocker() error {
@@ -191,6 +228,16 @@ func (c *ContainerDiscoverManager) Init() bool {
 		}
 	}
 	logger.Info(context.Background(), "init docker center, client request timeout", ContainerCenterTimeout.String())
+	{
+		count := int(MaxFetchOneTriggerPerSecond)
+		if err := util.InitFromEnvInt("CONTAINER_FETCH_ONE_MAX_COUNT_PER_SECOND", &count, count); err != nil {
+			c.LogAlarm(err, "initialize env CONTAINER_FETCH_ONE_MAX_COUNT_PER_SECOND error")
+		}
+		if count > 0 {
+			MaxFetchOneTriggerPerSecond = int32(count)
+		}
+	}
+	logger.Info(context.Background(), "init docker center, max fetchOne count per second", MaxFetchOneTriggerPerSecond)
 	{
 		timeoutSec := int(ForceReleaseDeletedFileFDTimeout.Seconds())
 		if err := util.InitFromEnvInt("force_release_deleted_file_fd_timeout", &timeoutSec, timeoutSec); err != nil {

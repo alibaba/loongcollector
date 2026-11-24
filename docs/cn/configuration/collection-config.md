@@ -91,6 +91,8 @@ flushers:
 
 Go 插件管理器使用 `PipelineGroupEvents`，C++ 输入通过 `PipelineEventGroup` protobuf 进入处理链。旧配置中的 `global.StructureType: v2` 仍可读取。请从新配置省略该字段，并从原来显式填写 `v1` 的配置中移除。
 
-未配置 aggregator 时，processor 输出直接交给 flusher，不再自动创建透传 aggregator 及其定时器。显式配置的 metadata 分组、攒批等 aggregator 仍有效。
+未配置 aggregator 时，Go Pipeline 使用默认的上下文聚合器，按来源、元数据和组标签攒批，并在达到容量或刷新周期时输出。显式配置的 aggregator 优先。
+
+发往 SLS 时，C++ 按最终日志组大小检查 `max_send_log_group_size`。超过上限的 Go 批次按原顺序拆分后重试。单个事件连同组标签仍超过上限时，该事件会被丢弃并告警，其他事件继续发送。
 
 采集、处理、聚合和发送统一使用事件接口。SLS protobuf 留在协议编码和解码边界。

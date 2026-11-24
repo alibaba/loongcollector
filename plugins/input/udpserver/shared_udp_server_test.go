@@ -15,12 +15,14 @@
 package udpserver
 
 import (
+	"strconv"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/encoding/protowire"
 
+	"github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
@@ -29,7 +31,7 @@ import (
 	"github.com/alibaba/ilogtail/plugins/test"
 )
 
-func TestSharedUDPServerRoutesStatsDMetrics(t *testing.T) {
+func TestSharedUDPServerRoutesStatsDLogs(t *testing.T) {
 	statsd, err := decoder.GetDecoder(common.ProtocolStatsd)
 	require.NoError(t, err)
 	first := helper.NewObservePipelineContext(2).Collector()
@@ -52,15 +54,19 @@ func TestSharedUDPServerRoutesStatsDMetrics(t *testing.T) {
 	require.Len(t, res, 1)
 	require.Equal(t, "packet", res[0].Group.GetMetadata().Get("source"))
 	require.Len(t, res[0].Events, 1)
-	require.Equal(t, map[string]string{"instance_peer": "other"}, res[0].Events[0].GetTags().Iterator())
-	require.Equal(t, float64(1), res[0].Events[0].(*models.Metric).GetValue().GetSingleValue())
+	log := res[0].Events[0].(*models.Log)
+	require.Empty(t, log.GetTags().Iterator())
+	require.Equal(t, "instance_peer#$#other", log.GetIndices().Get("__labels__"))
+	require.Equal(t, "1", log.GetIndices().Get("__value__"))
 
 	res = second.ToArray()
 	require.Len(t, res, 1)
 	require.Equal(t, "packet", res[0].Group.GetMetadata().Get("source"))
 	require.Len(t, res[0].Events, 1)
-	require.Equal(t, map[string]string{"env": "test"}, res[0].Events[0].GetTags().Iterator())
-	require.Equal(t, float64(2), res[0].Events[0].(*models.Metric).GetValue().GetSingleValue())
+	log = res[0].Events[0].(*models.Log)
+	require.Empty(t, log.GetTags().Iterator())
+	require.Equal(t, "env#$#test", log.GetIndices().Get("__labels__"))
+	require.Equal(t, "2", log.GetIndices().Get("__value__"))
 }
 
 func TestUDPDatagramPreservesRawLogAndSLSTags(t *testing.T) {
@@ -95,4 +101,34 @@ func TestUDPDatagramPreservesRawLogAndSLSTags(t *testing.T) {
 	require.Equal(t, "udp-topic", groups[0].Group.GetTags().Get(pipeline.TopicTagKey))
 	require.Equal(t, "test", groups[0].Group.GetTags().Get("env"))
 	require.Equal(t, uint64(1700000000123456789), groups[0].Events[0].GetTimestamp())
+}
+
+func TestUDPStatsDPreservesLegacyLogFields(t *testing.T) {
+	opts := &config.LoongcollectorGlobalConfig
+	wasEnabled := opts.EnableSlsMetricsFormat
+	t.Cleanup(func() { opts.EnableSlsMetricsFormat = wasEnabled })
+	statsd, err := decoder.GetDecoder(common.ProtocolStatsd)
+	require.NoError(t, err)
+	u := &UDPServer{Format: common.ProtocolStatsd, decoder: statsd}
+
+	for _, tc := range []struct {
+		enabled bool
+		name    string
+		labels  string
+	}{
+		{false, "app.requests", "a#$#first|x.y#$#other"},
+		{true, "app_requests", "a#$#first|x_y#$#other"},
+	} {
+		opts.EnableSlsMetricsFormat = tc.enabled
+		groups, err := u.decodeDatagram([]byte("app.requests:3.5|g|#x.y:other,a:first"))
+		require.NoError(t, err)
+		require.Len(t, groups, 1)
+		require.Len(t, groups[0].Events, 1)
+		log := groups[0].Events[0].(*models.Log)
+		require.Equal(t, tc.name, log.GetIndices().Get("__name__"))
+		require.Equal(t, tc.labels, log.GetIndices().Get("__labels__"))
+		require.Equal(t, "3.5", log.GetIndices().Get("__value__"))
+		require.Equal(t, strconv.FormatUint(log.GetTimestamp(), 10), log.GetIndices().Get("__time_nano__"))
+		require.Empty(t, log.GetTags().Iterator())
+	}
 }

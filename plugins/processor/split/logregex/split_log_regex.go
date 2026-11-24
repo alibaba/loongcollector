@@ -20,6 +20,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 
 	"regexp"
+	"time"
 
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
@@ -133,6 +134,10 @@ func (p *ProcessorSplitRegex) Process(in *models.PipelineGroupEvents, context pi
 				logger.Warning(p.context.GetRuntimeContext(), selfmonitor.LogRegexFindAlarm, "can't find split key", p.SplitKey)
 			}
 			if p.PreserveOthers {
+				if log.Timestamp == 0 {
+					log = log.Clone().(*models.Log)
+					log.Timestamp = uint64(time.Now().Truncate(time.Second).UnixNano())
+				}
 				outEvents = append(outEvents, log)
 			}
 			continue
@@ -147,15 +152,21 @@ func (p *ProcessorSplitRegex) Process(in *models.PipelineGroupEvents, context pi
 			// Split payloads are appended after the preserved fields.
 			template.GetIndices().Delete(splitKey)
 		} else {
-			template.SetIndices(models.NewLogContents())
+			template.SetIndices(models.NewOrderedLogContents(1))
 		}
+		if template.Timestamp == 0 {
+			template.Timestamp = uint64(time.Now().Truncate(time.Second).UnixNano())
+		}
+		hasOffset := log.GetOffset() != 0 || log.GetRawSize() != 0
 		for i, seg := range segments {
 			newLog := template
 			if i < len(segments)-1 {
 				newLog = template.Clone().(*models.Log)
 			}
 			newLog.GetIndices().Add(splitKey, seg.value)
-			newLog.SetOffset(log.GetOffset() + uint64(seg.offset))
+			if p.EnableLogPositionMeta && hasOffset {
+				newLog.SetOffset(log.GetOffset() + uint64(seg.offset))
+			}
 			outEvents = append(outEvents, newLog)
 		}
 	}

@@ -882,6 +882,19 @@ void SLSSerializerUnittest::TestSerializePBLogWire() {
         EXPECT_EQ(expected, actual);
     }
 
+    const int32_t oldMaxSize = INT32_FLAG(max_send_log_group_size);
+    INT32_FLAG(max_send_log_group_size) = 1;
+    string output, error;
+    bool exceedsSizeLimit = false;
+    EXPECT_FALSE(serializer.DoSerializePBLogWire(*wire, tags.mInner, 5, output, error, &exceedsSizeLimit));
+    EXPECT_TRUE(exceedsSizeLimit);
+    EXPECT_TRUE(output.empty());
+    exceedsSizeLimit = false;
+    EXPECT_FALSE(serializer.DoSerializePBLogs(pb, tags.mInner, 5, output, error, &exceedsSizeLimit));
+    EXPECT_TRUE(exceedsSizeLimit);
+    EXPECT_TRUE(output.empty());
+    INT32_FLAG(max_send_log_group_size) = oldMaxSize;
+
     EXPECT_FALSE(SLSLogGroupWireView::Parse(encoded.substr(0, encoded.size() - 1), 2));
     EXPECT_FALSE(SLSLogGroupWireView::Parse(encoded + "\x20\x01", 2));
     field->set_key("first"); // Repeated keys require last-value override.

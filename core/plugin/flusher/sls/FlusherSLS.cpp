@@ -959,9 +959,12 @@ bool FlusherSLS::InitForProfile(CollectionPipelineContext& context) {
         || SenderQueueManager::GetInstance()->CreateQueue(mQueueKey, mPluginID, mLogstore, context, {});
 }
 
-bool FlusherSLS::Send(const models::PipelineEventGroup& pbGroup, const string& shardHashKey, const string& logstore) {
+bool FlusherSLS::Send(const models::PipelineEventGroup& pbGroup,
+                      const string& shardHashKey,
+                      const string& logstore,
+                      bool* exceedsSizeLimit) {
     if (pbGroup.has_logs()) {
-        return sendPBLogs(pbGroup, shardHashKey, logstore);
+        return sendPBLogs(pbGroup, shardHashKey, logstore, nullptr, exceedsSizeLimit);
     }
 
     PipelineEventGroup group(make_shared<SourceBuffer>());
@@ -983,24 +986,28 @@ bool FlusherSLS::Send(const models::PipelineEventGroup& pbGroup, const string& s
     }
     AddPackId(batch);
     string data;
-    if (!mGroupSerializer || !mGroupSerializer->DoSerialize(std::move(batch), data, errorMsg)) {
-        LOG_WARNING(sLogger, ("failed to serialize PipelineEventGroup PB", errorMsg));
+    if (!mGroupSerializer || !mGroupSerializer->DoSerializeGoEvents(std::move(batch), data, errorMsg, exceedsSizeLimit)) {
+        if (exceedsSizeLimit == nullptr || !*exceedsSizeLimit) {
+            LOG_WARNING(sLogger, ("failed to serialize PipelineEventGroup PB", errorMsg));
+        }
         return false;
     }
-    return sendSerializedGroup(std::move(data), hash, logstore);
+    return sendGoSerializedGroup(std::move(data), hash, logstore, exceedsSizeLimit);
 }
 
 bool FlusherSLS::SendPBLogWire(const models::PipelineEventGroup& header,
                                const SLSLogGroupWireView& wire,
                                const string& shardHashKey,
-                               const string& logstore) {
-    return sendPBLogs(header, shardHashKey, logstore, &wire);
+                               const string& logstore,
+                               bool* exceedsSizeLimit) {
+    return sendPBLogs(header, shardHashKey, logstore, &wire, exceedsSizeLimit);
 }
 
 bool FlusherSLS::sendPBLogs(const models::PipelineEventGroup& pbGroup,
                             const string& shardHashKey,
                             const string& logstore,
-                            const SLSLogGroupWireView* wire) {
+                            const SLSLogGroupWireView* wire,
+                            bool* exceedsSizeLimit) {
     if (wire ? wire->mEventCount == 0 : pbGroup.logs().events_size() == 0) {
         LOG_WARNING(
             sLogger,
@@ -1030,13 +1037,30 @@ bool FlusherSLS::sendPBLogs(const models::PipelineEventGroup& pbGroup,
 
     string data, errorMsg;
     const bool serialized = mGroupSerializer
-        && (wire ? mGroupSerializer->DoSerializePBLogWire(*wire, tags.mInner, originalTagSize, data, errorMsg)
-                 : mGroupSerializer->DoSerializePBLogs(pbGroup, tags.mInner, originalTagSize, data, errorMsg));
+        && (wire ? mGroupSerializer->DoSerializePBLogWire(
+                       *wire, tags.mInner, originalTagSize, data, errorMsg, exceedsSizeLimit)
+                 : mGroupSerializer->DoSerializePBLogs(
+                       pbGroup, tags.mInner, originalTagSize, data, errorMsg, exceedsSizeLimit));
     if (!serialized) {
-        LOG_WARNING(sLogger, ("failed to serialize PipelineEventGroup PB", errorMsg));
+        if (exceedsSizeLimit == nullptr || !*exceedsSizeLimit) {
+            LOG_WARNING(sLogger, ("failed to serialize PipelineEventGroup PB", errorMsg));
+        }
         return false;
     }
-    return sendSerializedGroup(std::move(data), hash, logstore);
+    return sendGoSerializedGroup(std::move(data), hash, logstore, exceedsSizeLimit);
+}
+
+bool FlusherSLS::sendGoSerializedGroup(
+    string&& data, const string& shardHashKey, const string& logstore, bool* exceedsSizeLimit) {
+    // Enforce the limit on the final payload, including group tags and pack ID.
+    const auto limit = INT32_FLAG(max_send_log_group_size);
+    if (limit <= 0 || data.size() > static_cast<size_t>(limit)) {
+        if (exceedsSizeLimit != nullptr) {
+            *exceedsSizeLimit = true;
+        }
+        return false;
+    }
+    return sendSerializedGroup(std::move(data), shardHashKey, logstore);
 }
 
 bool FlusherSLS::sendSerializedGroup(string&& data, const string& shardHashKey, const string& logstore) {

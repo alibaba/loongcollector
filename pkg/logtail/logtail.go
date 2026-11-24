@@ -32,6 +32,10 @@ import (
 	"github.com/alibaba/ilogtail/pkg/util"
 )
 
+// SendPipelineEventGroupTooLarge means the native SLS serializer exceeded its
+// size limit and did not enqueue the batch. Callers may split it and retry.
+const SendPipelineEventGroupTooLarge = -3
+
 // SendPipelineEventGroup pushes a serialized PipelineEventGroup protobuf into
 // the C++ SLS flusher. Reject an empty buffer before crossing the cgo boundary.
 func SendPipelineEventGroup(configName string, logstore string, pbBuffer []byte, eventCount int, hash string) int {

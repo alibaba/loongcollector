@@ -240,7 +240,11 @@ bool ParseSLSLogWire(StringView event, SLSLogGroupWireView& result) {
     return true;
 }
 
-bool PrepareSLSLogGroup(LogGroupSerializer& serializer, const GroupTags& tags, size_t logGroupSZ, string& errorMsg) {
+bool PrepareSLSLogGroup(LogGroupSerializer& serializer,
+                        const GroupTags& tags,
+                        size_t logGroupSZ,
+                        string& errorMsg,
+                        bool* exceedsSizeLimit) {
     if (logGroupSZ == 0) {
         errorMsg = "all empty logs";
         return false;
@@ -256,7 +260,11 @@ bool PrepareSLSLogGroup(LogGroupSerializer& serializer, const GroupTags& tags, s
         }
     }
 
-    if (static_cast<int32_t>(logGroupSZ) > INT32_FLAG(max_send_log_group_size)) {
+    const auto limit = INT32_FLAG(max_send_log_group_size);
+    if (limit <= 0 || logGroupSZ > static_cast<size_t>(limit)) {
+        if (exceedsSizeLimit != nullptr) {
+            *exceedsSizeLimit = true;
+        }
         errorMsg = "log group exceeds size limit\tgroup size: " + ToString(logGroupSZ)
             + "\tsize limit: " + ToString(INT32_FLAG(max_send_log_group_size));
         return false;
@@ -312,7 +320,12 @@ std::optional<SLSLogGroupWireView> SLSLogGroupWireView::Parse(StringView wire, s
 }
 
 bool SLSEventGroupSerializer::DoSerializePBLogWire(
-    const SLSLogGroupWireView& group, const GroupTags& tags, size_t originalTagSize, string& res, string& errorMsg) {
+    const SLSLogGroupWireView& group,
+    const GroupTags& tags,
+    size_t originalTagSize,
+    string& res,
+    string& errorMsg,
+    bool* exceedsSizeLimit) {
     const size_t inputSize = sizeof(EventsContainer) + originalTagSize + group.mLogInputSize;
     return SerializeWithMetrics(inputSize, res, [&] {
         const bool enableNs = mFlusher->GetContext().GetGlobalConfig().mEnableTimestampNanosecond;
@@ -322,7 +335,7 @@ bool SLSEventGroupSerializer::DoSerializePBLogWire(
             groupSize += GetLogSize(log.mContents.size(), enableNs, logSize);
         }
         LogGroupSerializer serializer;
-        if (!PrepareSLSLogGroup(serializer, tags, groupSize, errorMsg)) {
+        if (!PrepareSLSLogGroup(serializer, tags, groupSize, errorMsg, exceedsSizeLimit)) {
             return false;
         }
         for (const auto& log : group.mLogs) {
@@ -347,7 +360,8 @@ bool SLSEventGroupSerializer::DoSerializePBLogs(const models::PipelineEventGroup
                                                 const GroupTags& tags,
                                                 size_t originalTagSize,
                                                 string& res,
-                                                string& errorMsg) {
+                                                string& errorMsg,
+                                                bool* exceedsSizeLimit) {
     const auto& events = group.logs().events();
     // BatchedEvents measures the input before the flusher adds the PackId.
     size_t inputSize = sizeof(EventsContainer) + originalTagSize;
@@ -391,7 +405,7 @@ bool SLSEventGroupSerializer::DoSerializePBLogs(const models::PipelineEventGroup
         }
 
         LogGroupSerializer serializer;
-        if (!PrepareSLSLogGroup(serializer, tags, logGroupSize, errorMsg)) {
+        if (!PrepareSLSLogGroup(serializer, tags, logGroupSize, errorMsg, exceedsSizeLimit)) {
             return false;
         }
 
@@ -419,6 +433,17 @@ bool SLSEventGroupSerializer::DoSerializePBLogs(const models::PipelineEventGroup
 }
 
 bool SLSEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, string& errorMsg) {
+    return SerializeGroup(group, res, errorMsg, nullptr);
+}
+
+bool SLSEventGroupSerializer::DoSerializeGoEvents(
+    BatchedEvents&& group, string& res, string& errorMsg, bool* exceedsSizeLimit) {
+    const auto inputSize = GetInputSize(group);
+    return SerializeWithMetrics(inputSize, res, [&] { return SerializeGroup(group, res, errorMsg, exceedsSizeLimit); });
+}
+
+bool SLSEventGroupSerializer::SerializeGroup(
+    BatchedEvents& group, string& res, string& errorMsg, bool* exceedsSizeLimit) {
     if (group.mEvents.empty()) {
         errorMsg = "empty event group";
         return false;
@@ -459,7 +484,7 @@ bool SLSEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, stri
             break;
     }
     thread_local LogGroupSerializer serializer;
-    if (!PrepareSLSLogGroup(serializer, group.mTags.mInner, logGroupSZ, errorMsg)) {
+    if (!PrepareSLSLogGroup(serializer, group.mTags.mInner, logGroupSZ, errorMsg, exceedsSizeLimit)) {
         return false;
     }
     switch (eventType) {

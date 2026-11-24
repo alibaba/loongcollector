@@ -27,6 +27,7 @@ import (
 	"google.golang.org/protobuf/encoding/protowire"
 
 	"github.com/alibaba/ilogtail/pkg/helper"
+	"github.com/alibaba/ilogtail/pkg/logtail"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/util"
@@ -446,4 +447,39 @@ func TestWireMessageBackfillsCanonicalLength(t *testing.T) {
 			require.Equal(t, body, actual)
 		}
 	}
+}
+
+func TestSlsFlusherSplitsOversizedPipelineBatch(t *testing.T) {
+	flusher, _ := newTestFlusher(true)
+	tags := models.NewTagsWithMap(map[string]string{util.ShardHashTagKey: "hash", "__topic__": "topic"})
+	group := models.NewGroup(models.NewMetadata(), tags)
+	group.DestinationLogstore = "routed"
+	var sent []string
+	var largeAttempts int
+	flusher.sendPipelineEventGroup = func(_, logstore string, wire []byte, count int, hash string) int {
+		var out protocol.PipelineEventGroup
+		require.NoError(t, out.Unmarshal(wire))
+		require.Equal(t, "routed", logstore)
+		require.Equal(t, "hash", hash)
+		require.Equal(t, "topic", string(out.Tags["__topic__"]))
+		require.Len(t, out.GetLogs().Events, count)
+		if count > 1 {
+			largeAttempts++
+			return logtail.SendPipelineEventGroupTooLarge
+		}
+		value := string(out.GetLogs().Events[0].GetContents()[0].GetValue())
+		if value == "single event over limit" {
+			return logtail.SendPipelineEventGroupTooLarge
+		}
+		sent = append(sent, value)
+		return 0
+	}
+	batch := &models.PipelineGroupEvents{Group: group}
+	for _, value := range []string{"first", "single event over limit", "last"} {
+		batch.Events = append(batch.Events, helper.NewInputLog(nil, map[string]string{"content": value}))
+	}
+
+	require.NoError(t, flusher.Export([]*models.PipelineGroupEvents{batch}, nil))
+	require.Positive(t, largeAttempts)
+	require.Equal(t, []string{"first", "last"}, sent)
 }

@@ -18,17 +18,22 @@
 package sls
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/alibaba/ilogtail/pkg/helper"
+	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/logtail"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
 
 var _ pipeline.Flusher = (*SlsFlusher)(nil)
+
+var errSLSGroupTooLarge = errors.New("SLS log group exceeds size limit")
 
 // SlsFlusher uses symbols in LogtailAdaptor(.so) to flush log groups to Logtail.
 type SlsFlusher struct { // nolint:revive
@@ -92,6 +97,28 @@ func (p *SlsFlusher) exportPipelineGroup(group *models.PipelineGroupEvents) erro
 }
 
 func (p *SlsFlusher) sendPipelineEvents(group *models.GroupInfo, events []models.PipelineEvent) error {
+	err := p.sendPipelineBatch(group, events)
+	if err != errSLSGroupTooLarge {
+		return err
+	}
+	if len(events) == 1 {
+		// One event and its group tags cannot be divided without changing the data.
+		// Discard that event and continue sending the remaining events.
+		logger.Warning(p.context.GetRuntimeContext(), selfmonitor.FlushDataAlarm,
+			"discard single event exceeding SLS log group size limit", "event type", events[0].GetType())
+		return nil
+	}
+
+	// Only retry explicit size rejections, before C++ enqueues any data.
+	// Keep the normal path to a single call and preserve the original order.
+	middle := len(events) / 2
+	if err := p.sendPipelineEvents(group, events[:middle]); err != nil {
+		return err
+	}
+	return p.sendPipelineEvents(group, events[middle:])
+}
+
+func (p *SlsFlusher) sendPipelineBatch(group *models.GroupInfo, events []models.PipelineEvent) error {
 	pb := &protocol.PipelineEventGroup{
 		Tags: make(map[string][]byte), Metadata: make(map[string][]byte),
 	}
@@ -167,7 +194,11 @@ func (p *SlsFlusher) sendEventGroupBytes(group *models.GroupInfo, buf []byte, ev
 	if logstore == "" {
 		logstore = p.context.GetLogstore()
 	}
-	if result := p.sendPipelineEventGroup(p.context.GetConfigName(), logstore, buf, eventCount, shardHash); result < 0 {
+	result := p.sendPipelineEventGroup(p.context.GetConfigName(), logstore, buf, eventCount, shardHash)
+	if result == logtail.SendPipelineEventGroupTooLarge {
+		return errSLSGroupTooLarge
+	}
+	if result < 0 {
 		return fmt.Errorf("send pipeline event group: error %d", result)
 	}
 	return nil

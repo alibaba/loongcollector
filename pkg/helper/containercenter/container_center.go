@@ -1438,7 +1438,7 @@ func (dc *ContainerCenter) fetchAll() error {
 	return nil
 }
 
-func (dc *ContainerCenter) fetchOne(containerID string) error {
+func (dc *ContainerCenter) fetchOne(containerID string, tryFindSandbox bool) error {
 	dc.containerStateLock.Lock()
 	defer dc.containerStateLock.Unlock()
 	ctx, cancel := getContextWithTimeout(defaultContextTimeout)
@@ -1451,9 +1451,27 @@ func (dc *ContainerCenter) fetchOne(containerID string) error {
 	if containerDetail.State.Status == ContainerStatusRunning && !dc.containerHelper.ContainerProcessAlive(containerDetail.State.Pid) {
 		containerDetail.State.Status = ContainerStatusExited
 	}
+	// Docker events discover the sandbox separately. A direct lookup has only
+	// the requested container ID and can fetch its sandbox here.
 	dc.updateContainer(containerID, dc.CreateInfoDetail(containerDetail, envConfigPrefix, false))
 	logger.Debug(context.Background(), "update container", containerID, "detail", containerDetail)
-	return nil
+	if tryFindSandbox && containerDetail.Config != nil {
+		if id := containerDetail.Config.Labels["io.kubernetes.sandbox.id"]; id != "" {
+			ctx, cancel := getContextWithTimeout(defaultContextTimeout)
+			defer cancel()
+			containerDetail, err = dc.client.ContainerInspect(ctx, id)
+			if err != nil {
+				dc.setLastError(err, "inspect sandbox container error "+id)
+			} else {
+				if containerDetail.State.Status == ContainerStatusRunning && !dc.containerHelper.ContainerProcessAlive(containerDetail.State.Pid) {
+					containerDetail.State.Status = ContainerStatusExited
+				}
+				dc.updateContainer(id, dc.CreateInfoDetail(containerDetail, envConfigPrefix, false))
+				logger.Debug(context.Background(), "update sandbox container", id, "detail", containerDetail)
+			}
+		}
+	}
+	return err
 }
 
 // We mark container removed if it is exited or its metadata cannot be accessed
@@ -1585,7 +1603,7 @@ func (dc *ContainerCenter) eventListener() {
 func (dc *ContainerCenter) handleDockerEvent(event events.Message) {
 	switch event.Action {
 	case "start", "restart", "rename":
-		_ = dc.fetchOne(event.Actor.ID)
+		_ = dc.fetchOne(event.Actor.ID, false)
 	case "die":
 		dc.markRemove(event.Actor.ID)
 	default:

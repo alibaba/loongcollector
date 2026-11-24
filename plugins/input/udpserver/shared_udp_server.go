@@ -16,6 +16,7 @@ package udpserver
 
 import (
 	"context"
+	"strings"
 	"sync"
 	"time"
 
@@ -112,6 +113,25 @@ func (s *SharedUDPServer) logErr(errStr string) {
 }
 
 func (s *SharedUDPServer) cutDispatchTag(event models.PipelineEvent) string {
+	if log, ok := event.(*models.Log); ok {
+		// StatsD logs carry the packed metric labels in their contents. Remove
+		// the routing label by exact key so similarly named labels survive.
+		const labelsKey = "__labels__"
+		contents := log.GetIndices()
+		labels, ok := contents.Get(labelsKey).(string)
+		if ok {
+			remaining := strings.Split(labels, "|")
+			for i, part := range remaining {
+				key, value, found := strings.Cut(part, "#$#")
+				if found && key == s.dispatchKey && value != "" {
+					remaining = append(remaining[:i], remaining[i+1:]...)
+					contents.Add(labelsKey, strings.Join(remaining, "|"))
+					return value
+				}
+			}
+			return ""
+		}
+	}
 	tags := event.GetTags()
 	if tags == nil {
 		return ""

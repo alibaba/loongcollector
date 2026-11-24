@@ -221,13 +221,14 @@ func TestInputStatsD(t *testing.T) {
 	groups := collectRequestEvents(t, input, body, http.StatusNoContent)
 	require.Len(t, groups, 1)
 	require.Len(t, groups[0].Events, 2)
-	counter := groups[0].Events[0].(*models.Metric)
-	require.Equal(t, "requests", counter.GetName())
-	require.Equal(t, float64(5), counter.GetValue().GetSingleValue())
-	require.Equal(t, "api", counter.GetTags().Get("service"))
-	gauge := groups[0].Events[1].(*models.Metric)
-	require.Equal(t, "latency", gauge.GetName())
-	require.Equal(t, 3.5, gauge.GetValue().GetSingleValue())
+	counter := groups[0].Events[0].(*models.Log)
+	require.Equal(t, "requests", counter.GetIndices().Get("__name__"))
+	require.Equal(t, "5", counter.GetIndices().Get("__value__"))
+	require.Equal(t, "service#$#api", counter.GetIndices().Get("__labels__"))
+	require.NotEmpty(t, counter.GetIndices().Get("__time_nano__"))
+	gauge := groups[0].Events[1].(*models.Log)
+	require.Equal(t, "latency", gauge.GetIndices().Get("__name__"))
+	require.Equal(t, "3.5", gauge.GetIndices().Get("__value__"))
 }
 
 func TestInputSLS(t *testing.T) {

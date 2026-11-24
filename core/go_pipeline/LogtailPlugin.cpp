@@ -256,6 +256,15 @@ int LogtailPlugin::SendPipelineEventGroup(const char* configName,
         logstore.assign(logstoreName, (size_t)logstoreSize);
     }
 
+    const auto send = [&](FlusherSLS& flusher, const string& hash) {
+        bool exceedsSizeLimit = false;
+        const bool sent = wire ? flusher.SendPBLogWire(*pbGroup, *wire, hash, logstore, &exceedsSizeLimit)
+                               : flusher.Send(*pbGroup, hash, logstore, &exceedsSizeLimit);
+        // Keep this result in sync with pkg/logtail.SendPipelineEventGroupTooLarge.
+        // It means serialization stopped before anything was added to the sender queue.
+        return sent ? 0 : (exceedsSizeLimit ? -3 : -1);
+    };
+
     if (configNameStr == containerConfig->mLogstore) {
         auto* plugin = LogtailPlugin::GetInstance();
         lock_guard<mutex> lock(plugin->mPluginContainerMutex);
@@ -272,9 +281,7 @@ int LogtailPlugin::SendPipelineEventGroup(const char* configName,
         if (!containerConfig->InitForProfile(plugin->mPluginContainerContext)) {
             return -1;
         }
-        const bool sent = wire ? containerConfig->SendPBLogWire(*pbGroup, *wire, hash, logstore)
-                               : containerConfig->Send(*pbGroup, hash, logstore);
-        return sent ? 0 : -1;
+        return send(*containerConfig, hash);
     }
 
     shared_ptr<CollectionPipeline> p = CollectionPipelineManager::GetInstance()->FindConfigByName(configNameStr);
@@ -299,9 +306,7 @@ int LogtailPlugin::SendPipelineEventGroup(const char* configName,
     if (shardHashSize > 0 && shardHash != nullptr) {
         hash.assign(shardHash, static_cast<size_t>(shardHashSize));
     }
-    const bool sent
-        = wire ? pConfig->SendPBLogWire(*pbGroup, *wire, hash, logstore) : pConfig->Send(*pbGroup, hash, logstore);
-    return sent ? 0 : -1;
+    return send(*pConfig, hash);
 }
 
 bool LogtailPlugin::LoadPluginBase() {

@@ -15,7 +15,9 @@
 package containercenter
 
 import (
+	"context"
 	"fmt"
+	"maps"
 	"strings"
 	"time"
 
@@ -23,7 +25,19 @@ import (
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/events"
 	docker "github.com/moby/moby/client"
+
+	"github.com/alibaba/ilogtail/pkg/logger"
 )
+
+type ContainerMeta struct {
+	PodName         string
+	K8sNamespace    string
+	ContainerName   string
+	Image           string
+	K8sLabels       map[string]string
+	ContainerLabels map[string]string
+	Env             map[string]string
+}
 
 type DockerInfoDetailWithFilteredEnvAndLabel struct {
 	Detail          *DockerInfoDetail
@@ -34,6 +48,51 @@ type DockerInfoDetailWithFilteredEnvAndLabel struct {
 
 func GetContainersLastUpdateTime() int64 {
 	return getContainerCenterInstance().getLastUpdateMapTime()
+}
+
+// GetContainerMeta returns a snapshot and attempts on-demand discovery on a cache miss.
+func GetContainerMeta(containerID string) *ContainerMeta {
+	getFunc := func() *ContainerMeta {
+		instance := getContainerCenterInstance()
+		instance.lock.RLock()
+		defer instance.lock.RUnlock()
+		detail, ok := instance.containerMap[containerID]
+		if !ok {
+			return nil
+		}
+		c := &ContainerMeta{
+			ContainerName: detail.ContainerNameTag["_container_name_"],
+			Image:         detail.ContainerNameTag["_image_name_"],
+		}
+		if info := detail.K8SInfo; info != nil {
+			info.mu.RLock()
+			if info.ContainerName != "" {
+				c.ContainerName = info.ContainerName
+			}
+			c.K8sNamespace = info.Namespace
+			c.PodName = info.Pod
+			c.K8sLabels = maps.Clone(info.Labels)
+			info.mu.RUnlock()
+		}
+		if cfg := detail.ContainerInfo.Config; cfg != nil {
+			c.ContainerLabels = maps.Clone(cfg.Labels)
+			c.Env = make(map[string]string, len(cfg.Env))
+			for _, env := range cfg.Env {
+				key, value, _ := strings.Cut(env, "=")
+				c.Env[key] = value
+			}
+		}
+		return c
+	}
+	meta := getFunc()
+	if meta != nil {
+		return meta
+	}
+	if err := containerFindingManager.FetchOne(containerID); err != nil {
+		logger.Debugf(context.Background(), "cannot fetch container for %s, error is %v", containerID, err)
+		return nil
+	}
+	return getFunc()
 }
 
 func ProcessContainerAllInfo(processor func(*DockerInfoDetail)) {
