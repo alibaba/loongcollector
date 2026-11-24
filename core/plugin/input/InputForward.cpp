@@ -76,8 +76,8 @@ bool InputForward::Init(const Json::Value& config, Json::Value& optionalGoPipeli
     mForwardConfig["Protocol"] = mProtocol;
 
     // Start may expose the input to processing as soon as the listener accepts a request.
-    auto processor = PluginRegistry::GetInstance()->CreateProcessor(
-        ProcessorParseFromPBNative::sName, mContext->GetPipeline().GenNextPluginMeta(false));
+    auto processor = PluginRegistry::GetInstance()->CreateProcessor(ProcessorParseFromPBNative::sName,
+                                                                    mContext->GetPipeline().GenNextPluginMeta(false));
     if (!processor->Init(mForwardConfig, *mContext)) {
         LOG_ERROR(sLogger, ("InputForward failed to init processor", mProtocol)("config", mConfigName));
         return false;

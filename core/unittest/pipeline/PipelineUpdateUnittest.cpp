@@ -63,8 +63,6 @@ const std::string ProcessorMock2::sName = "processor_mock2";
 
 class FlusherSLSMock : public FlusherSLS {
 public:
-    static const std::string sName;
-
     bool Init(const Json::Value& config, Json::Value& optionalGoPipeline) override {
         string errorMsg;
         uint32_t delay = 0;
@@ -94,15 +92,6 @@ public:
 private:
     std::chrono::milliseconds mSendDelay = std::chrono::milliseconds(0);
 };
-
-const std::string FlusherSLSMock::sName = "flusher_sls_mock";
-
-class FlusherSLSMock2 : public FlusherSLSMock {
-public:
-    static const std::string sName;
-};
-
-const std::string FlusherSLSMock2::sName = "flusher_sls_mock2";
 
 class PipelineUpdateUnittest : public testing::Test {
 public:
@@ -149,13 +138,13 @@ public:
 
 protected:
     static void SetUpTestCase() {
+        // Exercise the production flusher_sls topology with mock transport and send delays.
+        PluginRegistry::GetInstance()->RegisterFlusherCreator(new StaticFlusherCreator<FlusherSLSMock>());
         PluginRegistry::GetInstance()->LoadPlugins();
         LoadPluginMock();
         PluginRegistry::GetInstance()->RegisterContinuousInputCreator(new StaticInputCreator<InputFileMock>());
         PluginRegistry::GetInstance()->RegisterContinuousInputCreator(new StaticInputCreator<InputFileMock2>());
         PluginRegistry::GetInstance()->RegisterProcessorCreator(new StaticProcessorCreator<ProcessorMock2>());
-        PluginRegistry::GetInstance()->RegisterFlusherCreator(new StaticFlusherCreator<FlusherSLSMock>());
-        PluginRegistry::GetInstance()->RegisterFlusherCreator(new StaticFlusherCreator<FlusherSLSMock2>());
 
         FlusherRunner::GetInstance()->mEnableRateLimiter = false;
         SenderQueueManager::GetInstance()->mDefaultQueueParam.mCapacity = 1; // test extra buffer
@@ -343,7 +332,7 @@ private:
         })";
     string nativeFlusherConfig = R"(
         {
-            "Type": "flusher_sls_mock",
+            "Type": "flusher_sls",
             "Project": "test_project",
             "Logstore": "test_logstore_1",
             "Region": "test_region",
@@ -351,7 +340,7 @@ private:
         })";
     string nativeFlusherConfig2 = R"(
         {
-            "Type": "flusher_sls_mock",
+            "Type": "flusher_sls",
             "Project": "test_project",
             "Logstore": "test_logstore_2",
             "Region": "test_region",
@@ -359,7 +348,7 @@ private:
         })";
     string slowFlusherConfig = R"(
         {
-            "Type": "flusher_sls_mock",
+            "Type": "flusher_sls",
             "Project": "test_project",
             "Logstore": "test_logstore_2",
             "Region": "test_region",
@@ -368,7 +357,7 @@ private:
         })";
     string nativeFlusherConfig3 = R"(
         {
-            "Type": "flusher_sls_mock2",
+            "Type": "flusher_sls",
             "Project": "test_project",
             "Logstore": "test_logstore_3",
             "Region": "test_region",
@@ -533,7 +522,7 @@ void PipelineUpdateUnittest::TestPipelineParamUpdateCase3() const {
     CollectionConfigDiff diff;
     CollectionConfig pipelineConfigObj
         = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson), filepath);
-    pipelineConfigObj.Parse();
+    APSARA_TEST_TRUE_FATAL(pipelineConfigObj.Parse());
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
     APSARA_TEST_EQUAL_FATAL(1U, pipelineManager->GetAllPipelines().size());
@@ -552,7 +541,7 @@ void PipelineUpdateUnittest::TestPipelineParamUpdateCase3() const {
     CollectionConfigDiff diffUpdate;
     CollectionConfig pipelineConfigObjUpdate
         = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate), filepath);
-    pipelineConfigObjUpdate.Parse();
+    APSARA_TEST_TRUE_FATAL(pipelineConfigObjUpdate.Parse());
     diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
     pipelineManager->UpdatePipelines(diffUpdate);
     APSARA_TEST_EQUAL_FATAL(1U, pipelineManager->GetAllPipelines().size());
@@ -585,7 +574,7 @@ void PipelineUpdateUnittest::TestPipelineParamUpdateCase4() const {
     CollectionConfigDiff diff;
     CollectionConfig pipelineConfigObj
         = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson), filepath);
-    pipelineConfigObj.Parse();
+    APSARA_TEST_TRUE_FATAL(pipelineConfigObj.Parse());
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
     APSARA_TEST_EQUAL_FATAL(1U, pipelineManager->GetAllPipelines().size());
@@ -611,7 +600,7 @@ void PipelineUpdateUnittest::TestPipelineParamUpdateCase4() const {
     CollectionConfigDiff diffUpdate;
     CollectionConfig pipelineConfigObjUpdate
         = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate), filepath);
-    pipelineConfigObjUpdate.Parse();
+    APSARA_TEST_TRUE_FATAL(pipelineConfigObjUpdate.Parse());
     diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
     auto result = async(launch::async, [&]() {
         this_thread::sleep_for(chrono::milliseconds(1000));
@@ -726,7 +715,7 @@ void PipelineUpdateUnittest::TestPipelineTypeUpdateCase3() const {
     CollectionConfigDiff diff;
     CollectionConfig pipelineConfigObj
         = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson), filepath);
-    pipelineConfigObj.Parse();
+    APSARA_TEST_TRUE_FATAL(pipelineConfigObj.Parse());
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
     APSARA_TEST_EQUAL_FATAL(1U, pipelineManager->GetAllPipelines().size());
@@ -745,7 +734,7 @@ void PipelineUpdateUnittest::TestPipelineTypeUpdateCase3() const {
     CollectionConfigDiff diffUpdate;
     CollectionConfig pipelineConfigObjUpdate
         = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate), filepath);
-    pipelineConfigObjUpdate.Parse();
+    APSARA_TEST_TRUE_FATAL(pipelineConfigObjUpdate.Parse());
     diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
     pipelineManager->UpdatePipelines(diffUpdate);
     APSARA_TEST_EQUAL_FATAL(1U, pipelineManager->GetAllPipelines().size());
@@ -778,7 +767,7 @@ void PipelineUpdateUnittest::TestPipelineTypeUpdateCase4() const {
     CollectionConfigDiff diff;
     CollectionConfig pipelineConfigObj
         = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson), filepath);
-    pipelineConfigObj.Parse();
+    APSARA_TEST_TRUE_FATAL(pipelineConfigObj.Parse());
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
     APSARA_TEST_EQUAL_FATAL(1U, pipelineManager->GetAllPipelines().size());
@@ -804,7 +793,7 @@ void PipelineUpdateUnittest::TestPipelineTypeUpdateCase4() const {
     CollectionConfigDiff diffUpdate;
     CollectionConfig pipelineConfigObjUpdate
         = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate), filepath);
-    pipelineConfigObjUpdate.Parse();
+    APSARA_TEST_TRUE_FATAL(pipelineConfigObjUpdate.Parse());
     diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
     auto result = async(launch::async, [&]() {
         this_thread::sleep_for(chrono::milliseconds(1000));
