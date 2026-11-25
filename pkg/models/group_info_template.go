@@ -29,8 +29,8 @@ type GroupInfoTemplate struct {
 // NewGroupInfoTemplate snapshots the supplied default metadata and tags.
 func NewGroupInfoTemplate(metadata, tags map[string]string) *GroupInfoTemplate {
 	return &GroupInfoTemplate{
-		metadata: groupValueDefaults{values: maps.Clone(metadata)},
-		tags:     groupValueDefaults{values: maps.Clone(tags), canEnrich: true},
+		metadata: groupValueDefaults{values: maps.Clone(metadata), valueBytes: stringMapSize(metadata)},
+		tags:     groupValueDefaults{values: maps.Clone(tags), valueBytes: stringMapSize(tags), canEnrich: true},
 	}
 }
 
@@ -55,9 +55,10 @@ func (t *GroupInfoTemplate) NewSingleEventGroup(event PipelineEvent) *PipelineGr
 }
 
 type groupValueDefaults struct {
-	values    map[string]string
-	enriched  atomic.Pointer[groupTagEnrichment]
-	canEnrich bool
+	values     map[string]string
+	valueBytes int64 // Cached size of the immutable defaults.
+	enriched   atomic.Pointer[groupTagEnrichment]
+	canEnrich  bool
 }
 
 type groupTagEnrichment struct {
@@ -162,7 +163,7 @@ func TryApplyGroupTagDefaults(tags Tags, additions map[string]string) bool {
 		}
 		cached = &groupTagEnrichment{
 			additions: snapshot,
-			merged:    groupValueDefaults{values: merged},
+			merged:    groupValueDefaults{values: merged, valueBytes: stringMapSize(merged)},
 		}
 		// Keep only the latest result for this container template. Previously
 		// emitted groups still refer to their own immutable snapshot.

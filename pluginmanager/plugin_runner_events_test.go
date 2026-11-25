@@ -15,6 +15,7 @@
 package pluginmanager
 
 import (
+	"encoding/json"
 	"fmt"
 	"testing"
 	"time"
@@ -203,6 +204,79 @@ func TestEventRunner_ProcessorMetricsFollowCollectedOutput(t *testing.T) {
 			assert.Equal(t, tt.outGroups, counters[selfmonitor.MetricPluginOutEventGroupsTotal])
 			assert.Equal(t, tt.outEvents, counters[selfmonitor.MetricPluginOutEventsTotal])
 			assert.Equal(t, tt.outSize, counters[selfmonitor.MetricPluginOutSizeBytes])
+		})
+	}
+}
+
+func TestEventRunner_PipelineIngressCountsBeforeFanOut(t *testing.T) {
+	for _, tt := range []struct {
+		name       string
+		configName string
+		inputs     string
+		hasGoInput bool
+		hasMetrics bool
+	}{
+		{"Go input", "entry/1", `"inputs":[{"type":"service_mock"}],`, true, true},
+		{"native input", "entry/2", "", false, true},
+		{"built-in runner", "entry", `"inputs":[{"type":"service_mock"}],`, true, false},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			lc, err := createLogstoreConfig("project", "logstore", tt.configName, 0, "{"+tt.inputs+`
+				"global":{"EnableProcessorTag":false},
+				"flushers":[{"type":"flusher_checker"},{"type":"flusher_checker"}]
+			}`)
+			require.NoError(t, err)
+			runner := lc.PluginRunner.(*pluginRunner)
+			require.Equal(t, tt.hasGoInput, runner.IsWithInputPlugin())
+			// Send groups directly after processing. The native fixture represents data
+			// that has already passed CollectionPipeline::Process.
+			runner.AggregatorPlugins = nil
+			group := models.NewGroup(nil, models.NewTagsWithKeyValues("env", "test"))
+			log := models.NewSimpleLog([]byte("hello"), nil, 1)
+			runner.InputPipeContext.Collector().Collect(group, log, log)
+			runner.InputPipeContext.Collector().Collect(group, log)
+			runner.runProcessor()
+			runner.ProcessControl.WaitCancel()
+			runner.runFlusher()
+			runner.FlushControl.WaitCancel()
+
+			var pipelineCounters map[string]string
+			var flusherCount int
+			for _, row := range lc.Context.ExportMetricRecords() {
+				counters, category := parseExportedRecord(t, row)
+				switch category {
+				case selfmonitor.MetricLabelValueMetricCategoryPlugin:
+					if counter, ok := counters[selfmonitor.MetricPluginInEventGroupsTotal]; ok {
+						assert.Equal(t, "2.0000", counter)
+						assert.Equal(t, "3.0000", counters[selfmonitor.MetricPluginInEventsTotal])
+						flusherCount++
+					}
+				case selfmonitor.MetricLabelValueMetricCategoryPipeline:
+					require.Nil(t, pipelineCounters)
+					pipelineCounters = counters
+					var labels map[string]string
+					require.NoError(t, json.Unmarshal([]byte(row[selfmonitor.MetricLabelPrefix]), &labels))
+					assert.Equal(t, "entry", labels[selfmonitor.MetricLabelKeyPipelineName])
+					assert.Equal(t, "project", labels[selfmonitor.MetricLabelKeyProject])
+					assert.Equal(t, "logstore", labels[selfmonitor.MetricLabelKeyLogstore])
+				}
+			}
+			require.Equal(t, 2, flusherCount)
+			if !tt.hasMetrics {
+				require.Nil(t, pipelineCounters)
+				return
+			}
+			require.NotNil(t, pipelineCounters)
+			assert.Equal(t, "2.0000", pipelineCounters[selfmonitor.MetricPipelineFlusherInEventGroupsTotal])
+			assert.Equal(t, "3.0000", pipelineCounters[selfmonitor.MetricPipelineFlusherInEventsTotal])
+			assert.Equal(t, "50.0000", pipelineCounters[selfmonitor.MetricPipelineFlusherInSizeBytes])
+			if tt.hasGoInput {
+				assert.Equal(t, "2.0000", pipelineCounters[selfmonitor.MetricPipelineProcessorInEventGroupsTotal])
+				assert.Equal(t, "3.0000", pipelineCounters[selfmonitor.MetricPipelineProcessorInEventsTotal])
+				assert.Equal(t, "50.0000", pipelineCounters[selfmonitor.MetricPipelineProcessorInSizeBytes])
+			} else {
+				assert.NotContains(t, pipelineCounters, selfmonitor.MetricPipelineProcessorInEventsTotal)
+			}
 		})
 	}
 }

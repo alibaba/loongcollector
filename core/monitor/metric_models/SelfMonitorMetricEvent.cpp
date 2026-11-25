@@ -128,29 +128,12 @@ SelfMonitorMetricEvent::SelfMonitorMetricEvent(const std::map<std::string, std::
 
 SelfMonitorMetricEvent::SelfMonitorMetricEvent(const models::MetricEvent& metricRecord)
     : mCategory(metricRecord.name()) {
-    // Match the sorted JSON label insertion used by the legacy constructor.
-    // Protobuf map iteration order varies, but identical labels must keep one key.
-    using TagIterator = decltype(metricRecord.tags().begin());
-    constexpr size_t kInlineLabels = 8;
-    std::array<TagIterator, kInlineLabels> inlineLabels;
-    std::vector<TagIterator> overflowLabels;
-    TagIterator* labels = inlineLabels.data();
-    if (metricRecord.tags().size() > kInlineLabels) {
-        overflowLabels.resize(metricRecord.tags().size());
-        labels = overflowLabels.data();
-    }
-    size_t labelCount = 0;
-    for (auto it = metricRecord.tags().begin(); it != metricRecord.tags().end(); ++it) {
-        if (it->first == "metric_category") {
-            mCategory = it->second;
+    for (const auto& tag : metricRecord.tags()) {
+        if (tag.first == "metric_category") {
+            mCategory = tag.second;
         } else {
-            labels[labelCount++] = it;
+            mLabels.emplace(tag.first, tag.second);
         }
-    }
-    std::sort(labels, labels + labelCount, [](const auto& a, const auto& b) { return a->first < b->first; });
-    for (size_t i = 0; i < labelCount; ++i) {
-        const auto& label = labels[i];
-        mLabels.emplace(label->first, label->second);
     }
     for (const auto& item : metricRecord.untypedmultidoublevalues().values()) {
         const double value = item.second.value();
@@ -173,18 +156,37 @@ const std::unordered_map<std::string, double>& SelfMonitorMetricEvent::GetGauges
 }
 
 void SelfMonitorMetricEvent::CreateKey() {
-    size_t keySize = 9 + mCategory.size();
-    for (const auto& label : mLabels) {
-        keySize += 2 + label.first.size() + label.second.size();
+    // Native, JSON and protobuf records can insert identical labels in different orders.
+    using Label = decltype(mLabels)::value_type;
+    constexpr size_t kInlineLabels = 8;
+    std::array<const Label*, kInlineLabels> inlineLabels;
+    std::vector<const Label*> overflowLabels;
+    auto* labels = inlineLabels.data();
+    if (mLabels.size() > inlineLabels.size()) {
+        overflowLabels.resize(mLabels.size());
+        labels = overflowLabels.data();
     }
+
+    size_t keySize = sizeof(uint64_t) + mCategory.size();
+    size_t labelCount = 0;
+    for (const auto& label : mLabels) {
+        labels[labelCount++] = &label;
+        keySize += 2 * sizeof(uint64_t) + label.first.size() + label.second.size();
+    }
+    std::sort(labels, labels + labelCount, [](const auto* a, const auto* b) { return a->first < b->first; });
+
     string key;
     key.reserve(keySize);
-    key.append("category:").append(mCategory);
-    for (const auto& label : mLabels) {
-        key.push_back(';');
-        key.append(label.first);
-        key.push_back(':');
-        key.append(label.second);
+    const auto appendPart = [&key](const string& part) {
+        // Length prefixes keep separators in label values from changing the identity.
+        const uint64_t length = part.size();
+        key.append(reinterpret_cast<const char*>(&length), sizeof(length));
+        key.append(part);
+    };
+    appendPart(mCategory);
+    for (size_t i = 0; i < labelCount; ++i) {
+        appendPart(labels[i]->first);
+        appendPart(labels[i]->second);
     }
     mKey = HashString(key);
     mUpdatedFlag = true;

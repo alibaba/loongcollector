@@ -100,6 +100,53 @@ void SelfMonitorMetricEventUnittest::TestCreateFromPB() {
     EXPECT_EQ(SelfMonitorMetricEvent(metricMap).mKey, SelfMonitorMetricEvent(reverse).mKey);
 }
 
+TEST_F(SelfMonitorMetricEventUnittest, CrossLanguageMetricIdentity) {
+    MetricsRecord native(MetricCategory::METRIC_CATEGORY_PLUGIN,
+                         std::make_shared<MetricLabels>(MetricLabels{{"project", "test-project"},
+                                                                     {"pipeline_name", "test-pipeline"},
+                                                                     {"logstore", "test-logstore"},
+                                                                     {"plugin_type", "flusher_sls"},
+                                                                     {"plugin_id", "4"}}),
+                         std::make_shared<DynamicMetricLabels>());
+    native.CreateCounter("in_events_total");
+    native.CreateCounter("success_total")->Add(1);
+    SelfMonitorMetricEvent merged(&native);
+
+    models::MetricEvent go;
+    go.set_name("plugin");
+    auto* tags = go.mutable_tags();
+    (*tags)["logstore"] = "test-logstore";
+    (*tags)["project"] = "test-project";
+    (*tags)["plugin_id"] = "4";
+    (*tags)["pipeline_name"] = "test-pipeline";
+    (*tags)["plugin_type"] = "flusher_sls";
+    auto& input = (*go.mutable_untypedmultidoublevalues()->mutable_values())["in_events_total"];
+    input.set_value(101);
+    input.set_metrictype(models::METRIC_TYPE_COUNTER);
+
+    SelfMonitorMetricEvent sample(go);
+    EXPECT_EQ(merged.mKey, sample.mKey);
+    merged.Merge(sample);
+    EXPECT_EQ(101U, merged.GetCounter("in_events_total"));
+    EXPECT_EQ(1U, merged.GetCounter("success_total"));
+
+    (*tags)["plugin_id"] = "5";
+    EXPECT_NE(merged.mKey, SelfMonitorMetricEvent(go).mKey);
+    (*tags)["plugin_id"] = "4";
+    go.set_name("plugin_source");
+    EXPECT_NE(merged.mKey, SelfMonitorMetricEvent(go).mKey);
+}
+
+TEST_F(SelfMonitorMetricEventUnittest, LabelSeparatorsKeepDistinctIdentities) {
+    models::MetricEvent go;
+    go.set_name("plugin");
+    (*go.mutable_tags())["a"] = "x;b:y";
+    SelfMonitorMetricEvent singleLabel(go);
+    (*go.mutable_tags())["a"] = "x";
+    (*go.mutable_tags())["b"] = "y";
+    EXPECT_NE(singleLabel.mKey, SelfMonitorMetricEvent(go).mKey);
+}
+
 void SelfMonitorMetricEventUnittest::TestCreateFromMetricEvent() {
     std::vector<std::pair<std::string, std::string>> labels;
     labels.emplace_back(std::make_pair<std::string, std::string>("plugin_type", "input_file"));

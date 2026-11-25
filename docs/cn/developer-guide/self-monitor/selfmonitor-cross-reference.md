@@ -215,15 +215,17 @@
 
 ### 4.3 Pipeline 指标
 
+Processor 入口由接收 Input 数据的一侧计数。原生文件输入在分行前统计原始块。Flusher 入口在分发给各个输出前计数，同一批次只计一次。Go 补充的计数按相同 Pipeline 标签与 C++ 指标合并。
+
 | C++ 常量 | Go 常量 | 字符串值 | 含义 |
 |----------|---------|----------|------|
-| `METRIC_PIPELINE_PROCESSORS_IN_EVENTS_TOTAL` | — | `processor_in_events_total` | 进入 Processor 阶段的事件总数 |
-| `METRIC_PIPELINE_PROCESSORS_IN_EVENT_GROUPS_TOTAL` | — | `processor_in_event_groups_total` | 进入 Processor 阶段的事件组总数 |
-| `METRIC_PIPELINE_PROCESSORS_IN_SIZE_BYTES` | — | `processor_in_size_bytes` | 进入 Processor 阶段的数据总字节数 |
+| `METRIC_PIPELINE_PROCESSORS_IN_EVENTS_TOTAL` | `MetricPipelineProcessorInEventsTotal` | `processor_in_events_total` | 进入 Processor 阶段的事件总数 |
+| `METRIC_PIPELINE_PROCESSORS_IN_EVENT_GROUPS_TOTAL` | `MetricPipelineProcessorInEventGroupsTotal` | `processor_in_event_groups_total` | 进入 Processor 阶段的事件组总数 |
+| `METRIC_PIPELINE_PROCESSORS_IN_SIZE_BYTES` | `MetricPipelineProcessorInSizeBytes` | `processor_in_size_bytes` | 进入 Processor 阶段的数据总字节数 |
 | `METRIC_PIPELINE_PROCESSORS_TOTAL_PROCESS_TIME_MS` | — | `processor_total_process_time_ms` | Processor 阶段总处理耗时（毫秒） |
-| `METRIC_PIPELINE_FLUSHERS_IN_EVENTS_TOTAL` | — | `flusher_in_events_total` | 进入 Flusher 阶段的事件总数 |
-| `METRIC_PIPELINE_FLUSHERS_IN_EVENT_GROUPS_TOTAL` | — | `flusher_in_event_groups_total` | 进入 Flusher 阶段的事件组总数 |
-| `METRIC_PIPELINE_FLUSHERS_IN_SIZE_BYTES` | — | `flusher_in_size_bytes` | 进入 Flusher 阶段的数据总字节数 |
+| `METRIC_PIPELINE_FLUSHERS_IN_EVENTS_TOTAL` | `MetricPipelineFlusherInEventsTotal` | `flusher_in_events_total` | 进入 Flusher 阶段的事件总数 |
+| `METRIC_PIPELINE_FLUSHERS_IN_EVENT_GROUPS_TOTAL` | `MetricPipelineFlusherInEventGroupsTotal` | `flusher_in_event_groups_total` | 进入 Flusher 阶段的事件组总数 |
+| `METRIC_PIPELINE_FLUSHERS_IN_SIZE_BYTES` | `MetricPipelineFlusherInSizeBytes` | `flusher_in_size_bytes` | 进入 Flusher 阶段的数据总字节数 |
 | `METRIC_PIPELINE_FLUSHERS_TOTAL_PACKAGE_TIME_MS` | — | `flusher_total_package_time_ms` | Flusher 阶段总打包耗时（毫秒） |
 | `METRIC_PIPELINE_START_TIME` | — | `start_time` | Pipeline 启动时间 |
 

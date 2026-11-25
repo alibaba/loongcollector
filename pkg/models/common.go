@@ -97,11 +97,21 @@ type Tags KeyValues[string]
 type Metadata KeyValues[string]
 
 func stringKeyValuesSize(values KeyValues[string]) int64 {
+	if group, ok := values.(*groupDefaultValues); ok {
+		if owned := group.owned.Load(); owned != nil {
+			return stringMapSize(owned.keyValues)
+		}
+		return group.defaults.valueBytes
+	}
 	if values == nil || values.Len() == 0 {
 		return 0
 	}
+	return stringMapSize(values.Iterator())
+}
+
+func stringMapSize(values map[string]string) int64 {
 	var size int64
-	for key, value := range readStringValues(values) {
+	for key, value := range values {
 		size += int64(len(key) + len(value))
 	}
 	return size

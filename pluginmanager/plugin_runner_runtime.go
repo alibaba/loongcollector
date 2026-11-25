@@ -46,8 +46,9 @@ type pluginRunner struct {
 	ExtensionPlugins  map[string]pipeline.Extension
 	TimerRunner       []*timerRunner
 
-	FlushOutStore  *FlushOutStore[models.PipelineGroupEvents]
-	LogstoreConfig *LogstoreConfig
+	FlushOutStore         *FlushOutStore[models.PipelineGroupEvents]
+	LogstoreConfig        *LogstoreConfig
+	processorInputMetrics *pipelineInputMetrics
 }
 
 func (p *pluginRunner) Init(inputQueueSize int, flushQueueSize int) error {
@@ -264,6 +265,9 @@ func (p *pluginRunner) runProcessorInternal(cc *pipeline.AsyncControl) {
 		case group := <-pipeChan:
 			if inputQueue != nil {
 				inputQueue.releaseGroup(group)
+			}
+			if metrics := p.processorInputMetrics; metrics != nil {
+				metrics.record(1, group.GetEventCount(), group.GetSize())
 			}
 			if processorTag != nil {
 				processorTag.Process(group)

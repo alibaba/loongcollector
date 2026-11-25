@@ -471,6 +471,10 @@ func createLogstoreConfig(project string, logstore string, configName string, lo
 	if err = logstoreC.PluginRunner.AddDefaultFlusherIfEmpty(); err != nil {
 		return nil, err
 	}
+	// C++-managed pipelines use /1 or /2. Built-in Go pipelines have unsuffixed names.
+	if logstoreC.ConfigName != configName {
+		runner.initPipelineInputMetrics()
+	}
 	return logstoreC, nil
 }
 
