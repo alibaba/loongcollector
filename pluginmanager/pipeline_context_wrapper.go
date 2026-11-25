@@ -48,11 +48,8 @@ func (collectorWrapper PipelineCollectorWrapper) Collect(groupInfo *models.Group
 
 	collectorWrapper.outEventsTotal.Add(int64(len(eventList)))
 	collectorWrapper.outEventGroupsTotal.Add(1)
-	size := int64(0)
-	for _, event := range eventList {
-		size += event.GetSize()
-	}
-	collectorWrapper.outSizeBytes.Add(size)
+	group := models.PipelineGroupEvents{Group: groupInfo, Events: eventList}
+	collectorWrapper.outSizeBytes.Add(group.GetSize())
 	collectorWrapper.inner.Collect(groupInfo, eventList...)
 }
 

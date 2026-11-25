@@ -63,10 +63,56 @@ func TestLogCloneKeepsIndependentBodyFieldsAndTags(t *testing.T) {
 func TestLogSizeKeepsBodyOwnership(t *testing.T) {
 	log := &Log{Contents: NewOrderedLogContents(1)}
 	SetOwnedLogBody(log, []byte("test"))
-	require.EqualValues(t, 4, log.GetSize())
+	require.EqualValues(t, len(BodyKey)+len("test"), log.GetSize())
 	_, found, reusable := LookupLogContentForReplacement(log.GetIndices(), BodyKey)
 	require.True(t, found)
 	require.True(t, reusable)
+}
+
+func TestGroupSizeTracksCurrentLogFieldsAndTags(t *testing.T) {
+	for name, contents := range map[string]LogContents{
+		"compact": NewOrderedLogContents(4),
+		"mapped":  NewOrderedLogContents(8),
+		"map":     NewLogContents(),
+	} {
+		t.Run(name, func(t *testing.T) {
+			log := &Log{Contents: contents, Tags: NewTagsWithKeyValues("source", "x")}
+			log.SetBody([]byte("raw"))
+			contents.Delete(BodyKey)
+			contents.Add("message", "你好")
+			contents.Add("status", 200)
+			contents.Add("binary", []byte{0, 1})
+			contents.Add("remove", "a")
+			contents.Add("extra", "b")
+			group := &PipelineGroupEvents{
+				Group:  NewGroup(NewMetadata(), NewTagsWithKeyValues("env", "prod")),
+				Events: []PipelineEvent{log, log},
+			}
+			require.EqualValues(t, 7+2*(7+13+9+8+7+6), group.GetSize())
+
+			fields := contents.Iterator()
+			delete(fields, "remove")
+			fields["extra"] = "updated"
+			fields["new"] = "row"
+			require.EqualValues(t, 7+2*(7+13+9+8+12+6), group.GetSize())
+		})
+	}
+}
+
+func TestGroupSizeKeepsSharedTagDefaults(t *testing.T) {
+	template := NewGroupInfoTemplate(nil, map[string]string{"env": "prod"})
+	log := NewLogWithOrderedContents(1)
+	SetOwnedLogBody(log, []byte("hello"))
+	group := template.NewSingleEventGroup(log)
+	require.EqualValues(t, 19, group.GetSize())
+	require.Nil(t, group.Group.Tags.(*groupDefaultValues).owned.Load())
+
+	require.True(t, TryApplyGroupTagDefaults(group.Group.Tags, map[string]string{"host": "node"}))
+	require.EqualValues(t, 27, group.GetSize())
+	require.Nil(t, group.Group.Tags.(*groupDefaultValues).owned.Load())
+
+	group.Group.Tags.Iterator()["env"] = "development"
+	require.EqualValues(t, 34, group.GetSize())
 }
 
 func TestCompactLogFieldsPreserveOrderAfterMaterializing(t *testing.T) {

@@ -207,6 +207,24 @@ func LogContentEntries(contents LogContents) iter.Seq2[string, any] {
 	}
 }
 
+// dataSize reads the live fields without exposing the body or building an ordered key list.
+func (c *orderedLogContents) dataSize() int64 {
+	var size int64
+	if mapped := c.mapped.Load(); mapped != nil {
+		for key, value := range mapped.values {
+			size += logFieldSize(key, value)
+		}
+		return size
+	}
+	for _, field := range c.packed {
+		size += logFieldSize(field.Key, field.Value)
+	}
+	if field := c.extra; field != nil {
+		size += logFieldSize(field.Key, field.Value)
+	}
+	return size
+}
+
 func (c *orderedLogContents) entries(yield func(string, any) bool) {
 	c.releaseBodyOwnership()
 	if mapped := c.mapped.Load(); mapped != nil {

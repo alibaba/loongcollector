@@ -96,6 +96,17 @@ type Tags KeyValues[string]
 
 type Metadata KeyValues[string]
 
+func stringKeyValuesSize(values KeyValues[string]) int64 {
+	if values == nil || values.Len() == 0 {
+		return 0
+	}
+	var size int64
+	for key, value := range readStringValues(values) {
+		size += int64(len(key) + len(value))
+	}
+	return size
+}
+
 type keyValuesImpl[TValue string | float64 | *TypedValue | any] struct {
 	keyValues map[string]TValue
 }

@@ -15,6 +15,7 @@
 package pluginmanager
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -27,6 +28,8 @@ import (
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
+	"github.com/alibaba/ilogtail/plugins/processor/regex"
+	"github.com/alibaba/ilogtail/plugins/processor/split/logstring"
 )
 
 type mockContect struct {
@@ -136,5 +139,70 @@ func TestEventRunner_MetricTimerRecordsSourceCounters(t *testing.T) {
 		require.Contains(t, []string{selfmonitor.MetricLabelValueMetricCategoryPlugin, selfmonitor.MetricLabelValueMetricCategoryPluginSource}, category)
 		assert.Equal(t, "1.0000", counters[selfmonitor.MetricPluginOutEventsTotal])
 		assert.Equal(t, "1.0000", counters[selfmonitor.MetricPluginOutEventGroupsTotal])
+	}
+}
+
+func TestEventRunner_ProcessorMetricsFollowCollectedOutput(t *testing.T) {
+	for _, tt := range []struct {
+		name      string
+		processor pipeline.Processor
+		body      string
+		outGroups string
+		outEvents string
+		outSize   string
+	}{
+		{
+			name:      "regex replaces the body with fields",
+			processor: &regex.ProcessorRegex{Regex: "^([^:]+):(.+)$", SourceKey: models.BodyKey, Keys: []string{"level", "message"}},
+			body:      "info:消息",
+			outGroups: "1.0000",
+			outEvents: "1.0000",
+			outSize:   "29.0000", // level=info (9), message=消息 (13), env=prod (7)
+		},
+		{
+			name:      "split emits replacement events",
+			processor: &logstring.ProcessorSplit{SplitSep: ","},
+			body:      "a,bb",
+			outGroups: "1.0000",
+			outEvents: "2.0000",
+			outSize:   "24.0000", // Two content keys (14), three payload bytes, and one group tag (7).
+		},
+		{
+			name:      "split drops empty events",
+			processor: &logstring.ProcessorSplit{SplitSep: ","},
+			body:      ",",
+			outGroups: "0.0000",
+			outEvents: "0.0000",
+			outSize:   "0.0000",
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := &ContextImp{}
+			ctx.InitContext("project", "store", "processor-pipeline")
+			runner := &pluginRunner{
+				LogstoreConfig:       &LogstoreConfig{Context: ctx, GlobalConfig: &config.GlobalConfig{}},
+				InputPipeContext:     helper.NewObservePipelineContext(1),
+				ProcessPipeContext:   helper.NewGroupedPipelineContext(),
+				AggregatePipeContext: helper.NewObservePipelineContext(1),
+				ProcessControl:       pipeline.NewAsyncControl(),
+			}
+			require.NoError(t, runner.addProcessor(&pipeline.PluginMeta{PluginID: "1", PluginType: "processor_test"}, tt.processor, 0))
+			log := models.NewLogWithOrderedContents(1)
+			models.SetOwnedLogBody(log, []byte(tt.body))
+			runner.InputPipeContext.Collector().Collect(models.NewGroup(nil, models.NewTagsWithKeyValues("env", "prod")), log)
+			runner.runProcessor()
+			runner.ProcessControl.WaitCancel()
+
+			records := ctx.ExportMetricRecords()
+			require.Len(t, records, 1)
+			counters, category := parseExportedRecord(t, records[0])
+			assert.Equal(t, selfmonitor.MetricLabelValueMetricCategoryPlugin, category)
+			assert.Equal(t, "1.0000", counters[selfmonitor.MetricPluginInEventGroupsTotal])
+			assert.Equal(t, "1.0000", counters[selfmonitor.MetricPluginInEventsTotal])
+			assert.Equal(t, fmt.Sprintf("%d.0000", len(models.BodyKey)+len(tt.body)+len("envprod")), counters[selfmonitor.MetricPluginInSizeBytes])
+			assert.Equal(t, tt.outGroups, counters[selfmonitor.MetricPluginOutEventGroupsTotal])
+			assert.Equal(t, tt.outEvents, counters[selfmonitor.MetricPluginOutEventsTotal])
+			assert.Equal(t, tt.outSize, counters[selfmonitor.MetricPluginOutSizeBytes])
+		})
 	}
 }

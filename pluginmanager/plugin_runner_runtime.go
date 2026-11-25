@@ -275,6 +275,7 @@ func (p *pluginRunner) runProcessorInternal(cc *pipeline.AsyncControl) {
 				}
 				clear(pipeEvents)
 				pipeEvents = helper.AppendDrainedPipelineGroups(pipeContext.Collector(), pipeEvents[:0])
+				processor.recordOutput(pipeEvents)
 				if len(pipeEvents) == 0 {
 					break
 				}

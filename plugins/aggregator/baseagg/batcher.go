@@ -212,8 +212,7 @@ func eventSize(event models.PipelineEvent) int64 {
 	if !ok {
 		return max(event.GetSize(), 1)
 	}
-	// Log.GetSize counts only the raw body. Include structured fields when
-	// enforcing the batch limit.
+	// Estimate the SLS wire size, including the protobuf field overhead.
 	size := int64(6)
 	for key, value := range models.LogContentEntries(log.GetIndices()) {
 		size += int64(5 + len(key))

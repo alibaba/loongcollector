@@ -75,11 +75,12 @@ func (g *PipelineGroupEvents) GetEventCount() int64 {
 	return int64(len(g.Events))
 }
 
+// GetSize estimates the current event data and counts group tags once per group.
 func (g *PipelineGroupEvents) GetSize() int64 {
 	if g == nil {
 		return 0
 	}
-	var size int64
+	size := stringKeyValuesSize(g.Group.GetTags())
 	for _, event := range g.Events {
 		size += event.GetSize()
 	}

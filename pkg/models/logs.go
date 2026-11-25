@@ -15,6 +15,7 @@
 package models
 
 import (
+	"fmt"
 	"maps"
 	"slices"
 
@@ -182,24 +183,33 @@ func (m *Log) GetIndices() LogContents {
 	return NilInterfaceValues
 }
 
+// GetSize returns the bytes in the current log fields and event tags.
 func (m *Log) GetSize() int64 {
-	if m == nil || m.Contents == nil {
+	if m == nil {
 		return 0
 	}
-	var body any
-	if ordered, ok := m.Contents.(*orderedLogContents); ok {
-		// Measuring the body does not expose its mutable byte slice.
-		body, _ = ordered.lookup(BodyKey)
-	} else {
-		body = m.Contents.Get(BodyKey)
+	size := stringKeyValuesSize(m.Tags)
+	switch contents := m.Contents.(type) {
+	case nil:
+	case *orderedLogContents:
+		size += contents.dataSize()
+	default:
+		for key, value := range contents.Iterator() {
+			size += logFieldSize(key, value)
+		}
 	}
-	switch value := body.(type) {
+	return size
+}
+
+func logFieldSize(key string, value any) int64 {
+	switch value := value.(type) {
 	case []byte:
-		return int64(len(value))
+		return int64(len(key) + len(value))
 	case string:
-		return int64(len(value))
+		return int64(len(key) + len(value))
+	default:
+		return int64(len(key) + len(fmt.Sprint(value)))
 	}
-	return 0
 }
 
 func (m *Log) Clone() PipelineEvent {
