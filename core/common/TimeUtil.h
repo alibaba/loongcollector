@@ -109,6 +109,10 @@ Strptime(const char* buf, const char* fmt, LogtailTime* ts, int& nanosecondLengt
 
 int32_t GetSystemBootTime();
 
+#if defined(__linux__)
+int32_t GetBootTimeFromProcStat(const std::string& procStatPath = "/proc/stat");
+#endif
+
 // For feature enable_log_time_auto_adjust.
 time_t GetTimeDelta();
 void UpdateTimeDelta(time_t serverTime);
