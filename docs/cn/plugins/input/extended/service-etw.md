@@ -48,6 +48,7 @@ ETW 是 Windows 操作系统内置的高性能事件追踪框架，几乎所有 
 | MinBuffers | uint32 | 否 | 0 | ETW session 最小 buffer 数；0 表示使用 Windows 默认值；配置时最大 1024 |
 | MaxBuffers | uint32 | 否 | 0 | ETW session 最大 buffer 数；0 表示使用 Windows 默认值；配置时最大 1024 |
 | FlushTimerSec | uint32 | 否 | 0 | ETW buffer flush 间隔，单位秒；0 表示使用 Windows 默认值；配置时最大 60 |
+| SessionName | string | 否 | 空字符串 | 固定 ETW session 名称；空字符串表示不固定（由系统自动分配）。启动时若发现同名 session 已存在，插件会尝试先 stop 再重建 |
 
 > **ProviderName vs ProviderGUID**：推荐使用 `ProviderName`，插件会自动解析为 GUID，无需手动查找。当目标 Windows 系统中未注册该名称对应的 GUID 时，才需回退为 `ProviderGUID` 方式。
 
