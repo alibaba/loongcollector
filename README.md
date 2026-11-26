@@ -156,11 +156,11 @@ docker run -d --name loongcollector \
 
 ## 📚 Documentation
 
-- **[User Manual](https://observability.cn/project/loongcollector/readme/)** - Comprehensive documentation
-- **[Installation Guide](https://observability.cn/project/loongcollector/quick-start/)** - Step-by-step setup
-- **[Configuration Reference](https://observability.cn/project/loongcollector/collection-config/)** - Detailed configuration options
-- **[Plugin Directory](https://observability.cn/project/loongcollector/overview/)** - Complete plugin documentation
-- **[Developer Guide](https://observability.cn/project/loongcollector/development-environment/)** - Contributing and development
+- **[User Manual](https://cnops.com.cn/projects/loongcollector/docs/lc--readme)** - Comprehensive documentation
+- **[Installation Guide](https://cnops.com.cn/projects/loongcollector/docs/lc--quick-start)** - Step-by-step setup
+- **[Configuration Reference](https://cnops.com.cn/projects/loongcollector/docs/lc--collection-config)** - Detailed configuration options
+- **[Plugin Directory](https://cnops.com.cn/projects/loongcollector/docs/lc--overview)** - Complete plugin documentation
+- **[Developer Guide](https://cnops.com.cn/projects/loongcollector/docs/lc--development-environment)** - Contributing and development
 
 ## 🤝 Contributing
 
