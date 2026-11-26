@@ -104,7 +104,7 @@ bool IsValidMetric(const StringView& line) {
         if (c == ' ' || c == '\t') {
             continue;
         }
-        if (c == '#') {
+        if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_' || c == ':')) {
             return false;
         }
         return true;
