@@ -36,6 +36,7 @@ import (
 	"github.com/moby/moby/api/types/network"
 	docker "github.com/moby/moby/client"
 
+	"github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/flags"
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
@@ -365,6 +366,12 @@ func (did *DockerInfoDetail) GetExternalTags(envs, k8sLabels map[string]string) 
 	}
 	did.GetCustomExternalTags(tags, envs, k8sLabels)
 	return tags
+}
+
+// UseOldStdoutContentTags keeps legacy stdout fields in log contents unless the
+// input explicitly opts into the pipeline's tag placement setting.
+func UseOldStdoutContentTags(usePipelineEventTags bool, settings *config.GlobalConfig) bool {
+	return !usePipelineEventTags || (settings != nil && settings.UsingOldContentTag)
 }
 
 // GetStdoutTags selects container tags for the Go stdout inputs. In the current

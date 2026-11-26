@@ -80,7 +80,7 @@ func NewDockerFileSyner(sds *ServiceDockerStdout,
 
 	source := util.NewPackIDPrefix(info.ContainerInfo.ID + sds.context.GetConfigName())
 	settings := sds.context.GetPipelineScopeConfig()
-	usingOldContentTag := settings != nil && settings.UsingOldContentTag
+	usingOldContentTag := containercenter.UseOldStdoutContentTags(sds.UsePipelineEventTags, settings)
 	tags := info.GetStdoutTags(sds.ExternalEnvTag, sds.ExternalK8sLabelTag, usingOldContentTag)
 	var contentTags, groupTags map[string]string
 	if usingOldContentTag {
@@ -166,6 +166,10 @@ type ServiceDockerStdout struct {
 	K8sNamespaceRegex     string            `comment:"the regular expression of kubernetes namespace to match containers."`
 	K8sPodRegex           string            `comment:"the regular expression of kubernetes pod to match containers."`
 	K8sContainerRegex     string            `comment:"the regular expression of kubernetes container to match containers."`
+
+	// UsePipelineEventTags applies the pipeline's UsingOldContentTag setting.
+	// The default keeps container fields in log contents.
+	UsePipelineEventTags bool
 
 	// export from ilogtail-trace component
 	IncludeLabelRegex map[string]*regexp2.Regexp

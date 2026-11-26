@@ -88,6 +88,8 @@ type stdoutSyner struct {
 	ExternalEnvTag      map[string]string
 	ExternalK8sLabelTag map[string]string
 
+	usePipelineEventTags bool
+
 	info                 *containercenter.DockerInfoDetail
 	client               *docker.Client
 	startCheckPoint      string
@@ -107,7 +109,7 @@ type stdoutSyner struct {
 
 func (ss *stdoutSyner) newContainerPump(c pipeline.PipelineCollector, stdout, stderr *io.PipeReader) {
 	settings := ss.context.GetPipelineScopeConfig()
-	usingOldContentTag := settings != nil && settings.UsingOldContentTag
+	usingOldContentTag := containercenter.UseOldStdoutContentTags(ss.usePipelineEventTags, settings)
 	tags := ss.info.GetStdoutTags(ss.ExternalEnvTag, ss.ExternalK8sLabelTag, usingOldContentTag)
 	pump := func(source string, input io.Reader) {
 		defer ss.wg.Done()
@@ -380,6 +382,10 @@ type ServiceDockerStdout struct {
 	K8sPodRegex           string
 	K8sContainerRegex     string
 
+	// UsePipelineEventTags applies the pipeline's UsingOldContentTag setting.
+	// The default keeps container fields in log contents.
+	UsePipelineEventTags bool
+
 	// export from ilogtail-trace component
 	IncludeLabelRegex map[string]*regexp2.Regexp
 	ExcludeLabelRegex map[string]*regexp2.Regexp
@@ -465,6 +471,8 @@ func (sds *ServiceDockerStdout) FlushAll(c pipeline.PipelineCollector, firstStar
 				}
 			}
 			syner = &stdoutSyner{
+				usePipelineEventTags: sds.UsePipelineEventTags,
+
 				info:                 info,
 				client:               sds.client,
 				stdoutCheckPoint:     sds.stdoutCheckPoint,

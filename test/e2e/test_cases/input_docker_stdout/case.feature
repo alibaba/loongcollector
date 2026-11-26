@@ -1,10 +1,10 @@
 @input
 Feature: Docker stdout tag placement
-  Both Go stdout inputs preserve their historical content fields when requested.
+  Both Go stdout inputs preserve their historical content fields by default.
   The event-group format matches native stdout when reading the same fixture.
 
   @e2e @docker-compose
-  Scenario: TestInputDockerStdoutLegacyContentTags
+  Scenario Outline: TestInputDockerStdout<mode>ContentTags
     Given {docker-compose} environment
     Given subcribe data from {grpc} with config
     """
@@ -13,7 +13,7 @@ Feature: Docker stdout tag placement
     """
     enable: true
     global:
-      UsingOldContentTag: true
+      <globalTagSetting>
       PipelineMetaTagKey:
         HOST_NAME: ""
         HOST_IP: ""
@@ -23,6 +23,7 @@ Feature: Docker stdout tag placement
       AgentEnvMetaTagKey: {}
     inputs:
       - Type: service_docker_stdout
+        <pluginTagSetting>
         IncludeEnv:
           STDOUT_SWITCH: "true"
         Stdout: true
@@ -61,8 +62,15 @@ Feature: Docker stdout tag placement
     {}
     """
 
+    Examples:
+      | mode           | globalTagSetting          | pluginTagSetting            |
+      | LegacyDefault  | # UsingOldContentTag      | # UsePipelineEventTags      |
+      | LegacyFalse    | UsingOldContentTag: false | # UsePipelineEventTags      |
+      | ExplicitLegacy | UsingOldContentTag: false | UsePipelineEventTags: false |
+      | GlobalLegacy   | UsingOldContentTag: true  | UsePipelineEventTags: true  |
+
   @e2e @docker-compose
-  Scenario: TestInputDockerStdoutGroupTags
+  Scenario Outline: TestInputDockerStdout<mode>GroupTags
     Given {docker-compose} environment
     Given subcribe data from {grpc} with config
     """
@@ -71,7 +79,7 @@ Feature: Docker stdout tag placement
     """
     enable: true
     global:
-      UsingOldContentTag: false
+      <globalTagSetting>
       PipelineMetaTagKey:
         HOST_NAME: ""
         HOST_IP: ""
@@ -81,6 +89,7 @@ Feature: Docker stdout tag placement
       AgentEnvMetaTagKey: {}
     inputs:
       - Type: service_docker_stdout
+        UsePipelineEventTags: true
         IncludeEnv:
           STDOUT_SWITCH: "true"
         Stdout: true
@@ -118,8 +127,13 @@ Feature: Docker stdout tag placement
     {}
     """
 
+    Examples:
+      | mode     | globalTagSetting          |
+      | Frontend | # UsingOldContentTag      |
+      | Explicit | UsingOldContentTag: false |
+
   @e2e @docker-compose
-  Scenario: TestInputDockerRawStdoutLegacyContentTags
+  Scenario Outline: TestInputDockerRawStdout<mode>ContentTags
     Given {docker-compose} environment
     Given subcribe data from {grpc} with config
     """
@@ -128,7 +142,7 @@ Feature: Docker stdout tag placement
     """
     enable: true
     global:
-      UsingOldContentTag: true
+      <globalTagSetting>
       PipelineMetaTagKey:
         HOST_NAME: ""
         HOST_IP: ""
@@ -138,6 +152,7 @@ Feature: Docker stdout tag placement
       AgentEnvMetaTagKey: {}
     inputs:
       - Type: service_docker_stdout_raw
+        <pluginTagSetting>
         IncludeEnv:
           STDOUT_SWITCH: "true"
         Stdout: true
@@ -176,8 +191,15 @@ Feature: Docker stdout tag placement
     {}
     """
 
+    Examples:
+      | mode           | globalTagSetting          | pluginTagSetting            |
+      | LegacyDefault  | # UsingOldContentTag      | # UsePipelineEventTags      |
+      | LegacyFalse    | UsingOldContentTag: false | # UsePipelineEventTags      |
+      | ExplicitLegacy | UsingOldContentTag: false | UsePipelineEventTags: false |
+      | GlobalLegacy   | UsingOldContentTag: true  | UsePipelineEventTags: true  |
+
   @e2e @docker-compose
-  Scenario: TestInputDockerRawStdoutGroupTags
+  Scenario Outline: TestInputDockerRawStdout<mode>GroupTags
     Given {docker-compose} environment
     Given subcribe data from {grpc} with config
     """
@@ -186,7 +208,7 @@ Feature: Docker stdout tag placement
     """
     enable: true
     global:
-      UsingOldContentTag: false
+      <globalTagSetting>
       PipelineMetaTagKey:
         HOST_NAME: ""
         HOST_IP: ""
@@ -196,6 +218,7 @@ Feature: Docker stdout tag placement
       AgentEnvMetaTagKey: {}
     inputs:
       - Type: service_docker_stdout_raw
+        UsePipelineEventTags: true
         IncludeEnv:
           STDOUT_SWITCH: "true"
         Stdout: true
@@ -232,6 +255,11 @@ Feature: Docker stdout tag placement
     """
     {}
     """
+
+    Examples:
+      | mode     | globalTagSetting          |
+      | Frontend | # UsingOldContentTag      |
+      | Explicit | UsingOldContentTag: false |
 
   @e2e @docker-compose
   Scenario: TestInputContainerStdioGroupTags

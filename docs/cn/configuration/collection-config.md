@@ -85,7 +85,7 @@ flushers:
 
 ### Go 标准输出标签兼容
 
-`global.UsingOldContentTag` 仅供 `service_docker_stdout` 和 `service_docker_stdout_raw` 使用。默认 `false`，容器标签与原生 `input_container_stdio` 一样写入事件组标签。设置为 `true` 时保留旧的 Go stdout 输出，将容器标签写为日志内容字段。
+`global.UsingOldContentTag` 适用于显式配置 `UsePipelineEventTags: true` 的 `service_docker_stdout` 和 `service_docker_stdout_raw`。此时默认 `false`，容器字段与原生 `input_container_stdio` 一样写入事件组标签。设置为 `true` 时写入日志正文。输入省略 `UsePipelineEventTags` 或设为 `false` 时，始终保留原有正文格式。
 
 ### Go 事件 Pipeline
 

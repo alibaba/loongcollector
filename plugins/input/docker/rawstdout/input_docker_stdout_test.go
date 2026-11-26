@@ -166,15 +166,19 @@ func (c stdoutTestContext) GetPipelineScopeConfig() *config.GlobalConfig {
 
 func TestContainerPumpPreservesTagMode(t *testing.T) {
 	for _, mode := range []struct {
-		name           string
-		oldContentTags bool
+		name              string
+		pipelineEventTags bool
+		globalContentTags bool
+		expectContentTags bool
 	}{
-		{"group tags", false},
-		{"content tags", true},
+		{"legacy content tags", false, false, true},
+		{"group tags", true, false, false},
+		{"global content tags", true, true, true},
 	} {
 		t.Run(mode.name, func(t *testing.T) {
 			ctx := helper.NewObservePipelineContext(4)
 			syner := &stdoutSyner{
+				usePipelineEventTags: mode.pipelineEventTags,
 				info: &containercenter.DockerInfoDetail{
 					ContainerInfo: container.InspectResponse{
 						ID:     "container-id",
@@ -183,7 +187,7 @@ func TestContainerPumpPreservesTagMode(t *testing.T) {
 					},
 					ContainerNameTag: map[string]string{"container": "container-name"},
 				},
-				context: stdoutTestContext{Context: mock.NewEmptyContext("project", "logstore", "config"), oldContentTags: mode.oldContentTags},
+				context: stdoutTestContext{Context: mock.NewEmptyContext("project", "logstore", "config"), oldContentTags: mode.globalContentTags},
 			}
 			reader, writer := io.Pipe()
 			before := time.Now()
@@ -202,7 +206,7 @@ func TestContainerPumpPreservesTagMode(t *testing.T) {
 			require.False(t, log.GetTags().Contains("container"))
 			key, ordered := models.FirstLogContentKey(log.GetIndices())
 			require.True(t, ordered)
-			if mode.oldContentTags {
+			if mode.expectContentTags {
 				require.Equal(t, "container", key)
 				require.Equal(t, "container-name", log.GetIndices().Get("container"))
 				require.False(t, groups[0].Group.GetTags().Contains("container"))

@@ -179,20 +179,24 @@ func (c stdoutTestContext) GetPipelineScopeConfig() *config.GlobalConfig {
 
 func TestDockerFileSynerPreservesTagModeAndSource(t *testing.T) {
 	for _, mode := range []struct {
-		name           string
-		oldContentTags bool
+		name              string
+		pipelineEventTags bool
+		globalContentTags bool
+		expectContentTags bool
 	}{
-		{"group tags", false},
-		{"content tags", true},
+		{"legacy content tags", false, false, true},
+		{"group tags", true, false, false},
+		{"global content tags", true, true, true},
 	} {
 		t.Run(mode.name, func(t *testing.T) {
 			ctx := helper.NewObservePipelineContext(4)
 			input := &ServiceDockerStdout{
-				context:    stdoutTestContext{Context: mock.NewEmptyContext("project", "logstore", "config"), oldContentTags: mode.oldContentTags},
-				collector:  ctx.Collector(),
-				Stdout:     true,
-				Stderr:     true,
-				MaxLogSize: 4096,
+				UsePipelineEventTags: mode.pipelineEventTags,
+				context:              stdoutTestContext{Context: mock.NewEmptyContext("project", "logstore", "config"), oldContentTags: mode.globalContentTags},
+				collector:            ctx.Collector(),
+				Stdout:               true,
+				Stderr:               true,
+				MaxLogSize:           4096,
 			}
 			info := &containercenter.DockerInfoDetail{
 				ContainerNameTag: map[string]string{"container": "test-container"},
@@ -216,7 +220,7 @@ func TestDockerFileSynerPreservesTagModeAndSource(t *testing.T) {
 				require.Equal(t, uint64(0), log.GetTimestamp()%uint64(time.Second))
 				require.NotEmpty(t, group.Group.GetMetadata().Get("source"))
 				require.False(t, log.GetTags().Contains("container"))
-				if mode.oldContentTags {
+				if mode.expectContentTags {
 					require.Equal(t, "test-container", log.GetIndices().Get("container"))
 					require.False(t, group.Group.GetTags().Contains("container"))
 				} else {
@@ -233,22 +237,26 @@ func TestDockerFileSynerPreservesTagModeAndSource(t *testing.T) {
 
 func TestDockerFileSynerPreservesEmptyMultilineContent(t *testing.T) {
 	for _, mode := range []struct {
-		name           string
-		oldContentTags bool
+		name              string
+		pipelineEventTags bool
+		globalContentTags bool
+		expectContentTags bool
 	}{
-		{"group tags", false},
-		{"content tags", true},
+		{"legacy content tags", false, false, true},
+		{"group tags", true, false, false},
+		{"global content tags", true, true, true},
 	} {
 		t.Run(mode.name, func(t *testing.T) {
 			ctx := helper.NewObservePipelineContext(4)
 			input := &ServiceDockerStdout{
-				context:            stdoutTestContext{Context: mock.NewEmptyContext("project", "logstore", "config"), oldContentTags: mode.oldContentTags},
-				collector:          ctx.Collector(),
-				Stdout:             true,
-				Stderr:             true,
-				MaxLogSize:         4096,
-				BeginLineRegex:     "^",
-				BeginLineTimeoutMs: 1000,
+				UsePipelineEventTags: mode.pipelineEventTags,
+				context:              stdoutTestContext{Context: mock.NewEmptyContext("project", "logstore", "config"), oldContentTags: mode.globalContentTags},
+				collector:            ctx.Collector(),
+				Stdout:               true,
+				Stderr:               true,
+				MaxLogSize:           4096,
+				BeginLineRegex:       "^",
+				BeginLineTimeoutMs:   1000,
 			}
 			info := &containercenter.DockerInfoDetail{
 				ContainerNameTag: map[string]string{"container": "test-container"},
@@ -272,7 +280,7 @@ func TestDockerFileSynerPreservesEmptyMultilineContent(t *testing.T) {
 				require.True(t, ok)
 				require.True(t, log.GetIndices().Contains(models.BodyKey))
 				require.Empty(t, log.GetBody())
-				if mode.oldContentTags {
+				if mode.expectContentTags {
 					require.Equal(t, "test-container", log.GetIndices().Get("container"))
 					require.False(t, groups[0].Group.GetTags().Contains("container"))
 				} else {

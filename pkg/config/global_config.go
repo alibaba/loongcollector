@@ -58,7 +58,7 @@ type GlobalConfig struct {
 	EnableSlsMetricsFormat    bool
 	EnableProcessorTag        bool
 
-	// UsingOldContentTag preserves plain container fields for the Go stdout inputs.
+	// UsingOldContentTag keeps container fields in log contents when Go stdout opts into this setting.
 	UsingOldContentTag bool
 
 	PipelineMetaTagKey     map[string]string
