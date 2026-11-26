@@ -83,7 +83,8 @@ func convTagsToLabels(tags models.Tags) []pb.Label {
 	for k, v := range tags.Iterator() {
 		// MUST NOT contain any empty label names or values.
 		// reference: https://prometheus.io/docs/specs/remote_write_spec/#labels
-		if k != "" && v != "" {
+		// The series name comes from the event, including per-field names.
+		if k != "" && k != metricNameKey && v != "" {
 			labels = append(labels, pb.Label{Name: k, Value: v})
 		}
 	}

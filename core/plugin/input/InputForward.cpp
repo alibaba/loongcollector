@@ -16,7 +16,7 @@
 
 #include "plugin/input/InputForward.h"
 
-#include <algorithm>
+#include <utility>
 
 #include "collection_pipeline/CollectionPipeline.h"
 #include "collection_pipeline/plugin/PluginRegistry.h"
@@ -32,7 +32,7 @@ const std::string InputForward::sName = "input_forward";
 
 const std::unordered_set<std::string> InputForward::sSupportedProtocols = {
     "LoongSuite",
-    // TODO: add more protocols here
+    // TODO: add the matching decoder in Init and gRPC service in Start for each new protocol.
 };
 
 bool InputForward::Init(const Json::Value& config, Json::Value& optionalGoPipeline) {
@@ -75,6 +75,15 @@ bool InputForward::Init(const Json::Value& config, Json::Value& optionalGoPipeli
     mForwardConfig["InputIndex"] = static_cast<int>(mIndex);
     mForwardConfig["Protocol"] = mProtocol;
 
+    // Start may expose the input to processing as soon as the listener accepts a request.
+    auto processor = PluginRegistry::GetInstance()->CreateProcessor(ProcessorParseFromPBNative::sName,
+                                                                    mContext->GetPipeline().GenNextPluginMeta(false));
+    if (!processor->Init(mForwardConfig, *mContext)) {
+        LOG_ERROR(sLogger, ("InputForward failed to init processor", mProtocol)("config", mConfigName));
+        return false;
+    }
+    mInnerProcessors.emplace_back(std::move(processor));
+
     LOG_INFO(
         sLogger,
         ("InputForward initialized", "success")("config", mConfigName)("endpoint", mEndpoint)("protocol", mProtocol));
@@ -82,25 +91,13 @@ bool InputForward::Init(const Json::Value& config, Json::Value& optionalGoPipeli
 }
 
 bool InputForward::Start() {
-    bool result = false;
-    mForwardConfig["QueueKey"] = mContext->GetProcessQueueKey();
-
-    std::unique_ptr<ProcessorInstance> processor;
-    if (mProtocol == "LoongSuite") {
-        result = GrpcInputManager::GetInstance()->AddListenInput<LoongSuiteForwardServiceImpl>(
-            mConfigName, mEndpoint, mForwardConfig);
-        processor = PluginRegistry::GetInstance()->CreateProcessor(ProcessorParseFromPBNative::sName,
-                                                                   mContext->GetPipeline().GenNextPluginMeta(false));
-        if (!processor->Init(mForwardConfig, *mContext)) {
-            LOG_ERROR(sLogger, ("InputForward failed to init processor", mProtocol)("config", mConfigName));
-            return false;
-        }
-        mInnerProcessors.emplace_back(std::move(processor));
-    } else {
-        LOG_WARNING(sLogger, ("Protocol not fully implemented, should not happen", mProtocol)("config", mConfigName));
+    if (mStarted) {
+        return true;
     }
-
-    if (!result) {
+    mForwardConfig["QueueKey"] = mContext->GetProcessQueueKey();
+    mStarted = GrpcInputManager::GetInstance()->AddListenInput<LoongSuiteForwardServiceImpl>(
+        mConfigName, mEndpoint, mForwardConfig);
+    if (!mStarted) {
         LOG_ERROR(sLogger,
                   ("InputForward failed to start service", mEndpoint)("config", mConfigName)("protocol", mProtocol));
         return false;
@@ -111,7 +108,11 @@ bool InputForward::Start() {
 }
 
 bool InputForward::Stop(bool isPipelineRemoving) {
-    bool result = GrpcInputManager::GetInstance()->RemoveListenInput(mConfigName, mEndpoint, mForwardConfig);
+    if (!mStarted) {
+        return true;
+    }
+    const bool result = GrpcInputManager::GetInstance()->RemoveListenInput(mConfigName, mEndpoint, mForwardConfig);
+    mStarted = false;
 
     if (result) {
         LOG_INFO(sLogger, ("InputForward stopped successfully", mEndpoint)("config", mConfigName));

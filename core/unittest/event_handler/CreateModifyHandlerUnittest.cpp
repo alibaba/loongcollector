@@ -21,6 +21,7 @@
 #include <string>
 
 #include "collection_pipeline/CollectionPipeline.h"
+#include "collection_pipeline/plugin/PluginRegistry.h"
 #include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "common/FileSystemUtil.h"
 #include "common/Flags.h"
@@ -58,6 +59,7 @@ public:
 
 protected:
     static void SetUpTestCase() {
+        PluginRegistry::GetInstance()->LoadPlugins();
         srand(time(NULL));
         gRootDir = GetProcessExecutionDir();
         gLogName = "test.log";
@@ -67,7 +69,7 @@ protected:
         filesystem::remove_all(gRootDir);
     }
 
-    static void TearDownTestCase() {}
+    static void TearDownTestCase() { PluginRegistry::GetInstance()->UnloadPlugins(); }
 
     void SetUp() override {
         bfs::create_directories(gRootDir);
@@ -79,7 +81,6 @@ protected:
         unique_ptr<Json::Value> configJson;
         string configStr, errorMsg;
         unique_ptr<CollectionConfig> config;
-        unique_ptr<CollectionPipeline> pipeline;
 
         // new pipeline
         configStr = R"(
@@ -110,11 +111,11 @@ protected:
 
         config.reset(new CollectionConfig(mConfigName, std::move(configJson), filesystem::path(".")));
         APSARA_TEST_TRUE(config->Parse());
-        pipeline.reset(new CollectionPipeline());
-        APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
-        ctx.SetPipeline(*pipeline.get());
+        mPipeline = make_unique<CollectionPipeline>();
+        APSARA_TEST_TRUE(mPipeline->Init(std::move(*config)));
+        ctx.SetPipeline(*mPipeline);
         ctx.SetConfigName(mConfigName);
-        ctx.SetProcessQueueKey(0);
+        ctx.SetProcessQueueKey(mPipeline->GetContext().GetProcessQueueKey());
         discoveryOpts = FileDiscoveryOptions();
         discoveryOpts.Init(inputConfigJson, ctx, "test");
         discoveryOpts.SetDeduceAndSetContainerBaseDirFunc(
@@ -130,7 +131,7 @@ protected:
         FileServer::GetInstance()->AddMultilineConfig(mConfigName, &multilineOpts, &ctx);
         FileServer::GetInstance()->AddFileTagConfig(mConfigName, &tagOpts, &ctx);
 
-        ProcessQueueManager::GetInstance()->CreateOrUpdateCountBoundedQueue(0, 0, ctx);
+        ProcessQueueManager::GetInstance()->CreateOrUpdateCountBoundedQueue(ctx.GetProcessQueueKey(), 0, ctx);
 
         // build a reader
         mReaderPtr = std::make_shared<LogFileReader>(gRootDir,
@@ -165,6 +166,8 @@ private:
     FileReaderOptions readerOpts;
     MultilineOptions multilineOpts;
     FileTagOptions tagOpts;
+    // Keep the pipeline alive for the context and use its allocated queue key.
+    unique_ptr<CollectionPipeline> mPipeline;
     CollectionPipelineContext ctx;
     FileDiscoveryConfig mConfig;
 

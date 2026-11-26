@@ -97,16 +97,31 @@ func BenchmarkLexicographicalSort(b *testing.B) {
 	})
 }
 
+func TestGenPromRemoteWriteTimeseries_IgnoresMetricNameTag(t *testing.T) {
+	tags := models.NewTagsWithKeyValues(metricNameKey, "tag_name", "source", "scrape")
+	metric := models.NewSingleValueMetric("scrape_duration_seconds", models.MetricTypeGauge, tags, 1_000_000_000, 0.5)
+
+	assert.Equal(t, []pb.TimeSeries{{
+		Labels: []pb.Label{
+			{Name: metricNameKey, Value: "scrape_duration_seconds"},
+			{Name: "source", Value: "scrape"},
+		},
+		Samples: []pb.Sample{{Value: 0.5, Timestamp: 1000}},
+	}}, genPromRemoteWriteTimeseries(metric))
+}
+
 func TestGenPromRemoteWriteTimeseries_MultiValue(t *testing.T) {
 	multiValue := models.NewMetricMultiValueWithMap(map[string]float64{
 		"cpu":            0.1,
 		"memory_used_mb": 25,
 	})
-	metric := models.NewMultiValuesMetric("agent", models.MetricTypeUntyped, models.NewTags(), 1_000_000_000, multiValue.Values)
+	tags := models.NewTagsWithKeyValues(metricNameKey, "agent")
+	metric := models.NewMultiValuesMetric("agent", models.MetricTypeUntyped, tags, 1_000_000_000, multiValue.Values)
 	series := genPromRemoteWriteTimeseries(metric)
 	assert.Len(t, series, 2)
 	names := map[string]bool{}
 	for _, ts := range series {
+		assert.Len(t, ts.Labels, 1)
 		assert.Len(t, ts.Samples, 1)
 		for _, label := range ts.Labels {
 			if label.Name == metricNameKey {
