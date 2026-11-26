@@ -36,7 +36,7 @@
 
 ## 采集范围
 
-路径运行时由 `GetAgentLogDir` / `GetAgentRunDir` / `GetAgentDataDir` / `GetLoongcollectorConfDir` 等决定，兼容商业版、集团包与 `logtail_mode`。缺文件跳过，不告警。
+路径运行时由 `GetAgentLogDir` / `GetAgentRunDir` / `GetAgentDataDir` / `GetLoongcollectorConfDir` 等决定，兼容商业版、集团包与 `logtail_mode`。缺文件、0 字节文件跳过，不告警。解析后 `content` 为空或只含空白的事件丢弃，不上报。
 
 ### 运行日志（按行解析 + 可选时间过滤）
 
