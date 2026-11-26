@@ -13,6 +13,7 @@ Feature: input docker stdout multiline
     enable: true
     inputs:
       - Type: service_docker_stdout
+        UsePipelineEventTags: true
         IncludeEnv:
           STDOUT_SWITCH: "true"
         Stdout: true
