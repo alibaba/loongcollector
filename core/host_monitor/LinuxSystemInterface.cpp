@@ -86,8 +86,7 @@ bool LinuxSystemInterface::GetHostLoadavg(vector<string>& lines, string& errorMe
     }
     return true;
 }
-bool LinuxSystemInterface::ReadSocketStat(const std::filesystem::path& path, uint64_t& tcp) {
-    tcp = 0;
+bool LinuxSystemInterface::ReadSocketStat(const std::filesystem::path& path, NetState& netState) {
     if (!path.empty()) {
         std::vector<std::string> sockstatLines;
         std::string errorMessage;
@@ -104,15 +103,18 @@ bool LinuxSystemInterface::ReadSocketStat(const std::filesystem::path& path, uin
             if (FastParse::FieldStartsWith(line, 0, "TCP:") || FastParse::FieldStartsWith(line, 0, "TCP6:")) {
                 // Check field count first to avoid unnecessary warnings
                 // /proc/net/sockstat6 may have simplified format: "TCP6: inuse 15"
-                // while /proc/net/sockstat has full format: "TCP: inuse 25 orphan 0 tw 2 alloc 28 mem 4"
+                // while /proc/net/sockstat has full format: "TCP: inuse 25 orphan 0 tw
+                // 2 alloc 28 mem 4"
                 FastFieldParser parser(line);
                 size_t fieldCount = parser.GetFieldCount();
 
                 uint64_t twValue = 0;
                 uint64_t allocValue = 0;
+                uint64_t memValue = 0;
 
                 // Only try to parse tw and alloc if we have enough fields
-                // Full format needs at least 9 fields (0-8), simplified format may have only 3 fields (0-2)
+                // Full format needs at least 9 fields (0-8), simplified format may have
+                // only 3 fields (0-2)
                 if (fieldCount >= 7) {
                     if (!FastParse::GetFieldAs(line, 6, twValue)) {
                         LOG_WARNING(sLogger, ("ReadSocketStat, failed to get tw value", line));
@@ -123,24 +125,31 @@ bool LinuxSystemInterface::ReadSocketStat(const std::filesystem::path& path, uin
                         LOG_WARNING(sLogger, ("ReadSocketStat, failed to get alloc value", line));
                     }
                 }
-                // For simplified format (e.g., TCP6: inuse 15), use inuse value as fallback
-                // For full format (9 fields), use tw + alloc
-                // If fieldCount is 7 or 8, we have tw but not alloc, fallback to inuse for accuracy
+                if (fieldCount >= 11) {
+                    if (!FastParse::GetFieldAs(line, 10, memValue)) {
+                        LOG_WARNING(sLogger, ("ReadSocketStat, failed to get mem value", line));
+                    }
+                }
+                // For simplified format (e.g., TCP6: inuse 15), use inuse value as
+                // fallback For full format (9 fields), use tw + alloc If fieldCount is
+                // 7 or 8, we have tw but not alloc, fallback to inuse for accuracy
                 if (fieldCount < 9) {
                     uint64_t inuseValue = 0;
                     if (FastParse::GetFieldAs(line, 2, inuseValue)) {
-                        tcp += inuseValue;
+                        netState.tcpStates[TCP_TOTAL] += inuseValue;
                     }
                 } else {
-                    tcp += twValue + allocValue;
+                    netState.tcpStates[TCP_TOTAL] += twValue + allocValue;
                 }
+                netState.tcpMem += memValue * PAGE_SIZE;
             }
         }
     }
     return true;
 }
 
-// Parse TCP state from /proc/net/tcp and /proc/net/tcp6 as a fallback when INET_DIAG is not available
+// Parse TCP state from /proc/net/tcp and /proc/net/tcp6 as a fallback when
+// INET_DIAG is not available
 bool LinuxSystemInterface::ReadProcNetTcp(std::vector<uint64_t>& tcpStateCount) {
     // Read /proc/net/tcp and /proc/net/tcp6
     std::vector<std::filesystem::path> tcpFiles = {PROCESS_DIR / PROCESS_NET_TCP, PROCESS_DIR / PROCESS_NET_TCP6};
@@ -167,8 +176,8 @@ bool LinuxSystemInterface::ReadProcNetTcp(std::vector<uint64_t>& tcpStateCount) 
         for (size_t i = 1; i < tcpLines.size(); ++i) {
             const auto& line = tcpLines[i];
 
-            // Parse the line format: sl local_address rem_address st tx_queue rx_queue ...
-            // We need the 4th field (st) which is the TCP state in hex
+            // Parse the line format: sl local_address rem_address st tx_queue
+            // rx_queue ... We need the 4th field (st) which is the TCP state in hex
             FastFieldParser parser(line);
 
             if (parser.GetFieldCount() < 4) {
@@ -203,11 +212,11 @@ bool LinuxSystemInterface::ReadNetLink(std::vector<uint64_t>& tcpStateCount) {
     fd = socket(AF_NETLINK, SOCK_RAW, NETLINK_INET_DIAG);
     if (fd < 0) {
         LOG_WARNING(sLogger,
-                    ("ReadNetLink, socket(AF_NETLINK, SOCK_RAW, NETLINK_INET_DIAG) failed, error msg: ",
+                    ("ReadNetLink, socket(AF_NETLINK, SOCK_RAW, "
+                     "NETLINK_INET_DIAG) failed, error msg: ",
                      std::string(strerror(errno))));
         return false;
     }
-
 
     // 存在多个netlink socket时，必须单独bind,并通过nl_pid来区分
     struct sockaddr_nl nladdr_bind {};
@@ -275,7 +284,8 @@ bool LinuxSystemInterface::ReadNetLink(std::vector<uint64_t>& tcpStateCount) {
             return false;
         } else if (status == 0) {
             LOG_WARNING(sLogger,
-                        ("ReadNetLink, Unexpected zero-sized  reply from netlink socket. error msg: ",
+                        ("ReadNetLink, Unexpected zero-sized  reply from "
+                         "netlink socket. error msg: ",
                          std::string(strerror(errno))));
             close(fd);
             return true;
@@ -330,10 +340,16 @@ bool LinuxSystemInterface::GetNetStateByNetLink(NetState& netState) {
         success = ReadNetLink(tcpStateCount);
         if (success) {
             netlinkAvailable = true;
-            LOG_INFO(sLogger, ("Netlink INET_DIAG is available, will use it for TCP state collection", ""));
+            LOG_INFO(sLogger,
+                     ("Netlink INET_DIAG is available, will use it for TCP "
+                      "state collection",
+                      ""));
         } else {
             netlinkAvailable = false;
-            LOG_INFO(sLogger, ("Netlink INET_DIAG not available, will use /proc/net/tcp fallback method", ""));
+            LOG_INFO(sLogger,
+                     ("Netlink INET_DIAG not available, will use "
+                      "/proc/net/tcp fallback method",
+                      ""));
             success = ReadProcNetTcp(tcpStateCount);
         }
     });
@@ -347,14 +363,8 @@ bool LinuxSystemInterface::GetNetStateByNetLink(NetState& netState) {
         return false;
     }
 
-    uint64_t tcp = 0, tcpSocketStat = 0;
-
-    if (ReadSocketStat(PROCESS_DIR / PROCESS_NET_SOCKSTAT, tcp)) {
-        tcpSocketStat += tcp;
-    }
-    if (ReadSocketStat(PROCESS_DIR / PROCESS_NET_SOCKSTAT6, tcp)) {
-        tcpSocketStat += tcp;
-    }
+    ReadSocketStat(PROCESS_DIR / PROCESS_NET_SOCKSTAT, netState);
+    ReadSocketStat(PROCESS_DIR / PROCESS_NET_SOCKSTAT6, netState);
 
     int total = 0;
     for (int i = TCP_ESTABLISHED; i <= TCP_CLOSING; i++) {
@@ -363,8 +373,8 @@ bool LinuxSystemInterface::GetNetStateByNetLink(NetState& netState) {
         }
         netState.tcpStates[i] = tcpStateCount[i];
     }
-    // 设置为-1表示没有采集
-    netState.tcpStates[TCP_TOTAL] = total + tcpSocketStat;
+    // 加上sockstat中的TCP_TOTAL计数
+    netState.tcpStates[TCP_TOTAL] += total;
     netState.tcpStates[TCP_NON_ESTABLISHED] = netState.tcpStates[TCP_TOTAL] - netState.tcpStates[TCP_ESTABLISHED];
     return true;
 }
@@ -382,7 +392,6 @@ bool LinuxSystemInterface::GetHostNetDev(vector<string>& lines, string& errorMes
     }
     return true;
 }
-
 
 bool LinuxSystemInterface::GetInterfaceConfig(InterfaceConfig& interfaceConfig, const std::string& name) {
     // 检查网络接口是否存在
@@ -444,7 +453,6 @@ bool LinuxSystemInterface::GetInterfaceConfig(InterfaceConfig& interfaceConfig, 
         }
     }
 
-
     enum {
         Inet6Address, // 长度为32的16进制IPv6地址
         Inet6DevNo, // netlink设备号
@@ -463,7 +471,8 @@ bool LinuxSystemInterface::GetInterfaceConfig(InterfaceConfig& interfaceConfig, 
         boost::algorithm::trim(inet6Name);
 
         if (inet6Name == name) {
-            // Doc: https://ata.atatech.org/articles/11020228072?spm=ata.25287382.0.0.1c647536bhA7NG#lyRD52DR
+            // Doc:
+            // https://ata.atatech.org/articles/11020228072?spm=ata.25287382.0.0.1c647536bhA7NG#lyRD52DR
             if (Inet6Address < fieldCount) {
                 auto* addr6 = (unsigned char*)&(interfaceConfig.address6.addr.in6);
 
@@ -1061,6 +1070,7 @@ bool LinuxSystemInterface::GetTCPStatInformationOnce(TCPStatInformation& tcpStat
         tcpStatInfo.stat.tcpListen = (netState.tcpStates[TCP_LISTEN]);
         tcpStatInfo.stat.tcpTotal = (netState.tcpStates[TCP_TOTAL]);
         tcpStatInfo.stat.tcpNonEstablished = (netState.tcpStates[TCP_NON_ESTABLISHED]);
+        tcpStatInfo.stat.tcpMem = netState.tcpMem;
     }
 
     return ret;
@@ -1356,6 +1366,76 @@ bool LinuxSystemInterface::InitGPUCollectorOnce(const FieldMap& fieldMap) {
     return true;
 }
 
+bool LinuxSystemInterface::GetCgroupStatInformationOnce(CgroupStatInformation& cgroupStatInfo) {
+    std::filesystem::path cgroupPath = PROCESS_DIR / PROCESS_CGROUP;
+    std::vector<std::string> cgroupLines = {};
+
+    if (!CheckExistance(cgroupPath)) {
+        LOG_ERROR(sLogger, ("file does not exist", (cgroupPath).string()));
+        return false;
+    }
+
+    std::string errorMessage;
+    int ret = GetFileLines(cgroupPath, cgroupLines, true, &errorMessage);
+    if (ret != 0 || cgroupLines.empty()) {
+        LOG_ERROR(sLogger, ("failed to read cgroup file", "fail")("error", errorMessage));
+        return false;
+    }
+
+    // 解析每一行，跳过注释行
+    for (const auto& line : cgroupLines) {
+        // 跳过空行和注释行
+        if (line.empty() || line[0] == '#') {
+            continue;
+        }
+        std::vector<std::string> fields;
+        boost::algorithm::split(fields, line, boost::algorithm::is_any_of(" \t"), boost::algorithm::token_compress_on);
+        // 每行应该有4个字段：subsys_name, hierarchy, num_cgroups, enabled
+        if (fields.size() >= 3) {
+            std::string subsysName = fields[0];
+            unsigned int numCgroups = 0;
+
+            // 尝试解析num_cgroups字段
+            if (StringTo(fields[2], numCgroups)) {
+                // 根据subsys_name设置对应的字段
+                if (subsysName == "cpuset") {
+                    cgroupStatInfo.stat.cpuset = numCgroups;
+                } else if (subsysName == "cpu") {
+                    cgroupStatInfo.stat.cpu = numCgroups;
+                } else if (subsysName == "cpuacct") {
+                    cgroupStatInfo.stat.cpuacct = numCgroups;
+                } else if (subsysName == "blkio") {
+                    cgroupStatInfo.stat.blkio = numCgroups;
+                } else if (subsysName == "memory") {
+                    cgroupStatInfo.stat.memory = numCgroups;
+                } else if (subsysName == "devices") {
+                    cgroupStatInfo.stat.devices = numCgroups;
+                } else if (subsysName == "freezer") {
+                    cgroupStatInfo.stat.freezer = numCgroups;
+                } else if (subsysName == "net_cls") {
+                    cgroupStatInfo.stat.net_cls = numCgroups;
+                } else if (subsysName == "perf_event") {
+                    cgroupStatInfo.stat.perf_event = numCgroups;
+                } else if (subsysName == "net_prio") {
+                    cgroupStatInfo.stat.net_prio = numCgroups;
+                } else if (subsysName == "hugetlb") {
+                    cgroupStatInfo.stat.hugetlb = numCgroups;
+                } else if (subsysName == "pids") {
+                    cgroupStatInfo.stat.pids = numCgroups;
+                } else if (subsysName == "ioasids") {
+                    cgroupStatInfo.stat.ioasids = numCgroups;
+                } else if (subsysName == "rdma") {
+                    cgroupStatInfo.stat.rdma = numCgroups;
+                }
+            } else {
+                LOG_WARNING(sLogger, ("failed to parse num_cgroups", fields[2])("subsys", subsysName));
+            }
+        }
+    }
+
+    return true;
+}
+
 bool LinuxSystemInterface::GetGPUInformationOnce(GPUInformation& gpuInfo) {
     if (!mDcgmCollector.IsFullyInitialized()) {
         LOG_ERROR(sLogger, ("GPU data retrieval failed", "DCGM collector not ready"));
@@ -1370,5 +1450,51 @@ bool LinuxSystemInterface::GetGPUInformationOnce(GPUInformation& gpuInfo) {
     }
 
     return success;
+}
+
+bool LinuxSystemInterface::GetDentryStatInformationOnce(DentryStatInformation& dentryStatInfo) {
+    std::filesystem::path dentryPath = PROCESS_DIR / SYSTEM_DENTRY_STATE_PATH;
+
+    if (!CheckExistance(dentryPath)) {
+        LOG_ERROR(sLogger, ("file does not exist", dentryPath.string()));
+        return false;
+    }
+
+    std::string errorMessage;
+    std::vector<std::string> dentryLines = {};
+    int ret = GetFileLines(dentryPath, dentryLines, true, &errorMessage);
+    if (ret != 0 || dentryLines.empty()) {
+        LOG_ERROR(sLogger, ("failed to read dentry-state file", "fail")("error", errorMessage));
+        return false;
+    }
+
+    // /proc/sys/fs/dentry-state format:
+    // nr_dentry nr_unused age_limit want_pages nr_negative
+    for (const auto& line : dentryLines) {
+        if (line.empty()) {
+            continue;
+        }
+        std::vector<std::string> fields;
+        boost::algorithm::split(fields, line, boost::algorithm::is_any_of(" \t"), boost::algorithm::token_compress_on);
+        if (fields.size() >= 5) {
+            unsigned int nrDentry = 0, nrUnused = 0, ageLimit = 0;
+            unsigned int wantPages = 0, nrNegative = 0;
+            if (StringTo(fields[0], nrDentry) && StringTo(fields[1], nrUnused) && StringTo(fields[2], ageLimit)
+                && StringTo(fields[3], wantPages) && StringTo(fields[4], nrNegative)) {
+                dentryStatInfo.stat.nrDentry = nrDentry;
+                dentryStatInfo.stat.nrUnused = nrUnused;
+                dentryStatInfo.stat.ageLimit = ageLimit;
+                dentryStatInfo.stat.wantPages = wantPages;
+                dentryStatInfo.stat.nrNegative = nrNegative;
+                return true;
+            } else {
+                LOG_WARNING(sLogger, ("failed to parse dentry-state", line));
+                return false;
+            }
+        }
+    }
+
+    LOG_ERROR(sLogger, ("dentry-state file", "no valid data line found"));
+    return false;
 }
 } // namespace logtail

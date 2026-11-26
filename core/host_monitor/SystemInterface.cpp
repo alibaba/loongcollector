@@ -57,7 +57,8 @@ SystemInterface* SystemInterface::GetInstance() {
 }
 
 bool SystemInterface::GetSystemInformation(SystemInformation& systemInfo) {
-    // SystemInformation is static and will not be changed. So cache will never be expired.
+    // SystemInformation is static and will not be changed. So cache will never be
+    // expired.
     if (mSystemInformationCache.collectTime > 0) {
         systemInfo = mSystemInformationCache;
         return true;
@@ -202,7 +203,6 @@ bool SystemInterface::GetFileSystemInformation(time_t now, std::string dirName, 
         dirName);
 }
 
-
 bool SystemInterface::GetProcessCmdlineString(time_t now, pid_t pid, ProcessCmdlineString& cmdline) {
     const std::string errorType = "processCmdline";
     return MemoizedCall(
@@ -306,6 +306,32 @@ bool SystemInterface::GetGPUInformation(time_t now, GPUInformation& gpuInfo) {
         errorType);
 }
 
+bool SystemInterface::GetCgroupStatInformation(CgroupStatInformation& cgroupStatInfo) {
+    time_t now = time(nullptr);
+    const std::string errorType = "cgroup";
+    return MemoizedCall(
+        mCgroupStatInformationCache,
+        now,
+        [this](BaseInformation& info) {
+            return this->GetCgroupStatInformationOnce(static_cast<CgroupStatInformation&>(info));
+        },
+        cgroupStatInfo,
+        errorType);
+}
+
+bool SystemInterface::GetDentryStatInformation(DentryStatInformation& dentryStatInfo) {
+    time_t now = time(nullptr);
+    const std::string errorType = "dentry";
+    return MemoizedCall(
+        mDentryStatInformationCache,
+        now,
+        [this](BaseInformation& info) {
+            return this->GetDentryStatInformationOnce(static_cast<DentryStatInformation&>(info));
+        },
+        dentryStatInfo,
+        errorType);
+}
+
 template <typename F, typename InfoT, typename... Args>
 bool SystemInterface::MemoizedCall(SystemInformationCache<InfoT, Args...>& cache,
                                    time_t now,
@@ -358,7 +384,8 @@ bool SystemInterface::SystemInformationCache<InfoT, Args...>::Get(time_t targetT
         });
 
         if (lower != data.end()) {
-            // Found entry with collectTime >= targetTime, this is the closest entry after targetTime
+            // Found entry with collectTime >= targetTime, this is the closest entry
+            // after targetTime
             info = *lower;
             return true;
         } else {
@@ -416,7 +443,8 @@ bool SystemInterface::SystemInformationCache<InfoT>::Get(time_t targetTime, Info
     });
 
     if (lower != mCache.end()) {
-        // Found entry with collectTime >= targetTime, this is the closest entry after targetTime
+        // Found entry with collectTime >= targetTime, this is the closest entry
+        // after targetTime
         info = *lower;
         return true;
     } else {

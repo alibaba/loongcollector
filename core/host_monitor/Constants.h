@@ -53,6 +53,8 @@ const extern int EXECUTE_FAIL;
 const extern std::filesystem::path PROCESS_NET_IF_INET6;
 const extern int64_t SYSTEM_HERTZ;
 const extern long PAGE_SIZE;
+const extern std::filesystem::path PROCESS_CGROUP;
+const extern std::filesystem::path SYSTEM_DENTRY_STATE_PATH;
 #ifdef __ENTERPRISE__
 inline constexpr StringView DEFAULT_INSTANCE_ID_LABEL = "instance_id";
 inline constexpr StringView DEFAULT_USER_ID_LABEL = "user_id";
