@@ -41,6 +41,9 @@ namespace logtail {
 class CheckPoint {
 public:
     DevInode mDevInode;
+    // Filesystem UUID of the block device that held the file. Empty for checkpoints
+    // written before this field existed, and for filesystems without a UUID.
+    std::string mFsUuid;
     int64_t mOffset = 0;
     uint64_t mSignatureHash = 0;
     uint32_t mSignatureSize = 0;
@@ -119,12 +122,39 @@ public:
             }
             return false;
         }
+
+        bool operator==(const CheckPointKey& o) const {
+            return mDevInode == o.mDevInode && mConfigName == o.mConfigName;
+        }
+    };
+
+    struct FsUuidCheckPointKey {
+        std::string mFsUuid;
+        uint64_t mInode = 0;
+        std::string mConfigName;
+
+        bool operator==(const FsUuidCheckPointKey& o) const {
+            return mInode == o.mInode && mFsUuid == o.mFsUuid && mConfigName == o.mConfigName;
+        }
+    };
+
+    struct FsUuidCheckPointKeyHash {
+        size_t operator()(const FsUuidCheckPointKey& key) const {
+            size_t seed = std::hash<std::string>()(key.mFsUuid);
+            seed ^= std::hash<uint64_t>()(key.mInode) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+            seed ^= std::hash<std::string>()(key.mConfigName) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+            return seed;
+        }
     };
 
     typedef std::map<CheckPointKey, CheckPointPtr> DevInodeCheckPointHashMap;
 
 private:
+    void IndexFsUuid(const CheckPointPtr& checkPoint);
+    void UnindexFsUuid(const CheckPointPtr& checkPoint);
+
     DevInodeCheckPointHashMap mDevInodeCheckPointPtrMap;
+    std::unordered_map<FsUuidCheckPointKey, CheckPointPtr, FsUuidCheckPointKeyHash> mFsUuidCheckPointPtrMap;
     std::unordered_map<std::string, DirCheckPointPtr> mDirNameMap;
     // Keys written by AddCheckPoint during the current dump round (i.e. snapshots of
     // live readers from DumpAllHandlersMeta). EndDumpRound erases exactly these, so
@@ -157,6 +187,13 @@ public:
     bool DumpCheckPointToLocal();
     int32_t GetReaderCount();
     bool GetCheckPoint(DevInode devInode, const std::string& configName, CheckPointPtr& checkPointPtr);
+    bool GetCheckPointByFsUuid(const std::string& fsUuid,
+                               uint64_t inode,
+                               const std::string& configName,
+                               CheckPointPtr& checkPointPtr);
+    // Moves the checkpoint off oldKey onto newDevInode and refreshes mFsUuid.
+    // Does not call AddCheckPoint, and does not register the new key with the dump round.
+    bool RekeyCheckPoint(const CheckPointKey& oldKey, const DevInode& newDevInode, const std::string& fsUuid);
     bool GetDirCheckPoint(const std::string& filename, DirCheckPointPtr& checkPointPtr);
     void RemoveAllCheckPoint();
     // Dump-round bracket for periodic dump: keys added between Begin and End (live
@@ -202,5 +239,13 @@ boost::optional<std::string> SearchFilePathByDevInodeInDirectory(const std::stri
                                                                  const DevInode& devInode,
                                                                  std::map<DevInode, SplitedFilePath>* cache,
                                                                  bool* searchTruncated);
+
+// Find a regular file under dirPath whose inode matches and whose filesystem UUID
+// equals fsUuid. Used when the block device number changed after a reboot.
+boost::optional<std::string> SearchFilePathByInodeAndFsUuid(const std::string& dirPath,
+                                                            uint16_t searchDepth,
+                                                            uint64_t inode,
+                                                            const std::string& fsUuid,
+                                                            DevInode* matchedDevInode);
 
 } // namespace logtail

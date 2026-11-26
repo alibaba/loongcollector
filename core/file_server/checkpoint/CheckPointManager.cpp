@@ -16,6 +16,8 @@
 
 #include <fcntl.h>
 
+#include <algorithm>
+#include <deque>
 #include <fstream>
 #include <string>
 #include <thread>
@@ -28,6 +30,7 @@
 #include "common/StringTools.h"
 #include "file_server/ConfigManager.h"
 #include "file_server/FileDiscoveryOptions.h"
+#include "file_server/checkpoint/FileSystemUuid.h"
 #include "logger/Logger.h"
 #include "monitor/AlarmManager.h"
 
@@ -46,6 +49,31 @@ DEFINE_FLAG_INT32(check_point_max_count, "max check point count", 100000);
 DEFINE_FLAG_INT32(checkpoint_find_max_file_count, "", 1000);
 
 namespace logtail {
+
+void CheckPointManager::IndexFsUuid(const CheckPointPtr& checkPoint) {
+    if (!checkPoint || checkPoint->mFsUuid.empty()) {
+        return;
+    }
+    FsUuidCheckPointKey key;
+    key.mFsUuid = checkPoint->mFsUuid;
+    key.mInode = checkPoint->mDevInode.inode;
+    key.mConfigName = checkPoint->mConfigName;
+    mFsUuidCheckPointPtrMap[key] = checkPoint;
+}
+
+void CheckPointManager::UnindexFsUuid(const CheckPointPtr& checkPoint) {
+    if (!checkPoint || checkPoint->mFsUuid.empty()) {
+        return;
+    }
+    FsUuidCheckPointKey key;
+    key.mFsUuid = checkPoint->mFsUuid;
+    key.mInode = checkPoint->mDevInode.inode;
+    key.mConfigName = checkPoint->mConfigName;
+    auto it = mFsUuidCheckPointPtrMap.find(key);
+    if (it != mFsUuidCheckPointPtrMap.end() && it->second == checkPoint) {
+        mFsUuidCheckPointPtrMap.erase(it);
+    }
+}
 
 namespace {
 
@@ -172,9 +200,12 @@ void CheckPointManager::AddCheckPoint(CheckPoint* checkPointPtr) {
                     "stale file", newCheckPoint->mFileName)("active file", oldCheckPoint->mFileName));
             return;
         }
+        UnindexFsUuid(it->second);
         it->second = newCheckPoint;
+        IndexFsUuid(newCheckPoint);
     } else {
         mDevInodeCheckPointPtrMap[key] = newCheckPoint;
+        IndexFsUuid(newCheckPoint);
     }
     if (mCollectingDumpRound) {
         mDumpRoundKeys.push_back(key);
@@ -184,8 +215,74 @@ void CheckPointManager::AddCheckPoint(CheckPoint* checkPointPtr) {
 void CheckPointManager::DeleteCheckPoint(DevInode devInode, const std::string& configName) {
     DevInodeCheckPointHashMap::iterator it = mDevInodeCheckPointPtrMap.find(CheckPointKey(devInode, configName));
     if (it != mDevInodeCheckPointPtrMap.end()) {
+        UnindexFsUuid(it->second);
         mDevInodeCheckPointPtrMap.erase(it);
     }
+}
+
+bool CheckPointManager::GetCheckPointByFsUuid(const std::string& fsUuid,
+                                              uint64_t inode,
+                                              const std::string& configName,
+                                              CheckPointPtr& checkPointPtr) {
+    if (fsUuid.empty()) {
+        return false;
+    }
+    FsUuidCheckPointKey key;
+    key.mFsUuid = fsUuid;
+    key.mInode = inode;
+    key.mConfigName = configName;
+    auto it = mFsUuidCheckPointPtrMap.find(key);
+    if (it == mFsUuidCheckPointPtrMap.end()) {
+        return false;
+    }
+    checkPointPtr = it->second;
+    return true;
+}
+
+bool CheckPointManager::RekeyCheckPoint(const CheckPointKey& oldKey,
+                                        const DevInode& newDevInode,
+                                        const std::string& fsUuid) {
+    DevInodeCheckPointHashMap::iterator it = mDevInodeCheckPointPtrMap.find(oldKey);
+    if (it == mDevInodeCheckPointPtrMap.end()) {
+        return false;
+    }
+    CheckPointPtr checkPoint = it->second;
+    const std::string oldFsUuid = checkPoint->mFsUuid;
+    const DevInode oldDevInode = checkPoint->mDevInode;
+    UnindexFsUuid(checkPoint);
+
+    CheckPointKey newKey(newDevInode, checkPoint->mConfigName);
+    if (!(newKey == oldKey)) {
+        auto occupied = mDevInodeCheckPointPtrMap.find(newKey);
+        if (occupied != mDevInodeCheckPointPtrMap.end() && occupied->second != checkPoint) {
+            checkPoint->mFsUuid = oldFsUuid;
+            IndexFsUuid(checkPoint);
+            LOG_WARNING(sLogger,
+                        ("skip checkpoint rekey", "target dev inode is already used")(
+                            "config", checkPoint->mConfigName)("old dev", ToString(oldKey.mDevInode.dev))(
+                            "new dev", ToString(newDevInode.dev))("inode", ToString(newDevInode.inode)));
+            return false;
+        }
+        mDevInodeCheckPointPtrMap.erase(it);
+        mDumpRoundKeys.erase(std::remove(mDumpRoundKeys.begin(), mDumpRoundKeys.end(), oldKey), mDumpRoundKeys.end());
+        checkPoint->mDevInode = newDevInode;
+        if (!fsUuid.empty()) {
+            checkPoint->mFsUuid = fsUuid;
+        } else {
+            checkPoint->mFsUuid = oldFsUuid;
+        }
+        mDevInodeCheckPointPtrMap[newKey] = checkPoint;
+    } else if (!fsUuid.empty()) {
+        checkPoint->mFsUuid = fsUuid;
+    } else {
+        checkPoint->mFsUuid = oldFsUuid;
+    }
+    IndexFsUuid(checkPoint);
+    LOG_INFO(sLogger,
+             ("rekey checkpoint", checkPoint->mConfigName)("old dev", ToString(oldDevInode.dev))(
+                 "new dev", ToString(checkPoint->mDevInode.dev))("inode", ToString(checkPoint->mDevInode.inode))(
+                 "fs uuid", checkPoint->mFsUuid));
+    return true;
 }
 
 bool CheckPointManager::GetCheckPoint(DevInode devInode, const std::string& configName, CheckPointPtr& checkPointPtr) {
@@ -387,6 +484,10 @@ void CheckPointManager::LoadFileCheckPoint(const Json::Value& root) {
             if (meta.isMember("idx_in_reader_array")) {
                 idxInReaderArray = meta["idx_in_reader_array"].asInt();
             }
+            std::string fsUuid;
+            if (meta.isMember("fs_uuid") && meta["fs_uuid"].isString()) {
+                fsUuid = meta["fs_uuid"].asString();
+            }
             // can not get file's dev inode
             if (!devInode.IsValid()) {
                 LOG_WARNING(sLogger, ("can not find check point dev inode, discard it", filePath));
@@ -411,6 +512,7 @@ void CheckPointManager::LoadFileCheckPoint(const Json::Value& root) {
                                                  lastForceRead != 0);
                 ptr->mLastUpdateTime = update_time;
                 ptr->mIdxInReaderArray = idxInReaderArray;
+                ptr->mFsUuid = fsUuid;
                 AddCheckPoint(ptr);
             } else {
                 // find config
@@ -446,6 +548,7 @@ void CheckPointManager::LoadFileCheckPoint(const Json::Value& root) {
                                                      lastForceRead != 0);
                     ptr->mLastUpdateTime = update_time;
                     ptr->mIdxInReaderArray = idxInReaderArray;
+                    ptr->mFsUuid = fsUuid;
                     AddCheckPoint(ptr);
                 }
             }
@@ -487,6 +590,9 @@ bool CheckPointManager::DumpCheckPointToLocal() {
             leaf["update_time"] = Json::Value(checkPointPtr->mLastUpdateTime);
             leaf["inode"] = Json::Value(Json::UInt64(checkPointPtr->mDevInode.inode));
             leaf["dev"] = Json::Value(Json::UInt64(checkPointPtr->mDevInode.dev));
+            if (!checkPointPtr->mFsUuid.empty()) {
+                leaf["fs_uuid"] = Json::Value(checkPointPtr->mFsUuid);
+            }
             leaf["file_open"] = Json::Value(checkPointPtr->mFileOpenFlag ? 1 : 0);
             leaf["container_stopped"] = Json::Value(checkPointPtr->mContainerStopped ? 1 : 0);
             leaf["container_id"] = Json::Value(checkPointPtr->mContainerID);
@@ -518,6 +624,9 @@ bool CheckPointManager::DumpCheckPointToLocal() {
             leaf["update_time"] = Json::Value(checkPointPtr->mLastUpdateTime);
             leaf["inode"] = Json::Value(Json::UInt64(checkPointPtr->mDevInode.inode));
             leaf["dev"] = Json::Value(Json::UInt64(checkPointPtr->mDevInode.dev));
+            if (!checkPointPtr->mFsUuid.empty()) {
+                leaf["fs_uuid"] = Json::Value(checkPointPtr->mFsUuid);
+            }
             leaf["file_open"] = Json::Value(checkPointPtr->mFileOpenFlag ? 1 : 0);
             leaf["container_stopped"] = Json::Value(checkPointPtr->mContainerStopped ? 1 : 0);
             leaf["container_id"] = Json::Value(checkPointPtr->mContainerID);
@@ -648,6 +757,7 @@ void CheckPointManager::CheckTimeoutCheckPoint() {
 void CheckPointManager::RemoveAllCheckPoint() {
     mDirNameMap.clear();
     mDevInodeCheckPointPtrMap.clear();
+    mFsUuidCheckPointPtrMap.clear();
 }
 
 void CheckPointManager::BeginDumpRound() {
@@ -746,6 +856,61 @@ boost::optional<std::string> SearchFilePathByDevInodeInDirectory(const std::stri
     }
     return result;
 #undef METHOD_LOG_PATTERN
+}
+
+boost::optional<std::string> SearchFilePathByInodeAndFsUuid(const std::string& baseDirPath,
+                                                            uint16_t searchDepth,
+                                                            uint64_t inode,
+                                                            const std::string& fsUuid,
+                                                            DevInode* matchedDevInode) {
+    if (fsUuid.empty()) {
+        return boost::none;
+    }
+    std::deque<std::pair<std::string, uint16_t>> dirs;
+    dirs.emplace_back(std::make_pair(baseDirPath, 0));
+    int32_t findCount = 0;
+    while (!dirs.empty()) {
+        const auto dirPath = dirs.front().first;
+        const auto depth = dirs.front().second;
+        dirs.pop_front();
+
+        fsutil::Dir dir(dirPath);
+        if (!dir.Open()) {
+            continue;
+        }
+        fsutil::Entry ent;
+        const std::string entPathPrefix = PathJoin(dirPath, "");
+        std::string entPath = entPathPrefix;
+        while ((ent = dir.ReadNext(false))) {
+            if (findCount++ > INT32_FLAG(checkpoint_find_max_file_count)) {
+                return boost::none;
+            }
+            entPath.resize(entPathPrefix.length());
+            entPath.append(ent.Name());
+            fsutil::PathStat buf;
+            if (!fsutil::PathStat::stat(entPath, buf)) {
+                continue;
+            }
+            if (!buf.IsRegFile()) {
+                if (buf.IsDir() && depth < searchDepth) {
+                    dirs.emplace_back(std::make_pair(entPath, depth + 1));
+                }
+                continue;
+            }
+            const DevInode entDevInode = buf.GetDevInode();
+            if (entDevInode.inode != inode) {
+                continue;
+            }
+            if (GetFileSystemUuid(entDevInode.dev) != fsUuid) {
+                continue;
+            }
+            if (matchedDevInode != nullptr) {
+                *matchedDevInode = entDevInode;
+            }
+            return entPath;
+        }
+    }
+    return boost::none;
 }
 
 #ifdef APSARA_UNIT_TEST_MAIN

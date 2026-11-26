@@ -23,6 +23,7 @@
 #include "common/HashUtil.h"
 #include "file_server/FileServer.h"
 #include "file_server/checkpoint/CheckPointManager.h"
+#include "file_server/checkpoint/FileSystemUuid.h"
 #include "unittest/Unittest.h"
 
 DECLARE_FLAG_INT32(checkpoint_find_max_file_count);
@@ -64,12 +65,14 @@ public:
         AppConfig::GetInstance()->mCheckPointFilePath = (bfs::path(kTestRootDir) / "file_check_point").string();
         bfs::remove(AppConfig::GetInstance()->mCheckPointFilePath);
         bfs::remove(AppConfig::GetInstance()->mCheckPointFilePath + ".bak");
+        ClearFileSystemUuidCacheForTest();
     }
 
     void TearDown() override {
         CheckPointManager::Instance()->RemoveAllCheckPoint();
         bfs::remove(AppConfig::GetInstance()->mCheckPointFilePath);
         bfs::remove(AppConfig::GetInstance()->mCheckPointFilePath + ".bak");
+        ClearFileSystemUuidCacheForTest();
     }
 
     void TestSearchFilePathByDevInodeInDirectory();
@@ -94,6 +97,11 @@ public:
     void TestGcEvictsWhenResidencyTimeout();
     void TestGcKeepsFreshEntryDespiteOldEventTime();
     void TestGcRespectsCheckInterval();
+    void TestRekeyCheckPointUpdatesDevAndFsUuid();
+    void TestRekeyPendingSurvivesDumpRound();
+    void TestDumpLoadFsUuid();
+    void TestFileSystemUuidUsesResolver();
+    void TestSearchFilePathByInodeAndFsUuid();
 
 private:
     // Ownership is transferred to AddCheckPoint via release(); unique_ptr keeps construction
@@ -152,6 +160,11 @@ UNIT_TEST_CASE(CheckpointManagerUnittest, TestGcEvictsRotatedFileWhenSignatureCh
 UNIT_TEST_CASE(CheckpointManagerUnittest, TestGcEvictsWhenResidencyTimeout);
 UNIT_TEST_CASE(CheckpointManagerUnittest, TestGcKeepsFreshEntryDespiteOldEventTime);
 UNIT_TEST_CASE(CheckpointManagerUnittest, TestGcRespectsCheckInterval);
+UNIT_TEST_CASE(CheckpointManagerUnittest, TestRekeyCheckPointUpdatesDevAndFsUuid);
+UNIT_TEST_CASE(CheckpointManagerUnittest, TestRekeyPendingSurvivesDumpRound);
+UNIT_TEST_CASE(CheckpointManagerUnittest, TestDumpLoadFsUuid);
+UNIT_TEST_CASE(CheckpointManagerUnittest, TestFileSystemUuidUsesResolver);
+UNIT_TEST_CASE(CheckpointManagerUnittest, TestSearchFilePathByInodeAndFsUuid);
 
 void CheckpointManagerUnittest::TestSearchFilePathByDevInodeInDirectory() {
     const std::string kRotateFileName = "test.log.5";
@@ -705,6 +718,96 @@ void CheckpointManagerUnittest::TestGcRespectsCheckInterval() {
 
     CheckPointPtr cpt;
     EXPECT_TRUE(manager->GetCheckPoint(devInode, "cfg_unregistered", cpt));
+}
+
+void CheckpointManagerUnittest::TestRekeyCheckPointUpdatesDevAndFsUuid() {
+    const std::string path = CreateFile("rekey.log");
+    const DevInode realDev = GetFileDevInode(path);
+    DevInode oldDev = realDev;
+    oldDev.dev += 1000;
+    auto* manager = CheckPointManager::Instance();
+
+    auto checkPoint = MakeCheckPoint(path, oldDev, 42, "cfg_rekey");
+    checkPoint->mFsUuid = "old-uuid";
+    manager->AddCheckPoint(checkPoint.release());
+
+    CheckPointManager::CheckPointKey oldKey(oldDev, "cfg_rekey");
+    EXPECT_TRUE(manager->RekeyCheckPoint(oldKey, realDev, "new-uuid"));
+
+    CheckPointPtr found;
+    EXPECT_FALSE(manager->GetCheckPoint(oldDev, "cfg_rekey", found));
+    EXPECT_TRUE(manager->GetCheckPoint(realDev, "cfg_rekey", found));
+    EXPECT_EQ(found->mOffset, 42);
+    EXPECT_EQ(found->mFsUuid, "new-uuid");
+    CheckPointPtr byUuid;
+    EXPECT_TRUE(manager->GetCheckPointByFsUuid("new-uuid", realDev.inode, "cfg_rekey", byUuid));
+    EXPECT_EQ(byUuid->mOffset, 42);
+    EXPECT_FALSE(manager->GetCheckPointByFsUuid("old-uuid", realDev.inode, "cfg_rekey", byUuid));
+}
+
+void CheckpointManagerUnittest::TestRekeyPendingSurvivesDumpRound() {
+    const std::string path = CreateFile("rekey_pending.log");
+    const DevInode realDev = GetFileDevInode(path);
+    DevInode oldDev = realDev;
+    oldDev.dev += 7;
+    auto* manager = CheckPointManager::Instance();
+    manager->AddCheckPoint(MakeCheckPoint(path, oldDev, 9, "cfg_rekey_pending").release());
+    CheckPointManager::CheckPointKey oldKey(oldDev, "cfg_rekey_pending");
+    EXPECT_TRUE(manager->RekeyCheckPoint(oldKey, realDev, "uuid-pending"));
+
+    const std::string activePath = CreateFile("rekey_active.log");
+    const DevInode activeDev = GetFileDevInode(activePath);
+    manager->BeginDumpRound();
+    manager->AddCheckPoint(MakeCheckPoint(activePath, activeDev, 1, "cfg_active").release());
+    EXPECT_TRUE(manager->DumpCheckPointToLocal());
+    manager->EndDumpRound();
+
+    CheckPointPtr found;
+    EXPECT_TRUE(manager->GetCheckPoint(realDev, "cfg_rekey_pending", found));
+    EXPECT_EQ(found->mOffset, 9);
+    EXPECT_EQ(found->mFsUuid, "uuid-pending");
+    EXPECT_FALSE(manager->GetCheckPoint(activeDev, "cfg_active", found));
+}
+
+void CheckpointManagerUnittest::TestDumpLoadFsUuid() {
+    const std::string path = CreateFile("fs_uuid.log");
+    const DevInode devInode = GetFileDevInode(path);
+    auto* manager = CheckPointManager::Instance();
+    auto checkPoint = MakeCheckPoint(path, devInode, 3, "cfg_uuid");
+    checkPoint->mFsUuid = "uuid-dump";
+    manager->AddCheckPoint(checkPoint.release());
+    EXPECT_TRUE(manager->DumpCheckPointToLocal());
+    manager->RemoveAllCheckPoint();
+    manager->LoadCheckPoint();
+
+    CheckPointPtr found;
+    EXPECT_TRUE(manager->GetCheckPoint(devInode, "cfg_uuid", found));
+    EXPECT_EQ(found->mFsUuid, "uuid-dump");
+    EXPECT_EQ(found->mOffset, 3);
+    EXPECT_TRUE(manager->GetCheckPointByFsUuid("uuid-dump", devInode.inode, "cfg_uuid", found));
+}
+
+void CheckpointManagerUnittest::TestFileSystemUuidUsesResolver() {
+    SetFileSystemUuidResolverForTest([](uint64_t) { return std::string("resolver-uuid"); });
+    EXPECT_EQ(GetFileSystemUuid(1), "resolver-uuid");
+}
+
+void CheckpointManagerUnittest::TestSearchFilePathByInodeAndFsUuid() {
+    const std::string path = CreateFile("uuid_search.log");
+    const DevInode devInode = GetFileDevInode(path);
+    SetFileSystemUuidResolverForTest([devInode](uint64_t dev) {
+        return dev == devInode.dev ? std::string("uuid-search") : std::string();
+    });
+
+    DevInode matched;
+    auto found = SearchFilePathByInodeAndFsUuid(kTestRootDir, 0, devInode.inode, "uuid-search", &matched);
+    ASSERT_TRUE(static_cast<bool>(found));
+    EXPECT_EQ(found.value(), path);
+    EXPECT_EQ(matched.dev, devInode.dev);
+    EXPECT_EQ(matched.inode, devInode.inode);
+
+    auto missed = SearchFilePathByInodeAndFsUuid(kTestRootDir, 0, devInode.inode, "other-uuid", &matched);
+    EXPECT_FALSE(static_cast<bool>(missed));
 }
 
 } // namespace logtail
