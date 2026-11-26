@@ -14,7 +14,13 @@
 
 package models
 
-import "github.com/alibaba/ilogtail/pkg/util"
+import (
+	"fmt"
+	"maps"
+	"slices"
+
+	"github.com/alibaba/ilogtail/pkg/util"
+)
 
 type LogContents KeyValues[interface{}]
 
@@ -171,29 +177,85 @@ func (m *Log) SetIndices(indices LogContents) {
 }
 
 func (m *Log) GetIndices() LogContents {
-	if m != nil {
+	if m != nil && m.Contents != nil {
 		return m.Contents
 	}
 	return NilInterfaceValues
 }
 
+// GetSize returns the bytes in the current log fields and event tags.
 func (m *Log) GetSize() int64 {
-	return int64(len(m.GetBody()))
+	if m == nil {
+		return 0
+	}
+	size := stringKeyValuesSize(m.Tags)
+	switch contents := m.Contents.(type) {
+	case nil:
+	case *orderedLogContents:
+		size += contents.dataSize()
+	default:
+		for key, value := range contents.Iterator() {
+			size += logFieldSize(key, value)
+		}
+	}
+	return size
+}
+
+func logFieldSize(key string, value any) int64 {
+	switch value := value.(type) {
+	case []byte:
+		return int64(len(key) + len(value))
+	case string:
+		return int64(len(key) + len(value))
+	default:
+		return int64(len(key) + len(fmt.Sprint(value)))
+	}
 }
 
 func (m *Log) Clone() PipelineEvent {
 	if m != nil {
+		var tags Tags
+		if m.Tags != nil {
+			tags = NewTagsWithMap(maps.Clone(m.Tags.Iterator()))
+		}
 		return &Log{
 			Name:              m.Name,
 			Level:             m.Level,
 			SpanID:            m.SpanID,
 			TraceID:           m.TraceID,
-			Tags:              m.Tags,
+			Tags:              tags,
 			Timestamp:         m.Timestamp,
 			ObservedTimestamp: m.ObservedTimestamp,
-			Contents:          m.Contents,
+			Contents:          cloneLogContents(m.Contents),
 			Offset:            m.Offset,
+			RawSize:           m.RawSize,
 		}
 	}
 	return nil
+}
+
+func cloneLogContents(contents LogContents) LogContents {
+	switch fields := contents.(type) {
+	case nil:
+		return nil
+	case *orderedLogContents:
+		cloned := NewOrderedLogContents(fields.Len())
+		for key, value := range LogContentEntries(fields) {
+			cloned.Add(key, cloneLogValue(value))
+		}
+		return cloned
+	default:
+		cloned := &keyValuesImpl[interface{}]{keyValues: make(map[string]interface{}, fields.Len())}
+		for key, value := range fields.Iterator() {
+			cloned.Add(key, cloneLogValue(value))
+		}
+		return cloned
+	}
+}
+
+func cloneLogValue(value any) any {
+	if bytes, ok := value.([]byte); ok {
+		return slices.Clone(bytes)
+	}
+	return value
 }

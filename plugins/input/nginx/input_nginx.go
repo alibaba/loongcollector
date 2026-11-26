@@ -24,7 +24,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pkg/util"
@@ -62,7 +64,8 @@ func (n *Nginx) Description() string {
 	return "Read Nginx's basic status information (ngx_http_stub_status_module)"
 }
 
-func (n *Nginx) Collect(collector pipeline.Collector) error {
+func (n *Nginx) Read(ctx pipeline.PipelineContext) error {
+	collector := ctx.Collector()
 	var wg sync.WaitGroup
 	logger.Debug(n.context.GetRuntimeContext(), "start collect nginx info", *n)
 	// Create an HTTP client that is re-used for each
@@ -112,7 +115,7 @@ func (n *Nginx) createHTTPClient() (*http.Client, error) {
 	return client, nil
 }
 
-func (n *Nginx) gatherURL(addr *url.URL, collector pipeline.Collector) error {
+func (n *Nginx) gatherURL(addr *url.URL, collector pipeline.PipelineCollector) error {
 	resp, err := n.client.Get(addr.String())
 	if err != nil {
 		return fmt.Errorf("error making HTTP request to %s: %s", addr.String(), err)
@@ -158,8 +161,10 @@ func (n *Nginx) gatherURL(addr *url.URL, collector pipeline.Collector) error {
 	writing := data[3]
 	waiting := data[5]
 
-	tags := getTags(addr)
+	host, port := getServerAddress(addr)
 	fields := map[string]string{
+		"_server_": host,
+		"_port_":   port,
 		"active":   active,
 		"accepts":  accepts,
 		"handled":  handled,
@@ -168,12 +173,11 @@ func (n *Nginx) gatherURL(addr *url.URL, collector pipeline.Collector) error {
 		"writing":  writing,
 		"waiting":  waiting,
 	}
-	collector.AddData(tags, fields)
+	collector.Collect(models.NewGroup(models.NewMetadata(), models.NewTags()), helper.NewInputLog(nil, fields))
 	return nil
 }
 
-// Get tag(s) for the nginx plugin
-func getTags(addr *url.URL) map[string]string {
+func getServerAddress(addr *url.URL) (host, port string) {
 	h := addr.Host
 	host, port, err := net.SplitHostPort(h)
 	if err != nil {
@@ -187,7 +191,7 @@ func getTags(addr *url.URL) map[string]string {
 			port = ""
 		}
 	}
-	return map[string]string{"_server_": host, "_port_": port}
+	return host, port
 }
 
 func init() {

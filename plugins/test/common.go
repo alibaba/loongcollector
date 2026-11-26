@@ -23,15 +23,13 @@ import (
 	"runtime"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/encoding/protowire"
 
-	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pluginmanager"
 	_ "github.com/alibaba/ilogtail/plugins/aggregator"
@@ -80,118 +78,26 @@ func PluginStop() error {
 	return nil
 }
 
-func CreateLogs(kvs ...string) *protocol.Log {
-	var slsLog protocol.Log
-	for i := 0; i < len(kvs)-1; i += 2 {
-		cont := &protocol.Log_Content{Key: kvs[i], Value: kvs[i+1]}
-		slsLog.Contents = append(slsLog.Contents, cont)
+// AppendSLSWireLog adds a log to a test payload using the public SLS wire schema.
+func AppendSLSWireLog(group []byte, seconds uint32, nanos *uint32, fields ...[2]string) []byte {
+	log := protowire.AppendVarint(protowire.AppendTag(nil, 1, protowire.VarintType), uint64(seconds))
+	for _, field := range fields {
+		log = protowire.AppendBytes(protowire.AppendTag(log, 2, protowire.BytesType), slsWirePair(field[0], field[1]))
 	}
-	nowTime := time.Now()
-	protocol.SetLogTime(&slsLog, uint32(nowTime.Unix()))
-	return &slsLog
-}
-
-func CreateLogByFields(fields map[string]string) *protocol.Log {
-	var slsLog protocol.Log
-	for key, val := range fields {
-		cont := &protocol.Log_Content{Key: key, Value: val}
-		slsLog.Contents = append(slsLog.Contents, cont)
+	if nanos != nil {
+		log = protowire.AppendFixed32(protowire.AppendTag(log, 4, protowire.Fixed32Type), *nanos)
 	}
-	nowTime := time.Now()
-	protocol.SetLogTime(&slsLog, uint32(nowTime.Unix()))
-	return &slsLog
+	return protowire.AppendBytes(protowire.AppendTag(group, 1, protowire.BytesType), log)
 }
 
-type MockLog struct {
-	Tags   map[string]string
-	Fields map[string]string
+// AppendSLSWireTag adds a group tag to a test payload.
+func AppendSLSWireTag(group []byte, key, value string) []byte {
+	return protowire.AppendBytes(protowire.AppendTag(group, 6, protowire.BytesType), slsWirePair(key, value))
 }
 
-type MockCollector struct {
-	Logs    []*MockLog
-	RawLogs []*protocol.Log
-}
-
-func (c *MockCollector) AddData(
-	tags map[string]string, fields map[string]string, t ...time.Time) {
-	c.AddDataWithContext(tags, fields, nil, t...)
-}
-
-func (c *MockCollector) AddDataArray(
-	tags map[string]string, columns []string, values []string, t ...time.Time) {
-	c.AddDataArrayWithContext(tags, columns, values, nil, t...)
-}
-
-func (c *MockCollector) AddRawLog(log *protocol.Log) {
-	c.AddRawLogWithContext(log, nil)
-}
-
-func (c *MockCollector) AddDataWithContext(
-	tags map[string]string, fields map[string]string, ctx map[string]interface{}, t ...time.Time) {
-	c.Logs = append(c.Logs, &MockLog{tags, fields})
-}
-
-func (c *MockCollector) AddDataArrayWithContext(
-	tags map[string]string, columns []string, values []string, ctx map[string]interface{}, t ...time.Time) {
-}
-
-func (c *MockCollector) AddRawLogWithContext(log *protocol.Log, ctx map[string]interface{}) {
-	c.RawLogs = append(c.RawLogs, log)
-}
-
-type MockMetricCollector struct {
-	Logs    []*protocol.Log
-	Tags    map[string]string
-	RawLogs []*protocol.Log
-	// Benchmark switch ignore the cpu and memory performance influences when opening.
-	Benchmark bool
-}
-
-func (m *MockMetricCollector) AddData(tags map[string]string, fields map[string]string, t ...time.Time) {
-	m.AddDataWithContext(tags, fields, nil, t...)
-}
-
-func (m *MockMetricCollector) AddDataArray(tags map[string]string, columns []string, values []string, t ...time.Time) {
-	m.AddDataArrayWithContext(tags, columns, values, nil, t...)
-}
-
-func (m *MockMetricCollector) AddRawLog(log *protocol.Log) {
-	m.AddRawLogWithContext(log, nil)
-}
-
-func (m *MockMetricCollector) AddDataWithContext(tags map[string]string, fields map[string]string, ctx map[string]interface{}, t ...time.Time) {
-	if m.Benchmark {
-		return
-	}
-	var logTime time.Time
-	if len(t) == 0 {
-		logTime = time.Now()
-	} else {
-		logTime = t[0]
-	}
-	slsLog, _ := helper.CreateLog(logTime, len(t) != 0, m.Tags, tags, fields)
-	m.Logs = append(m.Logs, slsLog)
-}
-
-func (m *MockMetricCollector) AddDataArrayWithContext(tags map[string]string, columns []string, values []string, ctx map[string]interface{}, t ...time.Time) {
-	if m.Benchmark {
-		return
-	}
-	var logTime time.Time
-	if len(t) == 0 {
-		logTime = time.Now()
-	} else {
-		logTime = t[0]
-	}
-	slsLog, _ := helper.CreateLogByArray(logTime, len(t) != 0, m.Tags, tags, columns, values)
-	m.Logs = append(m.Logs, slsLog)
-}
-
-func (m *MockMetricCollector) AddRawLogWithContext(log *protocol.Log, ctx map[string]interface{}) {
-	if m.Benchmark {
-		return
-	}
-	m.Logs = append(m.Logs, log)
+func slsWirePair(key, value string) []byte {
+	pair := protowire.AppendString(protowire.AppendTag(nil, 1, protowire.BytesType), key)
+	return protowire.AppendString(protowire.AppendTag(pair, 2, protowire.BytesType), value)
 }
 
 type portpair struct {
@@ -277,26 +183,6 @@ func createExclusionsList(exclusionsText string, t testing.TB) []portpair {
 		}
 	}
 	return exclusions
-}
-
-// ReadLogVal returns the log content value for the input key, and returns empty string when not found.
-func ReadLogVal(log *protocol.Log, key string) string {
-	for _, content := range log.Contents {
-		if content.Key == key {
-			return content.Value
-		}
-	}
-	return ""
-}
-
-// PickLogs select some of original logs to new res logs by the specific pickKey and pickVal.
-func PickLogs(logs []*protocol.Log, pickKey string, pickVal string) (res []*protocol.Log) {
-	for _, log := range logs {
-		if ReadLogVal(log, pickKey) == pickVal {
-			res = append(res, log)
-		}
-	}
-	return res
 }
 
 // PickEvent select one of original events by the specific event name.

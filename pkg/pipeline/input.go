@@ -14,47 +14,20 @@
 
 package pipeline
 
-// MetricInput ...
+// MetricInput collects events on a schedule.
 type MetricInput interface {
-	// Init called for init some system resources, like socket, mutex...
-	// return call interval(ms) and error flag, if interval is 0, use default interval
+	// Init returns the collection interval in milliseconds. Zero uses the default.
 	Init(Context) (int, error)
-
-	// Description returns a one-sentence description on the Input
 	Description() string
-}
-
-type MetricInputV1 interface {
-	MetricInput
-	// Collect takes in an accumulator and adds the metrics that the Input
-	// gathers. This is called every "interval"
-	Collect(Collector) error
-}
-
-type MetricInputV2 interface {
-	MetricInput
-	// Collect takes in an accumulator and adds the metrics that the Input
-	// gathers. This is called every "interval"
 	Read(PipelineContext) error
 }
 
-// ServiceInput ...
+// ServiceInput runs a service that submits events to the pipeline.
 type ServiceInput interface {
-	// Init called for init some system resources, like socket, mutex...
-	// return interval(ms) and error flag, if interval is 0, use default interval
 	Init(Context) (int, error)
-
-	// Description returns a one-sentence description on the Input
 	Description() string
-
-	// Stop stops the services and closes any necessary channels and connections
+	StartService(PipelineContext) error
 	Stop() error
-}
-
-type ServiceInputV1 interface {
-	ServiceInput
-	// Start starts the ServiceInput's service, whatever that may be
-	Start(Collector) error
 }
 
 // PipelineRemovedCleaner is an optional interface a ServiceInput may implement to run
@@ -66,10 +39,4 @@ type PipelineRemovedCleaner interface {
 	// OnPipelineRemoved is called after the pipeline has stopped and just before its
 	// config is deleted. Implementations must not block for long.
 	OnPipelineRemoved()
-}
-
-type ServiceInputV2 interface {
-	ServiceInput
-	// StartService starts the ServiceInput's service, whatever that may be
-	StartService(PipelineContext) error
 }

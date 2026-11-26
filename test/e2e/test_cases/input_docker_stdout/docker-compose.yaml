@@ -22,6 +22,7 @@ services:
     hostname: container
     environment:
       - STDOUT_SWITCH=true
+      - STDOUT_IMAGE=overridden-image
   decoy:
     build:
       context: .

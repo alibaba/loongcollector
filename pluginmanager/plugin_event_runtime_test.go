@@ -16,7 +16,6 @@ package pluginmanager
 
 import (
 	"fmt"
-	"math"
 	"testing"
 	"time"
 
@@ -27,7 +26,6 @@ import (
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
-	converter "github.com/alibaba/ilogtail/pkg/protocol/converter"
 )
 
 func TestDefaultEventPipeline(t *testing.T) {
@@ -67,17 +65,6 @@ func TestProcessorDirectlyForwardsAllEventTypes(t *testing.T) {
 		})
 	}
 }
-func TestCollectorInputEmitsNamedContents(t *testing.T) {
-	ctx := helper.NewObservePipelineContext(4)
-	collector := &inputCollector{context: ctx}
-	collector.AddDataWithContext(map[string]string{"tag": "value"}, map[string]string{"content": "body", "field": "named"}, map[string]interface{}{"source": "id"}, time.Unix(10, 20))
-	group := <-ctx.Collector().Observe()
-	log := group.Events[0].(*models.Log)
-	require.Equal(t, "named", log.Contents.Get("field"))
-	require.Equal(t, "value", log.Tags.Get("tag"))
-	require.Equal(t, []byte("body"), log.GetBody())
-	require.Equal(t, uint64(10000000020), log.Timestamp)
-}
 func BenchmarkPipelineConfigInit(b *testing.B) {
 	jsonConfig := `{"global":{"StructureType":"v2"},"flushers":[{"type":"flusher_stdout"}]}`
 	b.ReportAllocs()
@@ -108,19 +95,19 @@ func TestRunnerRestoresPendingGroupsBeforeStart(t *testing.T) {
 	require.Zero(t, store.Len())
 }
 
-type collectorOnlyInput struct{}
+type eventMetricInput struct{}
 
-func (*collectorOnlyInput) Init(pipeline.Context) (int, error) { return 0, nil }
-func (*collectorOnlyInput) Description() string                { return "collector compatibility" }
-func (*collectorOnlyInput) Collect(collector pipeline.Collector) error {
-	collector.AddData(nil, map[string]string{"content": "body", "key": "value"})
+func (*eventMetricInput) Init(pipeline.Context) (int, error) { return 0, nil }
+func (*eventMetricInput) Description() string                { return "event input" }
+func (*eventMetricInput) Read(ctx pipeline.PipelineContext) error {
+	ctx.Collector().Collect(models.NewGroup(nil, nil), helper.NewInputLog(nil, map[string]string{"content": "body", "key": "value"}))
 	return nil
 }
-func TestCollectorOnlyInputUsesEventCounters(t *testing.T) {
+func TestMetricInputUsesEventCounters(t *testing.T) {
 	ctx := &ContextImp{}
 	ctx.InitContext("project", "store", "collector")
 	runner := &pluginRunner{LogstoreConfig: &LogstoreConfig{Context: ctx, GlobalConfig: &config.GlobalConfig{}}}
-	require.NoError(t, runner.addMetricInput(&pipeline.PluginMeta{PluginID: "1", PluginType: "collector"}, &collectorOnlyInput{}, 1000))
+	require.NoError(t, runner.addMetricInput(&pipeline.PluginMeta{PluginID: "1", PluginType: "collector"}, &eventMetricInput{}, 1000))
 	output := helper.NewObservePipelineContext(2)
 	require.NoError(t, runner.MetricPlugins[0].Read(output))
 	group := <-output.Collector().Observe()
@@ -132,99 +119,188 @@ func TestCollectorOnlyInputUsesEventCounters(t *testing.T) {
 		require.Equal(t, "1.0000", counters["out_events_total"])
 	}
 }
-func TestCollectorMetricLogBecomesMetric(t *testing.T) {
-	output := helper.NewObservePipelineContext(2)
-	collector := &inputCollector{context: output}
-	labels := &helper.MetricLabels{}
-	labels.Append("city", "hz")
-	collector.AddRawLog(helper.NewMetricLog("counter", time.Unix(10, 20).UnixNano(), 42, labels))
-	event := (<-output.Collector().Observe()).Events[0]
-	metric, ok := event.(*models.Metric)
-	require.True(t, ok)
-	require.Equal(t, "counter", metric.Name)
-	require.Equal(t, "hz", metric.Tags.Get("city"))
-	require.Equal(t, float64(42), metric.Value.GetSingleValue())
-}
-
-func TestCollectorStaleMetricPreservesNaNPayload(t *testing.T) {
-	output := helper.NewObservePipelineContext(1)
-	collector := &inputCollector{context: output}
-	collector.AddRawLog(helper.NewMetricLog("stale", time.Now().UnixNano(), math.Float64frombits(helper.StaleNaN), &helper.MetricLabels{}))
-	metric, ok := (<-output.Collector().Observe()).Events[0].(*models.Metric)
-	require.True(t, ok)
-	require.Equal(t, helper.StaleNaN, math.Float64bits(metric.Value.GetSingleValue()))
-}
-
 func TestNativeInputPreservesFieldsAndGroupTags(t *testing.T) {
 	ctx := &ContextImp{}
 	ctx.InitContext("project", "store", "native")
-	runner := &pluginRunner{LogstoreConfig: &LogstoreConfig{Context: ctx, GlobalConfig: &config.GlobalConfig{}}, FlushOutStore: NewFlushOutStore[models.PipelineGroupEvents]()}
+	lc := &LogstoreConfig{Context: ctx, GlobalConfig: &config.GlobalConfig{}}
+	runner := &pluginRunner{LogstoreConfig: lc, FlushOutStore: NewFlushOutStore[models.PipelineGroupEvents]()}
+	lc.PluginRunner = runner
 	require.NoError(t, runner.Init(1, 1))
-	runner.ReceivePipelineEventGroup(&protocol.PipelineEventGroup{
-		Tags: map[string][]byte{"path": []byte("/logs/app.log")},
-		PipelineEvents: &protocol.PipelineEventGroup_Logs{Logs: &protocol.PipelineEventGroup_LogEvents{Events: []*protocol.LogEvent{{
-			Contents: []*protocol.LogEvent_Content{{Key: []byte("named"), Value: []byte("first")}, {Key: []byte("content"), Value: []byte("body")}},
-		}}}},
-	}, map[string]interface{}{"source": "pack"})
+	pb := &protocol.PipelineEventGroup{
+		Metadata: map[string][]byte{"source": []byte("original-source"), "scope": []byte("app")},
+		Tags:     map[string][]byte{"path": []byte("/logs/app.log")},
+		PipelineEvents: &protocol.PipelineEventGroup_Logs{Logs: &protocol.PipelineEventGroup_LogEvents{
+			Events: []*protocol.LogEvent{
+				{Timestamp: 1700000000123456789, FileOffset: 42, RawSize: 15, Level: []byte("info"),
+					Contents: []*protocol.LogEvent_Content{
+						{Key: []byte("content")},
+						{Key: []byte("named"), Value: []byte("first")},
+						{Key: []byte("content"), Value: []byte("old")},
+						{Key: []byte("last"), Value: []byte("tail")},
+						{Key: []byte("content"), Value: []byte("body\x00")},
+						{Key: []byte("content")},
+					},
+				},
+				{Contents: []*protocol.LogEvent_Content{{Key: []byte("content")}}},
+			},
+		}},
+	}
+	wire, err := pb.Marshal()
+	require.NoError(t, err)
+	require.Equal(t, 0, lc.ProcessPipelineEventGroup(wire, "pack"))
+	// The C++ caller can reuse its protobuf buffer once ingress returns.
+	clear(wire)
+
 	group := <-runner.InputPipeContext.Collector().Observe()
+	require.Len(t, group.Events, 2)
 	log := group.Events[0].(*models.Log)
 	require.Equal(t, "first", log.Contents.Get("named"))
-	require.Equal(t, []byte("body"), log.GetBody())
+	require.Equal(t, []byte("body\x00"), log.GetBody())
+	require.Equal(t, uint64(1700000000123456789), log.GetTimestamp())
+	require.Equal(t, uint64(42), log.GetOffset())
+	require.Equal(t, uint64(15), log.GetRawSize())
+	require.Equal(t, "info", log.GetLevel())
+
+	var keys []string
+	for key := range models.LogContentEntries(log.Contents) {
+		keys = append(keys, key)
+	}
+	require.Equal(t, []string{"named", "content", "last"}, keys)
+	require.False(t, group.Events[1].(*models.Log).GetIndices().Contains("content"))
 	require.Equal(t, "/logs/app.log", group.Group.Tags.Get("path"))
 	require.False(t, log.Contents.Contains("__tag__:path"))
 	require.Equal(t, "pack", group.Group.Metadata.Get("source"))
+	require.Equal(t, "app", group.Group.Metadata.Get("scope"))
 }
 
-// Collector tags stay separate from contents in memory and on the output wire.
-func TestCollectorTagsStaySeparate(t *testing.T) {
+// Input tags stay separate from contents in memory and on the output wire.
+func TestInputEventTagsStaySeparate(t *testing.T) {
 	for _, array := range []bool{false, true} {
 		t.Run(fmt.Sprintf("array=%t", array), func(t *testing.T) {
-			output := helper.NewObservePipelineContext(1)
-			collector := &inputCollector{context: output, configTags: map[string]string{"configured": "value"}}
-			tags := map[string]string{"_method_": "GET", "_image_name_": "example-container:latest"}
-			ctx := map[string]interface{}{"source": "container", "tags": []*protocol.LogTag{{Key: "group", Value: "tag"}}}
+			tags := map[string]string{"_method_": "GET", "_image_name_": "example-container:latest", "configured": "value"}
+			var log *models.Log
 			if array {
-				collector.AddDataArrayWithContext(tags, []string{"content", "field"}, []string{"body", "value"}, ctx, time.Unix(10, 20))
+				var err error
+				log, err = helper.NewInputLogRow(tags, []string{"content", "field"}, []string{"body", "value"}, time.Unix(10, 20))
+				require.NoError(t, err)
 			} else {
-				collector.AddDataWithContext(tags, map[string]string{"content": "body", "field": "value"}, ctx, time.Unix(10, 20))
+				log = helper.NewInputLog(tags, map[string]string{"content": "body", "field": "value"}, time.Unix(10, 20))
 			}
-			group := <-output.Collector().Observe()
-			log := group.Events[0].(*models.Log)
+			group := &models.PipelineGroupEvents{
+				Group:  models.NewGroup(models.NewMetadataWithKeyValues("source", "container"), models.NewTagsWithKeyValues("group", "tag")),
+				Events: []models.PipelineEvent{log},
+			}
+			require.Equal(t, "value", log.GetIndices().Get("field"))
+			require.Equal(t, uint64(10000000020), log.GetTimestamp())
 			require.Equal(t, "GET", log.Tags.Get("_method_"))
 			require.False(t, log.Contents.Contains("_method_"))
 			require.Equal(t, "example-container:latest", log.Tags.Get("_image_name_"))
 			require.Equal(t, "value", log.Tags.Get("configured"))
 			require.Equal(t, 3, log.Tags.Len())
 			require.Equal(t, "tag", group.Group.Tags.Get("group"))
-			wires, err := converter.PipelineGroupEventsToLogGroups(group)
+			var reports []*protocol.PipelineEventGroupReport
+			require.NoError(t, helper.ForEachPipelineEventReport(group, func(report *protocol.PipelineEventGroupReport) error {
+				reports = append(reports, report)
+				return nil
+			}))
+			require.Len(t, reports, 1)
+			received, err := helper.DecodePipelineEventReport(reports[0])
 			require.NoError(t, err)
-			require.Len(t, wires, 1)
-			wire := wires[0]
-			wireTags := make(map[string]string)
-			for _, tag := range wire.LogTags {
-				wireTags[tag.Key] = tag.Value
-			}
-			fields := make(map[string]string)
-			for _, field := range wire.Logs[0].Contents {
-				fields[field.Key] = field.Value
-			}
-			require.Equal(t, "GET", wireTags["_method_"])
-			require.NotContains(t, fields, "_method_")
-			require.Equal(t, "example-container:latest", wireTags["_image_name_"])
-			require.Equal(t, "value", wireTags["configured"])
-			require.Equal(t, "body", fields["content"])
+			require.Equal(t, "tag", received.Group.GetTags().Get("group"))
+			receivedLog := received.Events[0].(*models.Log)
+			require.Equal(t, "GET", receivedLog.GetTags().Get("_method_"))
+			require.Equal(t, "example-container:latest", receivedLog.GetTags().Get("_image_name_"))
+			require.Equal(t, "value", receivedLog.GetTags().Get("configured"))
+			require.False(t, receivedLog.GetIndices().Contains("_method_"))
+			require.Equal(t, []byte("body"), receivedLog.GetBody())
 		})
 	}
 }
 
-func TestCollectorRejectsMismatchedArrays(t *testing.T) {
-	output := helper.NewObservePipelineContext(1)
+func TestFileIngressReleasesQueueReservations(t *testing.T) {
 	ctx := &ContextImp{}
-	ctx.InitContext("project", "store", "array-input")
-	collector := &inputCollector{context: output, runtimeContext: ctx.GetRuntimeContext()}
+	ctx.InitContext("", "", "file-ingress")
+	lc := &LogstoreConfig{Context: ctx, GlobalConfig: &config.GlobalConfig{}}
+	runner := initPluginRunner(lc)
+	lc.PluginRunner = runner
+	require.NoError(t, runner.Init(1, 1))
+	queue := newReservedInputQueue(runner.InputPipeContext, 1)
+	runner.InputPipeContext = queue
 
-	collector.AddDataArray(nil, []string{"first", "second"}, []string{"value"})
-	require.Len(t, output.Collector().Observe(), 0)
-	collector.AddDataArray(nil, []string{"first"}, []string{"value", "extra"})
-	require.Len(t, output.Collector().Observe(), 0)
+	require.Equal(t, -1, lc.ProcessPipelineEventGroup([]byte{0x80}, "bad"))
+	empty := &protocol.PipelineEventGroup{
+		PipelineEvents: &protocol.PipelineEventGroup_Logs{Logs: &protocol.PipelineEventGroup_LogEvents{}},
+	}
+	wire, err := empty.Marshal()
+	require.NoError(t, err)
+	require.Equal(t, 0, lc.ProcessPipelineEventGroup(wire, "empty"))
+	require.Empty(t, queue.slots)
+	require.Empty(t, queue.Observe())
+
+	logs := empty.GetLogs()
+	logs.Events = []*protocol.LogEvent{{Timestamp: 123}}
+	wire, err = empty.Marshal()
+	require.NoError(t, err)
+	require.Equal(t, 0, lc.ProcessPipelineEventGroup(wire, "first"))
+	require.Len(t, queue.slots, 1)
+
+	started := make(chan struct{})
+	done := make(chan int, 1)
+	go func() {
+		close(started)
+		done <- lc.ProcessPipelineEventGroup([]byte{0x80}, "bad after valid")
+	}()
+	<-started
+	select {
+	case <-done:
+		t.Fatal("native ingress returned before queue capacity became available")
+	case <-time.After(10 * time.Millisecond):
+	}
+
+	runner.runProcessor()
+	defer runner.ProcessControl.WaitCancel()
+	select {
+	case result := <-done:
+		require.Equal(t, -1, result)
+	case <-time.After(3 * time.Second):
+		t.Fatal("native ingress failed to obtain the released reservation")
+	}
+	require.Empty(t, queue.slots)
+	select {
+	case group := <-runner.AggregatePipeContext.Collector().Observe():
+		require.Equal(t, "first", group.Group.Metadata.Get(ctxKeySource))
+		require.Equal(t, uint64(123), group.Events[0].GetTimestamp())
+	case <-time.After(3 * time.Second):
+		t.Fatal("processor failed to forward the queued event")
+	}
+}
+
+func TestFileIngressWireBudgetReleasesWhenDrained(t *testing.T) {
+	queue := newReservedInputQueue(helper.NewObservePipelineContext(3), 3)
+	firstWeight := queue.reserveWire(fileInputWireBudget * 2)
+	require.EqualValues(t, fileInputWireBudget, firstWeight)
+	first := &models.PipelineGroupEvents{Events: []models.PipelineEvent{&models.Log{Timestamp: 1}}}
+	queue.collectReserved(first, firstWeight)
+
+	started := make(chan struct{})
+	admitted := make(chan int64, 1)
+	go func() {
+		close(started)
+		admitted <- queue.reserveWire(1)
+	}()
+	<-started
+	select {
+	case <-admitted:
+		t.Fatal("another group entered while an oversized batch held the wire budget")
+	case <-time.After(10 * time.Millisecond):
+	}
+	require.Equal(t, []*models.PipelineGroupEvents{first}, queue.ToArray())
+	select {
+	case weight := <-admitted:
+		require.EqualValues(t, 1, weight)
+		queue.cancelWireReservation(weight)
+	case <-time.After(3 * time.Second):
+		t.Fatal("draining the group did not release its wire budget")
+	}
+	require.Empty(t, queue.slots)
 }

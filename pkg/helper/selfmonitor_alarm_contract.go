@@ -36,27 +36,6 @@ const (
 	AlarmFieldConfig   = "config"
 )
 
-// AlarmContractFields returns the ordered list of required field keys in the
-// Go-to-C++ bridge contract. Final output metadata (ip/os/ver) is added by C++;
-// optional project_name, category and config are sent only when non-empty.
-func AlarmContractFields() []string {
-	return []string{
-		AlarmFieldType,
-		AlarmFieldLevel,
-		AlarmFieldMessage,
-		AlarmFieldCount,
-	}
-}
-
-// AlarmContractOptionalFields returns field keys that are conditionally included.
-func AlarmContractOptionalFields() []string {
-	return []string{
-		AlarmFieldProject,
-		AlarmFieldCategory,
-		AlarmFieldConfig,
-	}
-}
-
 // TransferAlarmsToPipelineEventGroup converts a batch of AlarmExportMessage to a
 // PipelineEventGroup containing LogEvents, using the existing PipelineEventGroup PB
 // as the transport format. Each alarm becomes one LogEvent with key-value Contents.
@@ -97,20 +76,6 @@ func TransferAlarmsToPipelineEventGroup(alarms []selfmonitor.AlarmExportMessage,
 			Logs: &protocol.PipelineEventGroup_LogEvents{Events: eventRefs},
 		},
 	}, nil
-}
-
-// TransferPipelineEventGroupToAlarms converts a PipelineEventGroup (containing LogEvents)
-// back to a slice of AlarmExportMessage. This is the inverse of TransferAlarmsToPipelineEventGroup.
-func TransferPipelineEventGroupToAlarms(group *protocol.PipelineEventGroup) []selfmonitor.AlarmExportMessage {
-	logsWrapper := group.GetLogs()
-	if logsWrapper == nil {
-		return nil
-	}
-	alarms := make([]selfmonitor.AlarmExportMessage, 0, len(logsWrapper.Events))
-	for _, logEvent := range logsWrapper.Events {
-		alarms = append(alarms, transferLogEventToAlarm(logEvent))
-	}
-	return alarms
 }
 
 func alarmContentCount(msg *selfmonitor.AlarmExportMessage) int {
@@ -157,29 +122,4 @@ func fillAlarmLogEvent(msg *selfmonitor.AlarmExportMessage, timestamp uint64,
 	event.Timestamp = timestamp
 	event.Contents = refs
 	event.RawSize = rawSize
-}
-
-func transferLogEventToAlarm(logEvent *protocol.LogEvent) selfmonitor.AlarmExportMessage {
-	msg := selfmonitor.AlarmExportMessage{}
-	for _, content := range logEvent.Contents {
-		key := string(content.Key)
-		val := string(content.Value)
-		switch key {
-		case AlarmFieldType:
-			msg.AlarmType = val
-		case AlarmFieldLevel:
-			msg.AlarmLevel = val
-		case AlarmFieldMessage:
-			msg.AlarmMessage = val
-		case AlarmFieldCount:
-			msg.Count, _ = strconv.Atoi(val)
-		case AlarmFieldProject:
-			msg.ProjectName = val
-		case AlarmFieldCategory:
-			msg.Category = val
-		case AlarmFieldConfig:
-			msg.Config = val
-		}
-	}
-	return msg
 }

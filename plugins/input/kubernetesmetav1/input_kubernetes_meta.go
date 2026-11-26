@@ -189,7 +189,8 @@ func (in *InputKubernetesMeta) Description() string {
 	return "collect the kubernetes metadata"
 }
 
-func (in *InputKubernetesMeta) Collect(collector pipeline.Collector) error {
+func (in *InputKubernetesMeta) Read(ctx pipeline.PipelineContext) error {
+	collector := ctx.Collector()
 	now := time.Now()
 	transfer := func(nodes []*helper.MetaNode) {
 		for _, node := range nodes {

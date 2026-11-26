@@ -28,6 +28,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/alibaba/ilogtail/pkg/helper"
+	"github.com/alibaba/ilogtail/pkg/models"
+
 	lumberlog "github.com/elastic/go-lumber/log"
 	"github.com/elastic/go-lumber/server"
 
@@ -91,14 +94,9 @@ func (p *ServiceLumber) Description() string {
 	return "lumberjack input plugin for logtail"
 }
 
-// Gather takes in an accumulator and adds the metrics that the Input
-// gathers. This is called every "interval"
-func (p *ServiceLumber) Collect(pipeline.Collector) error {
-	return nil
-}
-
 // Start starts the ServiceInput's service, whatever that may be
-func (p *ServiceLumber) Start(c pipeline.Collector) error {
+func (p *ServiceLumber) StartService(ctx pipeline.PipelineContext) error {
+	collector := ctx.Collector()
 	p.shutdown = make(chan struct{})
 	p.waitGroup.Add(1)
 	defer p.waitGroup.Done()
@@ -136,8 +134,6 @@ func (p *ServiceLumber) Start(c pipeline.Collector) error {
 
 		recvChan := p.server.ReceiveChan()
 
-		keys := []string{"content"}
-		values := []string{""}
 	ForBlock:
 		for {
 			select {
@@ -150,13 +146,12 @@ func (p *ServiceLumber) Start(c pipeline.Collector) error {
 				for _, event := range batch.Events {
 					if p.V2 {
 						strValue, _ := event.(string)
-						values[0] = strValue
-						c.AddDataArray(nil, keys, values)
+						collector.Collect(models.NewGroup(models.NewMetadata(), models.NewTags()), helper.NewInputLog(nil, map[string]string{"content": strValue}))
 						logger.Debug(p.context.GetRuntimeContext(), "received event", strValue)
 					} else {
 						strMap, ok := event.(map[string]string)
 						if ok && strMap != nil {
-							c.AddData(nil, strMap)
+							collector.Collect(models.NewGroup(models.NewMetadata(), models.NewTags()), helper.NewInputLog(nil, strMap))
 						} else {
 							logger.Debug(p.context.GetRuntimeContext(), "received invalid event")
 						}

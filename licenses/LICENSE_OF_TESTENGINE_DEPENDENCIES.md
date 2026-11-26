@@ -91,6 +91,12 @@ When distributed in a binary form, Logtailplugin Test Engine may contain portion
 
 ## MIT licenses
 
+- [github.com/go-kit/kit](https://pkg.go.dev/github.com/go-kit/kit?tab=licenses)
+- [github.com/go-kit/log](https://pkg.go.dev/github.com/go-kit/log?tab=licenses)
+- [github.com/go-logfmt/logfmt](https://pkg.go.dev/github.com/go-logfmt/logfmt?tab=licenses)
+- [github.com/influxdata/telegraf](https://pkg.go.dev/github.com/influxdata/telegraf?tab=licenses)
+- [github.com/josharian/intern](https://pkg.go.dev/github.com/josharian/intern?tab=licenses)
+- [github.com/mailru/easyjson](https://pkg.go.dev/github.com/mailru/easyjson?tab=licenses)
 - [github.com/influxdata/influxdb1-client](https://pkg.go.dev/github.com/influxdata/influxdb1-client?tab=licenses)
 - [github.com/mitchellh/mapstructure](https://pkg.go.dev/github.com/mitchellh/mapstructure?tab=licenses)
 - [github.com/ClickHouse/clickhouse-go](https://pkg.go.dev/github.com/ClickHouse/clickhouse-go?tab=licenses)

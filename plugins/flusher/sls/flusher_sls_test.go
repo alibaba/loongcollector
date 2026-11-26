@@ -18,31 +18,34 @@
 package sls
 
 import (
+	"bytes"
 	"testing"
 
+	"github.com/gogo/protobuf/proto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/encoding/protowire"
 
 	"github.com/alibaba/ilogtail/pkg/helper"
+	"github.com/alibaba/ilogtail/pkg/logtail"
 	"github.com/alibaba/ilogtail/pkg/models"
-	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
-	converter "github.com/alibaba/ilogtail/pkg/protocol/converter"
 	"github.com/alibaba/ilogtail/pkg/util"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
 )
 
 // capturedSend records both ABIs without requiring a live Logtail.
 type capturedSend struct {
-	configName  string
-	logstore    string
-	pbBuffer    []byte
-	lines       int
-	hash        string
-	calls       int
-	pegCalls    int
-	legacyCalls int
-	buffers     [][]byte
+	destinations []string
+	configName   string
+	logstore     string
+	pbBuffer     []byte
+	lines        int
+	hash         string
+	calls        int
+	pegCalls     int
+
+	buffers [][]byte
 }
 
 func newTestFlusher(enableShardHash bool) (*SlsFlusher, *capturedSend) {
@@ -50,45 +53,20 @@ func newTestFlusher(enableShardHash bool) (*SlsFlusher, *capturedSend) {
 	flusher := &SlsFlusher{
 		EnableShardHash: enableShardHash,
 		KeepShardHash:   true,
-		sendPb: func(configName, logstore string, pbBuffer []byte, lines int) int {
-			captured.configName = configName
-			captured.logstore = logstore
-			captured.pbBuffer = pbBuffer
-			captured.lines = lines
-			captured.calls++
-			captured.legacyCalls++
-			return 0
-		},
-		sendPbV2: func(configName, logstore string, pbBuffer []byte, lines int, hash string) int {
-			captured.configName = configName
-			captured.logstore = logstore
-			captured.pbBuffer = pbBuffer
-			captured.lines = lines
-			captured.hash = hash
-			captured.calls++
-			captured.legacyCalls++
-			return 0
-		},
 	}
 	flusher.sendPipelineEventGroup = func(configName, logstore string, pbBuffer []byte, events int, hash string) int {
 		captured.configName, captured.logstore = configName, logstore
+		pbBuffer = bytes.Clone(pbBuffer)
 		captured.pbBuffer, captured.lines, captured.hash = pbBuffer, events, hash
 		captured.calls++
 		captured.pegCalls++
 		captured.buffers = append(captured.buffers, pbBuffer)
+		captured.destinations = append(captured.destinations, logstore)
 		return 0
 	}
 	// mock.NewEmptyContext(project, logstore, configName)
 	_ = flusher.Init(mock.NewEmptyContext("test-project", "test-logstore", "test-config"))
 	return flusher, captured
-}
-
-// TestSlsFlusher_ImplementsFlusherV2 is a compile-and-runtime guard that the SLS
-// flusher can be loaded by the v2 Runner.
-func TestSlsFlusher_ImplementsFlusherV2(t *testing.T) {
-	flusher, _ := newTestFlusher(false)
-	require.Implements(t, (*pipeline.FlusherV2)(nil), flusher, "SlsFlusher must be loadable by the v2 Runner")
-	require.Implements(t, (*pipeline.FlusherV1)(nil), flusher, "SlsFlusher must remain loadable by the v1 Runner")
 }
 
 // Export must use the typed protobuf ABI and retain log contents.
@@ -113,7 +91,7 @@ func TestSlsFlusher_ExportConvertsLogEvent(t *testing.T) {
 	assert.Equal(t, 1, captured.lines)
 
 	assert.Equal(t, 1, captured.pegCalls)
-	assert.Zero(t, captured.legacyCalls)
+
 	var decoded protocol.PipelineEventGroup
 	require.NoError(t, decoded.Unmarshal(captured.pbBuffer))
 	require.NotNil(t, decoded.GetLogs())
@@ -148,7 +126,6 @@ func TestSlsFlusher_ExportPreservesReservedTopic(t *testing.T) {
 			flusher, captured := newTestFlusher(false)
 			require.NoError(t, flusher.Export([]*models.PipelineGroupEvents{converted}, nil))
 			require.Equal(t, 1, captured.pegCalls)
-			assert.Zero(t, captured.legacyCalls)
 
 			var outgoing protocol.PipelineEventGroup
 			require.NoError(t, outgoing.Unmarshal(captured.pbBuffer))
@@ -264,7 +241,7 @@ func TestSlsFlusher_ExportMixedEventsPreservesOrderAndMetadata(t *testing.T) {
 			require.Len(t, pb.GetLogs().Events, 1)
 		}
 	}
-	assert.Zero(t, captured.legacyCalls)
+
 }
 
 func TestSlsFlusher_ExportShardHashDoesNotMutateInput(t *testing.T) {
@@ -274,7 +251,7 @@ func TestSlsFlusher_ExportShardHashDoesNotMutateInput(t *testing.T) {
 			flusher.KeepShardHash = keep
 			tags := models.NewTags()
 			tags.Add(util.ShardHashTagKey, "hash")
-			log := models.NewLog("", nil, "", "", "", models.NewTags(), 1)
+			log := models.NewSimpleLog([]byte("message"), models.NewTags(), 1)
 			require.NoError(t, flusher.Export([]*models.PipelineGroupEvents{{
 				Group: models.NewGroup(models.NewMetadata(), tags), Events: []models.PipelineEvent{log},
 			}}, nil))
@@ -318,7 +295,7 @@ func TestSlsFlusher_ExportKeepsLogTagsSeparate(t *testing.T) {
 }
 
 func TestSlsFlusher_ExportErrors(t *testing.T) {
-	log := models.NewLog("", nil, "", "", "", models.NewTags(), 1)
+	log := models.NewSimpleLog([]byte("message"), models.NewTags(), 1)
 	log.Contents.Add("bad", 42)
 	for _, event := range []models.PipelineEvent{nil, log, (*models.Log)(nil), models.ByteArray("unsupported")} {
 		flusher, captured := newTestFlusher(false)
@@ -328,81 +305,181 @@ func TestSlsFlusher_ExportErrors(t *testing.T) {
 	flusher, _ := newTestFlusher(false)
 	calls := 0
 	flusher.sendPipelineEventGroup = func(_, _ string, _ []byte, _ int, _ string) int { calls++; return -2 }
-	log = models.NewLog("", nil, "", "", "", models.NewTags(), 1)
+	log = models.NewSimpleLog([]byte("message"), models.NewTags(), 1)
 	require.ErrorContains(t, flusher.Export([]*models.PipelineGroupEvents{
 		{Events: []models.PipelineEvent{log}}, {Events: []models.PipelineEvent{log}},
 	}, nil), "error -2")
 	assert.Equal(t, 1, calls)
 }
 
-func TestSlsFlusher_FlushRetainsLegacyABI(t *testing.T) {
-	for _, enable := range []bool{false, true} {
-		flusher, captured := newTestFlusher(enable)
-		group := &protocol.LogGroup{Category: "legacy-store", Logs: []*protocol.Log{{Time: 100}},
-			LogTags: []*protocol.LogTag{{Key: util.ShardHashTagKey, Value: "hash"}}}
-		require.NoError(t, flusher.Flush("project", "ignored", "legacy-config", []*protocol.LogGroup{group}))
-		assert.Equal(t, 1, captured.legacyCalls)
-		assert.Zero(t, captured.pegCalls)
-		assert.Equal(t, "legacy-store", captured.logstore)
-		var pb protocol.LogGroup
-		require.NoError(t, pb.Unmarshal(captured.pbBuffer))
-		assert.Equal(t, uint32(100), pb.Logs[0].Time)
+func TestSlsFlusherExportUsesExplicitRouteAndIgnoresOrdinaryMetadata(t *testing.T) {
+	flusher, capture := newTestFlusher(true)
+	flusher.KeepShardHash = false
+	var groups []*models.PipelineGroupEvents
+	for _, destination := range []string{"first", "second", ""} {
+		info := models.NewGroup(
+			models.NewMetadataWithKeyValues("__logstore__", "ordinary-resource-attribute"),
+			models.NewTagsWithKeyValues(util.ShardHashTagKey, "bucket"),
+		)
+		info.DestinationLogstore = destination
+		log := models.NewSimpleLog([]byte("message"), models.NewTagsWithKeyValues("event", "tag"), 1700000000123456789)
+		groups = append(groups, &models.PipelineGroupEvents{Group: info, Events: []models.PipelineEvent{log}})
+	}
+
+	require.NoError(t, flusher.Export(groups, nil))
+	require.Equal(t, []string{"first", "second", "test-logstore"}, capture.destinations)
+	require.Equal(t, "bucket", capture.hash)
+	for i, buf := range capture.buffers {
+		var wire protocol.PipelineEventGroup
+		require.NoError(t, wire.Unmarshal(buf))
+		require.Equal(t, []byte("tag"), wire.Tags["event"])
+		require.NotContains(t, wire.Tags, util.ShardHashTagKey)
+		require.Equal(t, "bucket", groups[i].Group.GetTags().Get(util.ShardHashTagKey))
+		require.Equal(t, []byte("ordinary-resource-attribute"), wire.Metadata["__logstore__"])
+		require.Equal(t, uint64(1700000000123456789), wire.GetLogs().Events[0].Timestamp)
 	}
 }
 
+func TestSlsFlusherExportContinuesPastEmptyLogs(t *testing.T) {
+	flusher, capture := newTestFlusher(false)
+	empty := &models.Log{Timestamp: 1}
+	valid := models.NewSimpleLog([]byte("valid"), models.NewTags(), 1700000000123456789)
+	require.NoError(t, flusher.Export([]*models.PipelineGroupEvents{
+		{Group: &models.GroupInfo{DestinationLogstore: "empty"}, Events: []models.PipelineEvent{empty}},
+		{Group: &models.GroupInfo{DestinationLogstore: "valid"}, Events: []models.PipelineEvent{empty, valid}},
+	}, nil))
+	require.Equal(t, []string{"valid"}, capture.destinations)
+	require.Equal(t, 1, capture.lines)
+	var wire protocol.PipelineEventGroup
+	require.NoError(t, wire.Unmarshal(capture.pbBuffer))
+	require.Len(t, wire.GetLogs().Events, 1)
+	require.Equal(t, valid.Timestamp, wire.GetLogs().Events[0].Timestamp)
+}
+
 func BenchmarkSlsFlusherExport(b *testing.B) {
-	for _, legacy := range []bool{false, true} {
-		for _, mixed := range []bool{false, true} {
-			name := "peg/logs"
-			if legacy {
-				name = "legacy/logs"
-			}
-			if mixed {
-				name = "peg/mixed"
-				if legacy {
-					name = "legacy/mixed"
+	for _, mixed := range []bool{false, true} {
+		name := "peg/logs"
+		if mixed {
+			name = "peg/mixed"
+		}
+		b.Run(name, func(b *testing.B) {
+			flusher := &SlsFlusher{sendPipelineEventGroup: func(_, _ string, _ []byte, _ int, _ string) int { return 0 }}
+			require.NoError(b, flusher.Init(mock.NewEmptyContext("project", "store", "config")))
+			events := make([]models.PipelineEvent, 100)
+			for i := range events {
+				if mixed && i%2 == 0 {
+					events[i] = models.NewSingleValueMetric("cpu", models.MetricTypeGauge, models.NewTags(), 100, 1.5)
+				} else {
+					log := models.NewLog("", nil, "", "", "", models.NewTags(), 100)
+					log.GetIndices().Add("content", "benchmark log payload")
+					events[i] = log
 				}
 			}
-			b.Run(name, func(b *testing.B) {
-				flusher := &SlsFlusher{sendPipelineEventGroup: func(_, _ string, _ []byte, _ int, _ string) int { return 0 }}
-				flusher.sendPb = func(_, _ string, _ []byte, _ int) int { return 0 }
-				if err := flusher.Init(mock.NewEmptyContext("project", "store", "config")); err != nil {
+			groups := []*models.PipelineGroupEvents{{Group: models.NewGroup(models.NewMetadata(), models.NewTags()), Events: events}}
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				if err := flusher.Export(groups, nil); err != nil {
 					b.Fatal(err)
 				}
-				events := make([]models.PipelineEvent, 100)
-				for i := range events {
-					if mixed && i%2 == 0 {
-						events[i] = models.NewSingleValueMetric("cpu", models.MetricTypeGauge, models.NewTags(), 100, 1.5)
-					} else {
-						log := models.NewLog("", nil, "", "", "", models.NewTags(), 100)
-						log.GetIndices().Add("content", "benchmark log payload")
-						events[i] = log
-					}
-				}
-				groups := []*models.PipelineGroupEvents{{Group: models.NewGroup(models.NewMetadata(), models.NewTags()), Events: events}}
-				b.ReportAllocs()
-				b.ResetTimer()
-				for i := 0; i < b.N; i++ {
-					if legacy {
-						for _, group := range groups {
-							convertedGroups, err := converter.PipelineGroupEventsToLogGroups(group)
-							if err != nil {
-								b.Fatal(err)
-							}
-							for _, converted := range convertedGroups {
-								converted.Category = "store"
-								if err := flusher.sendLogGroup("config", converted); err != nil {
-									b.Fatal(err)
-								}
-							}
-						}
-						continue
-					}
-					if err := flusher.Export(groups, nil); err != nil {
-						b.Fatal(err)
-					}
-				}
-			})
+			}
+		})
+	}
+}
+
+func TestMarshalLogGroupMatchesGeneratedEncoding(t *testing.T) {
+	log := &models.Log{
+		Timestamp: 1700000001234567890,
+		Level:     "warn",
+		Offset:    65001,
+		RawSize:   65536,
+		Contents:  models.NewOrderedLogContents(4),
+	}
+	log.GetIndices().Add("message", "a UTF-8 message 日志")
+	log.GetIndices().Add("empty", "")
+	log.GetIndices().Add("", []byte{0xff, 0})
+	log.GetIndices().Add("data", []byte{})
+	header := &protocol.PipelineEventGroup{
+		Tags:     map[string][]byte{"__topic__": []byte("test"), "": {}},
+		Metadata: map[string][]byte{"source": []byte("input")},
+	}
+	var buffer logWireBuffer
+	encoded, count, err := buffer.marshalLogGroup(header, []models.PipelineEvent{
+		&models.Log{}, log,
+	})
+	require.NoError(t, err)
+	require.Equal(t, 1, count)
+	referenceLog, err := helper.TransferLogEventToPB(log)
+	require.NoError(t, err)
+	reference := &protocol.PipelineEventGroup{
+		Tags:     header.Tags,
+		Metadata: header.Metadata,
+		PipelineEvents: &protocol.PipelineEventGroup_Logs{
+			Logs: &protocol.PipelineEventGroup_LogEvents{Events: []*protocol.LogEvent{referenceLog}},
+		},
+	}
+	originalWire, err := reference.Marshal()
+	require.NoError(t, err)
+	var actual, expected protocol.PipelineEventGroup
+	require.NoError(t, actual.Unmarshal(encoded))
+	require.NoError(t, expected.Unmarshal(originalWire))
+	require.True(t, proto.Equal(&expected, &actual))
+	// An explicit empty value means the native serializer can borrow
+	// the same content bytes when writing the required SLS fields.
+	for _, field := range actual.GetLogs().Events[0].Contents {
+		require.NotNil(t, field.Key)
+		require.NotNil(t, field.Value)
+	}
+}
+
+func TestWireMessageBackfillsCanonicalLength(t *testing.T) {
+	for _, size := range []int{0, 127, 128, 16383, 16384, 2097152} {
+		body := bytes.Repeat([]byte{0xFE}, size)
+		for _, reserved := range []int{2, 3} {
+			wire, lengthAt := beginWireMessage([]byte("header"), logEventField, reserved)
+			wire = finishWireMessage(append(wire, body...), lengthAt, reserved)
+			require.Equal(t, "header", string(wire[:6]))
+			number, kind, used := protowire.ConsumeTag(wire[6:])
+			require.EqualValues(t, logEventField, number)
+			require.Equal(t, protowire.BytesType, kind)
+			actual, consumed := protowire.ConsumeBytes(wire[6+used:])
+			require.Equal(t, protowire.SizeBytes(size), consumed)
+			require.Equal(t, body, actual)
 		}
 	}
+}
+
+func TestSlsFlusherSplitsOversizedPipelineBatch(t *testing.T) {
+	flusher, _ := newTestFlusher(true)
+	tags := models.NewTagsWithMap(map[string]string{util.ShardHashTagKey: "hash", "__topic__": "topic"})
+	group := models.NewGroup(models.NewMetadata(), tags)
+	group.DestinationLogstore = "routed"
+	var sent []string
+	var largeAttempts int
+	flusher.sendPipelineEventGroup = func(_, logstore string, wire []byte, count int, hash string) int {
+		var out protocol.PipelineEventGroup
+		require.NoError(t, out.Unmarshal(wire))
+		require.Equal(t, "routed", logstore)
+		require.Equal(t, "hash", hash)
+		require.Equal(t, "topic", string(out.Tags["__topic__"]))
+		require.Len(t, out.GetLogs().Events, count)
+		if count > 1 {
+			largeAttempts++
+			return logtail.SendPipelineEventGroupTooLarge
+		}
+		value := string(out.GetLogs().Events[0].GetContents()[0].GetValue())
+		if value == "single event over limit" {
+			return logtail.SendPipelineEventGroupTooLarge
+		}
+		sent = append(sent, value)
+		return 0
+	}
+	batch := &models.PipelineGroupEvents{Group: group}
+	for _, value := range []string{"first", "single event over limit", "last"} {
+		batch.Events = append(batch.Events, helper.NewInputLog(nil, map[string]string{"content": value}))
+	}
+
+	require.NoError(t, flusher.Export([]*models.PipelineGroupEvents{batch}, nil))
+	require.Positive(t, largeAttempts)
+	require.Equal(t, []string{"first", "last"}, sent)
 }

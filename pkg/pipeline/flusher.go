@@ -16,16 +16,14 @@ package pipeline
 
 import (
 	"github.com/alibaba/ilogtail/pkg/models"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
-// Flusher ...
-// Sample flusher implementation: see plugin_manager/flusher_sls.gox.
+// Flusher exports event groups to a destination.
 type Flusher interface {
 	// Init called for init some system resources, like socket, mutex...
 	Init(Context) error
 
-	// Description returns a one-sentence description on the Input.
+	// Description returns a one-sentence description of the flusher.
 	Description() string
 
 	// IsReady checks if flusher is ready to accept more data.
@@ -55,20 +53,7 @@ type Flusher interface {
 	// 3. Maybe more, it depends.
 	// In a word, flusher should only have things that can be recycled by GC after this.
 	Stop() error
-}
 
-type FlusherV1 interface {
-	Flusher
-	// Flush flushes data to destination, such as SLS, console, file, etc.
-	// It is expected to return no error at most time because IsReady will be called
-	// before it to make sure there is space for next data.
-	Flush(projectName string, logstoreName string, configName string, logGroupList []*protocol.LogGroup) error
-}
-
-type FlusherV2 interface {
-	Flusher
-	// Export data to destination, such as gRPC, console, file, etc.
-	// It is expected to return no error at most time because IsReady will be called
-	// before it to make sure there is space for next data.
+	// Export sends event groups after IsReady reports that the destination can accept them.
 	Export([]*models.PipelineGroupEvents, PipelineContext) error
 }

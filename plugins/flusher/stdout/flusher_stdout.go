@@ -15,14 +15,13 @@
 package stdout
 
 import (
-	"encoding/json"
 	"fmt"
-	"strconv"
+	"sync/atomic"
+	"time"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 
 	"github.com/cihub/seelog"
@@ -35,16 +34,12 @@ const flushMsg = `
 	 %s
  </outputs>
  <formats>
-	 <format id="common" format="%%Date %%Time %%Msg%%n" />
+	 <format id="common" format="%s %%Msg%%n" />
  </formats>
 </seelog>
 `
 
-// FlusherStdout is a flusher plugin in plugin system.
-// It has two usages:
-// 1. flusher the logGroup to the stdout
-// 2. flusher the logGroup to the file. If the specified file name is not configured,
-// the logGroups would append to the global log file.
+// FlusherStdout writes events to stdout, a configured file or the global log.
 type FlusherStdout struct {
 	FileName      string
 	MaxSize       int
@@ -55,6 +50,7 @@ type FlusherStdout struct {
 
 	context   pipeline.Context
 	outLogger seelog.LoggerInterface
+	file      *stdoutFileOutput
 }
 
 // Init method would be trigger before working. For the plugin, init method choose the log output
@@ -67,18 +63,23 @@ func (p *FlusherStdout) Init(context pipeline.Context) error {
 		pattern = "<console/>"
 		logger.CloseCatchStdout()
 	} else if p.FileName != "" {
-		pattern = `<rollingfile type="size" filename="%s" maxsize="%d" maxrolls="%d"/>`
 		if p.MaxSize <= 0 {
 			p.MaxSize = 1024 * 1024
 		}
 		if p.MaxRolls <= 0 {
 			p.MaxRolls = 1
 		}
-		pattern = fmt.Sprintf(pattern, p.FileName, p.MaxSize, p.MaxRolls)
+		file, err := newStdoutFileOutput(p.FileName, p.MaxSize, p.MaxRolls, p.reportWriteError)
+		if err != nil {
+			logger.Warning(p.context.GetRuntimeContext(), selfmonitor.FlusherInitAlarm, "init stdout flusher fail, error", err)
+			p.outLogger = seelog.Disabled
+		} else {
+			p.file = file
+		}
 	}
 	if pattern != "" {
 		var err error
-		p.outLogger, err = seelog.LoggerFromConfigAsString(fmt.Sprintf(flushMsg, pattern))
+		p.outLogger, err = seelog.LoggerFromConfigAsString(fmt.Sprintf(flushMsg, pattern, stdoutTimeFormat))
 		if err != nil {
 			logger.Warning(p.context.GetRuntimeContext(), selfmonitor.FlusherInitAlarm, "init stdout flusher fail, error", err)
 			p.outLogger = seelog.Disabled
@@ -91,70 +92,48 @@ func (*FlusherStdout) Description() string {
 	return "stdout flusher for logtail"
 }
 
-// Flush the logGroup list to stdout or files.
-func (p *FlusherStdout) Flush(projectName string, logstoreName string, configName string, logGroupList []*protocol.LogGroup) error {
-	for _, logGroup := range logGroupList {
-		if p.Tags {
-			if p.outLogger != nil {
-				p.outLogger.Infof("[LogGroup] topic %s, logstore %s, logcount %d, tags %v", logGroup.Topic, logGroup.Category, len(logGroup.Logs), logGroup.LogTags)
-			} else {
-				logger.Info(p.context.GetRuntimeContext(), "[LogGroup] topic", logGroup.Topic, "logstore", logGroup.Category, "logcount", len(logGroup.Logs), "tags", logGroup.LogTags)
-			}
-		}
-
-		if p.KeyValuePairs {
-			for _, log := range logGroup.Logs {
-				writer := jsoniter.NewStream(jsoniter.ConfigDefault, nil, 128)
-				writer.WriteObjectStart()
-				for _, c := range log.Contents {
-					writer.WriteObjectField(c.Key)
-					writer.WriteString(c.Value)
-					_, _ = writer.Write([]byte{','})
-				}
-				writer.WriteObjectField("__time__")
-				writer.WriteString(strconv.Itoa(int(log.Time)))
-				writer.WriteObjectEnd()
-
-				if p.outLogger != nil {
-					p.outLogger.Infof("%s", writer.Buffer())
-				} else {
-					logger.Info(p.context.GetRuntimeContext(), string(writer.Buffer()))
-				}
-			}
-
-		} else {
-			for _, log := range logGroup.Logs {
-				buf, _ := json.Marshal(log)
-				if p.outLogger != nil {
-					p.outLogger.Infof("%s", buf)
-				} else {
-					logger.Info(p.context.GetRuntimeContext(), string(buf))
-				}
-			}
-		}
-
-	}
-	return nil
-}
-
 func (p *FlusherStdout) Export(in []*models.PipelineGroupEvents, context pipeline.PipelineContext) error {
-	for _, groupEvents := range in {
+	writer := jsoniter.ConfigDefault.BorrowStream(nil)
+	defer func() {
+		if p.file != nil || cap(writer.Buffer()) > maxStdoutBatchBytes {
+			writer.SetBuffer(nil)
+		}
+		jsoniter.ConfigDefault.ReturnStream(writer)
+	}()
+	var batch *stdoutFileBatch
+	if p.file != nil {
+		batch = p.file.getBatch()
+		defer func() { p.file.enqueue(batch) }()
+	}
 
+	for _, groupEvents := range in {
 		if p.Tags {
 			metadata := fmt.Sprintf("%v", groupEvents.Group.GetMetadata().Iterator())
 			tags := fmt.Sprintf("%v", groupEvents.Group.GetTags().Iterator())
-			if p.outLogger != nil {
+			switch {
+			case batch != nil:
+				message := fmt.Sprintf("[Event] event %d, metadata %s, tags %s", len(groupEvents.Events), metadata, tags)
+				start := batch.beginLine()
+				batch.data = append(batch.data, message...)
+				batch = p.file.finishLine(batch, start)
+			case p.outLogger != nil:
 				p.outLogger.Infof("[Event] event %d, metadata %s, tags %s", len(groupEvents.Events), metadata, tags)
-			} else {
+			default:
 				logger.Info(p.context.GetRuntimeContext(), "[Event] event", len(groupEvents.Events), "metadata", metadata, "tags", tags)
 			}
 		}
 
 		for _, event := range groupEvents.Events {
-			writer := jsoniter.NewStream(jsoniter.ConfigDefault, nil, 128)
+			writer.Reset(nil)
+			lineStart := 0
+			if batch != nil {
+				lineStart = batch.beginLine()
+				writer.SetBuffer(batch.data)
+			}
 			writer.WriteObjectStart()
 			writer.WriteObjectField("eventType")
-			switch event.GetType() {
+			eventType := event.GetType()
+			switch eventType {
 			case models.EventTypeMetric:
 				writer.WriteString("metric")
 			case models.EventTypeSpan:
@@ -164,30 +143,32 @@ func (p *FlusherStdout) Export(in []*models.PipelineGroupEvents, context pipelin
 			case models.EventTypeByteArray:
 				writer.WriteString("byteArray")
 			}
-			_, _ = writer.Write([]byte{','})
+			writer.WriteMore()
 			writer.WriteObjectField("name")
 			writer.WriteString(event.GetName())
-			_, _ = writer.Write([]byte{','})
+			writer.WriteMore()
 			writer.WriteObjectField("timestamp")
 			writer.WriteUint64(event.GetTimestamp())
-			_, _ = writer.Write([]byte{','})
+			writer.WriteMore()
 			writer.WriteObjectField("observedTimestamp")
 			writer.WriteUint64(event.GetObservedTimestamp())
-			_, _ = writer.Write([]byte{','})
+			writer.WriteMore()
 			writer.WriteObjectField("tags")
 			writer.WriteObjectStart()
-			i := 0
-			for k, v := range event.GetTags().Iterator() {
-				writer.WriteObjectField(k)
-				writer.WriteString(v)
-				if i < event.GetTags().Len()-1 {
-					_, _ = writer.Write([]byte{','})
+			firstTag := true
+			if tags := event.GetTags(); tags != nil && tags.Len() > 0 {
+				for k, v := range tags.Iterator() {
+					if !firstTag {
+						writer.WriteMore()
+					}
+					firstTag = false
+					writer.WriteObjectField(k)
+					writer.WriteString(v)
 				}
-				i++
 			}
 			writer.WriteObjectEnd()
-			_, _ = writer.Write([]byte{','})
-			switch event.GetType() {
+			writer.WriteMore()
+			switch eventType {
 			case models.EventTypeMetric:
 				p.writeMetricValues(writer, event.(*models.Metric))
 			case models.EventTypeSpan:
@@ -200,10 +181,18 @@ func (p *FlusherStdout) Export(in []*models.PipelineGroupEvents, context pipelin
 
 			writer.WriteObjectEnd()
 
+			if batch != nil {
+				batch.data = writer.Buffer()
+				writer.SetBuffer(nil)
+				batch = p.file.finishLine(batch, lineStart)
+				continue
+			}
+			// The logger may retain the message after Export reuses the buffer.
+			message := string(writer.Buffer())
 			if p.outLogger != nil {
-				p.outLogger.Infof("%s", writer.Buffer())
+				p.outLogger.Info(message)
 			} else {
-				logger.Info(p.context.GetRuntimeContext(), string(writer.Buffer()))
+				logger.Info(p.context.GetRuntimeContext(), message)
 			}
 		}
 	}
@@ -258,23 +247,24 @@ func (p *FlusherStdout) writeSpan(writer *jsoniter.Stream, metric *models.Span) 
 func (p *FlusherStdout) writeLogBody(writer *jsoniter.Stream, log *models.Log) {
 	writer.WriteObjectField("offset")
 	writer.WriteInt64(int64(log.GetOffset()))
-	_, _ = writer.Write([]byte{','})
+	writer.WriteMore()
 	writer.WriteObjectField("level")
 	writer.WriteString(log.GetLevel())
-	_, _ = writer.Write([]byte{','})
+	writer.WriteMore()
 	writer.WriteObjectField("traceID")
 	writer.WriteString(log.GetTraceID())
-	_, _ = writer.Write([]byte{','})
-	writer.WriteObjectField("traceID")
-	writer.WriteString(log.GetTraceID())
-	_, _ = writer.Write([]byte{','})
+	writer.WriteMore()
 	writer.WriteObjectField("spanID")
 	writer.WriteString(log.GetSpanID())
 	contents := log.GetIndices()
-	for key, value := range contents.Iterator() {
-		_, _ = writer.Write([]byte{','})
+	for key, value := range models.LogContentEntries(contents) {
+		writer.WriteMore()
 		writer.WriteObjectField(key)
-		_, _ = writer.Write([]byte(fmt.Sprintf("%#v", value)))
+		if field, ok := value.(string); ok {
+			writer.WriteString(field)
+		} else {
+			writer.WriteRaw(fmt.Sprintf("%#v", value))
+		}
 	}
 }
 
@@ -295,14 +285,55 @@ func (*FlusherStdout) IsReady(projectName string, logstoreName string, logstoreK
 
 // Stop ...
 func (p *FlusherStdout) Stop() error {
+	if p.file != nil {
+		p.file.close()
+	}
 	if p.outLogger != nil {
 		p.outLogger.Close()
 	}
 	return nil
 }
 
+func (p *FlusherStdout) reportWriteError(err error) {
+	logger.Warning(p.context.GetRuntimeContext(), selfmonitor.PluginAlarm, "stdout file write failed", err)
+}
+
+const stdoutTimestampFormatter = "LoongCollectorStdoutTimestamp"
+
+var stdoutTimeFormat = "%Date %Time"
+
+type timestampCacheEntry struct {
+	second   int64
+	location *time.Location
+	text     string
+	boxed    any
+}
+
+// newStdoutTimestampFormatter caches the formatted timestamp per logger.
+// The prefix has one-second precision and depends on the time's location.
+func newStdoutTimestampFormatter(_ string) seelog.FormatterFunc {
+	var cached atomic.Pointer[timestampCacheEntry]
+	return func(_ string, _ seelog.LogLevel, ctx seelog.LogContextInterface) any {
+		return stdoutTimestamp(&cached, ctx.CallTime()).boxed
+	}
+}
+
+func stdoutTimestamp(cache *atomic.Pointer[timestampCacheEntry], now time.Time) *timestampCacheEntry {
+	second, location := now.Unix(), now.Location()
+	if entry := cache.Load(); entry != nil && entry.second == second && entry.location == location {
+		return entry
+	}
+	text := now.Format("2006-01-02 15:04:05")
+	entry := &timestampCacheEntry{second: second, location: location, text: text, boxed: text}
+	cache.Store(entry)
+	return entry
+}
+
 // Register the plugin to the Flushers array.
 func init() {
+	if err := seelog.RegisterCustomFormatter(stdoutTimestampFormatter, newStdoutTimestampFormatter); err == nil {
+		stdoutTimeFormat = "%" + stdoutTimestampFormatter
+	}
 	pipeline.Flushers["flusher_stdout"] = func() pipeline.Flusher {
 		return &FlusherStdout{
 			KeyValuePairs: true,

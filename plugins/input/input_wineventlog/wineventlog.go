@@ -23,7 +23,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pkg/util"
@@ -73,7 +75,7 @@ type WinEventLog struct {
 	shutdown  chan struct{}
 	waitGroup sync.WaitGroup
 	context   pipeline.Context
-	collector pipeline.Collector
+	collector pipeline.PipelineCollector
 
 	checkpoint         eventlog.Checkpoint
 	lastCheckpointTime time.Time
@@ -114,14 +116,9 @@ func (w *WinEventLog) Description() string {
 	return "A service input plugin which collects Windows event logs of " + w.Name
 }
 
-// Collect ...
-func (w *WinEventLog) Collect(collector pipeline.Collector) error {
-	return nil
-}
-
 // Start ...
-func (w *WinEventLog) Start(collector pipeline.Collector) error {
-	w.collector = collector
+func (w *WinEventLog) StartService(ctx pipeline.PipelineContext) error {
+	w.collector = ctx.Collector()
 	w.initCheckpoint()
 	w.shutdown = make(chan struct{}, 1)
 	w.waitGroup.Add(1)
@@ -197,7 +194,7 @@ func (w *WinEventLog) run() bool {
 
 		for _, r := range records {
 			values := r.ToEvent(w.IgnoreZeroValue)
-			w.collector.AddData(values, nil, r.TimeCreated.SystemTime)
+			w.collector.Collect(models.NewGroup(models.NewMetadata(), models.NewTags()), helper.NewInputLog(nil, values, r.TimeCreated.SystemTime))
 			w.checkpoint = r.Offset
 			curTime := time.Now()
 			if curTime.Sub(w.lastCheckpointTime) > time.Duration(3)*time.Second {

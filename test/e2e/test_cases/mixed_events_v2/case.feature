@@ -1,20 +1,6 @@
 @flusher
-Feature: mixed log metric span v2
-  B6 regression gate (#2605 / Epic #2595 / Discussion #1928): after B3/B4,
-  an explicit StructureType: v2 pipeline must carry mixed Log + Metric + Span
-  without dropping or mis-typing events. This is the prerequisite for C1.
-
-  Existing e2e cases are single-kind (processor_v2 = Log, flusher_http =
-  Metric, input_internal_metrics_prometheus = Metric). This case is the
-  first that asserts all three kinds on the v2 path.
-
-  Contract:
-    - processor_add_fields mutates Log and pass-through Metric (B4
-      ProcessLogEventsOnly)
-    - flusher_http serializes Log / Metric / Span via custom_single v2
-    - flusher_prometheus keeps Metric identity when Log/Span also reach Export
-  Span runs in a sibling v2 pipeline: processor_otel_trace replaces the
-  source Log, so it cannot share the pipeline with logs we still assert.
+Feature: mixed log metric span events
+  Verify event encoding through a pipeline with an explicit aggregator and omitted StructureType.
 
   @e2e @docker-compose
   Scenario: TestMixedEventsFlusherHTTP
@@ -28,13 +14,13 @@ Feature: mixed log metric span v2
     """
     Given loongcollector container mount {./log_line.log} to {/root/test/log_line.log}
     Given loongcollector container mount {./otel_trace.json} to {/root/test/otel_trace.json}
-    # Pipeline 1: Log + Metric in one v2 group path.
+    # Pipeline 1: Log + Metric in one event pipeline.
     #   - metric_debug_file.Read emits a Log (content="hello mixed log")
     #   - metric_mock.Read emits Metric events (single_metrics_mock +
     #     multi_values_metrics_mock_{Index,value})
     #   - processor_add_fields.Process appends event_kind/source on Log only
     #     and CollectGroupEvents the Metric unchanged (B4 pass-through)
-    #   - flusher_http.Export -> ConvertToSingleProtocolStreamV2:
+    #   - flusher_http.Export -> ConvertToSingleProtocolStream:
     #       Log -> {content, event_kind, source}
     #       Metric -> {__name__, __labels__, __value__, __time_nano__}
     #     posted as custom_single JSON to Elasticsearch _doc (same envelope
@@ -43,7 +29,6 @@ Feature: mixed log metric span v2
     """
     enable: true
     global:
-      StructureType: v2
       InputIntervalMs: 1000
     inputs:
       - Type: metric_debug_file
@@ -59,6 +44,8 @@ Feature: mixed log metric span v2
         Fields:
           event_kind: log
           source: e2e_mixed
+    aggregators:
+      - Type: aggregator_base
     flushers:
       - Type: flusher_http
         RemoteURL: http://elasticsearch:9200/mixed/_doc
@@ -67,13 +54,12 @@ Feature: mixed log metric span v2
           Encoding: json
     """
     # Pipeline 2: OTLP JSON Log -> processor_otel_trace -> native Span.
-    # ConvertToSingleProtocolStreamV2 then flattens the Span into
+    # ConvertToSingleProtocolStream then flattens the Span into
     # {traceID, spanID, name, ...} so the same ES subscriber can assert it.
     Given {mixed-span-http} local config as below
     """
     enable: true
     global:
-      StructureType: v2
       InputIntervalMs: 1000
     inputs:
       - Type: metric_debug_file
@@ -82,6 +68,8 @@ Feature: mixed log metric span v2
       - Type: processor_otel_trace
         SourceKey: content
         Format: json
+    aggregators:
+      - Type: aggregator_base
     flushers:
       - Type: flusher_http
         RemoteURL: http://elasticsearch:9200/mixed/_doc
@@ -114,7 +102,7 @@ Feature: mixed log metric span v2
     """
     Given loongcollector container mount {./log_line.log} to {/root/test/log_line.log}
     Given loongcollector container mount {./otel_trace.json} to {/root/test/otel_trace.json}
-    # Same mixed Log + Metric v2 pipeline, but Export goes to
+    # Same mixed Log + Metric event pipeline, but Export goes to
     # flusher_prometheus. The prometheus encoder skips non-Metric events
     # (debug-log, no error) and remote-writes the Metric series. Querying
     # single_metrics_mock proves the Metric identity survived the mixed
@@ -124,7 +112,6 @@ Feature: mixed log metric span v2
     """
     enable: true
     global:
-      StructureType: v2
       InputIntervalMs: 1000
     inputs:
       - Type: metric_debug_file
@@ -156,7 +143,6 @@ Feature: mixed log metric span v2
     """
     enable: true
     global:
-      StructureType: v2
       InputIntervalMs: 1000
     inputs:
       - Type: metric_debug_file

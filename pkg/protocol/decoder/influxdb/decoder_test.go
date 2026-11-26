@@ -15,15 +15,13 @@
 package influxdb
 
 import (
-	"fmt"
 	"net/http"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
-	"github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/models"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
 var textFormat = `
@@ -68,127 +66,22 @@ cpu.load,host=server01,region=uswest value=1 1434055562000000000
 cpu.load,host.dd=server02,region=uswest tt="xx",value=3 1434055562000010000
 `
 
-func TestFieldsExtend(t *testing.T) {
-	cases := []struct {
-		enableFieldsExtend     bool
-		enableSlsMetricsFormat bool
-		data                   string
-		wantLogs               []*protocol.Log
-		wantErr                bool
-	}{
-		{
-			enableFieldsExtend: true,
-			data:               txtWithDotNames,
-			wantErr:            false,
-			wantLogs: []*protocol.Log{
-				{
-					Contents: []*protocol.Log_Content{
-						{Key: "__name__", Value: "cpu.load"},
-						{Key: "__value__", Value: "1"},
-						{Key: "__labels__", Value: "host#$#server01|region#$#uswest"},
-						{Key: "__time_nano__", Value: "1434055562000000000"},
-						{Key: "__type__", Value: "float"},
-						{Key: "__field__", Value: "value"},
-					},
-				},
-				{
-					Contents: []*protocol.Log_Content{
-						{Key: "__name__", Value: "cpu.load:tt"},
-						{Key: "__value__", Value: "xx"},
-						{Key: "__labels__", Value: "host.dd#$#server02|region#$#uswest"},
-						{Key: "__time_nano__", Value: "1434055562000010000"},
-						{Key: "__type__", Value: "string"},
-						{Key: "__field__", Value: "tt"},
-					},
-				},
-				{
-					Contents: []*protocol.Log_Content{
-						{Key: "__name__", Value: "cpu.load"},
-						{Key: "__value__", Value: "3"},
-						{Key: "__labels__", Value: "host.dd#$#server02|region#$#uswest"},
-						{Key: "__time_nano__", Value: "1434055562000010000"},
-						{Key: "__type__", Value: "float"},
-						{Key: "__field__", Value: "value"},
-					},
-				},
-			},
-		},
-		{
-			enableFieldsExtend:     false,
-			enableSlsMetricsFormat: true,
-			data:                   txtWithDotNames,
-			wantErr:                false,
-			wantLogs: []*protocol.Log{
-				{
-					Contents: []*protocol.Log_Content{
-						{Key: "__name__", Value: "cpu_load"},
-						{Key: "__value__", Value: "1"},
-						{Key: "__labels__", Value: "host#$#server01|region#$#uswest"},
-						{Key: "__time_nano__", Value: "1434055562000000000"},
-					},
-				},
-				{
-					Contents: []*protocol.Log_Content{
-						{Key: "__name__", Value: "cpu_load"},
-						{Key: "__value__", Value: "3"},
-						{Key: "__labels__", Value: "host_dd#$#server02|region#$#uswest"},
-						{Key: "__time_nano__", Value: "1434055562000010000"},
-					},
-				},
-			},
-		},
-	}
-
-	for _, testCase := range cases {
-		decoder := &Decoder{FieldsExtend: testCase.enableFieldsExtend}
-		config.LoongcollectorGlobalConfig.EnableSlsMetricsFormat = testCase.enableSlsMetricsFormat
-		logs, err := decoder.Decode([]byte(txtWithDotNames), &http.Request{}, nil)
-		if testCase.wantErr {
-			assert.NotNil(t, err)
-			continue
+func TestMixedPointFields(t *testing.T) {
+	d := &Decoder{}
+	for _, tc := range []struct {
+		data   string
+		points int
+	}{{textFormat, 13}, {mySQLFormat, 3}} {
+		groups, err := d.Decode([]byte(tc.data), &http.Request{})
+		if assert.NoError(t, err) && assert.Len(t, groups, 1) {
+			assert.Len(t, groups[0].Events, tc.points)
 		}
-		assert.Nil(t, err)
-		assert.Len(t, logs, len(testCase.wantLogs))
-		assert.ElementsMatch(t, convertLog2Map(testCase.wantLogs), convertLog2Map(logs))
 	}
 }
 
-func convertLog2Map(logs []*protocol.Log) (mapLogs []map[string]string) {
-	for _, log := range logs {
-		m := map[string]string{}
-		for _, v := range log.Contents {
-			m[v.Key] = v.Value
-		}
-		mapLogs = append(mapLogs, m)
-	}
-	return mapLogs
-}
-
-func TestNormal(t *testing.T) {
+func TestDecode(t *testing.T) {
 	decoder := &Decoder{}
-	req := &http.Request{}
-	logs, err := decoder.Decode([]byte(textFormat), req, nil)
-	assert.Nil(t, err)
-	assert.Equal(t, len(logs), 15)
-	for _, log := range logs {
-		fmt.Printf("%s \n", log.String())
-	}
-}
-
-func TestMySQL(t *testing.T) {
-	decoder := &Decoder{}
-	req := &http.Request{}
-	logs, err := decoder.Decode([]byte(mySQLFormat), req, nil)
-	assert.Nil(t, err)
-	assert.Equal(t, len(logs), 38)
-	for _, log := range logs {
-		fmt.Printf("%s \n", log.String())
-	}
-}
-
-func TestDecodeV2(t *testing.T) {
-	decoder := &Decoder{}
-	groups, err := decoder.DecodeV2([]byte(txtWithDotNames), &http.Request{Form: map[string][]string{"db": {"mydb"}}})
+	groups, err := decoder.Decode([]byte(txtWithDotNames), &http.Request{Form: map[string][]string{"db": {"mydb"}}})
 	assert.Nil(t, err)
 	assert.Len(t, groups, 1) // should convert to one eventGroup
 
@@ -217,18 +110,46 @@ func TestDecodeV2(t *testing.T) {
 func TestDecodeExtendedFieldsIntoEvents(t *testing.T) {
 	decoder := &Decoder{FieldsExtend: true}
 	request := &http.Request{Form: map[string][]string{"db": {"mydb"}}}
-	groups, err := decoder.DecodeV2([]byte("weather,city=hz value=32"), request)
-	assert.NoError(t, err)
-	if !assert.Len(t, groups, 1) || !assert.Len(t, groups[0].Events, 1) {
-		return
+	data := []byte(`weather,region=west,city=hz value=32,days=3i,sunny=true,note="rain" 1434055562000000035`)
+	groups, err := decoder.Decode(data, request)
+	require.NoError(t, err)
+	require.Len(t, groups, 1)
+	require.Len(t, groups[0].Events, 4)
+
+	want := map[string]struct{ name, kind, value string }{
+		"value": {"weather", "float", "32"},
+		"days":  {"weather:days", "int", "3"},
+		"sunny": {"weather:sunny", "bool", "1"},
+		"note":  {"weather:note", "string", "rain"},
 	}
-	log, ok := groups[0].Events[0].(*models.Log)
-	if !assert.True(t, ok) {
-		return
+	for _, event := range groups[0].Events {
+		log := event.(*models.Log)
+		field := log.Contents.Get("__field__").(string)
+		expected, ok := want[field]
+		require.True(t, ok)
+		delete(want, field)
+		assert.Equal(t, expected.name, log.Contents.Get("__name__"))
+		assert.Equal(t, expected.value, log.Contents.Get("__value__"))
+		assert.Equal(t, expected.kind, log.Contents.Get("__type__"))
+		assert.Equal(t, "mydb", log.Contents.Get("__tag__:db"))
+		assert.Equal(t, "city#$#hz|region#$#west", log.Contents.Get("__labels__"))
+		assert.Equal(t, uint64(1434055562000000035), log.GetTimestamp())
+		assert.Equal(t, "1434055562000000035", log.Contents.Get("__time_nano__"))
+		var keys []string
+		for key := range models.LogContentEntries(log.Contents) {
+			keys = append(keys, key)
+		}
+		assert.Equal(t, []string{"__name__", "__time_nano__", "__labels__", "__value__", "__type__", "__field__", "__tag__:db"}, keys)
 	}
-	assert.Equal(t, "weather", log.Contents.Get("__name__"))
-	assert.Equal(t, "32", log.Contents.Get("__value__"))
-	assert.Equal(t, "float", log.Contents.Get("__type__"))
-	assert.Equal(t, "mydb", log.Contents.Get("__tag__:db"))
-	assert.Equal(t, "city#$#hz", log.Contents.Get("__labels__"))
+}
+
+func TestDecodeExtendedFieldsKeepsLegacyTimestamp(t *testing.T) {
+	decoder := &Decoder{FieldsExtend: true}
+	groups, err := decoder.Decode([]byte("weather value=32 1434055562035"), &http.Request{})
+	require.NoError(t, err)
+	require.Len(t, groups, 1)
+	require.Len(t, groups[0].Events, 1)
+	log := groups[0].Events[0].(*models.Log)
+	assert.Equal(t, uint64(1434055562035000000), log.GetTimestamp())
+	assert.Equal(t, "1434055562035000000", log.Contents.Get("__time_nano__"))
 }

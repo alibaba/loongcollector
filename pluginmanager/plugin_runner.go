@@ -16,7 +16,6 @@ package pluginmanager
 
 import (
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
 type pluginCategory string
@@ -30,28 +29,18 @@ const (
 	pluginExtension    pluginCategory = "Extension"
 )
 
-const (
-	ctxKeySource = "source"
-	ctxKeyTopic  = "topic"
-	ctxKeyTags   = "tags"
-)
-
 type PluginRunner interface {
 	Init(inputQueueSize int, aggrQueueSize int) error
 
 	AddDefaultFlusherIfEmpty() error
 
-	ReceiveRawLog(log *pipeline.LogWithContext)
-
-	ReceivePipelineEventGroup(group *protocol.PipelineEventGroup, context map[string]interface{})
+	receivePipelineEventGroup(wire []byte, packID string) error
 
 	AddPlugin(pluginMeta *pipeline.PluginMeta, category pluginCategory, plugin interface{}, config map[string]interface{}) error
 
 	GetExtension(name string) (pipeline.Extension, bool)
 
 	Run()
-
-	RunPlugins(category pluginCategory, control *pipeline.AsyncControl)
 
 	Merge(p PluginRunner)
 

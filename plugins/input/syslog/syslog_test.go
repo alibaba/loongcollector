@@ -15,8 +15,11 @@
 package inputsyslog
 
 import (
+	"github.com/alibaba/ilogtail/pkg/helper"
 	_ "github.com/alibaba/ilogtail/pkg/logger/test"
-	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/models"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
+	"github.com/alibaba/ilogtail/pkg/util"
 	"github.com/alibaba/ilogtail/pluginmanager"
 
 	"fmt"
@@ -24,7 +27,7 @@ import (
 	"net"
 	"os"
 	"strconv"
-	"sync"
+	"strings"
 	"testing"
 	"time"
 
@@ -61,10 +64,10 @@ func TestStartAndStop(t *testing.T) {
 	ctx.InitContext("test_project", "test_logstore", "test_configname")
 
 	syslog := newSyslog()
-	collector := &mockCollector{}
+	collector := helper.NewObservePipelineContext(1024)
 	_, _ = syslog.Init(ctx)
 	go func() {
-		err := syslog.Start(collector)
+		err := syslog.StartService(collector)
 		require.NoError(t, err)
 	}()
 	time.Sleep(time.Second)
@@ -120,47 +123,6 @@ func connect(t *testing.T, syslog *Syslog) net.Conn {
 	return conn
 }
 
-type mockLog struct {
-	tags    map[string]string
-	fields  map[string]string
-	t       time.Time
-	isValid bool
-}
-
-type mockCollector struct {
-	rawLogs []string
-	logs    []*mockLog
-	lock    sync.Mutex
-}
-
-func (c *mockCollector) AddData(
-	tags map[string]string, fields map[string]string, t ...time.Time) {
-	c.AddDataWithContext(tags, fields, nil, t...)
-}
-
-func (c *mockCollector) AddDataArray(
-	tags map[string]string, columns []string, values []string, t ...time.Time) {
-	c.AddDataArrayWithContext(tags, columns, values, nil, t...)
-}
-
-func (c *mockCollector) AddRawLog(log *protocol.Log) {
-	c.AddRawLogWithContext(log, nil)
-}
-
-func (c *mockCollector) AddDataWithContext(tags map[string]string, fields map[string]string, ctx map[string]interface{}, t ...time.Time) {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-	c.logs = append(c.logs, &mockLog{tags, fields, t[0], true})
-}
-
-func (c *mockCollector) AddDataArrayWithContext(
-	tags map[string]string, columns []string, values []string, ctx map[string]interface{}, t ...time.Time) {
-}
-
-func (c *mockCollector) AddRawLogWithContext(log *protocol.Log, ctx map[string]interface{}) {
-
-}
-
 func getLog(priority int, hostname string, program string, message string, t *time.Time) string {
 	if t == nil {
 		t = &time.Time{}
@@ -171,11 +133,12 @@ func getLog(priority int, hostname string, program string, message string, t *ti
 }
 
 //nolint:gosec
-func mockRun(t *testing.T, syslog *Syslog, collector *mockCollector) {
+func mockRun(t *testing.T, syslog *Syslog, collector pipeline.PipelineContext) {
 	rand.Seed(time.Now().UnixNano())
 
 	reconnectCount := 0
 	totalLogCount := 0
+	var rawLogs []string
 
 	conn := connect(t, syslog)
 	for i := 0; i < 10; i++ {
@@ -191,7 +154,7 @@ func mockRun(t *testing.T, syslog *Syslog, collector *mockCollector) {
 		batchLogs := ""
 		for logIdx := 0; logIdx < logCount; logIdx++ {
 			log := getLog(int(rand.Int31n(24)*8+rand.Int31n(8)), "hostname", "program", "message", nil)
-			collector.rawLogs = append(collector.rawLogs, log)
+			rawLogs = append(rawLogs, log)
 			batchLogs += log
 		}
 		n, err := conn.Write([]byte(batchLogs))
@@ -209,16 +172,21 @@ func mockRun(t *testing.T, syslog *Syslog, collector *mockCollector) {
 	require.True(t, dur/time.Microsecond < 3000, "dur: %v", dur)
 	assert.NoError(t, conn.Close())
 
-	require.Equal(t, len(collector.rawLogs), len(collector.logs))
-	for idx, rawLog := range collector.rawLogs {
-		slog := collector.logs[idx]
-		priority, _ := strconv.Atoi(slog.fields["_priority_"])
-		log := getLog(priority,
-			slog.fields["_hostname_"], slog.fields["_program_"], slog.fields["_content_"], &slog.t)
+	groups := collector.Collector().ToArray()
+	require.Len(t, groups, len(rawLogs))
+	for idx, rawLog := range rawLogs {
+		require.Len(t, groups[idx].Events, 1)
+		event := groups[idx].Events[0].(*models.Log)
+		fields := event.GetIndices()
+		priority, err := strconv.Atoi(pipeline.GetStringValue(fields.Get("_priority_")))
+		require.NoError(t, err)
+		timestamp := time.Unix(0, int64(event.GetTimestamp()))
+		log := getLog(priority, pipeline.GetStringValue(fields.Get("_hostname_")),
+			pipeline.GetStringValue(fields.Get("_program_")), pipeline.GetStringValue(fields.Get("_content_")), &timestamp)
 		if t.Name() != "TestMockUnixGram" {
-			require.Equal(t, "127.0.0.1", slog.fields["_client_ip_"])
+			require.Equal(t, "127.0.0.1", fields.Get("_client_ip_"))
 		}
-		require.Equal(t, rawLog, log, "log index: %v, slog: %v, raw log: %v", idx, slog, rawLog)
+		require.Equal(t, rawLog, log, "log index: %v", idx)
 	}
 
 	t.Logf("Total log count: %v, reconnect count: %v\n", totalLogCount, reconnectCount)
@@ -228,14 +196,14 @@ func mockRun(t *testing.T, syslog *Syslog, collector *mockCollector) {
 func TestMockTcpRun(t *testing.T) {
 	ctx := &pluginmanager.ContextImp{}
 	ctx.InitContext("test_project", "test_logstore", "test_configname")
-	collector := &mockCollector{}
+	collector := helper.NewObservePipelineContext(1024)
 
 	syslog := newSyslog()
 	syslog.ParseProtocol = "rfc3164"
 	syslog.Address = "tcp://127.0.0.1:0"
 	_, _ = syslog.Init(ctx)
 	go func() {
-		err := syslog.Start(collector)
+		err := syslog.StartService(collector)
 		require.NoError(t, err)
 	}()
 	time.Sleep(time.Duration(1) * time.Second)
@@ -246,14 +214,14 @@ func TestMockTcpRun(t *testing.T) {
 func TestMockUdpRun(t *testing.T) {
 	ctx := &pluginmanager.ContextImp{}
 	ctx.InitContext("test_project", "test_logstore", "test_configname")
-	collector := &mockCollector{}
+	collector := helper.NewObservePipelineContext(1024)
 
 	syslog := newSyslog()
 	syslog.ParseProtocol = "rfc3164"
 	syslog.Address = "udp://127.0.0.1:0"
 	_, _ = syslog.Init(ctx)
 	go func() {
-		err := syslog.Start(collector)
+		err := syslog.StartService(collector)
 		require.NoError(t, err)
 	}()
 	time.Sleep(time.Duration(1) * time.Second)
@@ -269,17 +237,95 @@ func TestMockUnixGram(t *testing.T) {
 	}
 	ctx := &pluginmanager.ContextImp{}
 	ctx.InitContext("test_project", "test_logstore", "test_configname")
-	collector := &mockCollector{}
+	collector := helper.NewObservePipelineContext(1024)
 
 	syslog := newSyslog()
 	syslog.ParseProtocol = "rfc3164"
 	syslog.Address = "unixgram://" + unixFilePath
 	_, _ = syslog.Init(ctx)
 	go func() {
-		err := syslog.Start(collector)
+		err := syslog.StartService(collector)
 		require.NoError(t, err)
 	}()
 	time.Sleep(time.Duration(1) * time.Second)
 
 	mockRun(t, syslog, collector)
+}
+
+func TestSyslogParseKeepsRawMessageFields(t *testing.T) {
+	syslog := newSyslog()
+	syslog.parser = syslogParsers[""](&parserConfig{})
+	collector := helper.NewObservePipelineContext(2).Collector()
+
+	input := []byte("first\nsecond\n")
+	syslog.parse(input, clientIPField("192.0.2.1:514"), collector)
+	// The receive buffer may be reused before the pipeline processes the messages.
+	clear(input)
+
+	groups := collector.ToArray()
+	require.Len(t, groups, 2)
+	for i, content := range []string{"first", "second"} {
+		require.Len(t, groups[i].Events, 1)
+		log := groups[i].Events[0].(*models.Log)
+		require.Equal(t, map[string]any{
+			"_program_":       "",
+			"_priority_":      "-1",
+			"_facility_":      "-1",
+			"_severity_":      "-1",
+			"_unixtimestamp_": strconv.FormatInt(int64(log.GetTimestamp()), 10),
+			"_hostname_":      util.GetHostName(),
+			"_client_ip_":     "192.0.2.1",
+			"_ip_":            util.GetIPAddress(),
+			"_content_":       content,
+		}, log.GetIndices().Iterator())
+	}
+
+	first := groups[0].Events[0].(*models.Log)
+	first.GetIndices().Iterator()["_content_"] = "changed"
+	first.GetTags().Add("event", "tag")
+	groups[0].Group.GetTags().Add("group", "tag")
+	groups[0].Group.GetMetadata().Add("group", "metadata")
+
+	second := groups[1].Events[0].(*models.Log)
+	require.Equal(t, "changed", first.GetIndices().Get("_content_"))
+	require.Equal(t, "tag", first.GetTags().Get("event"))
+	require.Equal(t, "tag", groups[0].Group.GetTags().Get("group"))
+	require.Equal(t, "metadata", groups[0].Group.GetMetadata().Get("group"))
+	require.Equal(t, "second", second.GetIndices().Get("_content_"))
+	require.Empty(t, second.GetTags().Iterator())
+	require.Empty(t, groups[1].Group.GetTags().Iterator())
+	require.Empty(t, groups[1].Group.GetMetadata().Iterator())
+}
+
+func TestSyslogTCPReadsLineAtMessageSizeLimit(t *testing.T) {
+	config := &pluginmanager.ContextImp{}
+	config.InitContext("test_project", "test_logstore", "test_configname")
+	ctx := helper.NewObservePipelineContext(2)
+	syslog := newSyslog()
+	_, err := syslog.Init(config)
+	require.NoError(t, err)
+	require.NoError(t, syslog.StartService(ctx))
+	t.Cleanup(func() { require.NoError(t, syslog.Stop()) })
+
+	conn := connect(t, syslog)
+	t.Cleanup(func() { require.NoError(t, conn.Close()) })
+	require.NoError(t, conn.SetWriteDeadline(time.Now().Add(5*time.Second)))
+	content := strings.Repeat("x", syslog.MaxMessageSize-len("\r\n"))
+	payload := content + "\r\nnext\n"
+	n, err := conn.Write([]byte(payload))
+	require.NoError(t, err)
+	require.Equal(t, len(payload), n)
+
+	timer := time.NewTimer(5 * time.Second)
+	defer timer.Stop()
+	for _, want := range []string{content, "next"} {
+		select {
+		case group := <-ctx.Collector().Observe():
+			require.Len(t, group.Events, 1)
+			log := group.Events[0].(*models.Log)
+			require.Equal(t, want, log.GetIndices().Get("_content_"))
+		case <-timer.C:
+			t.Fatal("timed out waiting for TCP message")
+		}
+	}
 }

@@ -127,7 +127,15 @@ func CollectGroupEvents(ctx PipelineContext, in *models.PipelineGroupEvents) {
 	if in == nil || len(in.Events) == 0 {
 		return
 	}
-	ctx.Collector().Collect(in.Group, in.Events...)
+	collector := ctx.Collector()
+	if single, ok := collector.(interface {
+		CollectGroup(*models.PipelineGroupEvents)
+	}); ok {
+		// The grouped processor collector needs only the group pointer.
+		single.CollectGroup(in)
+		return
+	}
+	collector.CollectList(in)
 }
 
 // GetStringValue converts a LogContents value to a string. A log body is

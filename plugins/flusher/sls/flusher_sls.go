@@ -18,23 +18,22 @@
 package sls
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/alibaba/ilogtail/pkg/helper"
+	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/logtail"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
 
-// SlsFlusher implements both the v1 (Flush) and v2 (Export) flusher interfaces
-// so it can be loaded by either Runner; it uses symbols in LogtailAdaptor(.so)
-// to push log groups into Logtail's sending queue.
-var (
-	_ pipeline.FlusherV1 = (*SlsFlusher)(nil)
-	_ pipeline.FlusherV2 = (*SlsFlusher)(nil)
-)
+var _ pipeline.Flusher = (*SlsFlusher)(nil)
+
+var errSLSGroupTooLarge = errors.New("SLS log group exceeds size limit")
 
 // SlsFlusher uses symbols in LogtailAdaptor(.so) to flush log groups to Logtail.
 type SlsFlusher struct { // nolint:revive
@@ -42,23 +41,13 @@ type SlsFlusher struct { // nolint:revive
 	KeepShardHash   bool
 
 	context pipeline.Context
-	// sendPb / sendPbV2 abstract the cgo calls into Logtail so the send path can
-	// be exercised in unit tests without a live Logtail adaptor. They default to
-	// the real logtail symbols in Init.
-	sendPb                 func(configName, logstore string, pbBuffer []byte, lines int) int
-	sendPbV2               func(configName, logstore string, pbBuffer []byte, lines int, hash string) int
+	// sendPipelineEventGroup wraps the C++ bridge for testing. It borrows the buffer until return.
 	sendPipelineEventGroup func(configName, logstore string, pbBuffer []byte, eventCount int, hash string) int
 }
 
 // Init ...
 func (p *SlsFlusher) Init(context pipeline.Context) error {
 	p.context = context
-	if p.sendPb == nil {
-		p.sendPb = logtail.SendPb
-	}
-	if p.sendPbV2 == nil {
-		p.sendPbV2 = logtail.SendPbV2
-	}
 	if p.sendPipelineEventGroup == nil {
 		p.sendPipelineEventGroup = logtail.SendPipelineEventGroup
 	}
@@ -75,20 +64,6 @@ func (p *SlsFlusher) Description() string {
 // to make sure if there is any space for coming data.
 func (p *SlsFlusher) IsReady(projectName string, logstoreName string, logstoreKey int64) bool {
 	return logtail.IsValidToSend(logstoreKey)
-}
-
-// Flush ...
-// Because IsReady is called before, Logtail must have space in sending queue,
-// just call LogtailSendPb through cgo to push data into queue, Logtail will
-// send data to its destination (SLS mostly) according to its config.
-func (p *SlsFlusher) Flush(projectName string, logstoreName string, configName string, logGroupList []*protocol.LogGroup) error {
-	for _, logGroup := range logGroupList {
-		if err := p.sendLogGroup(configName, logGroup); err != nil {
-			return err
-		}
-	}
-
-	return nil
 }
 
 // Export sends typed PipelineEventGroups to C++. Log tags are group-level
@@ -122,34 +97,60 @@ func (p *SlsFlusher) exportPipelineGroup(group *models.PipelineGroupEvents) erro
 }
 
 func (p *SlsFlusher) sendPipelineEvents(group *models.GroupInfo, events []models.PipelineEvent) error {
+	err := p.sendPipelineBatch(group, events)
+	if err != errSLSGroupTooLarge {
+		return err
+	}
+	if len(events) == 1 {
+		// One event and its group tags cannot be divided without changing the data.
+		// Discard that event and continue sending the remaining events.
+		logger.Warning(p.context.GetRuntimeContext(), selfmonitor.FlushDataAlarm,
+			"discard single event exceeding SLS log group size limit", "event type", events[0].GetType())
+		return nil
+	}
+
+	// Only retry explicit size rejections, before C++ enqueues any data.
+	// Keep the normal path to a single call and preserve the original order.
+	middle := len(events) / 2
+	if err := p.sendPipelineEvents(group, events[:middle]); err != nil {
+		return err
+	}
+	return p.sendPipelineEvents(group, events[middle:])
+}
+
+func (p *SlsFlusher) sendPipelineBatch(group *models.GroupInfo, events []models.PipelineEvent) error {
 	pb := &protocol.PipelineEventGroup{
 		Tags: make(map[string][]byte), Metadata: make(map[string][]byte),
 	}
 	for k, v := range group.GetTags().Iterator() {
-		pb.Tags[k] = []byte(v)
+		pb.Tags[k] = util.ZeroCopyStringToBytes(v)
 	}
 	for k, v := range group.GetMetadata().Iterator() {
-		pb.Metadata[k] = []byte(v)
+		pb.Metadata[k] = util.ZeroCopyStringToBytes(v)
+	}
+	var shardHash string
+	if p.EnableShardHash {
+		shardHash = group.GetTags().Get(util.ShardHashTagKey)
+		if !p.KeepShardHash {
+			delete(pb.Tags, util.ShardHashTagKey)
+		}
 	}
 	// Check conversion errors explicitly: the generic group helper ignores
 	// event conversion failures, which would turn malformed data into data loss.
+	eventCount := len(events)
 	switch events[0].GetType() {
 	case models.EventTypeLogging:
-		logs := &protocol.PipelineEventGroup_LogEvents{}
-		for _, event := range events {
-			log, ok := event.(*models.Log)
-			if !ok || log == nil {
-				return fmt.Errorf("invalid log event %T", event)
-			}
-			converted, err := helper.TransferLogEventToPB(log)
-			if err != nil {
-				return fmt.Errorf("convert log event: %w", err)
-			}
-			logs.Events = append(logs.Events, converted)
+		buffer := acquireLogWireBuffer()
+		defer releaseLogWireBuffer(buffer)
+		buf, count, err := buffer.marshalLogGroup(pb, events)
+		if err != nil || count == 0 {
+			return err
 		}
-		pb.PipelineEvents = &protocol.PipelineEventGroup_Logs{Logs: logs}
+		return p.sendEventGroupBytes(group, buf, count, shardHash)
 	case models.EventTypeMetric:
-		metrics := &protocol.PipelineEventGroup_MetricEvents{}
+		metrics := &protocol.PipelineEventGroup_MetricEvents{
+			Events: make([]*protocol.MetricEvent, 0, len(events)),
+		}
 		for _, event := range events {
 			metric, ok := event.(*models.Metric)
 			if !ok || metric == nil {
@@ -163,7 +164,9 @@ func (p *SlsFlusher) sendPipelineEvents(group *models.GroupInfo, events []models
 		}
 		pb.PipelineEvents = &protocol.PipelineEventGroup_Metrics{Metrics: metrics}
 	case models.EventTypeSpan:
-		spans := &protocol.PipelineEventGroup_SpanEvents{}
+		spans := &protocol.PipelineEventGroup_SpanEvents{
+			Events: make([]*protocol.SpanEvent, 0, len(events)),
+		}
 		for _, event := range events {
 			span, ok := event.(*models.Span)
 			if !ok || span == nil {
@@ -179,55 +182,24 @@ func (p *SlsFlusher) sendPipelineEvents(group *models.GroupInfo, events []models
 	default:
 		return fmt.Errorf("unsupported pipeline event type %v", events[0].GetType())
 	}
-	var shardHash string
-	if p.EnableShardHash {
-		shardHash = string(pb.Tags[util.ShardHashTagKey])
-		if !p.KeepShardHash {
-			delete(pb.Tags, util.ShardHashTagKey)
-		}
-	}
 	buf, err := pb.Marshal()
 	if err != nil {
 		return fmt.Errorf("marshal pipeline event group: %w", err)
 	}
-	if result := p.sendPipelineEventGroup(p.context.GetConfigName(), p.context.GetLogstore(), buf, len(events), shardHash); result < 0 {
-		return fmt.Errorf("send pipeline event group: error %d", result)
-	}
-	return nil
+	return p.sendEventGroupBytes(group, buf, eventCount, shardHash)
 }
 
-// sendLogGroup marshals a single LogGroup and pushes it into Logtail's sending
-// queue via the legacy v1 SendPb/SendPbV2 ABI.
-func (p *SlsFlusher) sendLogGroup(configName string, logGroup *protocol.LogGroup) error {
-	if len(logGroup.Logs) == 0 {
-		return nil
+func (p *SlsFlusher) sendEventGroupBytes(group *models.GroupInfo, buf []byte, eventCount int, shardHash string) error {
+	logstore := group.GetDestinationLogstore()
+	if logstore == "" {
+		logstore = p.context.GetLogstore()
 	}
-
-	var shardHash string
-	if p.EnableShardHash {
-		for idx, tag := range logGroup.LogTags {
-			if tag.Key == util.ShardHashTagKey {
-				shardHash = tag.Value
-				if !p.KeepShardHash {
-					logGroup.LogTags = append(logGroup.LogTags[0:idx], logGroup.LogTags[idx+1:]...)
-				}
-				break
-			}
-		}
+	result := p.sendPipelineEventGroup(p.context.GetConfigName(), logstore, buf, eventCount, shardHash)
+	if result == logtail.SendPipelineEventGroupTooLarge {
+		return errSLSGroupTooLarge
 	}
-	buf, err := logGroup.Marshal()
-	if err != nil {
-		return fmt.Errorf("loggroup marshal err %v", err)
-	}
-
-	var rst int
-	if !p.EnableShardHash {
-		rst = p.sendPb(configName, logGroup.Category, buf, len(logGroup.Logs))
-	} else {
-		rst = p.sendPbV2(configName, logGroup.Category, buf, len(logGroup.Logs), shardHash)
-	}
-	if rst < 0 {
-		return fmt.Errorf("send error %d", rst)
+	if result < 0 {
+		return fmt.Errorf("send pipeline event group: error %d", result)
 	}
 	return nil
 }

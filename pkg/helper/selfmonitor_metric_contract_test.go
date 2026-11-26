@@ -21,6 +21,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/alibaba/ilogtail/pkg/helper/telemetrytest"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
@@ -74,7 +75,7 @@ func TestTransferMetricsToPipelineEventGroup_AllFields(t *testing.T) {
 	}
 	ts := time.Unix(1700000000, 0)
 
-	group := TransferMetricsToPipelineEventGroup(records, ts)
+	group := telemetrytest.TransferMetricsToPipelineEventGroup(records, ts)
 	require.NotNil(t, group)
 	require.NotNil(t, group.GetMetrics())
 	require.Len(t, group.GetMetrics().Events, 1)
@@ -118,7 +119,7 @@ func TestTransferMetricsToPipelineEventGroup_EmptyCountersAndGauges(t *testing.T
 	}
 	ts := time.Unix(1700000000, 0)
 
-	group := TransferMetricsToPipelineEventGroup(records, ts)
+	group := telemetrytest.TransferMetricsToPipelineEventGroup(records, ts)
 	require.NotNil(t, group.GetMetrics())
 	require.Len(t, group.GetMetrics().Events, 1)
 
@@ -158,8 +159,8 @@ func TestTransferPipelineEventGroupToMetrics_RoundTrip(t *testing.T) {
 	}
 	ts := time.Unix(1700000000, 0)
 
-	group := TransferMetricsToPipelineEventGroup(original, ts)
-	restored := TransferPipelineEventGroupToMetrics(group)
+	group := telemetrytest.TransferMetricsToPipelineEventGroup(original, ts)
+	restored := telemetrytest.TransferPipelineEventGroupToMetrics(group)
 	require.Len(t, restored, 2)
 
 	assert.Equal(t, original[0].Category, restored[0].Category)
@@ -176,7 +177,7 @@ func TestTransferPipelineEventGroupToMetrics_RoundTrip(t *testing.T) {
 // TestTransferPipelineEventGroupToMetrics_NilMetrics verifies nil metrics returns nil.
 func TestTransferPipelineEventGroupToMetrics_NilMetrics(t *testing.T) {
 	group := &protocol.PipelineEventGroup{}
-	result := TransferPipelineEventGroupToMetrics(group)
+	result := telemetrytest.TransferPipelineEventGroupToMetrics(group)
 	assert.Nil(t, result)
 }
 
@@ -190,7 +191,7 @@ func TestTransferMetricsToPipelineEventGroup_Multiple(t *testing.T) {
 	}
 	ts := time.Unix(1700000000, 0)
 
-	group := TransferMetricsToPipelineEventGroup(records, ts)
+	group := telemetrytest.TransferMetricsToPipelineEventGroup(records, ts)
 	require.Len(t, group.GetMetrics().Events, 3)
 
 	assert.Equal(t, "plugin", string(group.GetMetrics().Events[0].Name))
@@ -210,14 +211,14 @@ func TestTransferRawMetricsToPipelineEventGroup(t *testing.T) {
 	}
 	ts := time.Unix(1700000000, 0)
 
-	group := TransferRawMetricsToPipelineEventGroup(rawMetrics, ts)
+	group := telemetrytest.TransferRawMetricsToPipelineEventGroup(rawMetrics, ts)
 	require.NotNil(t, group.GetMetrics())
 	require.Len(t, group.GetMetrics().Events, 1)
 
 	event := group.GetMetrics().Events[0]
 	assert.Equal(t, "plugin", string(event.Name))
 	assert.Equal(t, "flusher_stdout", string(event.Tags["plugin_type"]))
-	_, hasCategoryTag := event.Tags[MetricFieldCategory]
+	_, hasCategoryTag := event.Tags["metric_category"]
 	assert.False(t, hasCategoryTag, "metric_category should be extracted to Name, not kept in Tags")
 
 	multiValues := event.GetUntypedMultiDoubleValues()
@@ -247,8 +248,8 @@ func TestMetricCounterSerialization(t *testing.T) {
 	}
 	ts := time.Unix(1700000000, 0)
 
-	group := TransferMetricsToPipelineEventGroup(records, ts)
-	restored := TransferPipelineEventGroupToMetrics(group)
+	group := telemetrytest.TransferMetricsToPipelineEventGroup(records, ts)
+	restored := telemetrytest.TransferPipelineEventGroupToMetrics(group)
 	require.Len(t, restored, 1)
 	assert.Equal(t, uint64(999999), restored[0].Counters["in_events_total"])
 }
@@ -266,26 +267,14 @@ func TestMetricGaugeSerialization(t *testing.T) {
 	}
 	ts := time.Unix(1700000000, 0)
 
-	group := TransferMetricsToPipelineEventGroup(records, ts)
-	restored := TransferPipelineEventGroupToMetrics(group)
+	group := telemetrytest.TransferMetricsToPipelineEventGroup(records, ts)
+	restored := telemetrytest.TransferPipelineEventGroupToMetrics(group)
 	require.Len(t, restored, 1)
 	assert.InDelta(t, 256.75, restored[0].Gauges["go_memory_used_mb"], 0.001)
 }
 
 // TestFormatCounterValue verifies counter formatting matches ExportMetricRecords.
-func TestFormatCounterValue(t *testing.T) {
-	assert.Equal(t, "0", FormatCounterValue(0))
-	assert.Equal(t, "42", FormatCounterValue(42))
-	assert.Equal(t, "18446744073709551615", FormatCounterValue(^uint64(0)))
-}
-
 // TestFormatGaugeValue verifies gauge formatting matches ExportMetricRecords.
-func TestFormatGaugeValue(t *testing.T) {
-	assert.Equal(t, "0", FormatGaugeValue(0))
-	assert.Equal(t, "1024.5", FormatGaugeValue(1024.5))
-	assert.Equal(t, "1e+06", FormatGaugeValue(1e6))
-}
-
 // TestParseMetricExportRecord_RoundTrip verifies parse from raw map matches structured record.
 func TestParseMetricExportRecord_RoundTrip(t *testing.T) {
 	raw := map[string]string{
@@ -319,4 +308,17 @@ func TestParseMetricExportRecord_EmptyFields(t *testing.T) {
 	assert.Empty(t, record.Labels)
 	assert.Empty(t, record.Counters)
 	assert.Empty(t, record.Gauges)
+}
+
+// MetricContractCategories returns the known metric categories, aligned with
+// C++ MetricCategory constants (core/monitor/metric_models/MetricRecord.h).
+func MetricContractCategories() []string {
+	return []string{
+		"agent",
+		"runner",
+		"pipeline",
+		"component",
+		"plugin",
+		"plugin_source",
+	}
 }

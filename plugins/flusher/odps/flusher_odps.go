@@ -31,7 +31,7 @@ import (
 
 const extraLevelDefault = 1
 
-var _ pipeline.FlusherV2 = (*FlusherOdps)(nil)
+var _ pipeline.Flusher = (*FlusherOdps)(nil)
 
 type FlusherOdps struct {
 	AccessKeyID     string
@@ -108,16 +108,14 @@ func (o *FlusherOdps) Description() string {
 
 func (o *FlusherOdps) Export(groups []*models.PipelineGroupEvents, _ pipeline.PipelineContext) error {
 	for _, groupEvents := range groups {
-		logGroups, err := converter.PipelineGroupEventsToLogGroups(groupEvents)
+		rows, err := converter.EncodeEventRecords(groupEvents)
 		if err != nil {
-			return fmt.Errorf("convert pipeline group events to ODPS logs: %w", err)
+			return fmt.Errorf("convert events to ODPS records: %w", err)
 		}
-		for _, logGroup := range logGroups {
-			for _, log := range logGroup.Logs {
-				if err := o.sender.Send(logGroup, log); err != nil {
-					logger.Errorf(o.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "Flush odps(%s/%s/%s) failed, error:%v", o.ProjectName, o.SchemaName, o.TableName, err)
-					return err
-				}
+		for _, row := range rows {
+			if err := o.sender.Send(row); err != nil {
+				logger.Errorf(o.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "Flush odps(%s/%s/%s) failed, error:%v", o.ProjectName, o.SchemaName, o.TableName, err)
+				return err
 			}
 		}
 	}

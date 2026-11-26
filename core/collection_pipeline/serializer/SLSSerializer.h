@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -23,6 +24,34 @@
 #include "protobuf/sls/LogGroupSerializer.h"
 
 namespace logtail {
+
+namespace models {
+class PipelineEventGroup;
+}
+
+// A Go log batch validated against the PEG log wire layout. The views
+// are borrowed only for the duration of the synchronous native callback.
+struct SLSLogGroupWireView {
+    struct Log {
+        uint64_t mTimestamp;
+        StringView mContents;
+    };
+
+    static std::optional<SLSLogGroupWireView> Parse(StringView wire, size_t eventCountHint);
+
+    StringView mHeader;
+    std::vector<Log> mLogs;
+    size_t mEventCount = 0;
+    size_t mLogInputSize = 0;
+};
+
+struct SLSLogGroupOptions {
+    StringView mPackIdPrefix;
+    StringView mProject;
+    StringView mLogstore;
+    bool mCanSplit = false;
+    bool mExceedsSizeLimit = false;
+};
 
 struct MetricEventContentCacheItem {
     std::vector<std::string> mMetricEventContentCache;
@@ -32,9 +61,26 @@ struct MetricEventContentCacheItem {
 class SLSEventGroupSerializer : public Serializer<BatchedEvents> {
 public:
     SLSEventGroupSerializer(Flusher* f) : Serializer<BatchedEvents>(f) {}
+    bool DoSerializePBLogs(const models::PipelineEventGroup& group,
+                           const GroupTags& tags,
+                           size_t originalTagSize,
+                           std::string& res,
+                           std::string& errorMsg,
+                           SLSLogGroupOptions* options = nullptr);
+
+    bool DoSerializePBLogWire(const SLSLogGroupWireView& group,
+                              const GroupTags& tags,
+                              size_t originalTagSize,
+                              std::string& res,
+                              std::string& errorMsg,
+                              SLSLogGroupOptions* options = nullptr);
+
+    bool
+    DoSerializeEventGroup(BatchedEvents& group, std::string& res, std::string& errorMsg, SLSLogGroupOptions& options);
 
 private:
     bool Serialize(BatchedEvents&& p, std::string& res, std::string& errorMsg) override;
+    bool SerializeGroup(BatchedEvents& group, std::string& res, std::string& errorMsg, SLSLogGroupOptions* options);
 
     void CalculateLogEventSize(const BatchedEvents& group,
                                size_t& logGroupSZ,

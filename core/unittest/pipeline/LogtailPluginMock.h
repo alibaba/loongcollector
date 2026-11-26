@@ -87,15 +87,15 @@ public:
         }
         sProcessPipelineEventGroupCount.fetch_add(1);
         sLastPipelineEventGroup = pipelineEventGroup;
-        LogtailPlugin::SendPbV2(configName.c_str(),
-                                configName.size(),
-                                "",
-                                0,
-                                const_cast<char*>(pipelineEventGroup.c_str()),
-                                pipelineEventGroup.size(),
-                                0,
-                                "",
-                                0);
+        LogtailPlugin::SendPipelineEventGroup(configName.c_str(),
+                                              configName.size(),
+                                              "",
+                                              0,
+                                              const_cast<char*>(pipelineEventGroup.c_str()),
+                                              pipelineEventGroup.size(),
+                                              0,
+                                              "",
+                                              0);
         LOG_INFO(sLogger,
                  ("LogtailPluginMock process pipeline event group",
                   "success")("config", configName)("pipelineEventGroup", pipelineEventGroup)("packId", packId));

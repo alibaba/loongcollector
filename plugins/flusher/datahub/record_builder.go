@@ -22,7 +22,6 @@ import (
 
 	"github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 
 	"github.com/shopspring/decimal"
 
@@ -49,7 +48,7 @@ const (
 
 type RecordBuilder interface {
 	Init() error
-	Log2Record(logGroup *protocol.LogGroup, log *protocol.Log) (datahub.IRecord, error)
+	Build(fields map[string]string) (datahub.IRecord, error)
 }
 
 func NewRecordBuilder(projectName string, topicName string, extraLevel int, client datahub.DataHubApi, ctx pipeline.Context) RecordBuilder {
@@ -108,7 +107,7 @@ func (rb *RecordBuilderImpl) freshRecordSchema() error {
 	return rb.doFreshRecordSchema()
 }
 
-func (rb *RecordBuilderImpl) Log2Record(logGroup *protocol.LogGroup, log *protocol.Log) (datahub.IRecord, error) {
+func (rb *RecordBuilderImpl) Build(fields map[string]string) (datahub.IRecord, error) {
 	if err := rb.freshRecordSchema(); err != nil {
 		return nil, err
 	}
@@ -116,9 +115,9 @@ func (rb *RecordBuilderImpl) Log2Record(logGroup *protocol.LogGroup, log *protoc
 	var record datahub.IRecord
 	var err error
 	if rb.schema == nil {
-		record, err = rb.log2BlobRecord(log)
+		record, err = rb.log2BlobRecord(fields)
 	} else {
-		record, err = rb.log2TupleRecord(log)
+		record, err = rb.log2TupleRecord(fields)
 	}
 
 	if err != nil {
@@ -128,45 +127,41 @@ func (rb *RecordBuilderImpl) Log2Record(logGroup *protocol.LogGroup, log *protoc
 	return record, nil
 }
 
-func (rb *RecordBuilderImpl) log2TupleRecord(log *protocol.Log) (datahub.IRecord, error) {
+func (rb *RecordBuilderImpl) log2TupleRecord(fields map[string]string) (datahub.IRecord, error) {
 	record := datahub.NewTupleRecord(rb.schema, 0)
-	for _, c := range log.Contents {
-		filed, err := rb.schema.GetFieldByName(c.Key)
+	for key, value := range fields {
+		filed, err := rb.schema.GetFieldByName(key)
 		if err != nil {
 			return nil, err
 		}
 
-		if c.Value == "" {
+		if value == "" {
 			if !filed.AllowNull {
-				return nil, fmt.Errorf("field %s is not nullable", c.Key)
+				return nil, fmt.Errorf("field %s is not nullable", key)
 			}
 			continue
 		}
 
-		val, err := validateFieldValue(filed.Type, c.Value)
+		val, err := validateFieldValue(filed.Type, value)
 		if err != nil {
 			return nil, err
 		}
-		record.SetValueByName(c.Key, val)
+		record.SetValueByName(key, val)
 	}
 	return record, nil
 }
 
-func (rb *RecordBuilderImpl) log2BlobRecord(log *protocol.Log) (datahub.IRecord, error) {
-	if len(log.Contents) == 0 {
+func (rb *RecordBuilderImpl) log2BlobRecord(fields map[string]string) (datahub.IRecord, error) {
+	if len(fields) == 0 {
 		return nil, fmt.Errorf("log is empty")
 	}
-
-	if len(log.Contents) == 1 && log.Contents[0].Key == blobContentColumn {
-		return datahub.NewBlobRecord([]byte(log.Contents[0].Value), 0), nil
+	if value, ok := fields[blobContentColumn]; len(fields) == 1 && ok {
+		return datahub.NewBlobRecord([]byte(value), 0), nil
 	}
-
-	m := make(map[string]string)
-	for _, c := range log.Contents {
-		m[c.Key] = c.Value
+	buf, err := json.Marshal(fields)
+	if err != nil {
+		return nil, fmt.Errorf("marshal DataHub record: %w", err)
 	}
-
-	buf, _ := json.Marshal(m)
 	record := datahub.NewBlobRecord(buf, 0)
 	return record, nil
 }

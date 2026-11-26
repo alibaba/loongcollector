@@ -18,15 +18,13 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-
-	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
 func TestStrMetricV2_Name(t *testing.T) {
 	type fields struct {
 		name   string
 		value  string
-		labels []*protocol.Log_Content
+		labels []LabelPair
 	}
 	tests := []struct {
 		name   string
@@ -46,7 +44,7 @@ func TestStrMetricV2_Name(t *testing.T) {
 			fields: fields{
 				name:  "field",
 				value: "v",
-				labels: []*protocol.Log_Content{
+				labels: []LabelPair{
 					{
 						Key:   "key",
 						Value: "value",

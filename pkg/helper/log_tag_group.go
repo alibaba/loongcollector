@@ -43,7 +43,7 @@ func ForEachLogTagGroup(group *models.PipelineGroupEvents, visit func(*models.Pi
 			merged := models.NewTags()
 			merged.AddAll(tags)
 			merged.AddAll(info.GetTags().Iterator())
-			info = models.NewGroup(info.GetMetadata(), merged)
+			info = &models.GroupInfo{Metadata: info.GetMetadata(), Tags: merged, DestinationLogstore: info.GetDestinationLogstore()}
 		}
 		if err := visit(&models.PipelineGroupEvents{Group: info, Events: group.Events[start:end]}); err != nil {
 			return err
@@ -54,7 +54,7 @@ func ForEachLogTagGroup(group *models.PipelineGroupEvents, visit func(*models.Pi
 }
 
 func logEventTags(event models.PipelineEvent) models.Tags {
-	if log, ok := event.(*models.Log); ok && log != nil && log.Tags != nil {
+	if log, ok := event.(*models.Log); ok && log != nil && log.Tags != nil && log.Tags.Len() > 0 {
 		return log.Tags
 	}
 	return models.NilStringValues

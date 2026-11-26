@@ -21,6 +21,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/alibaba/ilogtail/pkg/models"
+
 	"github.com/prometheus/procfs"
 	"github.com/shirou/gopsutil/cpu"
 	"github.com/shirou/gopsutil/disk"
@@ -105,11 +107,11 @@ func (r *InputSystem) CommonInit(context pipeline.Context) (int, error) {
 	return 0, nil
 }
 
-func (r *InputSystem) addMetric(collector pipeline.Collector, name string, labels *helper.MetricLabels, value float64) {
-	collector.AddRawLog(helper.NewMetricLog(name, r.collectTime.UnixNano(), value, labels))
+func (r *InputSystem) addMetric(collector pipeline.PipelineCollector, name string, labels *helper.MetricLabels, value float64) {
+	collector.Collect(models.NewGroup(models.NewMetadata(), models.NewTags()), helper.NewInputMetric(name, r.collectTime.UnixNano(), value, labels))
 }
 
-func (r *InputSystem) CollectCore(collector pipeline.Collector) {
+func (r *InputSystem) CollectCore(collector pipeline.PipelineCollector) {
 
 	// host info
 	if r.lastInfo == nil {
@@ -126,7 +128,7 @@ func (r *InputSystem) CollectCore(collector pipeline.Collector) {
 	r.addMetric(collector, "system_boot_time", &r.commonLabels, float64(r.lastInfo.BootTime))
 }
 
-func (r *InputSystem) CollectCPU(collector pipeline.Collector) {
+func (r *InputSystem) CollectCPU(collector pipeline.PipelineCollector) {
 	// cpu stat
 	cpuStat, err := cpu.Times(false)
 	cpuInfo, _ := cpu.Info()
@@ -176,7 +178,7 @@ func (r *InputSystem) CollectCPU(collector pipeline.Collector) {
 	}
 }
 
-func (r *InputSystem) CollectMem(collector pipeline.Collector) {
+func (r *InputSystem) CollectMem(collector pipeline.PipelineCollector) {
 	// mem stat
 	memStat, err := mem.VirtualMemory()
 	if err == nil {
@@ -194,7 +196,7 @@ func (r *InputSystem) CollectMem(collector pipeline.Collector) {
 	}
 }
 
-func (r *InputSystem) collectOneDisk(collector pipeline.Collector, name string, timeDeltaSec float64, last, now *disk.IOCountersStat) {
+func (r *InputSystem) collectOneDisk(collector pipeline.PipelineCollector, name string, timeDeltaSec float64, last, now *disk.IOCountersStat) {
 	labels := r.commonLabels.Clone()
 	labels.Append("disk", name)
 	r.addMetric(collector, "disk_rbps", labels, float64(now.ReadBytes-last.ReadBytes)/timeDeltaSec)
@@ -216,7 +218,7 @@ func (r *InputSystem) collectOneDisk(collector pipeline.Collector, name string, 
 	}
 }
 
-func (r *InputSystem) CollectDisk(collector pipeline.Collector) {
+func (r *InputSystem) CollectDisk(collector pipeline.PipelineCollector) {
 	r.CollectDiskUsage(collector)
 
 	// disk stat
@@ -262,7 +264,7 @@ func (r *InputSystem) CollectDisk(collector pipeline.Collector) {
 	}
 }
 
-func (r *InputSystem) collectOneNet(collector pipeline.Collector, name string, timeDeltaSec float64, last, now *net.IOCountersStat) {
+func (r *InputSystem) collectOneNet(collector pipeline.PipelineCollector, name string, timeDeltaSec float64, last, now *net.IOCountersStat) {
 	labels := r.commonLabels.Clone()
 	labels.Append("interface", name)
 	r.addMetric(collector, "net_in", labels, float64(now.BytesRecv-last.BytesRecv)/timeDeltaSec)
@@ -288,7 +290,7 @@ func (r *InputSystem) collectOneNet(collector pipeline.Collector, name string, t
 	}
 }
 
-func (r *InputSystem) CollectNet(collector pipeline.Collector) {
+func (r *InputSystem) CollectNet(collector pipeline.PipelineCollector) {
 	netIoStatAll, err := net.IOCounters(true)
 	if err == nil && len(netIoStatAll) > 0 {
 		nowTime := time.Now()
@@ -336,7 +338,7 @@ func (r *InputSystem) CollectNet(collector pipeline.Collector) {
 	}
 }
 
-func (r *InputSystem) CollectProtocol(collector pipeline.Collector) {
+func (r *InputSystem) CollectProtocol(collector pipeline.PipelineCollector) {
 	protoCounterStats, err := net.ProtoCounters([]string{})
 	if err == nil && len(protoCounterStats) > 0 {
 
@@ -373,7 +375,8 @@ func (r *InputSystem) CollectProtocol(collector pipeline.Collector) {
 	}
 }
 
-func (r *InputSystem) Collect(collector pipeline.Collector) error {
+func (r *InputSystem) Read(ctx pipeline.PipelineContext) error {
+	collector := ctx.Collector()
 	r.collectTime = time.Now()
 	r.CollectCore(collector)
 	if r.CPU {

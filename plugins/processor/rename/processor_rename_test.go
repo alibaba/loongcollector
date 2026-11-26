@@ -18,7 +18,6 @@ import (
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
 
 	"strings"
@@ -67,32 +66,6 @@ func newProcessor() (*ProcessorRename, error) {
 	return processor, err
 }
 
-func TestSourceKey(t *testing.T) {
-	processor, err := newProcessor()
-	require.NoError(t, err)
-
-	log := &protocol.Log{Time: 0}
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "same_key", Value: "test_value"})
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "a", Value: "test_value"})
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "b", Value: "test_value"})
-	processor.processLog(log)
-	assert.Equal(t, "same_key", log.Contents[0].Key)
-	assert.Equal(t, "c", log.Contents[1].Key)
-	assert.Equal(t, "d", log.Contents[2].Key)
-}
-
-func TestNoKeyError(t *testing.T) {
-	processor, err := newProcessor()
-	require.NoError(t, err)
-	log := &protocol.Log{Time: 0}
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "a", Value: "test_value"})
-	processor.processLog(log)
-	assert.Equal(t, "c", log.Contents[0].Key)
-	memoryLog, ok := logger.ReadMemoryLog(1)
-	assert.True(t, ok)
-	assert.True(t, strings.Contains(memoryLog, "RENAME_FIND_ALARM\tcannot find key [b]"), "got: %s", memoryLog)
-}
-
 func TestProcessLogEvent(t *testing.T) {
 	processor, err := newProcessor()
 	require.NoError(t, err)
@@ -133,7 +106,7 @@ func TestProcessMetricEvent(t *testing.T) {
 	assert.Equal(t, "test_value", tags.Get("d"))
 }
 
-func TestNoKeyErrorV2(t *testing.T) {
+func TestNoKeyError(t *testing.T) {
 	processor, err := newProcessor()
 	require.NoError(t, err)
 	// construct test log

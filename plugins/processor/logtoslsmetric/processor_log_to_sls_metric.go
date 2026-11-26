@@ -20,13 +20,11 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"time"
 	"unicode"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	converter "github.com/alibaba/ilogtail/pkg/protocol/converter"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
@@ -171,172 +169,6 @@ func (p *ProcessorLogToSlsMetric) Description() string {
 	return "Parse fields from logs into metrics."
 }
 
-func (p *ProcessorLogToSlsMetric) ProcessLogs(logArray []*protocol.Log) []*protocol.Log {
-	var metricLogs []*protocol.Log
-TraverseLogArray:
-	for _, log := range logArray {
-		names := map[string]string{}
-		values := map[string]string{}
-		// __time_nano__ field
-		var timeNano string
-		// __labels__ field
-		metricLabels := converter.MetricLabels{}
-		labelExisted := map[string]bool{}
-		for i, cont := range log.Contents {
-			if log.Contents[i] == nil {
-				continue
-			}
-
-			// __labels__
-			if cont.Key == metricLabelsKey {
-				labels := strings.Split(cont.Value, converter.LabelSeparator)
-				for _, label := range labels {
-					keyValues := strings.Split(label, converter.KeyValueSeparator)
-					if len(keyValues) != 2 {
-						p.logError(errInvalidMetricLabelValue)
-						continue TraverseLogArray
-					}
-					key := keyValues[0]
-					if p.metricLabelKeysMap[key] {
-						p.logError(errFieldRepeated)
-						continue TraverseLogArray
-					}
-					// The Key of Label must follow the regular expression: ^[a-zA-Z_][a-zA-Z0-9_]*$
-					if !metricLabelKeyRegex.MatchString(key) {
-						p.logError(errInvalidMetricLabelKey)
-						continue TraverseLogArray
-					}
-					value := keyValues[1]
-					// The value of Label cannot contain "|" or "#$#".
-					if strings.Contains(value, converter.LabelSeparator) || strings.Contains(value, converter.KeyValueSeparator) {
-						p.logError(errInvalidMetricLabelValue)
-						continue TraverseLogArray
-					}
-					metricLabels = append(metricLabels, converter.MetricLabel{Key: key, Value: value})
-				}
-				continue
-			}
-
-			// Match to the label field
-			if p.metricLabelKeysMap[cont.Key] {
-				if labelExisted[cont.Key] {
-					p.logError(errFieldRepeated)
-					continue TraverseLogArray
-				}
-				// The value of Label cannot contain "|" or "#$#".
-				if strings.Contains(cont.Value, converter.LabelSeparator) || strings.Contains(cont.Value, converter.KeyValueSeparator) {
-					p.logError(errInvalidMetricLabelValue)
-					continue TraverseLogArray
-				}
-				labelExisted[cont.Key] = true
-				metricLabels = append(metricLabels, converter.MetricLabel{Key: cont.Key, Value: cont.Value})
-				continue
-			}
-
-			// Match to the name field
-			if p.metricNamesMap[cont.Key] {
-				// Metric name needs to follow the regular expression: ^[a-zA-Z_:][a-zA-Z0-9_:]*$
-				if !metricNameRegex.MatchString(cont.Value) {
-					p.logError(errInvalidMetricName)
-					continue TraverseLogArray
-				}
-				names[cont.Key] = cont.Value
-				continue
-			}
-
-			// Match to the value field
-			if p.metricValuesMap[cont.Key] {
-				// Metric value needs to be a float type string.
-				if !canParseToFloat64(cont.Value) {
-					p.logError(errInvalidMetricValue)
-					continue TraverseLogArray
-				}
-				values[cont.Key] = cont.Value
-				continue
-			}
-
-			if p.MetricTimeKey != "" && cont.Key == p.MetricTimeKey {
-				if !isTimeNano(cont.Value) {
-					p.logError(errInvalidMetricTime)
-					continue TraverseLogArray
-				}
-				switch len(cont.Value) {
-				case 19:
-					// nanosecond
-					timeNano = cont.Value
-				case 16:
-					// microsecond
-					timeNano = cont.Value + "000"
-				case 13:
-					// millisecond
-					timeNano = cont.Value + "000000"
-				case 10:
-					// second
-					timeNano = cont.Value + "000000000"
-				}
-				continue
-			}
-		}
-
-		if timeNano == "" {
-			if p.MetricTimeKey != "" {
-				p.logError(errInvalidMetricTime)
-				continue TraverseLogArray
-			}
-			timeNano = GetLogTimeNano(log)
-		}
-
-		// The number of labels must be equal to the number of label fields.
-		if len(labelExisted) != len(p.MetricLabelKeys) {
-			p.logError(errInvalidMetricLabelKeyCount)
-			continue TraverseLogArray
-		}
-
-		// The number of names must be equal to the number of name fields.
-		if len(names) != len(p.metricNamesMap) {
-			p.logError(errInvalidMetricNameCount)
-			continue TraverseLogArray
-		}
-
-		// The number of values must be equal to the number of value fields.
-		if len(values) != len(p.metricValuesMap) {
-			p.logError(errInvalidMetricValueCount)
-			continue TraverseLogArray
-		}
-
-		for key, value := range p.CustomMetricLabels {
-			metricLabels = append(metricLabels, converter.MetricLabel{Key: key, Value: value})
-		}
-
-		metricLabel := metricLabels.GetLabel()
-
-		for name, value := range p.MetricValues {
-			metricLog := &protocol.Log{
-				Time:     log.Time,
-				Contents: nil,
-			}
-			metricLog.Contents = append(metricLog.Contents, &protocol.Log_Content{
-				Key:   metricLabelsKey,
-				Value: metricLabel,
-			})
-			metricLog.Contents = append(metricLog.Contents, &protocol.Log_Content{
-				Key:   metricNameKey,
-				Value: names[name],
-			})
-			metricLog.Contents = append(metricLog.Contents, &protocol.Log_Content{
-				Key:   metricValueKey,
-				Value: values[value],
-			})
-			metricLog.Contents = append(metricLog.Contents, &protocol.Log_Content{
-				Key:   metricTimeNanoKey,
-				Value: timeNano,
-			})
-			metricLogs = append(metricLogs, metricLog)
-		}
-	}
-	return metricLogs
-}
-
 func (p *ProcessorLogToSlsMetric) logError(err error) {
 	if !p.IgnoreError {
 		logger.Warning(p.context.GetRuntimeContext(), processorLogErrorAlarmType, "process log error", err)
@@ -345,15 +177,6 @@ func (p *ProcessorLogToSlsMetric) logError(err error) {
 
 func (p *ProcessorLogToSlsMetric) logInitError(err error) {
 	logger.Warning(p.context.GetRuntimeContext(), processorInitErrorLogAlarmType, "init processor_log_to_sls_metric error", err)
-}
-
-func GetLogTimeNano(log *protocol.Log) string {
-	nanoTime := int64(log.Time) * int64(time.Second)
-	if log.TimeNs != nil {
-		nanoTime += int64(*log.TimeNs)
-	}
-	nanosecondsStr := strconv.FormatInt(nanoTime, 10)
-	return nanosecondsStr
 }
 
 func canParseToFloat64(s string) bool {
@@ -382,18 +205,8 @@ func init() {
 	}
 }
 
-// Process implements the v2 ProcessorV2 interface. Mirroring the v1 semantics
-// (v1 inputs Log and outputs SLS-metric-format Logs), the v2 path inputs Log
-// events and OUTPUTS models.Metric events: each matched Log is converted into
-// one *models.Metric per configured (name, value) pair, all sharing the same
-// tags and timestamp.
-//
-// Just like v1 (see ProcessLogs), a source Log is NEVER preserved: on success
-// it is replaced by the produced Metric events; on any validation error it is
-// logged and dropped entirely (v1 does `continue TraverseLogArray`, emitting
-// only metric logs). Logs that do not carry the configured name/value/label
-// fields fail the count checks and are likewise dropped. Metric and Span events
-// (and any other non-Log kind) pass through unchanged.
+// Process replaces each valid log with metric events and drops logs that fail validation.
+// Other event types pass through unchanged.
 func (p *ProcessorLogToSlsMetric) Process(in *models.PipelineGroupEvents, context pipeline.PipelineContext) {
 	if in == nil || len(in.Events) == 0 {
 		return
@@ -408,7 +221,7 @@ func (p *ProcessorLogToSlsMetric) Process(in *models.PipelineGroupEvents, contex
 			for _, metric := range p.logToMetrics(log) {
 				outEvents = append(outEvents, metric)
 			}
-			// v1 does not preserve the source log; only metrics are emitted.
+			// The derived metrics replace the source log.
 			continue
 		}
 		// Non-Log events (Metric/Span/...) pass through unchanged.
@@ -420,10 +233,7 @@ func (p *ProcessorLogToSlsMetric) Process(in *models.PipelineGroupEvents, contex
 	context.Collector().Collect(in.Group, outEvents...)
 }
 
-// logToMetrics reproduces the v1 ProcessLogs extraction + validation for a
-// single v2 models.Log, returning the produced metrics or nil when the log
-// fails any validation (in which case it is logged and dropped, matching the
-// v1 `continue TraverseLogArray` skip semantics).
+// logToMetrics validates the configured fields and produces one metric per value.
 func (p *ProcessorLogToSlsMetric) logToMetrics(log *models.Log) []*models.Metric {
 	contents := log.GetIndices()
 
@@ -530,8 +340,6 @@ func (p *ProcessorLogToSlsMetric) logToMetrics(log *models.Log) []*models.Metric
 			p.logError(errInvalidMetricTime)
 			return nil
 		}
-		// models.Log.Timestamp is already in nanoseconds (see plugin_runner_v2
-		// conversion), matching v1 GetLogTimeNano.
 		timeNano = strconv.FormatUint(log.GetTimestamp(), 10)
 	}
 
@@ -578,8 +386,7 @@ func (p *ProcessorLogToSlsMetric) logToMetrics(log *models.Log) []*models.Metric
 	return metrics
 }
 
-// contentToString normalizes a v2 log content value (interface{}) into a string
-// for the string-oriented extraction/validation reused from v1.
+// contentToString normalizes a log field to a string for metric validation.
 func contentToString(value interface{}) string {
 	switch v := value.(type) {
 	case string:

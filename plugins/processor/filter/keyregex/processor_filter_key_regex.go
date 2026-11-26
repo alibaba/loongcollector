@@ -20,7 +20,6 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
@@ -71,58 +70,14 @@ func (*ProcessorKeyFilter) Description() string {
 	return "key regex filter for logtail, if key is unmatched, drop this log"
 }
 
-func (p *ProcessorKeyFilter) IsLogMatch(log *protocol.Log) bool {
-	if p.includeRegex != nil {
-	ForBlock:
-		for _, reg := range p.includeRegex {
-			for _, cont := range log.Contents {
-				if reg.MatchString(cont.Key) {
-					continue ForBlock
-				}
-			}
-			return false
-		}
-	}
-
-	if p.excludeRegex != nil {
-		for _, cont := range log.Contents {
-			for _, reg := range p.excludeRegex {
-				// if match, return false
-				if reg.MatchString(cont.Key) {
-					return false
-				}
-			}
-		}
-	}
-	return true
-}
-
-func (p *ProcessorKeyFilter) ProcessLogs(logArray []*protocol.Log) []*protocol.Log {
-	totalLen := len(logArray)
-	nextIdx := 0
-	for idx := 0; idx < totalLen; idx++ {
-		if p.IsLogMatch(logArray[idx]) {
-			if idx != nextIdx {
-				logArray[nextIdx] = logArray[idx]
-			}
-			nextIdx++
-		} else {
-			p.filterMetric.Add(1)
-		}
-	}
-	logArray = logArray[:nextIdx]
-	return logArray
-}
-
 func init() {
 	pipeline.Processors[pluginType] = func() pipeline.Processor {
 		return &ProcessorKeyFilter{}
 	}
 }
 
-// isLogMatchV2 mirrors IsLogMatch for the v2 models.Log representation, matching
-// against content keys held in log.GetIndices().
-func (p *ProcessorKeyFilter) isLogMatchV2(log *models.Log) bool {
+// isLogMatch tests the log field names against the configured patterns.
+func (p *ProcessorKeyFilter) isLogMatch(log *models.Log) bool {
 	contents := log.GetIndices()
 	if p.includeRegex != nil {
 	ForBlock:
@@ -149,10 +104,7 @@ func (p *ProcessorKeyFilter) isLogMatchV2(log *models.Log) bool {
 	return true
 }
 
-// Process implements the v2 ProcessorV2 interface. Log events are filtered by
-// key regex (dropping logs that do not match, mirroring the v1 semantics), while
-// Metric/Span and any other non-Log events always pass through unchanged. The
-// original event order is preserved.
+// Process filters logs by field name and passes other events through in order.
 func (p *ProcessorKeyFilter) Process(in *models.PipelineGroupEvents, context pipeline.PipelineContext) {
 	if in == nil {
 		return
@@ -160,7 +112,7 @@ func (p *ProcessorKeyFilter) Process(in *models.PipelineGroupEvents, context pip
 	survivors := make([]models.PipelineEvent, 0, len(in.Events))
 	for _, event := range in.Events {
 		if event.GetType() == models.EventTypeLogging {
-			if p.isLogMatchV2(event.(*models.Log)) {
+			if p.isLogMatch(event.(*models.Log)) {
 				survivors = append(survivors, event)
 			} else {
 				p.filterMetric.Add(1)

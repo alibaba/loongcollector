@@ -17,59 +17,90 @@ package statsd
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"net/http"
+	"strconv"
+	"sync"
 	"time"
+
+	dogstatsd "github.com/narqo/go-dogstatsd-parser"
 
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/protocol/decoder/common"
-
-	dogstatsd "github.com/narqo/go-dogstatsd-parser"
-
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
 type Decoder struct {
 	Time time.Time
+	mu   sync.Mutex
 }
 
-func parseLabels(metric *dogstatsd.Metric) *helper.MetricLabels {
-	var labels helper.MetricLabels
-	for k, v := range metric.Tags {
-		labels.Append(k, v)
-	}
-	return &labels
-}
-
-func (d *Decoder) Decode(data []byte, req *http.Request, tags map[string]string) (logs []*protocol.Log, err error) {
-	now := time.Now()
-	parts := bytes.Split(data, []byte("\n"))
-	for _, part := range parts {
-		if len(part) == 0 {
-			continue
-		}
-		m, err := dogstatsd.Parse(string(part))
-		if err != nil {
-			logger.Debug(context.Background(), "parse statsd error", err)
-			if time.Since(d.Time).Seconds() > 10 {
-				logger.Warning(context.Background(), selfmonitor.StatsdParseAlarm, "parse err", err)
-				d.Time = time.Now()
-			}
-			continue
-		}
-		log := helper.NewMetricLog(m.Name, now.UnixNano(), m.Value.(float64), parseLabels(m))
-		logs = append(logs, log)
-	}
-	return
-}
-
-func (d *Decoder) ParseRequest(res http.ResponseWriter, req *http.Request, maxBodySize int64) (data []byte, statusCode int, err error) {
+func (d *Decoder) ParseRequest(res http.ResponseWriter, req *http.Request, maxBodySize int64) ([]byte, int, error) {
 	return common.CollectBody(res, req, maxBodySize)
 }
 
-func (d *Decoder) DecodeV2(data []byte, req *http.Request) (groups []*models.PipelineGroupEvents, err error) {
-	//TODO: Implement DecodeV2
-	return nil, nil
+func (d *Decoder) Decode(data []byte, _ *http.Request) ([]*models.PipelineGroupEvents, error) {
+	now := time.Now()
+	timeText := strconv.FormatInt(now.UnixNano(), 10)
+	keys := []string{"__name__", "__time_nano__", "__labels__", "__value__"}
+	var events []models.PipelineEvent
+	d.parseMetrics(data, func(metric *dogstatsd.Metric, value float64) {
+		// StatsD has historically exposed the metric row as ordinary log
+		// contents, including the configurable SLS name and label formatting.
+		var labels helper.MetricLabels
+		labels.AppendMap(metric.Tags)
+		log, _ := helper.NewInputLogRow(nil, keys, []string{
+			helper.FormatMetricLogName(metric.Name),
+			timeText,
+			labels.String(),
+			helper.FormatMetricLogValue(value),
+		}, now)
+		events = append(events, log)
+	})
+	if len(events) == 0 {
+		return nil, nil
+	}
+	return []*models.PipelineGroupEvents{{
+		Group:  models.NewGroup(models.NewMetadata(), models.NewTags()),
+		Events: events,
+	}}, nil
+}
+
+func (d *Decoder) parseMetrics(data []byte, emit func(*dogstatsd.Metric, float64)) {
+	for _, packet := range bytes.Split(data, []byte("\n")) {
+		line := bytes.TrimSpace(packet)
+		if len(line) == 0 {
+			continue
+		}
+		// The parser expects a first byte on every option delimited by '|'.
+		if line[len(line)-1] == '|' || bytes.Contains(line, []byte("||")) {
+			d.reportParseError(fmt.Errorf("empty statsd metric option"))
+			continue
+		}
+		metric, err := dogstatsd.Parse(string(line))
+		if err != nil {
+			d.reportParseError(err)
+			continue
+		}
+		switch value := metric.Value.(type) {
+		case float64:
+			emit(metric, value)
+		case int64:
+			emit(metric, float64(value))
+		default:
+			d.reportParseError(fmt.Errorf("unsupported statsd metric value type %T", value))
+		}
+	}
+}
+
+func (d *Decoder) reportParseError(err error) {
+	logger.Debug(context.Background(), "parse statsd error", err)
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if time.Since(d.Time) > 10*time.Second {
+		logger.Warning(context.Background(), selfmonitor.StatsdParseAlarm, "parse err", err)
+		d.Time = time.Now()
+	}
 }

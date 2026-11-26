@@ -17,6 +17,8 @@ package kafka
 import (
 	ctx "context"
 	"fmt"
+	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -30,11 +32,6 @@ import (
 	"github.com/alibaba/ilogtail/pkg/protocol/decoder"
 	"github.com/alibaba/ilogtail/pkg/protocol/decoder/common"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
-)
-
-const (
-	v1 = iota
-	v2
 )
 
 type InputKafka struct {
@@ -62,10 +59,8 @@ type InputKafka struct {
 	messages            chan *sarama.ConsumerMessage
 	context             pipeline.Context
 	cancelConsumer      ctx.CancelFunc
-	collectorV2         pipeline.PipelineCollector
+	collector           pipeline.PipelineCollector
 	decoder             extensions.Decoder
-	collectorV1         pipeline.Collector
-	version             int8
 }
 
 const (
@@ -89,6 +84,7 @@ func (k *InputKafka) Init(context pipeline.Context) (int, error) {
 	}
 
 	// init decoder
+	k.Format = strings.ToLower(strings.TrimSpace(k.Format))
 	if k.Format == "" {
 		k.Format = common.ProtocolRaw
 	}
@@ -189,21 +185,9 @@ func (k *InputKafka) Description() string {
 	return "Kafka input for logtail"
 }
 
-func (k *InputKafka) Start(collector pipeline.Collector) error {
-	k.collectorV1 = collector
-	k.version = v1
-	go func() {
-		k.receiver()
-	}()
-	return nil
-}
-
-func (k *InputKafka) StartService(context pipeline.PipelineContext) error {
-	k.collectorV2 = context.Collector()
-	k.version = v2
-	go func() {
-		k.receiver()
-	}()
+func (k *InputKafka) StartService(ctx pipeline.PipelineContext) error {
+	k.collector = ctx.Collector()
+	go k.receiver()
 	return nil
 }
 
@@ -246,25 +230,56 @@ func (k *InputKafka) ConsumeClaim(session sarama.ConsumerGroupSession, claim sar
 }
 
 func (k *InputKafka) onMessage(msg *sarama.ConsumerMessage) {
-	if msg != nil {
-		switch k.version {
-		case v1:
-			fields := make(map[string]string)
-			if len(msg.Key) == 0 {
-				fields[models.ContentKey] = string(msg.Value)
-			} else {
-				fields[string(msg.Key)] = string(msg.Value)
-			}
-			k.collectorV1.AddData(nil, fields)
-		case v2:
-			data, err := k.decoder.DecodeV2(msg.Value, nil)
-			if err != nil {
-				logger.Warning(k.context.GetRuntimeContext(), selfmonitor.DecodeMessageFailAlarm, "decode message failed", err)
-				return
-			}
-			k.collectorV2.CollectList(data...)
+	if msg == nil {
+		return
+	}
+	if k.Format == common.ProtocolRaw {
+		key := models.ContentKey
+		if len(msg.Key) != 0 {
+			key = string(msg.Key)
+		}
+		log := models.NewLogWithOrderedContents(1)
+		log.Timestamp = uint64(time.Now().Truncate(time.Second).UnixNano())
+		log.Contents.Add(key, string(msg.Value))
+		k.collector.Collect(models.NewGroup(models.NewMetadata(), models.NewTags()), log)
+		return
+	}
+	groups, err := k.decoder.Decode(msg.Value, k.decodeRequest(msg.Headers))
+	if err != nil {
+		logger.Warning(k.context.GetRuntimeContext(), selfmonitor.DecodeMessageFailAlarm, "decode message failed", err)
+		return
+	}
+	k.collector.CollectList(groups...)
+}
+
+// decodeRequest exposes Kafka record headers to decoders that use HTTP request metadata.
+// Protocols that decode the payload alone do not need a request.
+func (k *InputKafka) decodeRequest(headers []*sarama.RecordHeader) *http.Request {
+	switch k.Format {
+	case common.ProtocolPrometheus, common.ProtocolInflux, common.ProtocolInfluxdb, common.ProtocolPyroscope,
+		common.ProtocolOTLPLogV1, common.ProtocolOTLPMetricV1, common.ProtocolOTLPTraceV1:
+	default:
+		return nil
+	}
+
+	request := &http.Request{Header: make(http.Header), URL: &url.URL{}}
+	query := make(url.Values)
+	for _, header := range headers {
+		if header != nil {
+			key, value := string(header.Key), string(header.Value)
+			request.Header.Add(key, value)
+			query.Add(key, value)
 		}
 	}
+	request.Form = query
+	request.URL.RawQuery = query.Encode()
+	switch k.Format {
+	case common.ProtocolOTLPLogV1, common.ProtocolOTLPMetricV1, common.ProtocolOTLPTraceV1:
+		if request.Header.Get("Content-Type") == "" {
+			request.Header.Set("Content-Type", "application/x-protobuf")
+		}
+	}
+	return request
 }
 
 func (k *InputKafka) Stop() error {
@@ -282,10 +297,6 @@ func (k *InputKafka) Stop() error {
 	return nil
 }
 
-func (k *InputKafka) Collect(collector pipeline.Collector) error {
-	return nil
-}
-
 func init() {
 	pipeline.ServiceInputs[pluginType] = func() pipeline.ServiceInput {
 		return &InputKafka{
@@ -298,6 +309,7 @@ func init() {
 			SASLUsername:  "",
 			SASLPassword:  "",
 			Assignor:      "range",
+			Format:        common.ProtocolRaw,
 			messages:      make(chan *sarama.ConsumerMessage, 256),
 			ready:         make(chan bool),
 		}

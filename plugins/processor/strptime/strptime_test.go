@@ -19,13 +19,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alibaba/ilogtail/plugins/processor/internal/processortest"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
 )
 
@@ -68,22 +69,21 @@ func TestSourceKey(t *testing.T) {
 	}
 
 	for idx, test := range tests {
-		log := &protocol.Log{Time: 0}
+		log := processortest.Log()
 		for idx, key := range test.Keys {
-			log.Contents = append(log.Contents,
-				&protocol.Log_Content{Key: key, Value: test.Values[idx]})
+			log.Contents.Add(key, test.Values[idx])
 		}
 
 		logger.ClearMemoryLog()
 		processor.SourceKey = test.SourceKey
-		processor.processLog(log)
+		processortest.Apply(processor, log)
 		require.Equal(t, 0, logger.GetMemoryLogCount())
-		require.Equal(t, test.ExpectedTime, int64(log.Time), "Test case %v failed", idx)
+		require.Equal(t, test.ExpectedTime, int64(log.GetTimestamp()/uint64(time.Second)), "Test case %v failed", idx)
 		if len(test.SourceKey) == 0 {
-			require.Equal(t, len(log.Contents), len(test.Keys))
+			require.Equal(t, log.Contents.Len(), len(test.Keys))
 		} else {
-			require.Equal(t, len(log.Contents), len(test.Keys)+1)
-			require.Equal(t, log.GetContents()[len(test.Keys)].Key, processor.PreciseTimestampKey)
+			require.Equal(t, log.Contents.Len(), len(test.Keys)+1)
+			require.Equal(t, true, log.Contents.Contains(processor.PreciseTimestampKey))
 		}
 	}
 }
@@ -134,18 +134,17 @@ func TestFormat(t *testing.T) {
 		processor, err := newProcessor(test.Format, nilUTCOffset, true)
 		require.NoError(t, err)
 
-		log := &protocol.Log{Time: 0}
-		log.Contents = append(log.Contents,
-			&protocol.Log_Content{Key: defaultSourceKey, Value: test.InputTimeStr})
-		processor.processLog(log)
+		log := processortest.Log()
+		log.Contents.Add(defaultSourceKey, test.InputTimeStr)
+		processortest.Apply(processor, log)
 		require.Equal(t, 0, logger.GetMemoryLogCount())
-		require.Equal(t, test.ExpectedTime, int64(log.Time), "Test case %v failed", idx)
+		require.Equal(t, test.ExpectedTime, int64(log.GetTimestamp()/uint64(time.Second)), "Test case %v failed", idx)
 
-		require.Equal(t, len(log.Contents), 2) // time + precise_timestamp
-		require.Equal(t, defaultSourceKey, log.GetContents()[0].Key)
-		require.Equal(t, test.InputTimeStr, log.GetContents()[0].Value)
-		require.Equal(t, defaultPreciseTimestampKey, log.GetContents()[1].Key)
-		require.Equal(t, strconv.FormatInt(test.PreciseTimeStamp, 10), log.GetContents()[1].Value)
+		require.Equal(t, log.Contents.Len(), 2) // time + precise_timestamp
+		require.True(t, log.Contents.Contains(defaultSourceKey))
+		require.Equal(t, test.InputTimeStr, log.Contents.Get(defaultSourceKey))
+		require.True(t, log.Contents.Contains(defaultPreciseTimestampKey))
+		require.Equal(t, strconv.FormatInt(test.PreciseTimeStamp, 10), log.Contents.Get(defaultPreciseTimestampKey))
 	}
 }
 
@@ -167,18 +166,17 @@ func TestUTCOffsetWithTimeZone(t *testing.T) {
 		for idx, test := range tests {
 			processor, err := newProcessor(test.Format, nilUTCOffset, true)
 			require.NoError(t, err)
-			log := &protocol.Log{Time: 0}
-			log.Contents = append(log.Contents,
-				&protocol.Log_Content{Key: defaultSourceKey, Value: test.InputTimeStr})
-			processor.processLog(log)
+			log := processortest.Log()
+			log.Contents.Add(defaultSourceKey, test.InputTimeStr)
+			processortest.Apply(processor, log)
 			require.Equal(t, 0, logger.GetMemoryLogCount())
-			require.Equal(t, results[idx].Unix(), int64(log.Time))
+			require.Equal(t, results[idx].Unix(), int64(log.GetTimestamp()/uint64(time.Second)))
 
-			require.Equal(t, len(log.Contents), 2) // time + precise_timestamp
-			require.Equal(t, defaultSourceKey, log.GetContents()[0].Key)
-			require.Equal(t, test.InputTimeStr, log.GetContents()[0].Value)
-			require.Equal(t, defaultPreciseTimestampKey, log.GetContents()[1].Key)
-			require.Equal(t, strconv.FormatInt(results[idx].UnixNano()/1e6, 10), log.GetContents()[1].Value)
+			require.Equal(t, log.Contents.Len(), 2) // time + precise_timestamp
+			require.True(t, log.Contents.Contains(defaultSourceKey))
+			require.Equal(t, test.InputTimeStr, log.Contents.Get(defaultSourceKey))
+			require.True(t, log.Contents.Contains(defaultPreciseTimestampKey))
+			require.Equal(t, strconv.FormatInt(results[idx].UnixNano()/1e6, 10), log.Contents.Get(defaultPreciseTimestampKey))
 		}
 	}
 
@@ -193,18 +191,17 @@ func TestUTCOffsetWithTimeZone(t *testing.T) {
 			processor, err := newProcessor(test.Format, offset, true)
 			require.NoError(t, err)
 			processor.AdjustUTCOffset = true
-			log := &protocol.Log{Time: 0}
-			log.Contents = append(log.Contents,
-				&protocol.Log_Content{Key: defaultSourceKey, Value: test.InputTimeStr})
-			processor.processLog(log)
+			log := processortest.Log()
+			log.Contents.Add(defaultSourceKey, test.InputTimeStr)
+			processortest.Apply(processor, log)
 			require.Equal(t, 0, logger.GetMemoryLogCount())
-			require.Equal(t, int64(log.Time), results[idx].Unix())
+			require.Equal(t, int64(log.GetTimestamp()/uint64(time.Second)), results[idx].Unix())
 
-			require.Equal(t, len(log.Contents), 2) // time + precise_timestamp
-			require.Equal(t, defaultSourceKey, log.GetContents()[0].Key)
-			require.Equal(t, test.InputTimeStr, log.GetContents()[0].Value)
-			require.Equal(t, defaultPreciseTimestampKey, log.GetContents()[1].Key)
-			require.Equal(t, strconv.FormatInt(results[idx].UnixNano()/1e6, 10), log.GetContents()[1].Value)
+			require.Equal(t, log.Contents.Len(), 2) // time + precise_timestamp
+			require.True(t, log.Contents.Contains(defaultSourceKey))
+			require.Equal(t, test.InputTimeStr, log.Contents.Get(defaultSourceKey))
+			require.True(t, log.Contents.Contains(defaultPreciseTimestampKey))
+			require.Equal(t, strconv.FormatInt(results[idx].UnixNano()/1e6, 10), log.Contents.Get(defaultPreciseTimestampKey))
 		}
 	}
 }
@@ -226,21 +223,20 @@ func TestUTCOffset(t *testing.T) {
 		processor, err := newProcessor("%Y/%m/%d", offset, true)
 		require.NoError(t, err, "Test case %v failed", idx)
 
-		log := &protocol.Log{Time: 0}
-		log.Contents = append(log.Contents,
-			&protocol.Log_Content{Key: defaultSourceKey, Value: "2016/01/02"})
-		processor.processLog(log)
+		log := processortest.Log()
+		log.Contents.Add(defaultSourceKey, "2016/01/02")
+		processortest.Apply(processor, log)
 		require.Equal(t, time.Date(
 			2016, time.January, 2, 0, 0, 0, 0, time.FixedZone("FixedZone", offset)).Unix(),
-			int64(log.Time), "Test case %v failed", idx)
+			int64(log.GetTimestamp()/uint64(time.Second)), "Test case %v failed", idx)
 
 		processor, err = newProcessor("%Y/%m/%d %z", offset, true)
 		require.NoError(t, err, "Test case {} failed", idx)
-		log.Contents[0].Value = "2016/01/02 +0400"
-		processor.processLog(log)
+		log.Contents.Add(defaultSourceKey, "2016/01/02 +0400")
+		processortest.Apply(processor, log)
 		require.Equal(t, time.Date(
 			2016, time.January, 1, 20, 0, 0, 0, time.FixedZone("FixedZone", offset)).Unix(),
-			int64(log.Time), "Test case %v failed", idx)
+			int64(log.GetTimestamp()/uint64(time.Second)), "Test case %v failed", idx)
 	}
 }
 
@@ -248,26 +244,24 @@ func TestKeepSource(t *testing.T) {
 	processor, err := newProcessor("%Y/%m/%d", nilUTCOffset, true)
 	require.NoError(t, err)
 	{
-		log := &protocol.Log{Time: 0}
-		log.Contents = append(log.Contents,
-			&protocol.Log_Content{Key: defaultSourceKey, Value: "2016/01/02"})
-		processor.processLog(log)
+		log := processortest.Log()
+		log.Contents.Add(defaultSourceKey, "2016/01/02")
+		processortest.Apply(processor, log)
 		require.Equal(t, time.Date(
-			2016, time.January, 2, 0, 0, 0, 0, time.Now().Location()).Unix(), int64(log.Time))
-		require.Equal(t, 2, len(log.Contents)) // time + precise_timestamp
+			2016, time.January, 2, 0, 0, 0, 0, time.Now().Location()).Unix(), int64(log.GetTimestamp()/uint64(time.Second)))
+		require.Equal(t, 2, log.Contents.Len()) // time + precise_timestamp
 	}
 
 	{
-		log := &protocol.Log{Time: 0}
-		log.Contents = append(log.Contents,
-			&protocol.Log_Content{Key: defaultSourceKey, Value: "2016/01/02"})
+		log := processortest.Log()
+		log.Contents.Add(defaultSourceKey, "2016/01/02")
 		processor.KeepSource = false
-		log.Time = 0
-		processor.processLog(log)
+		log.Timestamp = 0
+		processortest.Apply(processor, log)
 		require.Equal(t, time.Date(
-			2016, time.January, 2, 0, 0, 0, 0, time.Now().Location()).Unix(), int64(log.Time))
-		require.Equal(t, 1, len(log.Contents)) // precise_timestamp
-		require.Equal(t, defaultPreciseTimestampKey, log.GetContents()[0].Key)
+			2016, time.January, 2, 0, 0, 0, 0, time.Now().Location()).Unix(), int64(log.GetTimestamp()/uint64(time.Second)))
+		require.Equal(t, 1, log.Contents.Len()) // precise_timestamp
+		require.True(t, log.Contents.Contains(defaultPreciseTimestampKey))
 	}
 }
 
@@ -275,18 +269,17 @@ func TestAlarmIfFail(t *testing.T) {
 	processor, err := newProcessor("%Y/%m/%d", nilUTCOffset, true)
 	require.NoError(t, err)
 
-	log := &protocol.Log{Time: 0}
-	log.Contents = append(log.Contents,
-		&protocol.Log_Content{Key: defaultSourceKey, Value: "/01/02"})
-	processor.processLog(log)
+	log := processortest.Log()
+	log.Contents.Add(defaultSourceKey, "/01/02")
+	processortest.Apply(processor, log)
 	require.Equal(t, 1, logger.GetMemoryLogCount())
-	require.Equal(t, len(log.Contents), 1)
+	require.Equal(t, log.Contents.Len(), 1)
 
 	processor.AlarmIfFail = false
 	logger.ClearMemoryLog()
-	processor.processLog(log)
+	processortest.Apply(processor, log)
 	require.Equal(t, 0, logger.GetMemoryLogCount())
-	require.Equal(t, len(log.Contents), 1)
+	require.Equal(t, log.Contents.Len(), 1)
 }
 
 func TestPreciseTimestamp(t *testing.T) {
@@ -339,38 +332,34 @@ func TestPreciseTimestamp(t *testing.T) {
 			processor.PreciseTimestampUnit = test.PreciseTimeUint
 			require.NoError(t, err)
 
-			log := &protocol.Log{Time: 0}
-			log.Contents = append(log.Contents,
-				&protocol.Log_Content{Key: defaultSourceKey, Value: test.InputTimeStr})
-			processor.processLog(log)
+			log := processortest.Log()
+			log.Contents.Add(defaultSourceKey, test.InputTimeStr)
+			processortest.Apply(processor, log)
 			require.Equal(t, 0, logger.GetMemoryLogCount())
-			require.Equal(t, test.ExpectedTime, int64(log.Time), "Test case %v failed", idx)
+			require.Equal(t, test.ExpectedTime, int64(log.GetTimestamp()/uint64(time.Second)), "Test case %v failed", idx)
 
-			require.Equal(t, len(log.Contents), 2) // time + precise_timestamp
-			require.Equal(t, defaultSourceKey, log.GetContents()[0].Key)
-			require.Equal(t, test.InputTimeStr, log.GetContents()[0].Value)
-			require.Equal(t, test.PreciseTimestampKey, log.GetContents()[1].Key)
-			require.Equal(t, strconv.FormatInt(test.PreciseTimeStamp, 10), log.GetContents()[1].Value)
+			require.Equal(t, log.Contents.Len(), 2) // time + precise_timestamp
+			require.True(t, log.Contents.Contains(defaultSourceKey))
+			require.Equal(t, test.InputTimeStr, log.Contents.Get(defaultSourceKey))
+			require.True(t, log.Contents.Contains(test.PreciseTimestampKey))
+			require.Equal(t, strconv.FormatInt(test.PreciseTimeStamp, 10), log.Contents.Get(test.PreciseTimestampKey))
 		}
 	}
 
 	{
 		processor, _ := newProcessor("%Y/%m/%d", nilUTCOffset, false)
-		log := &protocol.Log{Time: 0}
-		log.Contents = append(log.Contents,
-			&protocol.Log_Content{Key: defaultSourceKey, Value: "2016/01/02"})
+		log := processortest.Log()
+		log.Contents.Add(defaultSourceKey, "2016/01/02")
 		processor.KeepSource = false
-		log.Time = 0
-		processor.processLog(log)
+		log.Timestamp = 0
+		processortest.Apply(processor, log)
 		require.Equal(t, time.Date(
-			2016, time.January, 2, 0, 0, 0, 0, time.Now().Location()).Unix(), int64(log.Time))
-		require.Equal(t, 0, len(log.Contents)) // precise_timestamp
+			2016, time.January, 2, 0, 0, 0, 0, time.Now().Location()).Unix(), int64(log.GetTimestamp()/uint64(time.Second)))
+		require.Equal(t, 0, log.Contents.Len()) // precise_timestamp
 	}
 }
 
-// ---- v2 (PipelineEvent / SendPb) Process path tests ----
-
-func TestStrptime_ProcessV2SetsTimestamp(t *testing.T) {
+func TestStrptime_ProcessSetsTimestamp(t *testing.T) {
 	time.Local = time.UTC
 	processor, err := newProcessor("%Y/%m/%d %H:%M:%S", nilUTCOffset, true)
 	require.NoError(t, err)
@@ -391,7 +380,7 @@ func TestStrptime_ProcessV2SetsTimestamp(t *testing.T) {
 		log.GetIndices().Get(defaultPreciseTimestampKey))
 }
 
-func TestStrptime_ProcessV2KeepSourceFalse(t *testing.T) {
+func TestStrptime_ProcessKeepSourceFalse(t *testing.T) {
 	time.Local = time.UTC
 	processor, err := newProcessor("%Y/%m/%d", nilUTCOffset, false)
 	require.NoError(t, err)
@@ -408,7 +397,7 @@ func TestStrptime_ProcessV2KeepSourceFalse(t *testing.T) {
 	assert.False(t, log.GetIndices().Contains(defaultSourceKey), "source key must be removed when KeepSource is false")
 }
 
-func TestStrptime_ProcessV2PassesThroughMetric(t *testing.T) {
+func TestStrptime_ProcessPassesThroughMetric(t *testing.T) {
 	processor, err := newProcessor("%Y/%m/%d", nilUTCOffset, true)
 	require.NoError(t, err)
 

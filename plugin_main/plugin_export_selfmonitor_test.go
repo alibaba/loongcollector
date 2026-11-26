@@ -22,7 +22,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/alibaba/ilogtail/pkg/helper"
+	"github.com/alibaba/ilogtail/pkg/helper/telemetrytest"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pluginmanager"
@@ -58,7 +58,7 @@ func TestMarshalAlarmsPBRoundTrip(t *testing.T) {
 	group := &protocol.PipelineEventGroup{}
 	require.NoError(t, group.Unmarshal(data))
 
-	got := helper.TransferPipelineEventGroupToAlarms(group)
+	got := telemetrytest.TransferPipelineEventGroupToAlarms(group)
 	require.Len(t, got, len(alarms))
 	for i, want := range alarms {
 		assert.Equal(t, want.AlarmType, got[i].AlarmType)
@@ -78,7 +78,7 @@ func TestMarshalMetricsPBCppProvided(t *testing.T) {
 	require.NoError(t, err)
 	var pb protocol.PipelineEventGroup
 	require.NoError(t, pb.Unmarshal(data))
-	records := helper.TransferPipelineEventGroupToMetrics(&pb)
+	records := telemetrytest.TransferPipelineEventGroupToMetrics(&pb)
 	require.Len(t, records, 1)
 	assert.Equal(t, "agent", records[0].Category)
 	assert.Equal(t, float64(123), records[0].Gauges[selfmonitor.MetricAgentMemoryGo])
@@ -112,7 +112,7 @@ func TestMarshalAlarmsPBEmpty(t *testing.T) {
 
 	group := &protocol.PipelineEventGroup{}
 	require.NoError(t, group.Unmarshal(data))
-	assert.Empty(t, helper.TransferPipelineEventGroupToAlarms(group))
+	assert.Empty(t, telemetrytest.TransferPipelineEventGroupToAlarms(group))
 }
 
 // TestMarshalMetricsPBRoundTrip verifies that raw metric records marshaled on the Go
@@ -139,7 +139,7 @@ func TestMarshalMetricsPBRoundTrip(t *testing.T) {
 	group := &protocol.PipelineEventGroup{}
 	require.NoError(t, group.Unmarshal(data))
 
-	got := helper.TransferPipelineEventGroupToMetrics(group)
+	got := telemetrytest.TransferPipelineEventGroupToMetrics(group)
 	require.Len(t, got, len(raw))
 
 	byCategory := make(map[string]selfmonitor.MetricExportRecord, len(got))
@@ -204,9 +204,9 @@ func TestSelfMonitorPBMetricContractCompatibility(t *testing.T) {
 	for i, raw := range cases {
 		actual, err := buildMetricsPB([]map[string]string{raw}, now)
 		require.NoError(t, err, "case %d", i)
-		expected := helper.TransferRawMetricsToPipelineEventGroup([]map[string]string{raw}, now)
-		assert.Equal(t, helper.TransferPipelineEventGroupToMetrics(expected),
-			helper.TransferPipelineEventGroupToMetrics(actual), "case %d", i)
+		expected := telemetrytest.TransferRawMetricsToPipelineEventGroup([]map[string]string{raw}, now)
+		assert.Equal(t, telemetrytest.TransferPipelineEventGroupToMetrics(expected),
+			telemetrytest.TransferPipelineEventGroupToMetrics(actual), "case %d", i)
 		decoded := &protocol.PipelineEventGroup{}
 		require.NoError(t, decoded.Unmarshal(copyPBForTest(actual)))
 		assert.Equal(t, uint64(now.UnixNano()), decoded.GetMetrics().Events[0].Timestamp)

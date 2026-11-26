@@ -21,12 +21,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alibaba/ilogtail/plugins/processor/internal/processortest"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/models"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
 )
 
@@ -160,64 +161,45 @@ func TestDestKey(t *testing.T) {
 	processor, err := newProcessor()
 	require.NoError(t, err)
 
-	log := &protocol.Log{Time: 0}
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "_ip_", Value: "127.0.0.1"})
-	processor.processLog(log)
-	assert.Equal(t, processor.SourceKey, log.Contents[0].Key)
+	log := processortest.Log()
+	log.Contents.Add("_ip_", "127.0.0.1")
+	processortest.Apply(processor, log)
+	assert.True(t, log.Contents.Contains(processor.SourceKey))
 
-	log = &protocol.Log{Time: 1}
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "_ip_", Value: "192.168.0.1"})
-	processor.processLog(log)
-	assert.Equal(t, processor.DestKey, log.Contents[0].Key)
+	log = processortest.Log()
+	log.Contents.Add("_ip_", "192.168.0.1")
+	processortest.Apply(processor, log)
+	assert.True(t, log.Contents.Contains(processor.DestKey))
 
-	log = &protocol.Log{Time: 2}
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "_ip_", Value: "0.0.0.0"})
-	processor.processLog(log)
-	assert.Equal(t, 1, len(log.Contents))
+	log = processortest.Log()
+	log.Contents.Add("_ip_", "0.0.0.0")
+	processortest.Apply(processor, log)
+	assert.Equal(t, 1, log.Contents.Len())
 
-	log = &protocol.Log{Time: 3}
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "_Missing_ip_", Value: "192.168.0.1"})
-	processor.processLog(log)
-	assert.Equal(t, processor.DestKey, log.Contents[1].Key)
+	log = processortest.Log()
+	log.Contents.Add("_Missing_ip_", "192.168.0.1")
+	processortest.Apply(processor, log)
+	assert.True(t, log.Contents.Contains(processor.DestKey))
 }
 
 func TestDestValue(t *testing.T) {
 	processor, err := newProcessor()
 	require.NoError(t, err)
 
-	log := &protocol.Log{Time: 0}
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "_ip_", Value: "127.0.0.1"})
-	processor.processLog(log)
-	assert.Equal(t, processor.MapDict["127.0.0.1"], log.Contents[0].Value)
+	log := processortest.Log()
+	log.Contents.Add("_ip_", "127.0.0.1")
+	processortest.Apply(processor, log)
+	assert.Equal(t, processor.MapDict["127.0.0.1"], log.Contents.Get(processor.DestKey))
 
-	log = &protocol.Log{Time: 1}
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "_ip_", Value: "192.168.0.1"})
-	processor.processLog(log)
-	assert.Equal(t, processor.MapDict["192.168.0.1"], log.Contents[0].Value)
+	log = processortest.Log()
+	log.Contents.Add("_ip_", "192.168.0.1")
+	processortest.Apply(processor, log)
+	assert.Equal(t, processor.MapDict["192.168.0.1"], log.Contents.Get(processor.DestKey))
 
-	log = &protocol.Log{Time: 2}
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "_Missing_ip_", Value: "192.168.0.1"})
-	processor.processLog(log)
-	assert.Equal(t, processor.Missing, log.Contents[1].Value)
-}
-
-func TestMultipleInput(t *testing.T) {
-	processor, err := newProcessor()
-	require.NoError(t, err)
-
-	log := &protocol.Log{Time: 0}
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "_ip_", Value: "127.0.0.1"})
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "_ip_", Value: "192.168.0.1"})
-	processor.processLog(log)
-	assert.Equal(t, processor.MapDict["127.0.0.1"], log.Contents[0].Value)
-
-	log = &protocol.Log{Time: 1}
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "_ip_", Value: "127.0.0.1"})
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "_ip_", Value: "192.168.0.1"})
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "_ip_", Value: "0.0.0.0"})
-	processor.processLog(log)
-	assert.Equal(t, processor.MapDict["127.0.0.1"], log.Contents[0].Value)
-
+	log = processortest.Log()
+	log.Contents.Add("_Missing_ip_", "192.168.0.1")
+	processortest.Apply(processor, log)
+	assert.Equal(t, processor.Missing, log.Contents.Get(processor.DestKey))
 }
 
 func TestOverWrite1(t *testing.T) {
@@ -235,21 +217,21 @@ func TestOverWrite1(t *testing.T) {
 	err := processor.Init(ctx)
 
 	require.NoError(t, err)
-	log := &protocol.Log{Time: 0}
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "_ip_", Value: "127.0.0.1"})
-	processor.processLog(log)
-	assert.Equal(t, processor.MapDict["127.0.0.1"], log.Contents[0].Value)
+	log := processortest.Log()
+	log.Contents.Add("_ip_", "127.0.0.1")
+	processortest.Apply(processor, log)
+	assert.Equal(t, processor.MapDict["127.0.0.1"], log.Contents.Get(processor.DestKey))
 
-	log = &protocol.Log{Time: 1}
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "_ip_", Value: "192.168.0.1"})
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "_another_ip_", Value: "127.0.0.1"})
-	processor.processLog(log)
-	assert.Equal(t, processor.MapDict["192.168.0.1"], log.Contents[0].Value)
+	log = processortest.Log()
+	log.Contents.Add("_ip_", "192.168.0.1")
+	log.Contents.Add("_another_ip_", "127.0.0.1")
+	processortest.Apply(processor, log)
+	assert.Equal(t, processor.MapDict["192.168.0.1"], log.Contents.Get(processor.DestKey))
 
-	log = &protocol.Log{Time: 2}
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "_Missing_ip_", Value: "192.168.0.1"})
-	processor.processLog(log)
-	assert.Equal(t, processor.Missing, log.Contents[1].Value)
+	log = processortest.Log()
+	log.Contents.Add("_Missing_ip_", "192.168.0.1")
+	processortest.Apply(processor, log)
+	assert.Equal(t, processor.Missing, log.Contents.Get(processor.DestKey))
 }
 
 func TestOverWrite2(t *testing.T) {
@@ -267,22 +249,22 @@ func TestOverWrite2(t *testing.T) {
 	err := processor.Init(ctx)
 
 	require.NoError(t, err)
-	log := &protocol.Log{Time: 0}
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "_Newip_", Value: "127.0.0.1"})
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "_ip_", Value: "127.0.0.1"})
-	processor.processLog(log)
-	assert.Equal(t, processor.MapDict["127.0.0.1"], log.Contents[0].Value)
+	log := processortest.Log()
+	log.Contents.Add("_Newip_", "127.0.0.1")
+	log.Contents.Add("_ip_", "127.0.0.1")
+	processortest.Apply(processor, log)
+	assert.Equal(t, processor.MapDict["127.0.0.1"], log.Contents.Get(processor.DestKey))
 
-	log = &protocol.Log{Time: 1}
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "_ip_", Value: "192.168.0.1"})
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "_Newip_", Value: "127.0.0.1"})
-	processor.processLog(log)
-	assert.Equal(t, processor.MapDict["192.168.0.1"], log.Contents[1].Value)
+	log = processortest.Log()
+	log.Contents.Add("_ip_", "192.168.0.1")
+	log.Contents.Add("_Newip_", "127.0.0.1")
+	processortest.Apply(processor, log)
+	assert.Equal(t, processor.MapDict["192.168.0.1"], log.Contents.Get(processor.DestKey))
 
-	log = &protocol.Log{Time: 2}
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "_Missing_ip_", Value: "192.168.0.1"})
-	processor.processLog(log)
-	assert.Equal(t, processor.Missing, log.Contents[1].Value)
+	log = processortest.Log()
+	log.Contents.Add("_Missing_ip_", "192.168.0.1")
+	processortest.Apply(processor, log)
+	assert.Equal(t, processor.Missing, log.Contents.Get(processor.DestKey))
 }
 
 func TestFill(t *testing.T) {
@@ -300,22 +282,22 @@ func TestFill(t *testing.T) {
 	err := processor.Init(ctx)
 
 	require.NoError(t, err)
-	log := &protocol.Log{Time: 0}
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "_Newip_", Value: "127.0.0.1"})
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "_ip_", Value: "127.0.0.1"})
-	processor.processLog(log)
-	assert.Equal(t, "127.0.0.1", log.Contents[0].Value)
+	log := processortest.Log()
+	log.Contents.Add("_Newip_", "127.0.0.1")
+	log.Contents.Add("_ip_", "127.0.0.1")
+	processortest.Apply(processor, log)
+	assert.Equal(t, "127.0.0.1", log.Contents.Get(processor.DestKey))
 
-	log = &protocol.Log{Time: 1}
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "_ip_", Value: "192.168.0.1"})
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "_Newip_", Value: "127.0.0.1"})
-	processor.processLog(log)
-	assert.Equal(t, "127.0.0.1", log.Contents[1].Value)
+	log = processortest.Log()
+	log.Contents.Add("_ip_", "192.168.0.1")
+	log.Contents.Add("_Newip_", "127.0.0.1")
+	processortest.Apply(processor, log)
+	assert.Equal(t, "127.0.0.1", log.Contents.Get(processor.DestKey))
 
-	log = &protocol.Log{Time: 2}
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "_Missing_ip_", Value: "192.168.0.1"})
-	processor.processLog(log)
-	assert.Equal(t, processor.Missing, log.Contents[1].Value)
+	log = processortest.Log()
+	log.Contents.Add("_Missing_ip_", "192.168.0.1")
+	processortest.Apply(processor, log)
+	assert.Equal(t, processor.Missing, log.Contents.Get(processor.DestKey))
 }
 
 func TestDontHandleMissing(t *testing.T) {
@@ -333,20 +315,18 @@ func TestDontHandleMissing(t *testing.T) {
 	err := processor.Init(ctx)
 	require.NoError(t, err)
 
-	log := &protocol.Log{Time: 0}
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "_Missing_ip_", Value: "192.168.0.1"})
-	processor.processLog(log)
-	assert.Equal(t, 1, len(log.Contents))
+	log := processortest.Log()
+	log.Contents.Add("_Missing_ip_", "192.168.0.1")
+	processortest.Apply(processor, log)
+	assert.Equal(t, 1, log.Contents.Len())
 
-	log = &protocol.Log{Time: 1}
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "_Another_ip_", Value: "0.0.0.0"})
-	processor.processLog(log)
-	assert.Equal(t, 1, len(log.Contents))
+	log = processortest.Log()
+	log.Contents.Add("_Another_ip_", "0.0.0.0")
+	processortest.Apply(processor, log)
+	assert.Equal(t, 1, log.Contents.Len())
 }
 
-// ---- v2 (PipelineEvent / SendPb) Process path tests ----
-
-func newDictMapV2(t *testing.T, p *ProcessorDictMap) *ProcessorDictMap {
+func newDictMap(t *testing.T, p *ProcessorDictMap) *ProcessorDictMap {
 	if p.MaxDictSize == 0 {
 		p.MaxDictSize = 1000
 	}
@@ -357,8 +337,8 @@ func newDictMapV2(t *testing.T, p *ProcessorDictMap) *ProcessorDictMap {
 	return p
 }
 
-func TestProcessorDictMap_ProcessV2InPlace(t *testing.T) {
-	processor := newDictMapV2(t, &ProcessorDictMap{SourceKey: "k", MapDict: map[string]string{"a": "b"}})
+func TestProcessorDictMap_ProcessInPlace(t *testing.T) {
+	processor := newDictMap(t, &ProcessorDictMap{SourceKey: "k", MapDict: map[string]string{"a": "b"}})
 
 	log := models.NewLog("", nil, "", "", "", models.NewTags(), 0)
 	log.GetIndices().Add("k", "a")
@@ -369,8 +349,8 @@ func TestProcessorDictMap_ProcessV2InPlace(t *testing.T) {
 	assert.Equal(t, "b", log.GetIndices().Get("k"))
 }
 
-func TestProcessorDictMap_ProcessV2ToDestKey(t *testing.T) {
-	processor := newDictMapV2(t, &ProcessorDictMap{SourceKey: "k", DestKey: "d", MapDict: map[string]string{"a": "b"}})
+func TestProcessorDictMap_ProcessToDestKey(t *testing.T) {
+	processor := newDictMap(t, &ProcessorDictMap{SourceKey: "k", DestKey: "d", MapDict: map[string]string{"a": "b"}})
 
 	log := models.NewLog("", nil, "", "", "", models.NewTags(), 0)
 	log.GetIndices().Add("k", "a")
@@ -382,8 +362,8 @@ func TestProcessorDictMap_ProcessV2ToDestKey(t *testing.T) {
 	assert.Equal(t, "b", log.GetIndices().Get("d"))
 }
 
-func TestProcessorDictMap_ProcessV2MissingHandled(t *testing.T) {
-	processor := newDictMapV2(t, &ProcessorDictMap{SourceKey: "k", DestKey: "d", MapDict: map[string]string{"a": "b"}, HandleMissing: true, Missing: "Unknown"})
+func TestProcessorDictMap_ProcessMissingHandled(t *testing.T) {
+	processor := newDictMap(t, &ProcessorDictMap{SourceKey: "k", DestKey: "d", MapDict: map[string]string{"a": "b"}, HandleMissing: true, Missing: "Unknown"})
 
 	log := models.NewLog("", nil, "", "", "", models.NewTags(), 0)
 	log.GetIndices().Add("other", "x")
@@ -394,8 +374,8 @@ func TestProcessorDictMap_ProcessV2MissingHandled(t *testing.T) {
 	assert.Equal(t, "Unknown", log.GetIndices().Get("d"))
 }
 
-func TestProcessorDictMap_ProcessV2PassesThroughMetric(t *testing.T) {
-	processor := newDictMapV2(t, &ProcessorDictMap{SourceKey: "k", MapDict: map[string]string{"a": "b"}})
+func TestProcessorDictMap_ProcessPassesThroughMetric(t *testing.T) {
+	processor := newDictMap(t, &ProcessorDictMap{SourceKey: "k", MapDict: map[string]string{"a": "b"}})
 
 	metric := models.NewSingleValueMetric("m", models.MetricTypeGauge, models.NewTags(), 0, 1.0)
 	context := helper.NewObservePipelineContext(10)

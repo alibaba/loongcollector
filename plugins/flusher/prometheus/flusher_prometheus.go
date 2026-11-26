@@ -25,7 +25,7 @@ import (
 	"github.com/alibaba/ilogtail/plugins/flusher/http"
 )
 
-var _ pipeline.FlusherV2 = (*FlusherPrometheus)(nil)
+var _ pipeline.Flusher = (*FlusherPrometheus)(nil)
 
 type FlusherPrometheus struct {
 	config            // config for flusher_prometheus only (not belongs to flusher_http)

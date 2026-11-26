@@ -143,12 +143,6 @@ plugin: clean import_plugins
 upgrade_adapter_lib:
 	./scripts/upgrade_adapter_lib.sh ${OUT_DIR}
 
-.PHONY: plugin_main
-plugin_main: clean
-	./scripts/plugin_build.sh mod default $(OUT_DIR) $(VERSION) $(PLUGINS_CONFIG_FILE) $(GO_MOD_FILE)
-	cp pkg/logtail/libGoPluginAdapter.so $(OUT_DIR)/libGoPluginAdapter.so
-	cp pkg/logtail/GoPluginAdapter.dll $(OUT_DIR)/GoPluginAdapter.dll
-
 .PHONY: plugin_local
 plugin_local:
 	./scripts/plugin_build.sh mod c-shared $(OUT_DIR) $(VERSION) $(PLUGINS_CONFIG_FILE) $(GO_MOD_FILE)
@@ -170,10 +164,6 @@ vendor: clean import_plugins
 .PHONY: check-dependency-licenses
 check-dependency-licenses: clean import_plugins
 	./scripts/dependency_licenses.sh plugin_main LICENSE_OF_ILOGTAIL_DEPENDENCIES.md && ./scripts/dependency_licenses.sh test LICENSE_OF_TESTENGINE_DEPENDENCIES.md
-
-.PHONY: docs
-docs: clean build
-	./bin/ilogtail --doc
 
 # e2e test
 .PHONY: e2e

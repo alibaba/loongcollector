@@ -79,11 +79,18 @@ func NewDockerFileSyner(sds *ServiceDockerStdout,
 	}
 
 	source := util.NewPackIDPrefix(info.ContainerInfo.ID + sds.context.GetConfigName())
-	tags := info.GetExternalTags(sds.ExternalEnvTag, sds.ExternalK8sLabelTag)
-	for k, v := range info.ContainerNameTag {
-		tags[k] = v
+	settings := sds.context.GetPipelineScopeConfig()
+	usingOldContentTag := containercenter.UseOldStdoutContentTags(sds.UsePipelineEventTags, settings)
+	tags := info.GetStdoutTags(sds.ExternalEnvTag, sds.ExternalK8sLabelTag, usingOldContentTag)
+	var contentTags, groupTags map[string]string
+	if usingOldContentTag {
+		contentTags = tags
+	} else {
+		groupTags = tags
 	}
-	processor := NewDockerStdoutProcessor(reg, time.Duration(sds.BeginLineTimeoutMs)*time.Millisecond, sds.BeginLineCheckLength, sds.MaxLogSize, sds.Stdout, sds.Stderr, sds.context, sds.collector, tags, source)
+	processor := newDockerStdoutProcessor(reg, time.Duration(sds.BeginLineTimeoutMs)*time.Millisecond,
+		sds.BeginLineCheckLength, sds.MaxLogSize, sds.Stdout, sds.Stderr, sds.context, sds.collector,
+		contentTags, groupTags, source)
 
 	checkpoint, ok := checkpointMap[info.ContainerInfo.ID]
 	if !ok {
@@ -160,6 +167,10 @@ type ServiceDockerStdout struct {
 	K8sPodRegex           string            `comment:"the regular expression of kubernetes pod to match containers."`
 	K8sContainerRegex     string            `comment:"the regular expression of kubernetes container to match containers."`
 
+	// UsePipelineEventTags applies the pipeline's UsingOldContentTag setting.
+	// The default keeps container fields in log contents.
+	UsePipelineEventTags bool
+
 	// export from ilogtail-trace component
 	IncludeLabelRegex map[string]*regexp2.Regexp
 	ExcludeLabelRegex map[string]*regexp2.Regexp
@@ -179,7 +190,7 @@ type ServiceDockerStdout struct {
 	}
 	waitGroup sync.WaitGroup
 	context   pipeline.Context
-	collector pipeline.Collector
+	collector pipeline.PipelineCollector
 
 	// Last return of GetAllAcceptedInfoV2
 	fullList              map[string]bool
@@ -249,11 +260,7 @@ func (sds *ServiceDockerStdout) Description() string {
 	return "the container stdout input plugin for iLogtail, which supports docker and containerd."
 }
 
-func (sds *ServiceDockerStdout) Collect(pipeline.Collector) error {
-	return nil
-}
-
-func (sds *ServiceDockerStdout) FlushAll(c pipeline.Collector, firstStart bool) error {
+func (sds *ServiceDockerStdout) FlushAll(firstStart bool) error {
 	newUpdateTime := containercenter.GetContainersLastUpdateTime()
 	if sds.lastUpdateTime != 0 {
 		if sds.lastUpdateTime >= newUpdateTime {
@@ -377,9 +384,8 @@ func (sds *ServiceDockerStdout) ClearUselessCheckpoint() {
 	}
 }
 
-// Start starts the ServiceInput's service, whatever that may be
-func (sds *ServiceDockerStdout) Start(c pipeline.Collector) error {
-	sds.collector = c
+func (sds *ServiceDockerStdout) StartService(ctx pipeline.PipelineContext) error {
+	sds.collector = ctx.Collector()
 	sds.shutdown = make(chan struct{})
 	sds.waitGroup.Add(1)
 	defer sds.waitGroup.Done()
@@ -388,7 +394,7 @@ func (sds *ServiceDockerStdout) Start(c pipeline.Collector) error {
 
 	lastSaveCheckPointTime := time.Now()
 
-	_ = sds.FlushAll(c, true)
+	_ = sds.FlushAll(true)
 	for {
 		timer := time.NewTimer(time.Duration(sds.FlushIntervalMs) * time.Millisecond)
 		select {
@@ -405,7 +411,7 @@ func (sds *ServiceDockerStdout) Start(c pipeline.Collector) error {
 				lastSaveCheckPointTime = nowTime
 				sds.ClearUselessCheckpoint()
 			}
-			_ = sds.FlushAll(c, false)
+			_ = sds.FlushAll(false)
 		}
 	}
 }

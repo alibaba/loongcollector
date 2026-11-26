@@ -21,19 +21,17 @@ import (
 	"time"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
-
-const labelName = "__labels__"
 
 // SharedUDPServer used for multi configs, such as using in JMX fetcher
 type SharedUDPServer struct {
 	dispatchKey string
 	lastLog     time.Time
 	udp         *UDPServer
-	collectors  map[string]pipeline.Collector
+	collectors  map[string]pipeline.PipelineCollector
 	lock        sync.RWMutex // mutex for register collector
 }
 
@@ -50,7 +48,7 @@ func NewSharedUDPServer(context pipeline.Context, decoder, format, addr, dispatc
 		dispatchKey: dispatchKey,
 		lastLog:     time.Now(),
 		udp:         server,
-		collectors:  make(map[string]pipeline.Collector),
+		collectors:  make(map[string]pipeline.PipelineCollector),
 	}, nil
 }
 
@@ -74,30 +72,36 @@ func (s *SharedUDPServer) UnregisterCollectors(key string) {
 	delete(s.collectors, key)
 }
 
-func (s *SharedUDPServer) RegisterCollectors(key string, collector pipeline.Collector) {
+func (s *SharedUDPServer) RegisterCollectors(key string, collector pipeline.PipelineCollector) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 	s.collectors[key] = collector
 }
 
-func (s *SharedUDPServer) dispatcher(logs []*protocol.Log) {
+func (s *SharedUDPServer) dispatcher(groups ...*models.PipelineGroupEvents) {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
-	for _, log := range logs {
-		if logger.DebugFlag() {
-			logger.Debug(context.Background(), "log", log.String())
+	for _, group := range groups {
+		for _, event := range group.Events {
+			if logger.DebugFlag() {
+				logger.Debug(context.Background(), "metric", event.GetName())
+			}
+			tag := s.cutDispatchTag(event)
+			if tag == "" {
+				s.logErr("dispatcher tag is empty")
+				continue
+			}
+			collector, ok := s.collectors[tag]
+			if !ok {
+				s.logErr("collector not exist for " + tag)
+				continue
+			}
+			info := models.NewGroup(models.NewMetadata(), models.NewTags())
+			info.Metadata.Merge(group.Group.GetMetadata())
+			info.Tags.Merge(group.Group.GetTags())
+			info.DestinationLogstore = group.Group.GetDestinationLogstore()
+			collector.Collect(info, event)
 		}
-		tag := s.cutDispatchTag(log)
-		if tag == "" {
-			s.logErr("dispatcher tag is empty")
-			continue
-		}
-		collector, ok := s.collectors[tag]
-		if !ok {
-			s.logErr("collector not exist for " + tag)
-			continue
-		}
-		collector.AddRawLog(log)
 	}
 }
 
@@ -108,33 +112,31 @@ func (s *SharedUDPServer) logErr(errStr string) {
 	}
 }
 
-func (s *SharedUDPServer) cutDispatchTag(log *protocol.Log) (tag string) {
-	for _, content := range log.Contents {
-		if content.Key == "__labels__" {
-			startIdx := strings.Index(content.Value, s.dispatchKey)
-			if startIdx == -1 {
-				s.logErr("dispatch key not exist")
-				break
+func (s *SharedUDPServer) cutDispatchTag(event models.PipelineEvent) string {
+	if log, ok := event.(*models.Log); ok {
+		// StatsD logs carry the packed metric labels in their contents. Remove
+		// the routing label by exact key so similarly named labels survive.
+		const labelsKey = "__labels__"
+		contents := log.GetIndices()
+		labels, ok := contents.Get(labelsKey).(string)
+		if ok {
+			remaining := strings.Split(labels, "|")
+			for i, part := range remaining {
+				key, value, found := strings.Cut(part, "#$#")
+				if found && key == s.dispatchKey && value != "" {
+					remaining = append(remaining[:i], remaining[i+1:]...)
+					contents.Add(labelsKey, strings.Join(remaining, "|"))
+					return value
+				}
 			}
-			endIdx := startIdx + len(s.dispatchKey) + len("#$#")
-			if endIdx >= len(content.Value) {
-				s.logErr("dispatch key over range")
-				break
-			}
-			str := content.Value[endIdx:]
-			offset := strings.Index(str, "|")
-			if offset == -1 {
-				tag = str
-				content.Value = content.Value[:startIdx-1]
-			} else {
-				tag = str[:offset]
-				content.Value = content.Value[:startIdx] + content.Value[endIdx+offset+1:]
-			}
-			break
+			return ""
 		}
 	}
-	if tag == "" {
-		s.logErr("not find any dispatch key" + log.String())
+	tags := event.GetTags()
+	if tags == nil {
+		return ""
 	}
-	return
+	value := tags.Get(s.dispatchKey)
+	tags.Delete(s.dispatchKey)
+	return value
 }

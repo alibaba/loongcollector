@@ -111,7 +111,7 @@ func (r *InputSystem) Init(context pipeline.Context) (int, error) {
 	return r.CommonInit(context)
 }
 
-func (r *InputSystem) CollectTCPStats(collector pipeline.Collector, stat *net.ProtoCountersStat) {
+func (r *InputSystem) CollectTCPStats(collector pipeline.PipelineCollector, stat *net.ProtoCountersStat) {
 	if !r.TCP {
 		r.addMetric(collector, "protocol_tcp_established", &r.commonLabels, float64(stat.Stats["CurrEstab"]))
 		return
@@ -144,7 +144,7 @@ func (r *InputSystem) CollectTCPStats(collector pipeline.Collector, stat *net.Pr
 	}
 }
 
-func (r *InputSystem) CollectOpenFD(collector pipeline.Collector) {
+func (r *InputSystem) CollectOpenFD(collector pipeline.PipelineCollector) {
 	// mount the host proc path
 	file, err := os.Open(containercenter.GetMonitorFilePath("/proc/sys/fs/file-nr"))
 	if err != nil {
@@ -172,7 +172,7 @@ func (r *InputSystem) CollectOpenFD(collector pipeline.Collector) {
 
 // CollectDiskUsage use `/proc/1/mounts` to find the device rather than `proc/self/mounts`
 // because one device would be mounted many times in virtual environment.
-func (r *InputSystem) CollectDiskUsage(collector pipeline.Collector) {
+func (r *InputSystem) CollectDiskUsage(collector pipeline.PipelineCollector) {
 	// mount the host proc path
 	file, err := os.Open(containercenter.GetMonitorFilePath("/proc/1/mounts"))
 	if err != nil {

@@ -27,7 +27,6 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	converter "github.com/alibaba/ilogtail/pkg/protocol/converter"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
@@ -72,7 +71,6 @@ type FlusherClickHouse struct {
 	context   pipeline.Context
 	converter *converter.Converter
 	conn      driver.Conn
-	flusher   FlusherFunc
 }
 
 type convertConfig struct {
@@ -86,8 +84,6 @@ type convertConfig struct {
 	// The options are: 'json'
 	Encoding string
 }
-
-type FlusherFunc func(projectName string, logstoreName string, configName string, logGroupList []*protocol.LogGroup) error
 
 func NewFlusherClickHouse() *FlusherClickHouse {
 	return &FlusherClickHouse{
@@ -177,17 +173,13 @@ func (f *FlusherClickHouse) Validate() error {
 func (f *FlusherClickHouse) getConverter() (*converter.Converter, error) {
 	logger.Debug(f.context.GetRuntimeContext(), "[ilogtail data convert config] Protocol", f.Convert.Protocol,
 		"Encoding", f.Convert.Encoding, "TagFieldsRename", f.Convert.TagFieldsRename, "ProtocolFieldsRename", f.Convert.ProtocolFieldsRename)
-	return converter.NewConverter(f.Convert.Protocol, f.Convert.Encoding, f.Convert.TagFieldsRename, f.Convert.ProtocolFieldsRename, f.context.GetPipelineScopeConfig())
-}
-
-func (f *FlusherClickHouse) Flush(projectName string, logstoreName string, configName string, logGroupList []*protocol.LogGroup) error {
-	return f.flusher(projectName, logstoreName, configName, logGroupList)
+	return converter.NewConverter(f.Convert.Protocol, f.Convert.Encoding, f.Convert.TagFieldsRename, f.Convert.ProtocolFieldsRename)
 }
 
 func (f *FlusherClickHouse) Export(groups []*models.PipelineGroupEvents, _ pipeline.PipelineContext) error {
 	ctx := context.Background()
 	for _, groupEvents := range groups {
-		serializedLogs, err := f.converter.ToByteStreamV2(groupEvents)
+		serializedLogs, err := f.converter.ToByteStream(groupEvents)
 		if err != nil {
 			logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "flush clickhouse convert log fail, error", err)
 			continue
@@ -198,27 +190,6 @@ func (f *FlusherClickHouse) Export(groups []*models.PipelineGroupEvents, _ pipel
 				logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "flush clickhouse AsyncInsert fail, error", err)
 			}
 		}
-	}
-	return nil
-}
-
-func (f *FlusherClickHouse) BufferFlush(projectName string, logstoreName string, configName string, logGroupList []*protocol.LogGroup) error {
-	ctx := context.Background()
-	for _, logGroup := range logGroupList {
-		logger.Debug(f.context.GetRuntimeContext(), "[LogGroup] topic", logGroup.Topic, "logstore", logGroup.Category, "logcount", len(logGroup.Logs), "tags", logGroup.LogTags)
-		// Merge topicKeys and HashKeys,Only one convert after merge
-		serializedLogs, err := f.converter.ToByteStream(logGroup)
-		if err != nil {
-			logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "flush clickhouse convert log fail, error", err)
-		}
-		for _, log := range serializedLogs.([][]byte) {
-			sql := fmt.Sprintf("INSERT INTO %s.ilogtail_%s_buffer (_timestamp, _log) VALUES (%d, '%s')", f.Authentication.PlainText.Database, f.Table, time.Now().Unix(), escapeClickHouseStringLiteral(string(log)))
-			err = f.conn.AsyncInsert(ctx, sql, false)
-			if err != nil {
-				logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "flush clickhouse AsyncInsert fail, error", err)
-			}
-		}
-		logger.Debug(f.context.GetRuntimeContext(), "ClickHouse success send events: messageID")
 	}
 	return nil
 }
@@ -235,9 +206,7 @@ func (f *FlusherClickHouse) Stop() error {
 
 func init() {
 	pipeline.Flushers["flusher_clickhouse"] = func() pipeline.Flusher {
-		f := NewFlusherClickHouse()
-		f.flusher = f.BufferFlush
-		return f
+		return NewFlusherClickHouse()
 	}
 }
 

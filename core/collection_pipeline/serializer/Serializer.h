@@ -66,13 +66,25 @@ public:
     virtual ~Serializer() = default;
 
     bool DoSerialize(T&& p, std::string& output, std::string& errorMsg) {
-        auto inputSize = GetInputSize(p);
+        const auto inputSize = GetInputSize(p);
+        return SerializeWithMetrics(inputSize, output, [&] { return Serialize(std::move(p), output, errorMsg); });
+    }
+
+protected:
+    template <typename SerializeFunc>
+    bool SerializeWithMetrics(const size_t& inputSize,
+                              const std::string& output,
+                              SerializeFunc serialize,
+                              const bool* retryableRejection = nullptr) {
+        auto before = std::chrono::system_clock::now();
+        const bool res = serialize();
+        ADD_COUNTER(mTotalProcessMs, std::chrono::system_clock::now() - before);
+        // Oversized batches that will be split are neither accepted nor discarded.
+        if (!res && retryableRejection != nullptr && *retryableRejection) {
+            return false;
+        }
         ADD_COUNTER(mInItemsTotal, 1);
         ADD_COUNTER(mInItemSizeBytes, inputSize);
-
-        auto before = std::chrono::system_clock::now();
-        auto res = Serialize(std::move(p), output, errorMsg);
-        ADD_COUNTER(mTotalProcessMs, std::chrono::system_clock::now() - before);
 
         if (res) {
             ADD_COUNTER(mOutItemsTotal, 1);
@@ -84,7 +96,6 @@ public:
         return res;
     }
 
-protected:
     // if serialized output contains output related info, it can be obtained via this member
     const Flusher* mFlusher = nullptr;
 

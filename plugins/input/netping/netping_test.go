@@ -20,12 +20,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
+	"github.com/alibaba/ilogtail/pkg/helper"
+	"github.com/alibaba/ilogtail/pkg/models"
+
 	goping "github.com/go-ping/ping"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/util"
-	"github.com/alibaba/ilogtail/plugins/test"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
 )
 
@@ -90,8 +94,8 @@ func TestInitEmpty(t *testing.T) {
 	assert.Equal(t, 0, len(netPing.ICMPConfigs))
 	assert.Equal(t, 0, len(netPing.TCPConfigs))
 
-	c := &test.MockMetricCollector{}
-	netPing.Collect(c)
+	c := helper.NewNoopPipelineContext()
+	netPing.Read(c)
 }
 
 func TestInitAndCollect(t *testing.T) {
@@ -126,28 +130,28 @@ func TestInitAndCollect(t *testing.T) {
 	assert.Equal(t, 1, len(netPing.ICMPConfigs))
 	assert.Equal(t, 1, len(netPing.TCPConfigs))
 
-	c := &test.MockMetricCollector{}
+	c := helper.NewGroupedPipelineContext()
 	netPing.icmpPrivileged = false
-	netPing.Collect(c)
+	netPing.Read(c)
 
 	hasTcping := false
 	hasPing := false
 	hasHTTPing := false
 	hasDNS := false
 
-	for _, log := range c.Logs {
-		fmt.Println(log)
-		for _, content := range log.Contents {
-			switch {
-			case content.Key == "__name__" && content.Value == "tcping_total":
-				hasTcping = true
-			case content.Key == "__name__" && content.Value == "ping_total":
-				hasPing = true
-			case content.Key == "__name__" && content.Value == "httping_total":
-				hasHTTPing = true
-			case content.Key == "__name__" && content.Value == "dns_resolve_rt_ms":
-				hasDNS = true
-			}
+	for _, group := range c.Collector().ToArray() {
+		require.Len(t, group.Events, 1)
+		metric, ok := group.Events[0].(*models.Metric)
+		require.True(t, ok)
+		switch metric.GetName() {
+		case "tcping_total":
+			hasTcping = true
+		case "ping_total":
+			hasPing = true
+		case "httping_total":
+			hasHTTPing = true
+		case "dns_resolve_rt_ms":
+			hasDNS = true
 		}
 	}
 
@@ -157,27 +161,25 @@ func TestInitAndCollect(t *testing.T) {
 	assert.Equal(t, true, hasHTTPing)
 
 	fmt.Println("disable dns")
-	c = &test.MockMetricCollector{}
+	c = helper.NewGroupedPipelineContext()
 	netPing.DisableDNS = true
-	netPing.Collect(c)
+	netPing.Read(c)
 
 	hasTcping = false
 	hasPing = false
 	hasDNS = false
 
-	for _, log := range c.Logs {
-		fmt.Println(log)
-		for _, content := range log.Contents {
-
-			switch {
-			case content.Key == "__name__" && content.Value == "tcping_total":
-				hasTcping = true
-			case content.Key == "__name__" && content.Value == "ping_total":
-				hasPing = true
-			case content.Key == "__name__" && content.Value == "dns_resolve_rt_ms":
-				hasDNS = true
-			}
-
+	for _, group := range c.Collector().ToArray() {
+		require.Len(t, group.Events, 1)
+		metric, ok := group.Events[0].(*models.Metric)
+		require.True(t, ok)
+		switch metric.GetName() {
+		case "tcping_total":
+			hasTcping = true
+		case "ping_total":
+			hasPing = true
+		case "dns_resolve_rt_ms":
+			hasDNS = true
 		}
 	}
 

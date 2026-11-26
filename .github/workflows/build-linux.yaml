@@ -153,7 +153,7 @@ jobs:
           BUILD_TYPE: Release
         run: CURRENT_DIR=$(pwd) && sed -i "s|/src|$CURRENT_DIR|g" docker/Dockerfile_build && make core PATH_IN_DOCKER=$(pwd)
 
-  BuildPurePlugin:
+  BuildGoPlugin:
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
     strategy:
@@ -185,11 +185,11 @@ jobs:
         with:
           submodules: false
 
-      - name: Build pure plugin
-        run: make plugin_main
+      - name: Build Go plugin shared library
+        run: make plugin_local
 
   actions-timeline:
-    needs: [BuildCoreUT, BuildCoreArm64, BuildPurePlugin]
+    needs: [BuildCoreUT, BuildCoreArm64, BuildGoPlugin]
     runs-on: loongcollector-small-runner
     permissions:
       actions: read

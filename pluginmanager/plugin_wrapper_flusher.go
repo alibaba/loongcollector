@@ -23,7 +23,8 @@ import (
 
 type FlusherPluginWrapper struct {
 	FlusherWrapper
-	Flusher pipeline.FlusherV2
+	Flusher              pipeline.Flusher
+	pipelineInputMetrics *pipelineInputMetrics
 }
 
 func (wrapper *FlusherPluginWrapper) Init(pluginMeta *pipeline.PluginMeta) error {
@@ -38,10 +39,17 @@ func (wrapper *FlusherPluginWrapper) IsReady(projectName string, logstoreName st
 
 func (wrapper *FlusherPluginWrapper) Export(pipelineGroupEvents []*models.PipelineGroupEvents, pipelineContext pipeline.PipelineContext) error {
 	startTime := time.Now()
-	for _, groups := range pipelineGroupEvents {
-		wrapper.inEventsTotal.Add(groups.GetEventCount())
-		wrapper.inEventGroupsTotal.Add(1)
-		wrapper.inSizeBytes.Add(groups.GetSize())
+	var events, size int64
+	for _, group := range pipelineGroupEvents {
+		events += group.GetEventCount()
+		size += group.GetSize()
+	}
+	groups := int64(len(pipelineGroupEvents))
+	wrapper.inEventsTotal.Add(events)
+	wrapper.inEventGroupsTotal.Add(groups)
+	wrapper.inSizeBytes.Add(size)
+	if metrics := wrapper.pipelineInputMetrics; metrics != nil {
+		metrics.record(groups, events, size)
 	}
 
 	err := wrapper.Flusher.Export(pipelineGroupEvents, pipelineContext)

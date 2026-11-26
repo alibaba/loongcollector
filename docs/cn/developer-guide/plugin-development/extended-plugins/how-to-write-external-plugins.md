@@ -30,7 +30,7 @@ mkdir example_plugin
 
 ### 4. 编写插件代码
 
-建议明确实现 **`ServiceInputV2`**（`StartService`）；若仍需兼容旧路径，可同时实现 **`ServiceInputV1`**（`Start(Collector)`）。下面示例演示在同一结构体上提供两种启动方式。
+服务型插件实现 `ServiceInput`，在 `StartService(PipelineContext)` 中取得事件 Collector。旧插件需把采集入口迁移到 `Read(PipelineContext)` 或 `StartService(PipelineContext)`，然后重新编译。下面的示例提交指标事件。
 
 ```shell
 cd example_plugin
@@ -45,19 +45,17 @@ import (
 
  "github.com/alibaba/ilogtail/pkg/models"
  "github.com/alibaba/ilogtail/pkg/pipeline"
- "github.com/alibaba/ilogtail/pkg/protocol"
 )
 
 type MyServiceInput struct {
  Interval time.Duration `json:"interval" mapstructure:"interval"`
 
- collector   pipeline.Collector
- collectorV2 pipeline.PipelineCollector
- stopCh      chan struct{}
+ collector pipeline.PipelineCollector
+ stopCh    chan struct{}
 }
 
 func (m *MyServiceInput) StartService(context pipeline.PipelineContext) error {
- m.collectorV2 = context.Collector()
+ m.collector = context.Collector()
  go m.loop()
  return nil
 }
@@ -77,30 +75,13 @@ func (m *MyServiceInput) Stop() error {
  return nil
 }
 
-func (m *MyServiceInput) Start(collector pipeline.Collector) error {
- m.collector = collector
- go m.loop()
- return nil
-}
-
 func (m *MyServiceInput) loop() {
  for {
   select {
   case <-m.stopCh:
    return
   case <-time.After(m.Interval):
-   if m.collector != nil {
-    m.collector.AddRawLog(&protocol.Log{
-     Time: uint32(time.Now().Unix()),
-     Contents: []*protocol.Log_Content{
-      {Key: "host", Value: "1.1.1.1"},
-     },
-    })
-   }
-   if m.collectorV2 == nil {
-    continue
-   }
-   m.collectorV2.Collect(&models.GroupInfo{},
+   m.collector.Collect(&models.GroupInfo{},
     models.NewSingleValueMetric("test_metric",
      models.MetricTypeCounter,
      models.NewTagsWithMap(map[string]string{"hello": "world"}),

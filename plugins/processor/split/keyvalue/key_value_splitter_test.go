@@ -18,22 +18,14 @@ import (
 	"math/rand"
 	"testing"
 
+	"github.com/alibaba/ilogtail/plugins/processor/internal/processortest"
+
 	"github.com/stretchr/testify/require"
 
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/models"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	pm "github.com/alibaba/ilogtail/pluginmanager"
 )
-
-func searchPair(contents []*protocol.Log_Content, key string, value string) bool {
-	for _, pair := range contents {
-		if pair.Key == key && pair.Value == value {
-			return true
-		}
-	}
-	return false
-}
 
 func TestSplit(t *testing.T) {
 	s := newKeyValueSplitter()
@@ -43,17 +35,14 @@ func TestSplit(t *testing.T) {
 	ctx.InitContext("test", "test", "test")
 	_ = s.Init(ctx)
 
-	log := &protocol.Log{}
-	log.Contents = append(log.Contents, &protocol.Log_Content{
-		Key:   s.SourceKey,
-		Value: "class:main\tuserid:123456\tmethod:get\tkey with empty:xxxxx\tmessage:\"wrong user\"",
-	})
-	logArray := []*protocol.Log{log}
+	log := processortest.Log()
+	log.Contents.Add(s.SourceKey, "class:main\tuserid:123456\tmethod:get\tkey with empty:xxxxx\tmessage:\"wrong user\"")
+	logArray := []*models.Log{log}
 
-	outLogArray := s.ProcessLogs(logArray)
+	outLogArray := processortest.Apply(s, logArray...)
 	require.Equal(t, len(outLogArray), 1)
 	outLog := logArray[0]
-	require.Equalf(t, len(outLog.Contents), 6, "%v", outLog.Contents)
+	require.Equalf(t, outLog.Contents.Len(), 6, "%v", outLog.Contents)
 	contents := outLog.Contents
 	expectedPairs := []struct {
 		Key   string
@@ -66,7 +55,7 @@ func TestSplit(t *testing.T) {
 		{"message", "\"wrong user\""},
 	}
 	for _, p := range expectedPairs {
-		require.Truef(t, searchPair(contents, p.Key, p.Value), "%v:%v", p, contents)
+		require.Truef(t, contents.Get(p.Key) == p.Value, "%v:%v", p, contents)
 	}
 }
 
@@ -79,17 +68,14 @@ func TestSplitWithEmptyKey(t *testing.T) {
 	ctx.InitContext("test", "test", "test")
 	_ = s.Init(ctx)
 
-	log := &protocol.Log{}
-	log.Contents = append(log.Contents, &protocol.Log_Content{
-		Key:   s.SourceKey,
-		Value: "class:main\tuserid:123456\tmethod:get\t:empty again\tmessage:\"wrong user\"\t:100 empty key\n\nhello",
-	})
-	logArray := []*protocol.Log{log}
+	log := processortest.Log()
+	log.Contents.Add(s.SourceKey, "class:main\tuserid:123456\tmethod:get\t:empty again\tmessage:\"wrong user\"\t:100 empty key\n\nhello")
+	logArray := []*models.Log{log}
 
-	outLogArray := s.ProcessLogs(logArray)
+	outLogArray := processortest.Apply(s, logArray...)
 	require.Equal(t, len(outLogArray), 1)
 	outLog := logArray[0]
-	require.Equalf(t, len(outLog.Contents), 7, "%v", outLog.Contents)
+	require.Equalf(t, outLog.Contents.Len(), 7, "%v", outLog.Contents)
 	contents := outLog.Contents
 	expectedPairs := []struct {
 		Key   string
@@ -103,7 +89,7 @@ func TestSplitWithEmptyKey(t *testing.T) {
 		{s.EmptyKeyPrefix + "1", "100 empty key\n\nhello"},
 	}
 	for _, p := range expectedPairs {
-		require.Truef(t, searchPair(contents, p.Key, p.Value), "%v:%v", p, contents)
+		require.Truef(t, contents.Get(p.Key) == p.Value, "%v:%v", p, contents)
 	}
 }
 
@@ -116,17 +102,14 @@ func TestSplitWithoutSeparator(t *testing.T) {
 	ctx.InitContext("test", "test", "test")
 	_ = s.Init(ctx)
 
-	log := &protocol.Log{}
-	log.Contents = append(log.Contents, &protocol.Log_Content{
-		Key:   s.SourceKey,
-		Value: "class:main\tuserid:123456\tmethod:get\tmessage:\"wrong user\"\t100 empty key\n\nhello\tno separator again",
-	})
-	logArray := []*protocol.Log{log}
+	log := processortest.Log()
+	log.Contents.Add(s.SourceKey, "class:main\tuserid:123456\tmethod:get\tmessage:\"wrong user\"\t100 empty key\n\nhello\tno separator again")
+	logArray := []*models.Log{log}
 
-	outLogArray := s.ProcessLogs(logArray)
+	outLogArray := processortest.Apply(s, logArray...)
 	require.Equal(t, len(outLogArray), 1)
 	outLog := logArray[0]
-	require.Equalf(t, len(outLog.Contents), 7, "%v", outLog.Contents)
+	require.Equalf(t, outLog.Contents.Len(), 7, "%v", outLog.Contents)
 	contents := outLog.Contents
 	expectedPairs := []struct {
 		Key   string
@@ -140,7 +123,7 @@ func TestSplitWithoutSeparator(t *testing.T) {
 		{s.NoSeparatorKeyPrefix + "1", "no separator again"},
 	}
 	for _, p := range expectedPairs {
-		require.Truef(t, searchPair(contents, p.Key, p.Value), "%v:%v", p, contents)
+		require.Truef(t, contents.Get(p.Key) == p.Value, "%v:%v", p, contents)
 	}
 }
 
@@ -154,17 +137,14 @@ func TestSplitWithMultiCharacterDelimiter(t *testing.T) {
 	ctx.InitContext("test", "test", "test")
 	_ = s.Init(ctx)
 
-	log := &protocol.Log{}
-	log.Contents = append(log.Contents, &protocol.Log_Content{
-		Key:   s.SourceKey,
-		Value: "class:main#?#userid:123456#?#method:get#?#message:\"wrong user\"#?#100 empty key\n\nhello#?#no separator again",
-	})
-	logArray := []*protocol.Log{log}
+	log := processortest.Log()
+	log.Contents.Add(s.SourceKey, "class:main#?#userid:123456#?#method:get#?#message:\"wrong user\"#?#100 empty key\n\nhello#?#no separator again")
+	logArray := []*models.Log{log}
 
-	outLogArray := s.ProcessLogs(logArray)
+	outLogArray := processortest.Apply(s, logArray...)
 	require.Equal(t, len(outLogArray), 1)
 	outLog := logArray[0]
-	require.Equalf(t, len(outLog.Contents), 7, "%v", outLog.Contents)
+	require.Equalf(t, outLog.Contents.Len(), 7, "%v", outLog.Contents)
 	contents := outLog.Contents
 	expectedPairs := []struct {
 		Key   string
@@ -178,7 +158,7 @@ func TestSplitWithMultiCharacterDelimiter(t *testing.T) {
 		{s.NoSeparatorKeyPrefix + "1", "no separator again"},
 	}
 	for _, p := range expectedPairs {
-		require.Truef(t, searchPair(contents, p.Key, p.Value), "%v:%v", p, contents)
+		require.Truef(t, contents.Get(p.Key) == p.Value, "%v:%v", p, contents)
 	}
 }
 
@@ -193,17 +173,14 @@ func TestSplitWithChineseCharacter(t *testing.T) {
 	ctx.InitContext("test", "test", "test")
 	_ = s.Init(ctx)
 
-	log := &protocol.Log{}
-	log.Contents = append(log.Contents, &protocol.Log_Content{
-		Key:   s.SourceKey,
-		Value: "class#S中文分隔#main#D中文分隔#userid#S中文分隔#123456#D中文分隔#method#S中文分隔#get#D中文分隔#message#S中文分隔#\"wrong user\"#D中文分隔#100 没有key\n\nhello#D中文分隔#没有分隔符again",
-	})
-	logArray := []*protocol.Log{log}
+	log := processortest.Log()
+	log.Contents.Add(s.SourceKey, "class#S中文分隔#main#D中文分隔#userid#S中文分隔#123456#D中文分隔#method#S中文分隔#get#D中文分隔#message#S中文分隔#\"wrong user\"#D中文分隔#100 没有key\n\nhello#D中文分隔#没有分隔符again")
+	logArray := []*models.Log{log}
 
-	outLogArray := s.ProcessLogs(logArray)
+	outLogArray := processortest.Apply(s, logArray...)
 	require.Equal(t, len(outLogArray), 1)
 	outLog := logArray[0]
-	require.Equalf(t, len(outLog.Contents), 7, "%v", outLog.Contents)
+	require.Equalf(t, outLog.Contents.Len(), 7, "%v", outLog.Contents)
 	contents := outLog.Contents
 	expectedPairs := []struct {
 		Key   string
@@ -217,7 +194,7 @@ func TestSplitWithChineseCharacter(t *testing.T) {
 		{s.NoSeparatorKeyPrefix + "1", "没有分隔符again"},
 	}
 	for _, p := range expectedPairs {
-		require.Truef(t, searchPair(contents, p.Key, p.Value), "%v:%v", p, contents)
+		require.Truef(t, contents.Get(p.Key) == p.Value, "%v:%v", p, contents)
 	}
 }
 
@@ -237,29 +214,26 @@ func TestSplitWithQuote(t *testing.T) {
 		ctx := &pm.ContextImp{}
 		ctx.InitContext("test", "test", "test")
 		_ = s.Init(ctx)
-		log := &protocol.Log{}
-		log.Contents = append(log.Contents, &protocol.Log_Content{
-			Key: s.SourceKey,
-			Value: "a1:" + buildQValue("b \\\" c", quote) +
-				" a2:" + buildQValue("b \\\" \\\" c \\\\", quote) +
-				" class:main userid:123456" +
-				" half_quote:\" " +
-				buildQValue("多  分  隔 ", quote) +
-				" method:get " + buildQValue("中文", quote) +
-				" chinesekey:" + buildQValue("中文", quote) +
-				" " + buildQValue("", quote) +
-				" nullval:" + buildQValue("", quote) +
-				" http_user_agent:" + buildQValue("User Agent", quote) +
-				" message:" + buildQValue("wrong user", quote) +
-				" 100 empty key\n\nhello " +
-				buildQValue("no separator again", quote) + " \"123",
-		})
-		logArray := []*protocol.Log{log}
+		log := processortest.Log()
+		log.Contents.Add(s.SourceKey, "a1:"+buildQValue("b \\\" c", quote)+
+			" a2:"+buildQValue("b \\\" \\\" c \\\\", quote)+
+			" class:main userid:123456"+
+			" half_quote:\" "+
+			buildQValue("多  分  隔 ", quote)+
+			" method:get "+buildQValue("中文", quote)+
+			" chinesekey:"+buildQValue("中文", quote)+
+			" "+buildQValue("", quote)+
+			" nullval:"+buildQValue("", quote)+
+			" http_user_agent:"+buildQValue("User Agent", quote)+
+			" message:"+buildQValue("wrong user", quote)+
+			" 100 empty key\n\nhello "+
+			buildQValue("no separator again", quote)+" \"123")
+		logArray := []*models.Log{log}
 
-		outLogArray := s.ProcessLogs(logArray)
+		outLogArray := processortest.Apply(s, logArray...)
 		require.Equal(t, len(outLogArray), 1)
 		outLog := logArray[0]
-		require.Equalf(t, len(outLog.Contents), 19, "%v", outLog.Contents)
+		require.Equalf(t, outLog.Contents.Len(), 19, "%v", outLog.Contents)
 		contents := outLog.Contents
 		expectedPairs := []struct {
 			Key   string
@@ -285,7 +259,7 @@ func TestSplitWithQuote(t *testing.T) {
 			{s.NoSeparatorKeyPrefix + "7", "\"123"},
 		}
 		for _, p := range expectedPairs {
-			require.Truef(t, searchPair(contents, p.Key, p.Value), "%v:%v", p, contents)
+			require.Truef(t, contents.Get(p.Key) == p.Value, "%v:%v", p, contents)
 		}
 	}
 }
@@ -308,11 +282,7 @@ func benchmarkSplit(b *testing.B, s *KeyValueSplitter, totalPartCount int, partL
 
 	b.ResetTimer()
 	for loop := 0; loop < b.N; loop++ {
-		s.ProcessLogs([]*protocol.Log{{
-			Contents: []*protocol.Log_Content{
-				{Key: s.SourceKey, Value: value},
-			},
-		}})
+		processortest.Apply(s, processortest.Log(s.SourceKey, value))
 	}
 }
 
@@ -386,9 +356,7 @@ func BenchmarkSplit_S_S_50_1000(b *testing.B) {
 	benchmarkSplit(b, s, 50, 1000)
 }
 
-// ---- v2 (PipelineEvent / SendPb) Process path tests ----
-
-func newSplitterV2(t *testing.T) *KeyValueSplitter {
+func newSplitter(t *testing.T) *KeyValueSplitter {
 	s := newKeyValueSplitter()
 	s.KeepSource = true
 	s.SourceKey = "content"
@@ -398,8 +366,8 @@ func newSplitterV2(t *testing.T) *KeyValueSplitter {
 	return s
 }
 
-func TestProcessLogEventSplitV2(t *testing.T) {
-	s := newSplitterV2(t)
+func TestProcessLogEventSplit(t *testing.T) {
+	s := newSplitter(t)
 
 	log := models.NewLog("", nil, "", "", "", models.NewTags(), 0)
 	contents := log.GetIndices()
@@ -416,8 +384,8 @@ func TestProcessLogEventSplitV2(t *testing.T) {
 	require.True(t, contents.Contains("content"))
 }
 
-func TestProcessLogEventDropSourceV2(t *testing.T) {
-	s := newSplitterV2(t)
+func TestProcessLogEventDropSource(t *testing.T) {
+	s := newSplitter(t)
 	s.KeepSource = false
 
 	log := models.NewLog("", nil, "", "", "", models.NewTags(), 0)
@@ -431,8 +399,8 @@ func TestProcessLogEventDropSourceV2(t *testing.T) {
 	require.Equal(t, "2", contents.Get("b"))
 }
 
-func TestProcessMetricPassThroughV2(t *testing.T) {
-	s := newSplitterV2(t)
+func TestProcessMetricPassThrough(t *testing.T) {
+	s := newSplitter(t)
 
 	log := models.NewLog("", nil, "", "", "", models.NewTags(), 0)
 	log.GetIndices().Add("content", "a:1\tb:2")

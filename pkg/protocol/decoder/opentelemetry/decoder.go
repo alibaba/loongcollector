@@ -23,7 +23,6 @@ import (
 	"go.opentelemetry.io/collector/pdata/ptrace/ptraceotlp"
 
 	"github.com/alibaba/ilogtail/pkg/models"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/protocol/decoder/common"
 )
 
@@ -41,43 +40,13 @@ type Decoder struct {
 	Format string
 }
 
-// Decode impl
-func (d *Decoder) Decode(data []byte, req *http.Request, tags map[string]string) (logs []*protocol.Log, err error) {
-	switch d.Format {
-	case common.ProtocolOTLPLogV1:
-		otlpLogReq := plogotlp.NewExportRequest()
-		otlpLogReq, err = DecodeOtlpRequest(otlpLogReq, data, req)
-		if err != nil {
-			return logs, err
-		}
-		logs, err = ConvertOtlpLogRequestV1(otlpLogReq)
-	case common.ProtocolOTLPMetricV1:
-		otlpMetricReq := pmetricotlp.NewExportRequest()
-		otlpMetricReq, err = DecodeOtlpRequest(otlpMetricReq, data, req)
-		if err != nil {
-			return logs, err
-		}
-		logs, err = ConvertOtlpMetricRequestV1(otlpMetricReq)
-	case common.ProtocolOTLPTraceV1:
-		otlpTraceReq := ptraceotlp.NewExportRequest()
-		otlpTraceReq, err = DecodeOtlpRequest(otlpTraceReq, data, req)
-		if err != nil {
-			return logs, err
-		}
-		logs, err = ConvertOtlpTraceRequestV1(otlpTraceReq)
-	default:
-		err = errors.New("Invalid RequestURI: " + req.RequestURI)
-	}
-	return logs, err
-}
-
 // ParseRequest impl
 func (d *Decoder) ParseRequest(res http.ResponseWriter, req *http.Request, maxBodySize int64) (data []byte, statusCode int, err error) {
 	return common.CollectBody(res, req, maxBodySize)
 }
 
-// DecodeV2 impl
-func (d *Decoder) DecodeV2(data []byte, req *http.Request) (groups []*models.PipelineGroupEvents, err error) {
+// Decode impl
+func (d *Decoder) Decode(data []byte, req *http.Request) (groups []*models.PipelineGroupEvents, err error) {
 	switch d.Format {
 	case common.ProtocolOTLPLogV1:
 		otlpLogReq := plogotlp.NewExportRequest()

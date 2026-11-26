@@ -20,7 +20,6 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
@@ -75,68 +74,14 @@ func (*ProcessorRegexFilter) Description() string {
 	return "regex filter for logtail"
 }
 
-func (p *ProcessorRegexFilter) IsLogMatch(log *protocol.Log) bool {
-	if p.includeRegex != nil {
-		includeCount := 0
-		for _, cont := range log.Contents {
-			if reg, ok := p.includeRegex[cont.Key]; ok {
-				if reg.MatchString(cont.Value) {
-					includeCount++
-				} else {
-					// not match
-					// logger.Info("include not match", "kv", cont.GetKey(), cont.GetValue(), "match result", matchRst)
-					return false
-				}
-			}
-		}
-		// not match all
-		if includeCount < len(p.includeRegex) {
-			// logger.Info("include count not match", includeCount)
-			return false
-		}
-	}
-
-	if p.excludeRegex != nil {
-		for _, cont := range log.Contents {
-			if reg, ok := p.excludeRegex[cont.Key]; ok {
-				if reg.MatchString(cont.Value) {
-					// if match, return false
-					// logger.Info("exclude not match", *cont)
-					return false
-				}
-			}
-		}
-	}
-
-	return true
-}
-
-func (p *ProcessorRegexFilter) ProcessLogs(logArray []*protocol.Log) []*protocol.Log {
-	totalLen := len(logArray)
-	nextIdx := 0
-	for idx := 0; idx < totalLen; idx++ {
-		if p.IsLogMatch(logArray[idx]) {
-			if idx != nextIdx {
-				logArray[nextIdx] = logArray[idx]
-			}
-			nextIdx++
-		} else {
-			p.filterMetric.Add(1)
-		}
-	}
-	logArray = logArray[:nextIdx]
-	return logArray
-}
-
 func init() {
 	pipeline.Processors[pluginType] = func() pipeline.Processor {
 		return &ProcessorRegexFilter{}
 	}
 }
 
-// isLogMatchV2 mirrors IsLogMatch for the v2 models.Log representation, matching
-// Include/Exclude regexes against the field values held in log.GetIndices().
-func (p *ProcessorRegexFilter) isLogMatchV2(log *models.Log) bool {
+// isLogMatch tests the log field values against the configured patterns.
+func (p *ProcessorRegexFilter) isLogMatch(log *models.Log) bool {
 	contents := log.GetIndices()
 	if p.includeRegex != nil {
 		includeCount := 0
@@ -170,10 +115,7 @@ func (p *ProcessorRegexFilter) isLogMatchV2(log *models.Log) bool {
 	return true
 }
 
-// Process implements the v2 ProcessorV2 interface. Log events are filtered by
-// the Include/Exclude field-value regexes (dropping logs that do not match,
-// mirroring the v1 semantics), while Metric/Span and any other non-Log events
-// always pass through unchanged. The original event order is preserved.
+// Process filters logs by field value and passes other events through in order.
 func (p *ProcessorRegexFilter) Process(in *models.PipelineGroupEvents, context pipeline.PipelineContext) {
 	if in == nil {
 		return
@@ -181,7 +123,7 @@ func (p *ProcessorRegexFilter) Process(in *models.PipelineGroupEvents, context p
 	survivors := make([]models.PipelineEvent, 0, len(in.Events))
 	for _, event := range in.Events {
 		if event.GetType() == models.EventTypeLogging {
-			if p.isLogMatchV2(event.(*models.Log)) {
+			if p.isLogMatch(event.(*models.Log)) {
 				survivors = append(survivors, event)
 			} else {
 				p.filterMetric.Add(1)

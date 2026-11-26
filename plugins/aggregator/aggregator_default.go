@@ -1,4 +1,4 @@
-// Copyright 2022 iLogtail Authors
+// Copyright 2021 iLogtail Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,8 +19,11 @@ import (
 	"github.com/alibaba/ilogtail/plugins/aggregator/context"
 )
 
+// DefaultPluginType names the context aggregator used by pipelines without an explicit aggregator.
+const DefaultPluginType = "aggregator_default"
+
 func init() {
-	pipeline.Aggregators["aggregator_default"] = func() pipeline.Aggregator {
+	pipeline.Aggregators[DefaultPluginType] = func() pipeline.Aggregator {
 		return context.NewAggregatorContext()
 	}
 }

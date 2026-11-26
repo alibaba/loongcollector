@@ -28,8 +28,8 @@ import (
 	"github.com/alibaba/ilogtail/pkg/flags"
 	"github.com/alibaba/ilogtail/pkg/helper/containercenter"
 	"github.com/alibaba/ilogtail/pkg/logger"
-	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/models"
+	"github.com/alibaba/ilogtail/plugins/aggregator/baseagg"
 	"github.com/alibaba/ilogtail/plugins/flusher/checker"
 	_ "github.com/alibaba/ilogtail/plugins/flusher/sls"
 	_ "github.com/alibaba/ilogtail/plugins/input/docker/stdout"
@@ -160,11 +160,12 @@ func loadMockConfig() error {
 	return nil
 }
 
-func (s *containerConfigTestSuite) TestLargeCountLog() {
+func (s *containerConfigTestSuite) TestStopCollectsPendingConfigResults() {
 	configStr := `
 	{
 		"global": {
-			"InputIntervalMs" :  30000,
+			"InputIntervalMs": 3600000,
+			"InputMaxFirstCollectDelayMs": 0,
 			"AggregatIntervalMs": 1000,
 			"FlushIntervalMs": 1000,
 			"DefaultLogQueueSize": 4,
@@ -186,24 +187,61 @@ func (s *containerConfigTestSuite) TestLargeCountLog() {
 			}
 		]
 	}`
-	nowTime := time.Now()
-	ContainerConfig, err := loadBuiltinConfig("container", "sls-test", "logtail_containers", "logtail_containers", configStr)
-	s.NoError(err)
-	ContainerConfig.Start()
-	loggroup := &protocol.LogGroup{}
-	for i := 1; i <= 10000; i++ {
-		log := &protocol.Log{}
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "test", Value: "123"})
-		protocol.SetLogTime(log, uint32(nowTime.Unix()))
-		loggroup.Logs = append(loggroup.Logs, log)
-	}
+	containerConfig, err := loadBuiltinConfig("container", "sls-test", "logtail_containers", "logtail_containers", configStr)
+	s.Require().NoError(err)
+	flusher := GetConfigFlushers(containerConfig.PluginRunner)[0].(*checker.FlusherChecker)
+	containercenter.RecordContainerConfigResultIncrement(&containercenter.ContainerConfigResult{ConfigName: "initial-read"})
+	containerConfig.Start()
+	s.Require().Eventually(func() bool {
+		flusher.Lock.RLock()
+		defer flusher.Lock.RUnlock()
+		for _, group := range flusher.GroupEvents {
+			for _, event := range group.Events {
+				if log, ok := event.(*models.Log); ok && log.GetIndices().Get("config_name") == "initial-read" {
+					return true
+				}
+			}
+		}
+		return false
+	}, 5*time.Second, time.Millisecond)
 
-	for _, log := range loggroup.Logs {
-		ContainerConfig.PluginRunner.ReceiveRawLog(&pipeline.LogWithContext{Log: log})
+	const size = 10000
+	for i := 0; i < size; i++ {
+		containercenter.RecordContainerConfigResultIncrement(&containercenter.ContainerConfigResult{
+			DataType: "collect_config_result", Project: "sls-test", Logstore: "container-store",
+			ConfigName: "region$application", InputType: "container", SourceAddress: "source", FlusherType: "sls",
+		})
 	}
-	s.Equal(1, len(GetConfigFlushers(ContainerConfig.PluginRunner)))
-	time.Sleep(time.Millisecond * time.Duration(1500))
-	c, ok := GetConfigFlushers(ContainerConfig.PluginRunner)[0].(*checker.FlusherChecker)
-	s.True(ok)
-	s.Equal(10000, c.GetLogCount())
+	containercenter.RecordContainerConfigResultIncrement(&containercenter.ContainerConfigResult{ConfigName: "final-read"})
+	// The next scheduled collection is an hour away. Stop runs the last Read.
+	s.Require().NoError(containerConfig.Stop(true))
+	var first *models.Log
+	var configResults, finalMarkers int
+	for _, group := range flusher.GroupEvents {
+		s.Require().LessOrEqual(len(group.Events), baseagg.MaxLogCount)
+		for _, event := range group.Events {
+			log := event.(*models.Log)
+			switch log.GetIndices().Get("config_name") {
+			case "final-read":
+				finalMarkers++
+			case "application":
+				configResults++
+				if first == nil {
+					first = log
+				}
+			}
+		}
+	}
+	s.Require().Equal(1, finalMarkers)
+	s.Require().Equal(size, configResults)
+	s.Require().NotNil(first)
+	s.Equal("collect_config_result", first.GetIndices().Get("type"))
+	s.Equal("sls-test", first.GetIndices().Get("project"))
+	s.Equal("container-store", first.GetIndices().Get("logstore"))
+	s.Equal("application", first.GetIndices().Get("config_name"))
+	s.Equal("source", first.GetIndices().Get("input.source_addresses"))
+	s.Equal("sls", first.GetIndices().Get("flusher.type"))
+	s.Equal(uint64(0), first.GetTimestamp()%1e9)
+	s.NotZero(first.GetTimestamp())
+	s.Empty(first.GetTags().Iterator())
 }

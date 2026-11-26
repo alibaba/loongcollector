@@ -19,13 +19,10 @@ import (
 	"strings"
 
 	"go.opentelemetry.io/collector/pdata/pmetric"
-	v1 "go.opentelemetry.io/proto/otlp/metrics/v1"
-	"google.golang.org/protobuf/encoding/protojson"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/protocol/decoder/opentelemetry"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
@@ -52,96 +49,6 @@ func (p *ProcessorOtelMetricParser) Description() string {
 	return "otel metrics parser for logtail"
 }
 
-func (p *ProcessorOtelMetricParser) ProcessLogs(logArray []*protocol.Log) []*protocol.Log {
-	var logs = make([]*protocol.Log, 0)
-	for _, log := range logArray {
-		if l, err := p.processLog(log); err != nil {
-			logger.Warningf(p.context.GetRuntimeContext(), selfmonitor.ProcessorOTELMetricParserAlarm, "parser otel metric error %v", err)
-		} else {
-			logs = append(logs, l...)
-		}
-	}
-	return logs
-}
-
-func (p *ProcessorOtelMetricParser) processLog(log *protocol.Log) (logs []*protocol.Log, err error) {
-	logs = make([]*protocol.Log, 0)
-
-	findKey := false
-	for idx := range log.Contents {
-		if log.Contents[idx].Key == p.SourceKey {
-			findKey = true
-			objectVal := log.Contents[idx].Value
-			var l []*protocol.Log
-
-			switch strings.ToLower(p.Format) {
-			case "json":
-				if l, err = p.processJSONMetricData(objectVal); err != nil {
-					return logs, err
-				}
-			case "protobuf":
-				if l, err = p.processProtobufMetricData(objectVal); err != nil {
-					return logs, err
-				}
-			case "protojson":
-				if l, err = p.processProtoJSONMetricData(objectVal); err != nil {
-					return logs, err
-				}
-			}
-			logs = append(logs, l...)
-		}
-	}
-
-	if !findKey && p.NoKeyError {
-		logger.Warningf(p.context.GetRuntimeContext(), selfmonitor.ProcessorOTELMetricFindAlarm, "cannot find key %v", p.SourceKey)
-		return logs, nil
-	}
-
-	return logs, nil
-}
-
-func (p *ProcessorOtelMetricParser) processJSONMetricData(data string) ([]*protocol.Log, error) {
-	jsonUnmarshaler := pmetric.JSONUnmarshaler{}
-	var metrics pmetric.Metrics
-	var err error
-
-	if metrics, err = jsonUnmarshaler.UnmarshalMetrics([]byte(data)); err != nil {
-		return nil, err
-	}
-
-	log, _ := opentelemetry.ConvertOtlpMetricV1(metrics)
-	return log, nil
-}
-
-func (p *ProcessorOtelMetricParser) processProtobufMetricData(data string) ([]*protocol.Log, error) {
-	protoUnmarshaler := pmetric.ProtoUnmarshaler{}
-	var metrics pmetric.Metrics
-	var err error
-
-	if metrics, err = protoUnmarshaler.UnmarshalMetrics([]byte(data)); err != nil {
-		return nil, err
-	}
-
-	log, _ := opentelemetry.ConvertOtlpMetricV1(metrics)
-	return log, nil
-}
-
-func (p *ProcessorOtelMetricParser) processProtoJSONMetricData(data string) ([]*protocol.Log, error) {
-	metrics := &v1.ResourceMetrics{}
-	var err error
-
-	if err = protojson.Unmarshal([]byte(data), metrics); err != nil {
-		return nil, err
-	}
-
-	var log []*protocol.Log
-	if log, err = opentelemetry.ConvertOtlpMetrics(metrics); err != nil {
-		return nil, err
-	}
-
-	return log, nil
-}
-
 func init() {
 	pipeline.Processors[otelMetricPluginName] = func() pipeline.Processor {
 		return &ProcessorOtelMetricParser{
@@ -152,12 +59,8 @@ func init() {
 	}
 }
 
-// Process implements the v2 ProcessorV2 interface: "v2场景下输入Log输出Metric".
-// For each Log event it reads the OTLP metric payload from p.SourceKey, decodes
-// it per the configured format and emits native models.Metric events produced
-// by the canonical OTLP→models converter. As in v1 (ProcessLogs/processLog),
-// the source Log is NOT preserved: it is replaced by the converted metrics.
-// Non-Log events (Metric/Span) are passed through unchanged.
+// Process converts the OTLP payload of each log to native events grouped by resource.
+// Other event types pass through unchanged.
 func (p *ProcessorOtelMetricParser) Process(in *models.PipelineGroupEvents, context pipeline.PipelineContext) {
 	if in == nil {
 		return
@@ -173,7 +76,6 @@ func (p *ProcessorOtelMetricParser) Process(in *models.PipelineGroupEvents, cont
 
 		groups, err := p.convertLogToMetricGroups(log)
 		if err != nil {
-			// Mirror v1 ProcessLogs error handling: log and skip.
 			logger.Warningf(p.context.GetRuntimeContext(), selfmonitor.ProcessorOTELMetricParserAlarm, "parser otel metric error %v", err)
 			continue
 		}
@@ -216,11 +118,7 @@ func (p *ProcessorOtelMetricParser) convertLogToMetricGroups(log *models.Log) ([
 	return opentelemetry.ConvertOtlpMetricsToGroupEvents(metrics)
 }
 
-// unmarshalMetrics decodes the OTLP metric payload into pdata pmetric.Metrics
-// (the input accepted by the canonical converter). json/protobuf mirror v1
-// exactly; protojson wraps the single ResourceMetrics object (v1's protojson
-// input shape) into the standard OTLP request envelope so the pdata JSON
-// unmarshaler can parse it.
+// unmarshalMetrics decodes the configured format. Protojson carries one ResourceMetrics object.
 func (p *ProcessorOtelMetricParser) unmarshalMetrics(data []byte) (pmetric.Metrics, error) {
 	switch strings.ToLower(p.Format) {
 	case "json":

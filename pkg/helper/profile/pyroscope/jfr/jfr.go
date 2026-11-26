@@ -23,19 +23,18 @@ import (
 	"mime/multipart"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/pyroscope-io/pyroscope/pkg/util/form"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/alibaba/ilogtail/pkg/helper/profile"
-	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/models"
 )
 
 type RawProfile struct {
 	RawData             []byte
 	FormDataContentType string
-
-	logs []*protocol.Log // v1 result
 }
 
 func NewRawProfile(data []byte, format string) *RawProfile {
@@ -45,97 +44,47 @@ func NewRawProfile(data []byte, format string) *RawProfile {
 	}
 }
 
-func (r *RawProfile) Parse(ctx context.Context, meta *profile.Meta, tags map[string]string) (logs []*protocol.Log, err error) {
+func (r *RawProfile) Parse(ctx context.Context, meta *profile.Meta, tags map[string]string) ([]models.PipelineEvent, error) {
 	reader, labels, err := r.extractProfileRaw()
 	if err != nil {
 		return nil, err
 	}
-	if err := r.ParseJFR(ctx, meta, reader, labels, r.extractProfileV1(meta, tags)); err != nil {
+	var events []models.PipelineEvent
+	if err := r.ParseJFR(ctx, meta, reader, labels, profileLogCallback(meta, tags, &events)); err != nil {
 		return nil, err
 	}
-	logs = r.logs
-	r.logs = nil
-	return
+	return events, nil
 }
 
-func (r *RawProfile) extractProfileV1(meta *profile.Meta, tags map[string]string) profile.CallbackFunc {
+func profileLogCallback(meta *profile.Meta, tags map[string]string, events *[]models.PipelineEvent) profile.CallbackFunc {
 	profileID := profile.GetProfileID(meta)
 	return func(id uint64, stack *profile.Stack, vals []uint64, types, units, aggs []string, startTime, endTime int64, labels map[string]string) {
-		var content []*protocol.Log_Content
-		for k, v := range tags {
-			labels[k] = v
+		for key, value := range tags {
+			labels[key] = value
 		}
-		b, _ := json.Marshal(labels)
-		content = append(content,
-			&protocol.Log_Content{
-				Key:   "name",
-				Value: stack.Name,
-			},
-			&protocol.Log_Content{
-				Key:   "stack",
-				Value: strings.Join(stack.Stack, "\n"),
-			},
-			&protocol.Log_Content{
-				Key:   "stackID",
-				Value: strconv.FormatUint(id, 16),
-			},
-			&protocol.Log_Content{
-				Key:   "language",
-				Value: meta.SpyName,
-			},
-			&protocol.Log_Content{
-				Key:   "dataType",
-				Value: "CallStack",
-			},
-			&protocol.Log_Content{
-				Key:   "durationNs",
-				Value: strconv.FormatInt(endTime-startTime, 10),
-			},
-
-			&protocol.Log_Content{
-				Key:   "profileID",
-				Value: profileID,
-			},
-			&protocol.Log_Content{
-				Key:   "labels",
-				Value: string(b),
-			},
-		)
-		for i, v := range vals {
-			var res []*protocol.Log_Content
-			if i != len(vals)-1 {
-				res = make([]*protocol.Log_Content, len(content))
-				copy(res, content)
-			} else {
-				res = content
-			}
-			res = append(res,
-				&protocol.Log_Content{
-					Key:   "units",
-					Value: units[i],
-				},
-				&protocol.Log_Content{
-					Key:   "type",
-					Value: profile.DetectProfileType(types[i]).Kind,
-				},
-				&protocol.Log_Content{
-					Key:   "valueTypes",
-					Value: types[i],
-				},
-				&protocol.Log_Content{
-					Key:   "aggTypes",
-					Value: aggs[i],
-				},
-				&protocol.Log_Content{
-					Key:   "val",
-					Value: strconv.FormatFloat(float64(v), 'f', 2, 64),
-				},
-			)
-			log := &protocol.Log{
-				Contents: res,
-			}
-			protocol.SetLogTimeWithNano(log, uint32(startTime/1e9), uint32(startTime%1e9))
-			r.logs = append(r.logs, log)
+		encodedLabels, _ := json.Marshal(labels)
+		labelText := string(encodedLabels)
+		timestamp := profile.LogTimestamp(startTime/int64(time.Second), startTime%int64(time.Second))
+		stackTrace := strings.Join(stack.Stack, "\n")
+		stackID := strconv.FormatUint(id, 16)
+		duration := strconv.FormatInt(endTime-startTime, 10)
+		for i, value := range vals {
+			log := models.NewLogWithOrderedContents(13)
+			log.Timestamp = timestamp
+			log.Contents.Add("name", stack.Name)
+			log.Contents.Add("stack", stackTrace)
+			log.Contents.Add("stackID", stackID)
+			log.Contents.Add("language", meta.SpyName)
+			log.Contents.Add("dataType", "CallStack")
+			log.Contents.Add("durationNs", duration)
+			log.Contents.Add("profileID", profileID)
+			log.Contents.Add("labels", labelText)
+			log.Contents.Add("units", units[i])
+			log.Contents.Add("type", profile.DetectProfileType(types[i]).Kind)
+			log.Contents.Add("valueTypes", types[i])
+			log.Contents.Add("aggTypes", aggs[i])
+			log.Contents.Add("val", strconv.FormatFloat(float64(value), 'f', 2, 64))
+			*events = append(*events, log)
 		}
 	}
 }

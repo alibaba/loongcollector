@@ -216,3 +216,29 @@ func Test_findTargetFieldsInGroup(t *testing.T) {
 		})
 	}
 }
+
+func TestConverterRawLogPayload(t *testing.T) {
+	body := models.NewLogWithOrderedContents(2)
+	body.GetIndices().Add(models.BodyKey, "request\x00body")
+	body.GetIndices().Add("upstream", "ignored")
+	keyedKafka := models.NewLogWithOrderedContents(1)
+	keyedKafka.GetIndices().Add("message-key", "keyed value")
+	emptyBody := models.NewLogWithOrderedContents(1)
+	emptyBody.GetIndices().Add(models.BodyKey, "")
+	group := &models.PipelineGroupEvents{Events: []models.PipelineEvent{
+		body, keyedKafka, emptyBody, models.ByteArray("custom decoder"),
+	}}
+	c := &Converter{Protocol: ProtocolRaw, Encoding: EncodingCustom}
+	stream, _, err := c.ConvertToRawStream(group, nil)
+	if assert.NoError(t, err) && assert.Len(t, stream, 4) {
+		assert.Equal(t, []byte("request\x00body"), stream[0])
+		assert.Equal(t, []byte("keyed value"), stream[1])
+		assert.Empty(t, stream[2])
+		assert.Equal(t, []byte("custom decoder"), stream[3])
+	}
+
+	c.Separator = "|"
+	stream, _, err = c.ConvertToRawStream(group, nil)
+	assert.NoError(t, err)
+	assert.Equal(t, [][]byte{[]byte("request\x00body|keyed value||custom decoder")}, stream)
+}

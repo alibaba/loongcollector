@@ -29,15 +29,15 @@ func (r *InputSystem) Init(context pipeline.Context) (int, error) {
 	return r.CommonInit(context)
 }
 
-func (r *InputSystem) CollectTCPStats(collector pipeline.Collector, stat *net.ProtoCountersStat) {
+func (r *InputSystem) CollectTCPStats(collector pipeline.PipelineCollector, stat *net.ProtoCountersStat) {
 	r.addMetric(collector, "protocol_tcp_established", &r.commonLabels, float64(stat.Stats["CurrEstab"]))
 }
 
-func (r *InputSystem) CollectOpenFD(collector pipeline.Collector) {
+func (r *InputSystem) CollectOpenFD(collector pipeline.PipelineCollector) {
 
 }
 
-func (r *InputSystem) CollectDiskUsage(collector pipeline.Collector) {
+func (r *InputSystem) CollectDiskUsage(collector pipeline.PipelineCollector) {
 	if allParts, err := disk.Partitions(false); err == nil {
 		for _, part := range allParts {
 			if r.excludeDiskFsTypeRegex != nil && r.excludeDiskFsTypeRegex.MatchString(part.Fstype) {

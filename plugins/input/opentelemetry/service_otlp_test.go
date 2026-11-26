@@ -19,6 +19,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -36,6 +37,8 @@ import (
 
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/models"
+	"github.com/alibaba/ilogtail/pkg/protocol/decoder/common"
+	otlpdecoder "github.com/alibaba/ilogtail/pkg/protocol/decoder/opentelemetry"
 	"github.com/alibaba/ilogtail/pluginmanager"
 	"github.com/alibaba/ilogtail/plugins/test"
 )
@@ -58,25 +61,7 @@ func (p *ContextTest) LogWarn(alarmType string, kvPairs ...interface{}) {
 	fmt.Println(alarmType, kvPairs)
 }
 
-type op func(*Server)
-
-func setCompression(cp string) op {
-	return func(s *Server) {
-		if s.Protocals.GRPC != nil {
-			s.Protocals.GRPC.Compression = cp
-		}
-	}
-}
-
-func setDecompression(cp string) op {
-	return func(s *Server) {
-		if s.Protocals.GRPC != nil {
-			s.Protocals.GRPC.Decompression = cp
-		}
-	}
-}
-
-func newInput(enableGRPC, enableHTTP bool, grpcEndpoint, httpEndpoint string, ops ...op) (*Server, error) {
+func newInput(enableGRPC, enableHTTP bool, grpcEndpoint, httpEndpoint string) (*Server, error) {
 	ctx := &ContextTest{}
 	ctx.ContextImp.InitContext("a", "b", "c")
 	s := &Server{
@@ -94,9 +79,6 @@ func newInput(enableGRPC, enableHTTP bool, grpcEndpoint, httpEndpoint string, op
 		}
 	}
 
-	for _, op := range ops {
-		op(s)
-	}
 	_, err := s.Init(&ctx.ContextImp)
 	return s, err
 }
@@ -182,18 +164,23 @@ func TestOtlpGRPC_Trace(t *testing.T) {
 func TestOtlpGRPC_Metrics(t *testing.T) {
 	endpointGrpc := test.GetAvailableLocalAddress(t)
 	input, err := newInput(true, false, endpointGrpc, "")
-	assert.NoError(t, err)
+	require.NoError(t, err)
+	input.Protocals.GRPC.Compression = "gzip"
+	input.Protocals.GRPC.Decompression = "gzip"
 
 	queueSize := 10
 	pipelineCxt := helper.NewObservePipelineContext(queueSize)
-	input.StartService(pipelineCxt)
+	require.NoError(t, input.StartService(pipelineCxt))
 	t.Cleanup(func() {
 		require.NoError(t, input.Stop())
 	},
 	)
 
-	cc, err := grpc.Dial(endpointGrpc, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	assert.NoError(t, err)
+	cc, err := grpc.Dial(endpointGrpc, grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithCompressor(grpc.NewGZIPCompressor()),
+		grpc.WithDecompressor(grpc.NewGZIPDecompressor()),
+	)
+	require.NoError(t, err)
 	defer func() {
 		assert.NoError(t, cc.Close())
 	}()
@@ -214,6 +201,39 @@ func TestOtlpGRPC_Metrics(t *testing.T) {
 		if count == queueSize {
 			break
 		}
+	}
+}
+
+func TestOtlpHTTP_Logs(t *testing.T) {
+	for _, contentType := range []string{pbContentType, jsonContentType} {
+		t.Run(contentType, func(t *testing.T) {
+			input, err := newInput(false, false, "", "")
+			require.NoError(t, err)
+			ctx := helper.NewObservePipelineContext(1)
+			input.logsReceiver = newLogsReceiver(ctx)
+			mux := http.NewServeMux()
+			input.registerHTTPLogsComsumer(mux, &otlpdecoder.Decoder{Format: common.ProtocolOTLPLogV1}, 1024*1024, "/v1/logs")
+
+			export := plogotlp.NewExportRequestFromLogs(GenerateLogs(1))
+			marshal := export.MarshalProto
+			if contentType == jsonContentType {
+				marshal = export.MarshalJSON
+			}
+			data, err := marshal()
+			require.NoError(t, err)
+			request := httptest.NewRequest(http.MethodPost, "/v1/logs", bytes.NewReader(data))
+			request.Header.Set("Content-Type", contentType)
+			response := httptest.NewRecorder()
+			mux.ServeHTTP(response, request)
+			require.Equal(t, http.StatusOK, response.Code)
+
+			groups := ctx.Collector().ToArray()
+			require.Len(t, groups, 1)
+			require.Equal(t, "resource-attr-val-1", groups[0].Group.GetMetadata().Get("resource-attr"))
+			require.Len(t, groups[0].Events, 1)
+			log := groups[0].Events[0].(*models.Log)
+			require.Equal(t, "log body 0", string(log.GetBody()))
+		})
 	}
 }
 

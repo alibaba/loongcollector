@@ -8,9 +8,9 @@
 
 列含义见 [概览 · 事件能力列说明](../../overview.md#事件能力列说明)。
 
-| v1 接口 | v2 接口 | Log | Metric | Span |
-| --- | --- | --- | --- | --- |
-| ✓ | ✓ | v1&v2 | 透传未知 | 透传未知 |
+| Log | Metric | Span |
+| --- | --- | --- |
+| ✓ | 日志记录 | 日志记录 |
 
 ## 版本
 
@@ -30,8 +30,8 @@
 | Version                               | string   | 否    | Kafka协议版本号 ,例如：`2.0.0`，默认值：`1.0.0`                                                                         |
 | Headers                               | header数组 | 否    | kafka消息头 ，配置使用请参考本文中`Headers`配置用例                                                                          |
 | Convert                               | Struct   | 否    | LoongCollector数据转换协议配置                                                                                           |
-| Convert.Protocol                      | string   | 否    | LoongCollector数据转换协议，kafka flusher 可选值：`custom_single`,`custom_single_flatten`,`otlp_log_v1`。默认值：`custom_single` |
-| Convert.Encoding                      | string   | 否    | LoongCollector flusher数据转换编码，可选值：`json`、`none`、`protobuf`，默认值：`json`                                             |
+| Convert.Protocol                      | string   | 否    | 数据转换协议。支持 `custom_single` 和 `custom_single_flatten`，默认值为 `custom_single`。 |
+| Convert.Encoding                      | string   | 否    | 数据转换编码，使用 `json`。 |
 | Convert.TagFieldsRename               | Map      | 否    | 对日志中tags中的json字段重命名                                                                                        |
 | Convert.ProtocolFieldsRename          | Map      | 否    | LoongCollector日志协议字段重命名，可当前可重命名的字段：`contents`,`tags`和`time`                                                      |
 | Authentication                        | Struct   | 否    | Kafka连接访问认证配置，支持`SASL/PLAIN`，根据kafka服务端认证方式选择配置                                                            |

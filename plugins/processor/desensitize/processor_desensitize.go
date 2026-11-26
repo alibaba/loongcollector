@@ -25,7 +25,6 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
@@ -130,20 +129,7 @@ func (*ProcessorDesensitize) Description() string {
 	return "desensitize processor for logtail"
 }
 
-func (p *ProcessorDesensitize) ProcessLogs(logArray []*protocol.Log) []*protocol.Log {
-	for _, log := range logArray {
-		for i, content := range log.Contents {
-			if p.SourceKey == content.Key {
-				newVal := p.desensitize(content.Value)
-				log.Contents[i].Value = newVal
-				break
-			}
-		}
-	}
-	return logArray
-}
-
-// Process implements the v2 ProcessorV2 interface: it desensitizes the SourceKey
+// Process implements the Processor interface: it desensitizes the SourceKey
 // value of each Log event in place; Metric/Span events pass through unchanged.
 func (p *ProcessorDesensitize) Process(in *models.PipelineGroupEvents, context pipeline.PipelineContext) {
 	pipeline.ProcessLogEventsOnly(in, context, p.processLogEvent)

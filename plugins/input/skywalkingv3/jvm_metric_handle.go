@@ -18,15 +18,15 @@ import (
 	"context"
 
 	"github.com/alibaba/ilogtail/pkg/helper"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	v3 "github.com/alibaba/ilogtail/plugins/input/skywalkingv3/skywalking/network/common/v3"
 	skywalking "github.com/alibaba/ilogtail/plugins/input/skywalkingv3/skywalking/network/language/agent/v3"
 )
 
 type JVMMetricHandler struct {
 	context   pipeline.Context
-	collector pipeline.Collector
+	collector pipeline.PipelineCollector
 	interval  int64
 	lastTime  int64
 }
@@ -45,19 +45,19 @@ func (h *JVMMetricHandler) Collect(ctx context.Context, req *skywalking.JVMMetri
 		// }
 		logs := h.toMetricStoreFormat(metric, req.Service, req.ServiceInstance)
 		for _, log := range logs {
-			h.collector.AddRawLog(log)
+			h.collector.Collect(models.NewGroup(models.NewMetadata(), models.NewTags()), log)
 		}
 	}
 	return &v3.Commands{}, nil
 }
 
-func (h *JVMMetricHandler) toMetricStoreFormat(metric *skywalking.JVMMetric, service string, serviceInstance string) []*protocol.Log {
-	var logs []*protocol.Log
+func (h *JVMMetricHandler) toMetricStoreFormat(metric *skywalking.JVMMetric, service string, serviceInstance string) []*models.Metric {
+	var logs []*models.Metric
 	var labels helper.MetricLabels
 	labels.Append("service", service)
 	labels.Append("serviceInstance", serviceInstance)
 
-	cpuUsage := helper.NewMetricLog("skywalking_jvm_cpu_usage", metric.Time, metric.GetCpu().UsagePercent, &labels)
+	cpuUsage := helper.NewInputMetric("skywalking_jvm_cpu_usage", metric.Time, metric.GetCpu().UsagePercent, &labels)
 	logs = append(logs, cpuUsage)
 
 	memLabels := labels.Clone()
@@ -69,50 +69,50 @@ func (h *JVMMetricHandler) toMetricStoreFormat(metric *skywalking.JVMMetric, ser
 			memType = "nonheap"
 		}
 		memLabels.Replace("type", memType)
-		memCommitted := helper.NewMetricLog("skywalking_jvm_memory_committed", metric.GetTime(), float64(mem.Committed), memLabels)
+		memCommitted := helper.NewInputMetric("skywalking_jvm_memory_committed", metric.GetTime(), float64(mem.Committed), memLabels)
 		logs = append(logs, memCommitted)
 
-		memInit := helper.NewMetricLog("skywalking_jvm_memory_init", metric.GetTime(), float64(mem.Init), memLabels)
+		memInit := helper.NewInputMetric("skywalking_jvm_memory_init", metric.GetTime(), float64(mem.Init), memLabels)
 		logs = append(logs, memInit)
 
-		memMax := helper.NewMetricLog("skywalking_jvm_memory_max", metric.GetTime(), float64(mem.Max), memLabels)
+		memMax := helper.NewInputMetric("skywalking_jvm_memory_max", metric.GetTime(), float64(mem.Max), memLabels)
 		logs = append(logs, memMax)
 
-		memUsed := helper.NewMetricLog("skywalking_jvm_memory_used", metric.GetTime(), float64(mem.Used), memLabels)
+		memUsed := helper.NewInputMetric("skywalking_jvm_memory_used", metric.GetTime(), float64(mem.Used), memLabels)
 		logs = append(logs, memUsed)
 	}
 	for _, memPool := range metric.MemoryPool {
 		memLabels.Replace("type", memPool.Type.String())
-		memPoolCommitted := helper.NewMetricLog("skywalking_jvm_memory_pool_committed", metric.GetTime(), float64(memPool.Committed), memLabels)
+		memPoolCommitted := helper.NewInputMetric("skywalking_jvm_memory_pool_committed", metric.GetTime(), float64(memPool.Committed), memLabels)
 		logs = append(logs, memPoolCommitted)
 
-		memPoolInit := helper.NewMetricLog("skywalking_jvm_memory_pool_init", metric.GetTime(), float64(memPool.Init), memLabels)
+		memPoolInit := helper.NewInputMetric("skywalking_jvm_memory_pool_init", metric.GetTime(), float64(memPool.Init), memLabels)
 		logs = append(logs, memPoolInit)
 
-		memPoolMax := helper.NewMetricLog("skywalking_jvm_memory_pool_max", metric.GetTime(), float64(memPool.Max), memLabels)
+		memPoolMax := helper.NewInputMetric("skywalking_jvm_memory_pool_max", metric.GetTime(), float64(memPool.Max), memLabels)
 		logs = append(logs, memPoolMax)
 
-		memPoolUsed := helper.NewMetricLog("skywalking_jvm_memory_pool_used", metric.GetTime(), float64(memPool.Used), memLabels)
+		memPoolUsed := helper.NewInputMetric("skywalking_jvm_memory_pool_used", metric.GetTime(), float64(memPool.Used), memLabels)
 		logs = append(logs, memPoolUsed)
 	}
 
 	gcLabels := labels.CloneInto(memLabels)
 	for _, gc := range metric.Gc {
 		gcLabels.Replace("phrase", gc.Phrase.String())
-		gcTime := helper.NewMetricLog("skywalking_jvm_gc_time", metric.GetTime(), float64(gc.Time), gcLabels)
+		gcTime := helper.NewInputMetric("skywalking_jvm_gc_time", metric.GetTime(), float64(gc.Time), gcLabels)
 		logs = append(logs, gcTime)
 
-		gcCount := helper.NewMetricLog("skywalking_jvm_gc_count", metric.GetTime(), float64(gc.Count), gcLabels)
+		gcCount := helper.NewInputMetric("skywalking_jvm_gc_count", metric.GetTime(), float64(gc.Count), gcLabels)
 		logs = append(logs, gcCount)
 	}
 
-	threadsLive := helper.NewMetricLog("skywalking_jvm_threads_live", metric.GetTime(), float64(metric.Thread.LiveCount), &labels)
+	threadsLive := helper.NewInputMetric("skywalking_jvm_threads_live", metric.GetTime(), float64(metric.Thread.LiveCount), &labels)
 	logs = append(logs, threadsLive)
 
-	threadsDaemon := helper.NewMetricLog("skywalking_jvm_threads_daemon", metric.GetTime(), float64(metric.Thread.DaemonCount), &labels)
+	threadsDaemon := helper.NewInputMetric("skywalking_jvm_threads_daemon", metric.GetTime(), float64(metric.Thread.DaemonCount), &labels)
 	logs = append(logs, threadsDaemon)
 
-	threadsPeak := helper.NewMetricLog("skywalking_jvm_threads_peak", metric.GetTime(), float64(metric.Thread.PeakCount), &labels)
+	threadsPeak := helper.NewInputMetric("skywalking_jvm_threads_peak", metric.GetTime(), float64(metric.Thread.PeakCount), &labels)
 	logs = append(logs, threadsPeak)
 
 	return logs

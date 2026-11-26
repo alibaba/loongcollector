@@ -112,6 +112,9 @@ func (p *ContextImp) RegisterMetricRecord(labels []selfmonitor.LabelPair) *selfm
 }
 
 func (p *ContextImp) RegisterLogstoreConfigMetricRecord(labels []selfmonitor.LabelPair) *selfmonitor.MetricsRecord {
+	contextMutex.Lock()
+	defer contextMutex.Unlock()
+
 	p.logstoreConfigMetricRecord = &selfmonitor.MetricsRecord{
 		Labels: labels,
 	}
@@ -119,6 +122,9 @@ func (p *ContextImp) RegisterLogstoreConfigMetricRecord(labels []selfmonitor.Lab
 }
 
 func (p *ContextImp) GetLogstoreConfigMetricRecord() *selfmonitor.MetricsRecord {
+	contextMutex.RLock()
+	defer contextMutex.RUnlock()
+
 	return p.logstoreConfigMetricRecord
 }
 
@@ -144,6 +150,9 @@ func (p *ContextImp) ExportMetricRecords() []map[string]string {
 			continue
 		}
 		records = append(records, metricsRecord.ExportMetricRecords())
+	}
+	if record := p.logstoreConfigMetricRecord; record != nil {
+		records = append(records, record.ExportMetricRecords())
 	}
 	return records
 }

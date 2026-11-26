@@ -39,24 +39,19 @@ type parseResult struct {
 	structuredData *map[string]map[string]string
 }
 
-func newParseResult() *parseResult {
-	return &parseResult{
-		hostname: "",
-		program:  "",
+func rawParseResult(data []byte) parseResult {
+	return parseResult{
 		priority: -1,
 		facility: -1,
 		severity: -1,
 		time:     time.Now(),
-		content:  "",
+		content:  string(data),
 	}
 }
 
 type parser interface {
-	// Parse parses @data to parseResult according to the protocol of parser.
-	// If it parses failed but failField in parserConfig is set, it will set the
-	// content of @data to this field and returns no error.
-	// It returns parseResult and any error encountered.
-	Parse(data []byte) (*parseResult, error)
+	// Parse returns the parsed fields or the raw message on an ignored parse error.
+	Parse(data []byte) (parseResult, error)
 }
 
 type parserConfig struct {
@@ -75,10 +70,8 @@ func newDefaultParser(config *parserConfig) parser {
 	return &defaultParser{}
 }
 
-func (p *defaultParser) Parse(data []byte) (*parseResult, error) {
-	pr := newParseResult()
-	pr.content = string(data)
-	return pr, nil
+func (p *defaultParser) Parse(data []byte) (parseResult, error) {
+	return rawParseResult(data), nil
 }
 
 type rfc3164Parser struct {
@@ -89,7 +82,7 @@ func newRfc3164Parser(config *parserConfig) parser {
 	return &rfc3164Parser{config: config}
 }
 
-func (p *rfc3164Parser) Parse(data []byte) (*parseResult, error) {
+func (p *rfc3164Parser) Parse(data []byte) (parseResult, error) {
 	pp := rfc3164.NewParser(data)
 	pp.Location(time.Local)
 	// if hostname field is not included in log, add os.Hostname for parser default hostname
@@ -99,24 +92,22 @@ func (p *rfc3164Parser) Parse(data []byte) (*parseResult, error) {
 	err := pp.Parse()
 	if err != nil {
 		if !p.config.ignoreParseFailure {
-			return nil, err
+			return parseResult{}, err
 		}
 
-		pr := newParseResult()
-		pr.content = string(data)
-		return pr, nil
+		return rawParseResult(data), nil
 	}
 
-	rfc3164Pr := pp.DumpParseResult()
-	pr := newParseResult()
-	pr.hostname = rfc3164Pr.Hostname
-	pr.program = rfc3164Pr.Tag
-	pr.priority = rfc3164Pr.Priority
-	pr.facility = rfc3164Pr.Facility
-	pr.severity = rfc3164Pr.Severity
-	pr.time = rfc3164Pr.Timestamp
-	pr.content = rfc3164Pr.Content
-	return pr, nil
+	result := pp.DumpParseResult()
+	return parseResult{
+		hostname: result.Hostname,
+		program:  result.Tag,
+		priority: result.Priority,
+		facility: result.Facility,
+		severity: result.Severity,
+		time:     result.Timestamp,
+		content:  result.Content,
+	}, nil
 }
 
 type rfc5424Parser struct {
@@ -131,39 +122,43 @@ func newRfc5424Parser(config *parserConfig) parser {
 	}
 }
 
-func (p *rfc5424Parser) Parse(data []byte) (*parseResult, error) {
+func (p *rfc5424Parser) Parse(data []byte) (parseResult, error) {
 	m, err := p.parser.Parse(data, nil)
 	if err != nil {
 		if !p.config.ignoreParseFailure {
-			return nil, err
+			return parseResult{}, err
 		}
 
-		pr := newParseResult()
-		pr.content = string(data)
-		return pr, nil
+		return rawParseResult(data), nil
 	}
 
-	pr := newParseResult()
-	if m.Priority() != nil {
-		pr.priority = int(*m.Priority())
+	pr := parseResult{
+		priority: -1,
+		facility: -1,
+		severity: -1,
 	}
-	if m.Severity() != nil {
-		pr.severity = int(*m.Severity())
+	if priority := m.Priority(); priority != nil {
+		pr.priority = int(*priority)
 	}
-	if m.Facility() != nil {
-		pr.facility = int(*m.Facility())
+	if severity := m.Severity(); severity != nil {
+		pr.severity = int(*severity)
 	}
-	if m.Hostname() != nil {
-		pr.hostname = *m.Hostname()
+	if facility := m.Facility(); facility != nil {
+		pr.facility = int(*facility)
 	}
-	if m.Appname() != nil {
-		pr.program = *m.Appname()
+	if hostname := m.Hostname(); hostname != nil {
+		pr.hostname = *hostname
 	}
-	if m.Message() != nil {
-		pr.content = *m.Message()
+	if appname := m.Appname(); appname != nil {
+		pr.program = *appname
 	}
-	if m.Timestamp() != nil {
-		pr.time = *m.Timestamp()
+	if message := m.Message(); message != nil {
+		pr.content = *message
+	}
+	if timestamp := m.Timestamp(); timestamp != nil {
+		pr.time = *timestamp
+	} else {
+		pr.time = time.Now()
 	}
 	pr.procID = m.ProcID()
 	pr.msgID = m.MsgID()
@@ -185,19 +180,17 @@ func newAutoParser(config *parserConfig) parser {
 	return p
 }
 
-func (p *autoParser) Parse(data []byte) (pr *parseResult, err error) {
+func (p *autoParser) Parse(data []byte) (parseResult, error) {
 	for _, realParser := range p.parsers {
-		pr, err = realParser.Parse(data)
+		pr, err := realParser.Parse(data)
 		if err == nil {
 			return pr, nil
 		}
 	}
 	if !p.config.ignoreParseFailure {
-		return nil, errors.New("No available parser can parse: " + string(data))
+		return parseResult{}, errors.New("No available parser can parse: " + string(data))
 	}
-	pr = newParseResult()
-	pr.content = string(data)
-	return pr, nil
+	return rawParseResult(data), nil
 }
 
 func init() {

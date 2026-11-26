@@ -25,12 +25,10 @@ import (
 	"github.com/alibaba/ilogtail/pkg/helper/platformmeta"
 	_ "github.com/alibaba/ilogtail/pkg/logger/test"
 	"github.com/alibaba/ilogtail/pkg/models"
-	"github.com/alibaba/ilogtail/pkg/protocol"
-	"github.com/alibaba/ilogtail/plugins/test"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
 )
 
-func Test_cloudMeta_ProcessLogs(t *testing.T) {
+func TestCloudMetaRefreshesGroupTags(t *testing.T) {
 	c := new(ProcessorCloudMeta)
 	c.Platform = platformmeta.Mock
 	c.RenameMetadata = map[string]string{
@@ -61,235 +59,54 @@ func Test_cloudMeta_ProcessLogs(t *testing.T) {
 	}
 	require.NoError(t, c.Init(mock.NewEmptyContext("a", "b", "c")))
 
-	log := &protocol.Log{
-		Time: 1,
+	log := models.NewSimpleLog(nil, models.NewTags(), 1)
+	collectTags := func() models.Tags {
+		ctx := helper.NewGroupedPipelineContext()
+		c.Process(&models.PipelineGroupEvents{Events: []models.PipelineEvent{log}}, ctx)
+		groups := ctx.Collector().ToArray()
+		require.Len(t, groups, 1)
+		require.Equal(t, []models.PipelineEvent{log}, groups[0].Events)
+		return groups[0].Group.GetTags()
 	}
-	logs := c.ProcessLogs([]*protocol.Log{log})
-	require.Equal(t, len(logs), 1)
-	require.Equal(t, len(logs[0].Contents), 11)
-	require.Equal(t, test.ReadLogVal(logs[0], "__instance_id__"), "id_xxx")
-	require.Equal(t, test.ReadLogVal(logs[0], "__instance_name__"), "name_xxx")
-	require.Equal(t, test.ReadLogVal(logs[0], "__zone__"), "zone_xxx")
-	require.Equal(t, test.ReadLogVal(logs[0], "__region__"), "region_xxx")
-	require.Equal(t, test.ReadLogVal(logs[0], "__instance_type__"), "type_xxx")
-	require.Equal(t, test.ReadLogVal(logs[0], "__vswitch_id__"), "vswitch_xxx")
-	require.Equal(t, test.ReadLogVal(logs[0], "__vpc_id__"), "vpc_xxx")
-	require.Equal(t, test.ReadLogVal(logs[0], "__image_id__"), "image_xxx")
-	require.Equal(t, test.ReadLogVal(logs[0], "__max_ingress__"), "0")
-	require.Equal(t, test.ReadLogVal(logs[0], "__max_egress__"), "0")
-	require.Equal(t, test.ReadLogVal(logs[0], "__instance_tags___tag_key"), "tag_val")
+	t.Cleanup(func() { atomic.StoreInt64(&platformmeta.MockManagerNum, 0) })
+	tags := collectTags()
+	require.Equal(t, tags.Len(), 11)
+	require.Equal(t, tags.Get("__instance_id__"), "id_xxx")
+	require.Equal(t, tags.Get("__instance_name__"), "name_xxx")
+	require.Equal(t, tags.Get("__zone__"), "zone_xxx")
+	require.Equal(t, tags.Get("__region__"), "region_xxx")
+	require.Equal(t, tags.Get("__instance_type__"), "type_xxx")
+	require.Equal(t, tags.Get("__vswitch_id__"), "vswitch_xxx")
+	require.Equal(t, tags.Get("__vpc_id__"), "vpc_xxx")
+	require.Equal(t, tags.Get("__image_id__"), "image_xxx")
+	require.Equal(t, tags.Get("__max_ingress__"), "0")
+	require.Equal(t, tags.Get("__max_egress__"), "0")
+	require.Equal(t, tags.Get("__instance_tags___tag_key"), "tag_val")
 
-	log.Contents = log.Contents[:0]
 	atomic.AddInt64(&platformmeta.MockManagerNum, 100)
-	time.Sleep(time.Second * 2)
-	logs = c.ProcessLogs([]*protocol.Log{log})
-	require.Equal(t, len(logs), 1)
-	require.Equal(t, len(logs[0].Contents), 11)
-	require.Equal(t, test.ReadLogVal(logs[0], "__instance_id__"), "id_xxx")
-	require.Equal(t, test.ReadLogVal(logs[0], "__instance_name__"), "name_xxx")
-	require.Equal(t, test.ReadLogVal(logs[0], "__zone__"), "zone_xxx")
-	require.Equal(t, test.ReadLogVal(logs[0], "__region__"), "region_xxx")
-	require.Equal(t, test.ReadLogVal(logs[0], "__instance_type__"), "type_xxx")
-	require.Equal(t, test.ReadLogVal(logs[0], "__vswitch_id__"), "vswitch_xxx")
-	require.Equal(t, test.ReadLogVal(logs[0], "__vpc_id__"), "vpc_xxx")
-	require.Equal(t, test.ReadLogVal(logs[0], "__image_id__"), "image_xxx")
-	require.Equal(t, test.ReadLogVal(logs[0], "__max_ingress__"), "100")
-	require.Equal(t, test.ReadLogVal(logs[0], "__max_egress__"), "1000")
-	require.Equal(t, test.ReadLogVal(logs[0], "__instance_tags___tag_key"), "tag_val")
+	c.lastReadTime = time.Now().Add(-time.Second)
+	tags = collectTags()
+	require.Equal(t, tags.Len(), 11)
+	require.Equal(t, tags.Get("__instance_id__"), "id_xxx")
+	require.Equal(t, tags.Get("__instance_name__"), "name_xxx")
+	require.Equal(t, tags.Get("__zone__"), "zone_xxx")
+	require.Equal(t, tags.Get("__region__"), "region_xxx")
+	require.Equal(t, tags.Get("__instance_type__"), "type_xxx")
+	require.Equal(t, tags.Get("__vswitch_id__"), "vswitch_xxx")
+	require.Equal(t, tags.Get("__vpc_id__"), "vpc_xxx")
+	require.Equal(t, tags.Get("__image_id__"), "image_xxx")
+	require.Equal(t, tags.Get("__max_ingress__"), "100")
+	require.Equal(t, tags.Get("__max_egress__"), "1000")
+	require.Equal(t, tags.Get("__instance_tags___tag_key"), "tag_val")
 	lastRead := c.lastReadTime
-	log.Contents = log.Contents[:0]
 	atomic.AddInt64(&platformmeta.MockManagerNum, 100)
-	logs = c.ProcessLogs([]*protocol.Log{log})
-	require.Equal(t, test.ReadLogVal(logs[0], "__max_ingress__"), "100")
-	require.Equal(t, test.ReadLogVal(logs[0], "__max_egress__"), "1000")
+	tags = collectTags()
+	require.Equal(t, tags.Get("__max_ingress__"), "100")
+	require.Equal(t, tags.Get("__max_egress__"), "1000")
 	require.Equal(t, c.lastReadTime, lastRead)
 }
 
-func Test_cloudMeta_ProcessJsonLogs(t *testing.T) {
-	metas := []string{
-		platformmeta.FlagInstanceID,
-		platformmeta.FlagInstanceName,
-		platformmeta.FlagInstanceTags,
-	}
-	type fields struct {
-		JSONPath string
-		Mode     platformmeta.Platform
-	}
-	tests := []struct {
-		name           string
-		fields         fields
-		initError      bool
-		content        string
-		key            string
-		logsLen        int
-		logsContentLen int
-		validator      func(log *protocol.Log, t *testing.T)
-	}{
-		{
-			name:           "content mode",
-			fields:         fields{},
-			initError:      false,
-			logsLen:        1,
-			logsContentLen: 3,
-			validator: func(log *protocol.Log, t *testing.T) {
-				println(log.String())
-				require.Equal(t, test.ReadLogVal(log, platformmeta.FlagInstanceID), "id_xxx")
-				require.Equal(t, test.ReadLogVal(log, platformmeta.FlagInstanceName), "name_xxx")
-				require.Equal(t, test.ReadLogVal(log, platformmeta.FlagInstanceTags+"_tag_key"), "tag_val")
-			},
-		},
-		{
-			name: "not exist key",
-			fields: fields{
-				JSONPath: "content",
-			},
-			initError:      false,
-			content:        "json",
-			key:            "con",
-			logsLen:        1,
-			logsContentLen: 2,
-			validator: func(log *protocol.Log, t *testing.T) {
-				require.Equal(t, test.ReadLogVal(log, "con"), "json")
-				require.Equal(t, test.ReadLogVal(log, "content"), "{\"__cloud_instance_id__\":\"id_xxx\",\"__cloud_instance_name__\":\"name_xxx\",\"__cloud_instance_tags___tag_key\":\"tag_val\"}")
-			},
-		},
-		{
-			name: "content val illegal",
-			fields: fields{
-				JSONPath: "content",
-			},
-			initError:      false,
-			content:        "json",
-			key:            "content",
-			logsLen:        1,
-			logsContentLen: 1,
-			validator: func(log *protocol.Log, t *testing.T) {
-				require.Equal(t, test.ReadLogVal(log, "content"), "json")
-			},
-		},
-		{
-			name: "content val illegal 2",
-			fields: fields{
-				JSONPath: "content.a",
-			},
-			initError:      false,
-			content:        `{"a":[]}`,
-			key:            "content",
-			logsLen:        1,
-			logsContentLen: 1,
-			validator: func(log *protocol.Log, t *testing.T) {
-				require.Equal(t, test.ReadLogVal(log, "content"), "{\"a\":[]}")
-			},
-		},
-		{
-			name: "path type illegal",
-			fields: fields{
-				JSONPath: "content.a",
-			},
-			initError:      false,
-			content:        `{"a":"b"}`,
-			key:            "content",
-			logsLen:        1,
-			logsContentLen: 1,
-			validator: func(log *protocol.Log, t *testing.T) {
-				require.Equal(t, test.ReadLogVal(log, "content"), `{"a":"b"}`)
-			},
-		},
-		{
-			name: "path type illegal2",
-			fields: fields{
-				JSONPath: "content.a.b.c",
-			},
-			initError:      false,
-			content:        `{"a": { "b": {"c": "d"}}}`,
-			key:            "content",
-			logsLen:        1,
-			logsContentLen: 1,
-			validator: func(log *protocol.Log, t *testing.T) {
-				require.Equal(t, test.ReadLogVal(log, "content"), "{\"a\":{\"b\":{\"c\":\"d\"}}}")
-			},
-		},
-		{
-			name: "path type legal",
-			fields: fields{
-				JSONPath: "content.a.b.c",
-			},
-			initError:      false,
-			content:        `{"a": { "b": {"c": {"d":"e"}}}}`,
-			key:            "content",
-			logsLen:        1,
-			logsContentLen: 1,
-			validator: func(log *protocol.Log, t *testing.T) {
-				require.Equal(t, test.ReadLogVal(log, "content"), "{\"a\":{\"b\":{\"c\":{\"__cloud_instance_id__\":\"id_xxx\",\"__cloud_instance_name__\":\"name_xxx\",\"__cloud_instance_tags___tag_key\":\"tag_val\",\"d\":\"e\"}}}}")
-			},
-		},
-		{
-			name: "test auto mode",
-			fields: fields{
-				JSONPath: "content.a.b.c.f",
-				Mode:     platformmeta.Auto,
-			},
-			initError:      false,
-			content:        `{"a": { "b": {"c": {"d":"e"}}}}`,
-			key:            "content",
-			logsLen:        1,
-			logsContentLen: 1,
-			validator: func(log *protocol.Log, t *testing.T) {
-				require.Equal(t, test.ReadLogVal(log, "content"), "{\"a\": { \"b\": {\"c\": {\"d\":\"e\"}}}}")
-			},
-		},
-		{
-			name: "test append structure",
-			fields: fields{
-				JSONPath: "content.a.b.c.f",
-			},
-			initError:      false,
-			content:        `{"a": { "b": {"c": {"d":"e"}}}}`,
-			key:            "content",
-			logsLen:        1,
-			logsContentLen: 1,
-			validator: func(log *protocol.Log, t *testing.T) {
-				require.Equal(t, test.ReadLogVal(log, "content"), "{\"a\":{\"b\":{\"c\":{\"d\":\"e\",\"f\":{\"__cloud_instance_id__\":\"id_xxx\",\"__cloud_instance_name__\":\"name_xxx\",\"__cloud_instance_tags___tag_key\":\"tag_val\"}}}}}")
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			c := new(ProcessorCloudMeta)
-			if tt.fields.Mode == "" {
-				c.Platform = platformmeta.Mock
-			} else {
-				c.Platform = tt.fields.Mode
-			}
-			c.Metadata = metas
-			c.JSONPath = tt.fields.JSONPath
-			if tt.initError {
-				require.Error(t, c.Init(mock.NewEmptyContext("a", "b", "c")))
-				return
-			}
-			require.NoError(t, c.Init(mock.NewEmptyContext("a", "b", "c")))
-			log := &protocol.Log{
-				Time: 1,
-			}
-			if tt.key != "" {
-				log.Contents = append(log.Contents, &protocol.Log_Content{
-					Key:   tt.key,
-					Value: tt.content,
-				})
-
-			}
-			logs := c.ProcessLogs([]*protocol.Log{log})
-			require.Equal(t, len(logs), tt.logsLen)
-			require.Equal(t, len(logs[0].Contents), tt.logsContentLen)
-			tt.validator(logs[0], t)
-		})
-	}
-}
-
-// ---- v2 (PipelineEvent / SendPb) Process path tests ----
-
-// Test_cloudMeta_Process_EnrichesGroupTags asserts the v2 semantics: cloud
+// Test_cloudMeta_Process_EnrichesGroupTags verifies that cloud
 // metadata is added ONCE to the group-level Tags (not into each event), and all
 // event types (Log AND Metric) pass through unchanged and are not dropped.
 func Test_cloudMeta_Process_EnrichesGroupTags(t *testing.T) {
@@ -336,7 +153,7 @@ func Test_cloudMeta_Process_EnrichesGroupTags(t *testing.T) {
 	require.Equal(t, 2, len(collected.Events))
 	require.Equal(t, logEvent, collected.Events[0])
 	require.Equal(t, metricEvent, collected.Events[1])
-	// The Log's own contents were NOT enriched with cloud meta in v2.
+	// Log contents are unchanged.
 	require.False(t, logEvent.GetIndices().Contains("__instance_id__"))
 	require.False(t, logEvent.GetIndices().Contains("__instance_name__"))
 	require.True(t, logEvent.GetIndices().Contains("orig_key"))
@@ -410,7 +227,7 @@ func Test_cloudMeta_Process_NoMetaPassThrough(t *testing.T) {
 	c.Platform = platformmeta.Auto
 	c.Metadata = []string{platformmeta.FlagInstanceID}
 	require.NoError(t, c.Init(mock.NewEmptyContext("a", "b", "c")))
-	// Force the v1 no-op condition regardless of the test host.
+	// Use a processor without a cloud metadata provider.
 	c.manager = nil
 	c.meta = make(map[string]string)
 

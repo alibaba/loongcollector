@@ -21,13 +21,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alibaba/ilogtail/plugins/processor/internal/processortest"
+
 	. "github.com/smartystreets/goconvey/convey"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/models"
-	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
 )
 
@@ -186,12 +188,12 @@ func TestProcessorDesensitizeWork(t *testing.T) {
 			So(err, ShouldBeNil)
 
 			record := "[{'account':'1812213231432969','password':'04a23f38'}, {'account':'1812213685634','password':'123a'}]"
-			log := &protocol.Log{Time: 0}
-			log.Contents = append(log.Contents, &protocol.Log_Content{Key: "content", Value: record})
-			logs := []*protocol.Log{}
+			log := processortest.Log()
+			log.Contents.Add("content", record)
+			logs := []*models.Log{}
 			logs = append(logs, log)
-			logs = processor.ProcessLogs(logs)
-			So(logs[0].Contents[0].Value, ShouldEqual, "[{'account':'1812213231432969','password':'9c525f463ba1c89d6badcd78b2b7bd79'}, {'account':'1812213685634','password':'1552c03e78d38d5005d4ce7b8018addf'}]")
+			logs = processortest.Apply(processor, logs...)
+			So(pipeline.GetStringValue(logs[0].Contents.Get("content")), ShouldEqual, "[{'account':'1812213231432969','password':'9c525f463ba1c89d6badcd78b2b7bd79'}, {'account':'1812213685634','password':'1552c03e78d38d5005d4ce7b8018addf'}]")
 		})
 	})
 }
@@ -257,7 +259,7 @@ type MockParam struct {
 	num          int
 	separator    string
 	separatorReg string
-	mockFunc     func(int, string, string) []*protocol.Log
+	mockFunc     func(int, string, string) []*models.Log
 }
 
 var params = []MockParam{
@@ -267,21 +269,11 @@ var params = []MockParam{
 	{"original", 10000, " ", "\\s", mockData},
 }
 
-func mockData(num int, separator, separatorReg string) []*protocol.Log {
-	Logs := []*protocol.Log{}
+func mockData(num int, separator, separatorReg string) []*models.Log {
+	Logs := []*models.Log{}
 
 	for i := 0; i < num; i++ {
-		log := new(protocol.Log)
-		log.Contents = make([]*protocol.Log_Content, 1)
-
-		// case 1
-		// log.Contents[0] = &protocol.Log_Content{Key: "content", Value: "[{'account':'1812213231432969','password':'04a23f38'}]"}
-		// case 2
-		// log.Contents[0] = &protocol.Log_Content{Key: "content", Value: "[{'account':'1812213231432969','password':'04a23f38'}, {'account':'1812213685634','password':'123a'}]"}
-		// case 3
-		// log.Contents[0] = &protocol.Log_Content{Key: "content", Value: "[{'account':'1812213231432969','password':'04a23f38'}, {'account':'1812213685634','password':'123a'}, {'account':'1812213685634','password':'666777888ccc'}]"}
-		// case 4
-		log.Contents[0] = &protocol.Log_Content{Key: "content", Value: "[{'account':'1812213231432969','password':'04a23f38'}, {'account':'1812213685634','password':'123a'}, {'account':'1812213685634','password':'666777888ccc'}, {'account':'1812213685634','password':'123a'}, {'account':'1812213685634','password':'666777888ccc'}, {'account':'1812213685634','password':'123a'}, {'account':'1812213685634','password':'666777888ccc'}, {'account':'1812213685634','password':'123a'}, {'account':'1812213685634','password':'666777888ccc'}, {'account':'1812213685634','password':'666777888ccc'}]"}
+		log := processortest.Log("content", "[{'account':'1812213231432969','password':'04a23f38'}, {'account':'1812213685634','password':'123a'}, {'account':'1812213685634','password':'666777888ccc'}, {'account':'1812213685634','password':'123a'}, {'account':'1812213685634','password':'666777888ccc'}, {'account':'1812213685634','password':'123a'}, {'account':'1812213685634','password':'666777888ccc'}, {'account':'1812213685634','password':'123a'}, {'account':'1812213685634','password':'666777888ccc'}, {'account':'1812213685634','password':'666777888ccc'}]")
 
 		Logs = append(Logs, log)
 	}
@@ -301,7 +293,7 @@ func BenchmarkDesensitizeTest(b *testing.B) {
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				processor.ProcessLogs(Logs)
+				processortest.Apply(processor, Logs...)
 			}
 			b.StopTimer()
 		})
@@ -323,10 +315,10 @@ func TestRegexContentZeroWidthWarning(t *testing.T) {
 
 		// Should still work despite zero-width pattern
 		record := "ATest"
-		log := &protocol.Log{Time: 0}
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "content", Value: record})
-		logs := []*protocol.Log{log}
-		out := p.ProcessLogs(logs)
+		log := processortest.Log()
+		log.Contents.Add("content", record)
+		logs := []*models.Log{log}
+		out := processortest.Apply(p, logs...)
 		So(len(out), ShouldEqual, 1)
 	})
 }
@@ -347,19 +339,19 @@ func TestTotalTimeoutBudget(t *testing.T) {
 
 		// Input that triggers catastrophic backtracking
 		record := "A" + strings.Repeat("a", 10000) + "c" // 'A' followed by many 'a's but no 'b'
-		log := &protocol.Log{Time: 0}
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "content", Value: record})
+		log := processortest.Log()
+		log.Contents.Add("content", record)
 
 		start := time.Now()
-		logs := []*protocol.Log{log}
-		out := p.ProcessLogs(logs)
+		logs := []*models.Log{log}
+		out := processortest.Apply(p, logs...)
 		elapsed := time.Since(start)
 
 		// Should complete quickly due to timeout protection
 		So(elapsed.Milliseconds(), ShouldBeLessThan, 500)
 		So(len(out), ShouldEqual, 1)
 		// Should preserve original content when timeout occurs
-		So(out[0].Contents[0].Value, ShouldEqual, record)
+		So(pipeline.GetStringValue(out[0].Contents.Get("content")), ShouldEqual, record)
 	})
 }
 
@@ -377,9 +369,7 @@ func TestTimeoutDefaults(t *testing.T) {
 	})
 }
 
-// ---- v2 (PipelineEvent / SendPb) Process path tests ----
-
-func TestProcessorDesensitize_ProcessV2ConstReplace(t *testing.T) {
+func TestProcessorDesensitize_ProcessConstReplace(t *testing.T) {
 	processor := &ProcessorDesensitize{SourceKey: "pwd", Method: "const", Match: "full", ReplaceString: "***"}
 	require.NoError(t, processor.Init(mock.NewEmptyContext("p", "l", "c")))
 
@@ -394,7 +384,7 @@ func TestProcessorDesensitize_ProcessV2ConstReplace(t *testing.T) {
 	assert.Equal(t, "plain", log.GetIndices().Get("keep"), "other keys must be untouched")
 }
 
-func TestProcessorDesensitize_ProcessV2PassesThroughMetric(t *testing.T) {
+func TestProcessorDesensitize_ProcessPassesThroughMetric(t *testing.T) {
 	processor := &ProcessorDesensitize{SourceKey: "pwd", Method: "const", Match: "full", ReplaceString: "***"}
 	require.NoError(t, processor.Init(mock.NewEmptyContext("p", "l", "c")))
 

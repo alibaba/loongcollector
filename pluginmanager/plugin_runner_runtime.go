@@ -15,6 +15,7 @@
 package pluginmanager
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/alibaba/ilogtail/pkg/flags"
@@ -22,14 +23,8 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
-)
-
-var (
-	tagPrefix     = "__tag__:"
-	fileOffsetKey = tagPrefix + "__file_offset__"
-	contentKey    = "content"
+	"github.com/alibaba/ilogtail/plugins/aggregator"
 )
 
 type pluginRunner struct {
@@ -51,8 +46,9 @@ type pluginRunner struct {
 	ExtensionPlugins  map[string]pipeline.Extension
 	TimerRunner       []*timerRunner
 
-	FlushOutStore  *FlushOutStore[models.PipelineGroupEvents]
-	LogstoreConfig *LogstoreConfig
+	FlushOutStore         *FlushOutStore[models.PipelineGroupEvents]
+	LogstoreConfig        *LogstoreConfig
+	processorInputMetrics *pipelineInputMetrics
 }
 
 func (p *pluginRunner) Init(inputQueueSize int, flushQueueSize int) error {
@@ -78,6 +74,18 @@ func (p *pluginRunner) Init(inputQueueSize int, flushQueueSize int) error {
 	return nil
 }
 
+func (p *pluginRunner) addDefaultAggregatorIfEmpty() error {
+	if len(p.AggregatorPlugins) != 0 {
+		return nil
+	}
+
+	name := aggregator.DefaultPluginType
+	if pipeline.Aggregators[name] == nil {
+		return fmt.Errorf("can't find plugin %s", name)
+	}
+	return loadAggregator(p.LogstoreConfig.genPluginMeta(name), p.LogstoreConfig, nil)
+}
+
 func (p *pluginRunner) AddDefaultFlusherIfEmpty() error {
 	if len(p.FlusherPlugins) == 0 {
 		category, options := flags.GetFlusherConfiguration()
@@ -97,15 +105,15 @@ func (p *pluginRunner) AddPlugin(pluginMeta *pipeline.PluginMeta, category plugi
 			return p.addServiceInput(pluginMeta, service)
 		}
 	case pluginProcessor:
-		if processor, ok := plugin.(pipeline.ProcessorV2); ok {
+		if processor, ok := plugin.(pipeline.Processor); ok {
 			return p.addProcessor(pluginMeta, processor, config["priority"].(int))
 		}
 	case pluginAggregator:
-		if aggregator, ok := plugin.(pipeline.AggregatorV2); ok {
+		if aggregator, ok := plugin.(pipeline.Aggregator); ok {
 			return p.addAggregator(pluginMeta, aggregator)
 		}
 	case pluginFlusher:
-		if flusher, ok := plugin.(pipeline.FlusherV2); ok {
+		if flusher, ok := plugin.(pipeline.Flusher); ok {
 			return p.addFlusher(pluginMeta, flusher)
 		}
 	case pluginExtension:
@@ -128,14 +136,6 @@ func (p *pluginRunner) Run() {
 	p.runAggregator()
 	p.runProcessor()
 	p.runInput()
-}
-
-func (p *pluginRunner) RunPlugins(category pluginCategory, control *pipeline.AsyncControl) {
-	switch category {
-	case pluginMetricInput:
-		p.runMetricInput(control)
-	default:
-	}
 }
 
 func (p *pluginRunner) IsWithInputPlugin() bool {
@@ -169,7 +169,7 @@ func (p *pluginRunner) addServiceInput(pluginMeta *pipeline.PluginMeta, input pi
 	return err
 }
 
-func (p *pluginRunner) addProcessor(pluginMeta *pipeline.PluginMeta, processor pipeline.ProcessorV2, _ int) error {
+func (p *pluginRunner) addProcessor(pluginMeta *pipeline.PluginMeta, processor pipeline.Processor, _ int) error {
 	var wrapper ProcessorPluginWrapper
 	wrapper.Config = p.LogstoreConfig
 	wrapper.Processor = processor
@@ -177,7 +177,7 @@ func (p *pluginRunner) addProcessor(pluginMeta *pipeline.PluginMeta, processor p
 	return wrapper.Init(pluginMeta)
 }
 
-func (p *pluginRunner) addAggregator(pluginMeta *pipeline.PluginMeta, aggregator pipeline.AggregatorV2) error {
+func (p *pluginRunner) addAggregator(pluginMeta *pipeline.PluginMeta, aggregator pipeline.Aggregator) error {
 	var wrapper AggregatorPluginWrapper
 	wrapper.Config = p.LogstoreConfig
 	wrapper.Aggregator = aggregator
@@ -196,7 +196,7 @@ func (p *pluginRunner) addAggregator(pluginMeta *pipeline.PluginMeta, aggregator
 	return nil
 }
 
-func (p *pluginRunner) addFlusher(pluginMeta *pipeline.PluginMeta, flusher pipeline.FlusherV2) error {
+func (p *pluginRunner) addFlusher(pluginMeta *pipeline.PluginMeta, flusher pipeline.Flusher) error {
 	var wrapper FlusherPluginWrapper
 	wrapper.Config = p.LogstoreConfig
 	wrapper.Flusher = flusher
@@ -249,7 +249,9 @@ func (p *pluginRunner) runProcessor() {
 func (p *pluginRunner) runProcessorInternal(cc *pipeline.AsyncControl) {
 	defer panicRecover(p.LogstoreConfig.ConfigName)
 	pipeContext := p.ProcessPipeContext
+	var singleGroup [1]*models.PipelineGroupEvents
 	pipeChan := p.InputPipeContext.Collector().Observe()
+	inputQueue, _ := p.InputPipeContext.(*reservedInputQueue)
 	var processorTag *ProcessorTag
 	if globalConfig := p.LogstoreConfig.GlobalConfig; globalConfig.EnableProcessorTag {
 		processorTag = NewProcessorTag(globalConfig.PipelineMetaTagKey, globalConfig.AppendingAllEnvMetaTag, globalConfig.AgentEnvMetaTagKey)
@@ -261,15 +263,23 @@ func (p *pluginRunner) runProcessorInternal(cc *pipeline.AsyncControl) {
 				return
 			}
 		case group := <-pipeChan:
+			if inputQueue != nil {
+				inputQueue.releaseGroup(group)
+			}
+			if metrics := p.processorInputMetrics; metrics != nil {
+				metrics.record(1, group.GetEventCount(), group.GetSize())
+			}
 			if processorTag != nil {
 				processorTag.Process(group)
 			}
-			pipeEvents := []*models.PipelineGroupEvents{group}
+			pipeEvents := append(singleGroup[:0], group)
 			for _, processor := range p.ProcessorPlugins {
 				for _, in := range pipeEvents {
 					processor.Process(in, pipeContext)
 				}
-				pipeEvents = pipeContext.Collector().ToArray()
+				clear(pipeEvents)
+				pipeEvents = helper.AppendDrainedPipelineGroups(pipeContext.Collector(), pipeEvents[:0])
+				processor.recordOutput(pipeEvents)
 				if len(pipeEvents) == 0 {
 					break
 				}
@@ -278,13 +288,14 @@ func (p *pluginRunner) runProcessorInternal(cc *pipeline.AsyncControl) {
 				break
 			}
 			if len(p.AggregatorPlugins) == 0 {
-				// Input groups are already formed. Deliver directly without a
-				// default pass-through aggregator or its idle flush timer.
+				// A runner initialized without a pipeline configuration can
+				// receive groups directly.
 				for _, group := range pipeEvents {
 					if len(group.Events) > 0 {
 						p.AggregatePipeContext.Collector().CollectList(group)
 					}
 				}
+				clear(pipeEvents)
 				continue
 			}
 			for _, aggregator := range p.AggregatorPlugins {
@@ -305,6 +316,7 @@ func (p *pluginRunner) runProcessorInternal(cc *pipeline.AsyncControl) {
 					}
 				}
 			}
+			clear(pipeEvents)
 		}
 	}
 }
@@ -312,7 +324,7 @@ func (p *pluginRunner) runProcessorInternal(cc *pipeline.AsyncControl) {
 func (p *pluginRunner) runAggregator() {
 	p.AggregateControl.Reset()
 	for _, t := range p.TimerRunner {
-		if plugin, ok := t.state.(pipeline.AggregatorV2); ok {
+		if plugin, ok := t.state.(pipeline.Aggregator); ok {
 			aggregator := plugin
 			timer := t
 			p.AggregateControl.Run(func(cc *pipeline.AsyncControl) {
@@ -433,45 +445,31 @@ func (p *pluginRunner) Stop(exit bool) error {
 	return nil
 }
 
-func (p *pluginRunner) ReceivePipelineEventGroup(pbGroup *protocol.PipelineEventGroup, ctx map[string]interface{}) {
-	groupEvents, err := helper.TransferPBToPipelineGroupEvents(pbGroup)
-	if err != nil {
-		logger.Warningf(p.LogstoreConfig.Context.GetRuntimeContext(), selfmonitor.ReceiveLogGroupAlarm, "transfer pipeline event group failed, err: %s", err.Error())
-		return
-	}
-	for k, v := range ctx {
-		value, ok := v.(string)
-		if !ok {
-			logger.Warningf(p.LogstoreConfig.Context.GetRuntimeContext(), selfmonitor.ReceiveLogGroupAlarm, "unknown values found in context, type is %T", v)
-			continue
-		}
-		groupEvents.Group.Metadata.Add(k, value)
-	}
-
-	p.InputPipeContext.Collector().Collect(groupEvents.Group, groupEvents.Events...)
-}
-
-// ReceiveRawLog adapts the public raw-log input API to the event queue.
-func (p *pluginRunner) ReceiveRawLog(in *pipeline.LogWithContext) {
-	md := models.NewMetadata()
-	tags := models.NewTags()
-	if in.Context != nil {
-		for k, v := range in.Context {
-			switch value := v.(type) {
-			case string:
-				md.Add(k, value)
-			case []*protocol.LogTag:
-				for _, tag := range value {
-					tags.Add(tag.GetKey(), tag.GetValue())
-				}
-			default:
-				logger.Warningf(p.LogstoreConfig.Context.GetRuntimeContext(), selfmonitor.ReceiveRawLogAlarm, "unknown values found in context, type is %T", v)
+func (p *pluginRunner) receivePipelineEventGroup(wire []byte, packID string) error {
+	inputQueue, _ := p.InputPipeContext.(*reservedInputQueue)
+	enqueued := false
+	var weight int64
+	if inputQueue != nil {
+		weight = inputQueue.reserveWire(len(wire))
+		defer func() {
+			if !enqueued {
+				inputQueue.cancelWireReservation(weight)
 			}
-		}
+		}()
 	}
-	log := convertInputLog(in.Log)
-	group := models.NewGroup(md, tags)
-	p.InputPipeContext.Collector().Collect(group, log)
+
+	group, err := helper.DecodePipelineGroupEvents(wire)
+	if err != nil || len(group.Events) == 0 {
+		return err
+	}
+	group.Group.Metadata.Add(ctxKeySource, packID)
+	if inputQueue != nil {
+		inputQueue.collectReserved(group, weight)
+		enqueued = true
+	} else {
+		p.InputPipeContext.Collector().Collect(group.Group, group.Events...)
+	}
+	return nil
 }
 
 func (p *pluginRunner) Merge(r PluginRunner) {

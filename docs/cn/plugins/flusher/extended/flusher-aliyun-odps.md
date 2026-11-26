@@ -6,15 +6,15 @@
 
 源代码：[flusher_odps.go](https://github.com/alibaba/loongcollector/blob/main/plugins/flusher/odps/flusher_odps.go)
 
-使用统一的 Go 事件 Pipeline；采集配置默认启用，无需显式设置 `global.StructureType`。配置结构详见[采集配置](../../../configuration/collection-config.md)。
+采集配置使用 Go 事件 Pipeline。配置结构详见[采集配置](../../../configuration/collection-config.md)。
 
 ## 事件能力
 
 列含义见 [概览 · 事件能力列说明](../../overview.md#事件能力列说明)。
 
-| v1 接口 | v2 接口 | Log | Metric | Span |
-| --- | --- | --- | --- | --- |
-| — | ✓ | v2 | v2 | v2 |
+| Log | Metric | Span |
+| --- | --- | --- |
+| ✓ | 日志记录 | 日志记录 |
 
 Metric 和 Span 事件转换为结构化字段后写入，字段需要与目标表的 Schema 匹配。
 
@@ -73,8 +73,6 @@ Metric 和 Span 事件转换为结构化字段后写入，字段需要与目标�
 
 ```yaml
 enable: true
-global:
-  StructureType: v2
 inputs:
   - Type: input_file
     FilePaths:
@@ -94,8 +92,6 @@ flushers:
 
 ```yaml
 enable: true
-global:
-  StructureType: v2
 inputs:
   - Type: input_file
     FilePaths:

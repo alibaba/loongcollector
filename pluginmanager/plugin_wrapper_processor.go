@@ -24,10 +24,11 @@ import (
 
 type ProcessorPluginWrapper struct {
 	ProcessorWrapper
-	Processor pipeline.ProcessorV2
+	Processor pipeline.Processor
 
-	inEventGroupsTotal  selfmonitor.CounterMetric
-	outEventGroupsTotal selfmonitor.CounterMetric
+	inEventGroupsTotal   selfmonitor.CounterMetric
+	outEventGroupsTotal  selfmonitor.CounterMetric
+	processTimeRemainder time.Duration
 }
 
 func (wrapper *ProcessorPluginWrapper) Init(pluginMeta *pipeline.PluginMeta) error {
@@ -39,17 +40,30 @@ func (wrapper *ProcessorPluginWrapper) Init(pluginMeta *pipeline.PluginMeta) err
 }
 
 func (wrapper *ProcessorPluginWrapper) Process(in *models.PipelineGroupEvents, context pipeline.PipelineContext) {
-	startTime := time.Now().UnixMilli()
-
 	wrapper.inEventGroupsTotal.Add(1)
 	wrapper.inEventsTotal.Add(in.GetEventCount())
 	wrapper.inSizeBytes.Add(in.GetSize())
 
+	start := time.Now()
 	wrapper.Processor.Process(in, context)
+	elapsed := time.Since(start) + wrapper.processTimeRemainder
+	if elapsed >= time.Millisecond {
+		wrapper.totalProcessTimeMs.Add(elapsed.Milliseconds())
+	}
+	wrapper.processTimeRemainder = elapsed % time.Millisecond
+}
 
-	wrapper.outEventGroupsTotal.Add(1)
-	wrapper.outEventsTotal.Add(in.GetEventCount())
-	wrapper.outSizeBytes.Add(in.GetSize())
-
-	wrapper.totalProcessTimeMs.Add(time.Now().UnixMilli() - startTime)
+// recordOutput counts the groups collected by the processor, including new groups it emitted.
+func (wrapper *ProcessorPluginWrapper) recordOutput(groups []*models.PipelineGroupEvents) {
+	if len(groups) == 0 {
+		return
+	}
+	var eventCount, size int64
+	for _, group := range groups {
+		eventCount += group.GetEventCount()
+		size += group.GetSize()
+	}
+	wrapper.outEventGroupsTotal.Add(int64(len(groups)))
+	wrapper.outEventsTotal.Add(eventCount)
+	wrapper.outSizeBytes.Add(size)
 }

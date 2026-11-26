@@ -18,12 +18,13 @@ import (
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/prompbmarshal"
 
 	"github.com/alibaba/ilogtail/pkg/helper"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 
 	"strings"
 )
 
-func appendTSDataToSlsLog(c pipeline.Collector, wr *prompbmarshal.WriteRequest) {
+func collectTimeSeries(collector pipeline.PipelineCollector, wr *prompbmarshal.WriteRequest) {
 	for i := range wr.Timeseries {
 		ts := &wr.Timeseries[i]
 		var name string
@@ -34,11 +35,10 @@ func appendTSDataToSlsLog(c pipeline.Collector, wr *prompbmarshal.WriteRequest) 
 				name = strings.Clone(label.Value)
 				continue
 			}
-			// Because AddRawLog operation would join labels to a new string, pass unsafe string would be safe.
-			labels.Append(label.Name, label.Value)
+			labels.Append(strings.Clone(label.Name), strings.Clone(label.Value))
 		}
 		for _, sample := range ts.Samples {
-			c.AddRawLog(helper.NewMetricLog(name, sample.Timestamp, sample.Value, &labels))
+			collector.Collect(models.NewGroup(models.NewMetadata(), models.NewTags()), helper.NewInputMetric(name, sample.Timestamp, sample.Value, &labels))
 		}
 	}
 

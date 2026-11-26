@@ -1,6 +1,6 @@
 # Allowlist for scripts/lint_process_events0.py (Issue #2604 / Discussion #1928 B5).
 #
-# ProcessorV2.Process must iterate PipelineGroupEvents; it must not index
+# Processor.Process must iterate PipelineGroupEvents; it must not index
 # Events[0] and assume *models.Log. After B4 (#2603) all in-tree Process
 # methods iterate or call ProcessLogEventsOnly, so this list is empty.
 #

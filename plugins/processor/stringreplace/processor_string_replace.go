@@ -25,7 +25,6 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
@@ -99,29 +98,7 @@ func (*ProcessorStringReplace) Description() string {
 	return "regex replace processor for logtail"
 }
 
-func (p *ProcessorStringReplace) ProcessLogs(logArray []*protocol.Log) []*protocol.Log {
-	replaceCount := 0
-	for _, log := range logArray {
-		for _, cont := range log.Contents {
-			if p.SourceKey != cont.Key {
-				continue
-			}
-			newContVal := p.replaceValue(cont.Value)
-			if len(p.DestKey) > 0 {
-				log.Contents = append(log.Contents, &protocol.Log_Content{Key: p.DestKey, Value: newContVal})
-			} else {
-				cont.Value = newContVal
-			}
-			replaceCount++
-		}
-	}
-	p.logPairMetric.Add(int64(replaceCount))
-	return logArray
-}
-
-// replaceValue applies the configured replace Method to val, falling back to the
-// original value on error. Shared by the v1 (protocol.Log) and v2 (models.Log)
-// processing paths.
+// replaceValue applies the configured replacement and keeps the original value on error.
 func (p *ProcessorStringReplace) replaceValue(val string) string {
 	var newContVal string
 	var err error
@@ -148,7 +125,7 @@ func (p *ProcessorStringReplace) replaceValue(val string) string {
 	return newContVal
 }
 
-// Process implements the v2 ProcessorV2 interface: it replaces the SourceKey
+// Process implements the Processor interface: it replaces the SourceKey
 // value of each Log event (writing to DestKey when set, otherwise in place);
 // Metric/Span events pass through unchanged.
 func (p *ProcessorStringReplace) Process(in *models.PipelineGroupEvents, context pipeline.PipelineContext) {

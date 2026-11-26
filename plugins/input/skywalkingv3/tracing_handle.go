@@ -20,6 +20,7 @@ import (
 	"runtime"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	v3 "github.com/alibaba/ilogtail/plugins/input/skywalkingv3/skywalking/network/common/v3"
@@ -28,7 +29,7 @@ import (
 
 type TracingHandler struct {
 	context                      pipeline.Context
-	collector                    pipeline.Collector
+	collector                    pipeline.PipelineCollector
 	cache                        *ResourcePropertiesCache
 	compIDMessagingSystemMapping map[int32]string
 }
@@ -106,7 +107,7 @@ func (h *TracingHandler) collectSegment(segment *skywalking.SegmentObject, mappi
 			logger.Warning(h.context.GetRuntimeContext(), selfmonitor.SkywalkingToOtTraceErr, "err", err)
 			return err
 		}
-		h.collector.AddRawLog(log)
+		h.collector.Collect(models.NewGroup(models.NewMetadata(), models.NewTags()), log)
 	}
 	return nil
 }

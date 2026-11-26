@@ -29,7 +29,6 @@ import (
 
 	"github.com/alibaba/ilogtail/pkg/doc"
 	"github.com/alibaba/ilogtail/pkg/logger"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
@@ -56,7 +55,7 @@ func (i *ClickHouseSubscriber) Description() string {
 	return "this's a clickhouse subscriber, which will query inserted records from clickhouse periodically."
 }
 
-func (i *ClickHouseSubscriber) GetData(sql string, startTime int32) ([]*protocol.LogGroup, error) {
+func (i *ClickHouseSubscriber) GetData(sql string, startTime int32) ([]*Batch, error) {
 	host, err := TryReplacePhysicalAddress(i.Address)
 	if err != nil {
 		return nil, err
@@ -90,12 +89,12 @@ func (i *ClickHouseSubscriber) GetData(sql string, startTime int32) ([]*protocol
 	}
 	i.client = conn
 	i.lastTimestamp = int64(startTime)
-	logGroup, err := i.queryRecords()
+	batch, err := i.queryRecords()
 	if err != nil {
 		logger.Warning(context.Background(), selfmonitor.ClickhouseSubscriberAlarm, "err", err)
 		return nil, err
 	}
-	return []*protocol.LogGroup{logGroup}, nil
+	return []*Batch{batch}, nil
 }
 
 func (i *ClickHouseSubscriber) FlusherConfig() string {
@@ -109,9 +108,9 @@ func (i *ClickHouseSubscriber) Stop() error {
 	return nil
 }
 
-func (i *ClickHouseSubscriber) queryRecords() (logGroup *protocol.LogGroup, err error) {
-	logGroup = &protocol.LogGroup{
-		Logs: []*protocol.Log{},
+func (i *ClickHouseSubscriber) queryRecords() (batch *Batch, err error) {
+	batch = &Batch{
+		Records: []*Record{},
 	}
 	s := fmt.Sprintf(clickhouseQuerySQL, i.Database, i.Table, i.lastTimestamp)
 	rows, err := i.client.Query(context.Background(), s)
@@ -140,16 +139,16 @@ func (i *ClickHouseSubscriber) queryRecords() (logGroup *protocol.LogGroup, err 
 			logger.Warning(context.Background(), selfmonitor.ClickhouseSubscriberAlarm, "failed to read clickhouse data, err", err)
 			return
 		}
-		log := &protocol.Log{}
+		log := &Record{}
 		lc := logContent{}
 		if err = json.Unmarshal([]byte(l), &lc); err != nil {
 			logger.Warning(context.Background(), selfmonitor.ClickhouseSubscriberAlarm, "failed to unmarshal data, err", err)
 			return
 		}
 		for k, v := range lc.Contents {
-			log.Contents = append(log.Contents, &protocol.Log_Content{Key: k, Value: v})
+			log.Fields = append(log.Fields, Field{Key: k, Value: v})
 		}
-		logGroup.Logs = append(logGroup.Logs, log)
+		batch.Records = append(batch.Records, log)
 	}
 	return
 }

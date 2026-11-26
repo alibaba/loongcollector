@@ -19,7 +19,6 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
-	"time"
 
 	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/plog"
@@ -27,116 +26,32 @@ import (
 	"go.opentelemetry.io/collector/pdata/ptrace"
 
 	"github.com/alibaba/ilogtail/pkg/models"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/protocol/otlp"
-)
-
-var (
-	bodyKey  = "content"
-	levelKey = "level"
 )
 
 var (
 	errBytesLengthNotMatch = errors.New("bytes_length_not_match")
 )
 
-func (c *Converter) ConvertToOtlpResourseLogs(logGroup *protocol.LogGroup, targetFields []string) (plog.ResourceLogs, []map[string]string, error) {
-	rsLogs := plog.NewResourceLogs()
-	desiredValues := make([]map[string]string, len(logGroup.Logs))
-
-	if logGroup.GetSource() != "" {
-		rsLogs.Resource().Attributes().PutStr("source", logGroup.GetSource())
+// ToOTLP converts a group to the OTLP resources for each signal kind.
+func (c *Converter) ToOTLP(group *models.PipelineGroupEvents) (plog.ResourceLogs, pmetric.ResourceMetrics, ptrace.ResourceSpans, error) {
+	logs := plog.NewResourceLogs()
+	metrics := pmetric.NewResourceMetrics()
+	traces := ptrace.NewResourceSpans()
+	if c.Protocol != ProtocolOtlpV1 {
+		return logs, metrics, traces, fmt.Errorf("unsupported protocol %s", c.Protocol)
 	}
-
-	if logGroup.GetTopic() != "" {
-		rsLogs.Resource().Attributes().PutStr("topic", logGroup.GetTopic())
-	}
-
-	if logGroup.GetMachineUUID() != "" {
-		rsLogs.Resource().Attributes().PutStr("machine_uuid", logGroup.GetMachineUUID())
-	}
-
-	for _, t := range logGroup.LogTags {
-		rsLogs.Resource().Attributes().PutStr(t.Key, t.Value)
-	}
-
-	scopeLog := rsLogs.ScopeLogs().AppendEmpty()
-
-	for i, log := range logGroup.Logs {
-		logRecord := scopeLog.LogRecords().AppendEmpty()
-
-		contents, tags := convertLogToMap(log, logGroup.LogTags, logGroup.Source, logGroup.Topic, c.TagKeyRenameMap)
-		desiredValue, err := findTargetValues(targetFields, contents, tags, c.TagKeyRenameMap)
-		if err != nil {
-			return rsLogs, nil, err
-		}
-		desiredValues[i] = desiredValue
-
-		for k, v := range contents {
-			if k != bodyKey && k != levelKey {
-				logRecord.Attributes().PutStr(k, v)
-			}
-		}
-		for k, v := range tags {
-			logRecord.Attributes().PutStr(k, v)
-		}
-
-		logRecord.SetObservedTimestamp(pcommon.Timestamp(time.Now().UnixNano()))
-		if c.GlobalConfig.EnableTimestampNanosecond {
-			logRecord.SetTimestamp(pcommon.Timestamp(uint64(log.Time)*uint64(time.Second)) + pcommon.Timestamp(uint64(*log.TimeNs)*uint64(time.Nanosecond)))
-		} else {
-			logRecord.SetTimestamp(pcommon.Timestamp(uint64(log.Time) * uint64(time.Second)))
-		}
-
-		if body, has := contents[bodyKey]; has {
-			logRecord.Body().SetStr(body)
-		}
-		if level, has := contents[levelKey]; has {
-			logRecord.SetSeverityText(level)
-		} else if level, has = tags[level]; has {
-			logRecord.SetSeverityText(level)
-		}
-
-	}
-
-	return rsLogs, desiredValues, nil
+	err := convertGroupToOTLP(group, logs, metrics, traces)
+	return logs, metrics, traces, err
 }
 
-func ConvertPipelineEventToOtlpEvent[
-	T1 plog.ResourceLogs,
-	T2 pmetric.ResourceMetrics,
-	T3 ptrace.ResourceSpans,
-](c *Converter, ps *models.PipelineGroupEvents) (t1 T1, t2 T2, t3 T3, err error) {
-	switch c.Protocol {
-	case ProtocolOtlpV1:
-		rsLogs := plog.NewResourceLogs()
-		rsMetrics := pmetric.NewResourceMetrics()
-		rsTraces := ptrace.NewResourceSpans()
-		err = ConvertPipelineGroupEvenstsToOtlpEvents(ps, rsLogs, rsMetrics, rsTraces)
-		return T1(rsLogs), T2(rsMetrics), T3(rsTraces), err
-	default:
-		err = fmt.Errorf("unsupported protocol %v", c.Protocol)
-	}
-	return
-}
-
-// PipelineGroupEvents -> OTLP Logs/Metrics/Traces
-func (c *Converter) ConvertPipelineGroupEventsToOTLPEventsV1(ps *models.PipelineGroupEvents) (plog.ResourceLogs, pmetric.ResourceMetrics, ptrace.ResourceSpans, error) {
-	var err error
-	rsLogs := plog.NewResourceLogs()
-	rsMetrics := pmetric.NewResourceMetrics()
-	rsTraces := ptrace.NewResourceSpans()
-	err = ConvertPipelineGroupEvenstsToOtlpEvents(ps, rsLogs, rsMetrics, rsTraces)
-	return rsLogs, rsMetrics, rsTraces, err
-}
-
-func ConvertPipelineGroupEvenstsToOtlpEvents(ps *models.PipelineGroupEvents, rsLogs plog.ResourceLogs, rsMetrics pmetric.ResourceMetrics, rsTraces ptrace.ResourceSpans) error {
+func convertGroupToOTLP(ps *models.PipelineGroupEvents, rsLogs plog.ResourceLogs, rsMetrics pmetric.ResourceMetrics, rsTraces ptrace.ResourceSpans) error {
 	var err error
 	if ps == nil || len(ps.Events) == 0 {
 		return err
 	}
-	meta := ps.Group.Metadata
-	groupTags := ps.Group.Tags
+	meta := ps.Group.GetMetadata()
+	groupTags := ps.Group.GetTags()
 
 	var scopeLog plog.ScopeLogs
 	var scopeMetric pmetric.ScopeMetrics

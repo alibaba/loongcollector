@@ -10,4 +10,5 @@ export PATH=$PATH:$GOPATH/bin
 
 protoc -I="${PROTO_HOME}" \
   -I="${GOPATH}/src" \
-  --gogofaster_out=plugins=grpc:"${PROTO_GEN_HOME}" "${PROTO_HOME}"/*.proto
+  -I="${PROTO_HOME}/../../../protobuf_public/models" \
+  --gogofaster_out=plugins=grpc,Mpipeline_event_group.proto=github.com/alibaba/ilogtail/pkg/protocol:"${PROTO_GEN_HOME}" "${PROTO_HOME}"/*.proto

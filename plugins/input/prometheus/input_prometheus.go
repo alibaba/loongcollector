@@ -52,7 +52,7 @@ type ServiceStaticPrometheus struct {
 	context   pipeline.Context
 	lock      sync.Mutex
 	running   bool
-	collector pipeline.Collector
+	collector pipeline.PipelineCollector
 	kubeMeta  *KubernetesMeta
 }
 
@@ -123,8 +123,8 @@ func (p *ServiceStaticPrometheus) Description() string {
 }
 
 // Start starts the ServiceInput's service, whatever that may be
-func (p *ServiceStaticPrometheus) Start(c pipeline.Collector) error {
-	p.collector = c
+func (p *ServiceStaticPrometheus) StartService(ctx pipeline.PipelineContext) error {
+	p.collector = ctx.Collector()
 	p.shutdown = make(chan struct{})
 	p.waitGroup.Add(1)
 	defer p.waitGroup.Done()
@@ -185,6 +185,6 @@ func init() {
 
 func (p *ServiceStaticPrometheus) slsPushData(_ *auth.Token, wr *prompbmarshal.WriteRequest) {
 	logger.Debug(p.context.GetRuntimeContext(), "append new metrics", wr.Size())
-	appendTSDataToSlsLog(p.collector, wr)
+	collectTimeSeries(p.collector, wr)
 	logger.Debug(p.context.GetRuntimeContext(), "append done", wr.Size())
 }

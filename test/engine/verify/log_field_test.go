@@ -20,21 +20,21 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 
-	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/test/engine/setup/subscriber"
 )
 
 // metricLog builds a canonical metric-log line as emitted by the v2 converter.
-func metricLog(kv ...string) *protocol.Log {
-	log := &protocol.Log{}
+func metricLog(kv ...string) *subscriber.Record {
+	log := &subscriber.Record{}
 	for i := 0; i+1 < len(kv); i += 2 {
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: kv[i], Value: kv[i+1]})
+		log.Fields = append(log.Fields, subscriber.Field{Key: kv[i], Value: kv[i+1]})
 	}
 	return log
 }
 
 func TestLogFieldGreaterThanEqual(t *testing.T) {
-	groups := []*protocol.LogGroup{{
-		Logs: []*protocol.Log{
+	groups := []*subscriber.Batch{{
+		Records: []*subscriber.Record{
 			metricLog("count", "9"),
 			metricLog("count", "10"),
 		},
@@ -42,13 +42,13 @@ func TestLogFieldGreaterThanEqual(t *testing.T) {
 
 	require.NoError(t, logFieldGreaterThanEqual(groups, "count", 10))
 	require.EqualError(t, logFieldGreaterThanEqual(groups, "count", 11), "want count >= 11, but got 10")
-	negativeGroups := []*protocol.LogGroup{{Logs: []*protocol.Log{metricLog("count", "-10")}}}
+	negativeGroups := []*subscriber.Batch{{Records: []*subscriber.Record{metricLog("count", "-10")}}}
 	require.NoError(t, logFieldGreaterThanEqual(negativeGroups, "count", -10))
 	require.EqualError(t, logFieldGreaterThanEqual(groups, "missing", 1), "want contains key missing, but not found")
 	require.EqualError(t, logFieldGreaterThanEqual(nil, "count", 1), "want contains key count, but not found")
 	require.ErrorContains(
 		t,
-		logFieldGreaterThanEqual([]*protocol.LogGroup{{Logs: []*protocol.Log{metricLog("count", "invalid")}}}, "count", 1),
+		logFieldGreaterThanEqual([]*subscriber.Batch{{Records: []*subscriber.Record{metricLog("count", "invalid")}}}, "count", 1),
 		`parse field count value "invalid"`,
 	)
 }
@@ -125,7 +125,7 @@ func TestExactKVDocstringParsing(t *testing.T) {
 	require.Equal(t, "log contents", records[2]["__value__"])
 
 	// Each record must be locatable in the flushed logs by exact key-value.
-	logs := []*protocol.Log{
+	logs := []*subscriber.Record{
 		metricLog("__name__", "single_metrics_mock", "__value__", "42"),
 		metricLog("__name__", "multi_values_metrics_mock__name", "__value__", "hello"),
 		metricLog("__name__", "multi_values_metrics_mock__value", "__value__", "log contents"),
@@ -143,8 +143,8 @@ func TestExactKVDocstringParsing(t *testing.T) {
 }
 
 func TestLogFieldNoDuplicates(t *testing.T) {
-	unique := []*protocol.LogGroup{{
-		Logs: []*protocol.Log{
+	unique := []*subscriber.Batch{{
+		Records: []*subscriber.Record{
 			metricLog("content", "old-1"),
 			metricLog("content", "new-1"),
 			nil,
@@ -152,8 +152,8 @@ func TestLogFieldNoDuplicates(t *testing.T) {
 	}, nil}
 	require.NoError(t, logFieldNoDuplicates(unique, "content"))
 
-	dups := []*protocol.LogGroup{{
-		Logs: []*protocol.Log{
+	dups := []*subscriber.Batch{{
+		Records: []*subscriber.Record{
 			metricLog("content", "new-1"),
 			metricLog("content", "old-1"),
 			metricLog("content", "new-1"),

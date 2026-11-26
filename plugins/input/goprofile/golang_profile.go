@@ -53,8 +53,8 @@ func (g *GoProfile) Stop() error {
 	return nil
 }
 
-func (g *GoProfile) Start(collector pipeline.Collector) error {
-	g.manager = NewManager(collector)
+func (g *GoProfile) StartService(ctx pipeline.PipelineContext) error {
+	g.manager = NewManager(ctx.Collector())
 	return g.manager.Start(g)
 }
 

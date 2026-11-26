@@ -18,6 +18,7 @@ import (
 	"fmt"
 
 	"github.com/alibaba/ilogtail/pkg/config"
+	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
@@ -32,7 +33,7 @@ const (
 	extraLevelDefault   = 1
 )
 
-var _ pipeline.FlusherV2 = (*FlusherDatahub)(nil)
+var _ pipeline.Flusher = (*FlusherDatahub)(nil)
 
 type FlusherDatahub struct {
 	AccessKeyID     string
@@ -103,26 +104,27 @@ func (d *FlusherDatahub) Description() string {
 
 func (d *FlusherDatahub) Export(groupEventsList []*models.PipelineGroupEvents, _ pipeline.PipelineContext) error {
 	for _, groupEvents := range groupEventsList {
-		logGroups, err := converter.PipelineGroupEventsToLogGroups(groupEvents)
-		if err != nil {
-			return fmt.Errorf("convert pipeline group events to loggroup: %w", err)
-		}
-		for _, logGroup := range logGroups {
-			records := make([]datahub.IRecord, len(logGroup.Logs))
-			for id, log := range logGroup.Logs {
-				record, buildErr := d.recordBuilder.Log2Record(logGroup, log)
-				if buildErr != nil {
-					return buildErr
-				}
-				records[id] = record
-			}
-			err = d.producer.Send(records)
-			if err != nil {
-				return err
-			}
+		if err := helper.ForEachLogTagGroup(groupEvents, d.sendGroup); err != nil {
+			return err
 		}
 	}
 	return nil
+}
+
+func (d *FlusherDatahub) sendGroup(group *models.PipelineGroupEvents) error {
+	rows, err := converter.EncodeEventRecords(group)
+	if err != nil {
+		return fmt.Errorf("convert events to DataHub records: %w", err)
+	}
+	records := make([]datahub.IRecord, len(rows))
+	for i, row := range rows {
+		record, err := d.recordBuilder.Build(row.Fields)
+		if err != nil {
+			return err
+		}
+		records[i] = record
+	}
+	return d.producer.Send(records)
 }
 
 func (d *FlusherDatahub) IsReady(projectName string, logstoreName string, logstoreKey int64) bool {

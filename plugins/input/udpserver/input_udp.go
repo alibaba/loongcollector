@@ -15,15 +15,22 @@
 package udpserver
 
 import (
+	"bytes"
+	"errors"
 	"fmt"
 	"net"
+	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
+	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/pipeline/extensions"
-	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/protocol/decoder/common"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
@@ -33,15 +40,15 @@ type UDPServer struct {
 	Address       string
 	MaxBufferSize int
 
-	context   pipeline.Context
-	decoder   extensions.Decoder
-	addr      *net.UDPAddr
-	conn      *net.UDPConn
-	collector pipeline.Collector
+	context pipeline.Context
+	decoder extensions.Decoder
+	addr    *net.UDPAddr
+	conn    *net.UDPConn
 }
 
 func (u *UDPServer) Init(context pipeline.Context) (int, error) {
 	u.context = context
+	u.Format = strings.ToLower(strings.TrimSpace(u.Format))
 	options := &struct {
 		Format string
 	}{
@@ -89,58 +96,79 @@ func (u *UDPServer) Description() string {
 	return "this is an udp listening server"
 }
 
-func (u *UDPServer) Start(collector pipeline.Collector) error {
-	u.collector = collector
-	err := u.doStart(u.dispatcher)
+func (u *UDPServer) StartService(ctx pipeline.PipelineContext) error {
+	err := u.doStart(ctx.Collector().CollectList)
 	logger.Infof(u.context.GetRuntimeContext(), "start udp server, status", err == nil)
 	return err
 }
 
-func (u *UDPServer) doStart(dispatchFunc func(logs []*protocol.Log)) error {
-	var err error
-	u.conn, err = net.ListenUDP("udp", u.addr)
+func (u *UDPServer) doStart(dispatch func(...*models.PipelineGroupEvents)) error {
+	conn, err := net.ListenUDP("udp", u.addr)
 	if err != nil {
 		logger.Warning(u.context.GetRuntimeContext(), selfmonitor.UDPServerAlarm, "start udp server err", err)
 		return err
 	}
+	u.conn = conn
 	go func() {
 		buf := make([]byte, u.MaxBufferSize)
 		defer func() {
 			logger.Debug(u.context.GetRuntimeContext(), "release udp read goroutine")
 		}()
 		for {
-			n, _, err := u.conn.ReadFromUDP(buf)
+			n, _, err := conn.ReadFromUDP(buf)
 			if err != nil {
 				// https://github.com/golang/go/issues/4373
 				// ignore net: errClosing error as it will occur during shutdown
-				if strings.HasSuffix(err.Error(), "use of closed network connection") {
+				if errors.Is(err, net.ErrClosed) {
 					return
 				}
 				logger.Warning(u.context.GetRuntimeContext(), selfmonitor.UDPServerAlarm, "read record err", err)
 				return
 			}
-			logs, err := u.decoder.Decode(buf[:n], nil, nil)
+			groups, err := u.decodeDatagram(buf[:n])
 			if err != nil {
 				logger.Warning(u.context.GetRuntimeContext(), selfmonitor.UDPServerAlarm, "decode record err,some logs would be dropped", err)
 			} else {
-				dispatchFunc(logs)
+				dispatch(groups...)
 			}
 		}
 	}()
 	return nil
 }
 
-func (u *UDPServer) Stop() error {
-	_ = u.conn.Close()
-	u.conn = nil
-	logger.Infof(u.context.GetRuntimeContext(), "stop udp server, success")
-	return nil
+func (u *UDPServer) decodeDatagram(packet []byte) ([]*models.PipelineGroupEvents, error) {
+	var request *http.Request
+	switch u.Format {
+	case common.ProtocolPrometheus, common.ProtocolInflux, common.ProtocolInfluxdb, common.ProtocolPyroscope:
+		request = &http.Request{URL: &url.URL{}}
+	case common.ProtocolOTLPLogV1, common.ProtocolOTLPMetricV1, common.ProtocolOTLPTraceV1:
+		request = &http.Request{URL: &url.URL{}, Header: http.Header{"Content-Type": {"application/x-protobuf"}}}
+	}
+
+	// The next datagram reuses the read buffer, but decoders may retain the payload.
+	groups, err := u.decoder.Decode(bytes.Clone(packet), request)
+	if err != nil || u.Format != common.ProtocolRaw {
+		return groups, err
+	}
+	for _, group := range groups {
+		for i, event := range group.Events {
+			if data, ok := event.(models.ByteArray); ok {
+				log := helper.NewInputLog(nil, nil, time.Now().Truncate(time.Second))
+				log.SetBody([]byte(data))
+				group.Events[i] = log
+			}
+		}
+	}
+	return groups, nil
 }
 
-func (u *UDPServer) dispatcher(logs []*protocol.Log) {
-	for _, log := range logs {
-		u.collector.AddRawLog(log)
+func (u *UDPServer) Stop() error {
+	if u.conn != nil {
+		_ = u.conn.Close()
+		u.conn = nil
 	}
+	logger.Infof(u.context.GetRuntimeContext(), "stop udp server, success")
+	return nil
 }
 
 func init() {

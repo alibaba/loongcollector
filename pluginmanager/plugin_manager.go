@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"github.com/alibaba/ilogtail/pkg/config"
-	"github.com/alibaba/ilogtail/pkg/flags"
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
@@ -232,12 +231,8 @@ func notifyPipelineRemoved(config *LogstoreConfig) {
 // StopBuiltInModulesConfig stops built-in services (container and checkpoint manager).
 func StopBuiltInModulesConfig() {
 	if ContainerConfig != nil {
-		if *flags.ForceSelfCollect {
-			logger.Info(context.Background(), "force collect the container metrics")
-			control := pipeline.NewAsyncControl()
-			ContainerConfig.PluginRunner.RunPlugins(pluginMetricInput, control)
-			control.WaitCancel()
-		}
+		// Stop waits for the input timer's last collection before draining
+		// the processor and flusher. Reuse that collection on shutdown.
 		_ = ContainerConfig.Stop(true)
 		ContainerConfig = nil
 	}

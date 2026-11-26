@@ -28,7 +28,6 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	converter "github.com/alibaba/ilogtail/pkg/protocol/converter"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
@@ -151,27 +150,6 @@ func (f *FlusherLoki) IsReady(projectName string, logstoreName string, logstoreK
 	return true
 }
 
-func (f *FlusherLoki) Flush(projectName string, logstoreName string, configName string, logGroupList []*protocol.LogGroup) error {
-	for _, logGroup := range logGroupList {
-		logger.Debug(f.context.GetRuntimeContext(), "[LogGroup] topic", logGroup.Topic, "logstore", logGroup.Category, "logcount", len(logGroup.Logs), "tags", logGroup.LogTags)
-		serializedLogs, values, err := f.converter.ToByteStreamWithSelectedFields(logGroup, f.DynamicLabels)
-		if err != nil {
-			logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "flush loki convert log fail, error", err)
-			continue
-		}
-
-		for i, log := range serializedLogs.([][]byte) {
-			labels := f.buildLokiLabels(values[i])
-			// Append a log to the next batch, the sending is async
-			err = f.lokiClient.Handle(labels, time.Unix(int64(logGroup.Logs[i].Time), 0), string(log))
-			if err != nil {
-				logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "flush loki convert log fail, error", err)
-			}
-		}
-	}
-	return nil
-}
-
 func (f *FlusherLoki) Export(groups []*models.PipelineGroupEvents, _ pipeline.PipelineContext) error {
 	for _, groupEvents := range groups {
 		if groupEvents == nil {
@@ -183,7 +161,7 @@ func (f *FlusherLoki) Export(groups []*models.PipelineGroupEvents, _ pipeline.Pi
 		// aligned with its own timestamp and keeps serializedLogs/values in lockstep.
 		for _, event := range groupEvents.Events {
 			single := &models.PipelineGroupEvents{Group: groupEvents.Group, Events: []models.PipelineEvent{event}}
-			serializedLogs, values, err := f.converter.ToByteStreamWithSelectedFieldsV2(single, f.DynamicLabels)
+			serializedLogs, values, err := f.converter.ToByteStreamWithSelectedFields(single, f.DynamicLabels)
 			if err != nil {
 				logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "flush loki convert log fail, error", err)
 				continue
@@ -210,7 +188,7 @@ func (f *FlusherLoki) Stop() error {
 func (f *FlusherLoki) getConverter() (*converter.Converter, error) {
 	logger.Debug(f.context.GetRuntimeContext(), "[ilogtail data convert config] Protocol", f.Convert.Protocol,
 		"Encoding", f.Convert.Encoding, "TagFieldsRename", f.Convert.TagFieldsRename, "ProtocolFieldsRename", f.Convert.ProtocolFieldsRename)
-	cvt, err := converter.NewConverter(f.Convert.Protocol, f.Convert.Encoding, f.Convert.TagFieldsRename, f.Convert.ProtocolFieldsRename, f.context.GetPipelineScopeConfig())
+	cvt, err := converter.NewConverter(f.Convert.Protocol, f.Convert.Encoding, f.Convert.TagFieldsRename, f.Convert.ProtocolFieldsRename)
 	if err != nil {
 		return nil, err
 	}

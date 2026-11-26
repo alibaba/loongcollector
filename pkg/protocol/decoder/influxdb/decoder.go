@@ -16,6 +16,7 @@ package influxdb
 
 import (
 	"fmt"
+	"math"
 	"net/http"
 	"strconv"
 	"time"
@@ -24,7 +25,6 @@ import (
 
 	"github.com/alibaba/ilogtail/pkg/helper"
 	imodels "github.com/alibaba/ilogtail/pkg/models"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/protocol/decoder/common"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
@@ -55,39 +55,20 @@ type Decoder struct {
 	FieldsExtend bool
 }
 
-func (d *Decoder) Decode(data []byte, req *http.Request, tags map[string]string) (logs []*protocol.Log, decodeErr error) {
-	points, err := d.decodeToInfluxdbPoints(data, req)
-	if err != nil {
-		return nil, err
-	}
-	logs = d.parsePointsToLogs(points, req)
-	return logs, nil
-}
-
 func (d *Decoder) ParseRequest(res http.ResponseWriter, req *http.Request, maxBodySize int64) (data []byte, statusCode int, err error) {
 	return common.CollectBody(res, req, maxBodySize)
 }
 
-func (d *Decoder) DecodeV2(data []byte, req *http.Request) ([]*imodels.PipelineGroupEvents, error) {
+func (d *Decoder) Decode(data []byte, req *http.Request) ([]*imodels.PipelineGroupEvents, error) {
 	points, err := d.decodeToInfluxdbPoints(data, req)
 	if err != nil {
 		return nil, err
 	}
 	if d.FieldsExtend {
-		// FieldsExtend explicitly requests the extended metric-log shape.
-		// Preserve these named fields as Log events; ordinary requests produce
-		// typed Metric events. Neither path constructs a LogGroup.
-		group := &imodels.PipelineGroupEvents{
-			Group: imodels.NewGroup(imodels.NewMetadata(), imodels.NewTags()),
-		}
-		for _, raw := range d.parsePointsToLogs(points, req) {
-			log := &imodels.Log{Timestamp: uint64(raw.GetTime())*1e9 + uint64(raw.GetTimeNs()), Tags: imodels.NewTags(), Contents: imodels.NewLogContents()}
-			for _, field := range raw.Contents {
-				log.Contents.Add(field.Key, field.Value)
-			}
-			group.Events = append(group.Events, log)
-		}
-		return []*imodels.PipelineGroupEvents{group}, nil
+		return []*imodels.PipelineGroupEvents{{
+			Group:  imodels.NewGroup(imodels.NewMetadata(), imodels.NewTags()),
+			Events: d.parsePointsToExtendedEvents(points, req),
+		}}, nil
 	}
 	return d.parsePointsToEvents(points, req)
 }
@@ -172,9 +153,9 @@ func (d *Decoder) parsePointFieldsToMetricValues(p models.Point) (imodels.Metric
 	return multiValue, typedValue, nil
 }
 
-func (d *Decoder) parsePointsToLogs(points []models.Point, req *http.Request) []*protocol.Log {
+func (d *Decoder) parsePointsToExtendedEvents(points []models.Point, req *http.Request) []imodels.PipelineEvent {
 	db := req.FormValue("db")
-	logs := make([]*protocol.Log, 0, len(points))
+	events := make([]imodels.PipelineEvent, 0, len(points))
 	for _, s := range points {
 		fields, err := s.Fields()
 		if err != nil {
@@ -198,9 +179,6 @@ func (d *Decoder) parsePointsToLogs(points []models.Point, req *http.Request) []
 				}
 				valueType = valueTypeBool
 			case string:
-				if !d.FieldsExtend {
-					continue
-				}
 				value = v
 				valueType = valueTypeString
 			default:
@@ -218,21 +196,37 @@ func (d *Decoder) parsePointsToLogs(points []models.Point, req *http.Request) []
 				labels.Append(util.ZeroCopyBytesToString(v.Key), util.ZeroCopyBytesToString(v.Value))
 			}
 
-			metricLog := helper.NewMetricLogStringVal(name, s.UnixNano(), value, &labels)
-			if d.FieldsExtend {
-				metricLog.Contents = append(metricLog.Contents,
-					&protocol.Log_Content{Key: typeKey, Value: valueType},
-					&protocol.Log_Content{Key: fieldNameKey, Value: field})
-				if len(db) > 0 {
-					metricLog.Contents = append(metricLog.Contents, &protocol.Log_Content{
-						Key:   tagDB,
-						Value: db,
-					})
-
-				}
+			timestamp, timestampText := extendedLogTimestamp(s.UnixNano())
+			log := imodels.NewLogWithOrderedContents(7)
+			log.Timestamp = timestamp
+			log.Contents.Add("__name__", helper.FormatMetricLogName(name))
+			log.Contents.Add("__time_nano__", timestampText)
+			log.Contents.Add("__labels__", labels.String())
+			log.Contents.Add("__value__", value)
+			log.Contents.Add(typeKey, valueType)
+			log.Contents.Add(fieldNameKey, field)
+			if db != "" {
+				log.Contents.Add(tagDB, db)
 			}
-			logs = append(logs, metricLog)
+			events = append(events, log)
 		}
 	}
-	return logs
+	return events
+}
+
+// extendedLogTimestamp keeps the original SLS metric row timestamp encoding.
+func extendedLogTimestamp(timestamp int64) (uint64, string) {
+	timestampText := strconv.FormatInt(timestamp, 10)
+	if len(timestampText) == 13 {
+		seconds := uint32(timestamp / 1000)
+		nanos := uint32((timestamp * int64(time.Millisecond)) % int64(time.Second))
+		return uint64(seconds)*uint64(time.Second) + uint64(nanos), timestampText + "000000"
+	}
+	if len(timestampText) != 19 {
+		timestamp = int64(float64(timestamp) * math.Pow10(19-len(timestampText)))
+		timestampText = strconv.FormatInt(timestamp, 10)
+	}
+	seconds := uint32(timestamp / int64(time.Second))
+	nanos := uint32(timestamp % int64(time.Second))
+	return uint64(seconds)*uint64(time.Second) + uint64(nanos), timestampText
 }

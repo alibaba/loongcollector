@@ -15,20 +15,20 @@
 package pluginmanager
 
 import (
-	"bytes"
 	"context"
 	"crypto/md5" //nolint:gosec
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
 	"sync/atomic"
 
 	"github.com/alibaba/ilogtail/pkg/config"
+	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/plugins/input"
 )
@@ -114,7 +114,7 @@ func (lc *LogstoreConfig) Start() {
 // 1. SetUrgent to all flushers to indicate them current state.
 // 2. Stop all input plugins, stop generating logs.
 // 3. Stop processor goroutine, pass all existing logs to aggregator.
-// 4. Stop all aggregator plugins, make all logs to LogGroups.
+// 4. Stop the aggregators and emit their pending event groups.
 // 5. Set stopping flag, stop flusher goroutine.
 // 6. If config will be removed and there are remaining data, try to flush once.
 // 7. Stop flusher plugins.
@@ -128,77 +128,18 @@ func (lc *LogstoreConfig) Stop(removedFlag bool) error {
 	return nil
 }
 
-const (
-	rawStringKey     = "content"
-	defaultTagPrefix = "__tag__:__prefix__"
-)
-
-var (
-	tagDelimiter = []byte("^^^")
-	tagSeparator = []byte("~=~")
-)
-
-// extractTagsToLogTags extracts tags from rawTags and append them into []*protocol.LogTag.
-// Rule: k1~=~v1^^^k2~=~v2
-// rawTags
-func extractTagsToLogTags(rawTags []byte) []*protocol.LogTag {
-	logTags := []*protocol.LogTag{}
-	defaultPrefixIndex := 0
-	for len(rawTags) != 0 {
-		idx := bytes.Index(rawTags, tagDelimiter)
-		var part []byte
-		if idx < 0 {
-			part = rawTags
-			rawTags = rawTags[len(rawTags):]
-		} else {
-			part = rawTags[:idx]
-			rawTags = rawTags[idx+len(tagDelimiter):]
-		}
-		if len(part) > 0 {
-			pos := bytes.Index(part, tagSeparator)
-			if pos > 0 {
-				logTags = append(logTags, &protocol.LogTag{
-					Key:   string(part[:pos]),
-					Value: string(part[pos+len(tagSeparator):]),
-				})
-			} else {
-				logTags = append(logTags, &protocol.LogTag{
-					Key:   defaultTagPrefix + strconv.Itoa(defaultPrefixIndex),
-					Value: string(part),
-				})
-			}
-			defaultPrefixIndex++
-		}
-	}
-	return logTags
-}
-
-// ProcessRawLogV2 ...
-// The versioned raw-log ABI carries topic metadata and separate group tags.
-// unsafe parameter: rawLog,packID and tags
-// safe parameter:  topic
-func (lc *LogstoreConfig) ProcessRawLogV2(rawLog []byte, packID string, topic string, tags []byte) int {
-	log := &protocol.Log{
-		Contents: make([]*protocol.Log_Content, 0, 16),
-	}
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: rawStringKey, Value: string(rawLog)})
-	if len(topic) > 0 {
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "__log_topic__", Value: topic})
-	}
-	// The raw-log entry point follows the event model: tags are group
-	// attributes, never additional log contents.
-	logTags := extractTagsToLogTags(tags)
-	lc.PluginRunner.ReceiveRawLog(&pipeline.LogWithContext{Log: log, Context: map[string]interface{}{"source": packID, "topic": topic, "tags": logTags}})
-	return 0
-}
+const ctxKeySource = "source"
 
 func (lc *LogstoreConfig) ProcessPipelineEventGroup(pbBytes []byte, packID string) int {
-	pbGroup := &protocol.PipelineEventGroup{}
-	if err := pbGroup.Unmarshal(pbBytes); err != nil {
-		logger.Error(lc.Context.GetRuntimeContext(), selfmonitor.WrongProtobufAlarm, "cannot process pipeline event group passed by core, err", err)
-		return -1
+	err := lc.PluginRunner.receivePipelineEventGroup(pbBytes, packID)
+	if err != nil {
+		if errors.Is(err, helper.ErrInvalidPipelineEventGroupWire) {
+			logger.Error(lc.Context.GetRuntimeContext(), selfmonitor.WrongProtobufAlarm, "cannot process pipeline event group passed by core, err", err)
+			return -1
+		}
+		logger.Warningf(lc.Context.GetRuntimeContext(), selfmonitor.ReceiveLogGroupAlarm, "transfer pipeline event group failed, err: %s", err.Error())
+		return 0
 	}
-	lc.PluginRunner.ReceivePipelineEventGroup(pbGroup, map[string]interface{}{ctxKeySource: packID})
 	return 0
 }
 
@@ -255,7 +196,8 @@ func createLogstoreConfig(project string, logstore string, configName string, lo
 	if err = validateStructureType(plugins); err != nil {
 		return nil, err
 	}
-	logstoreC.PluginRunner = initPluginRunner(logstoreC)
+	runner := initPluginRunner(logstoreC)
+	logstoreC.PluginRunner = runner
 	if lastConfigRunner, hasLastConfig := LastUnsendBuffer[configName]; hasLastConfig {
 		// Move unsent event groups from last config to new config.
 		logstoreC.PluginRunner.Merge(lastConfigRunner)
@@ -366,15 +308,20 @@ func createLogstoreConfig(project string, logstore string, configName string, lo
 
 	logQueueSize := logstoreC.GlobalConfig.DefaultLogQueueSize
 	// Because the transferred data of the file MixProcessMode is quite large, we have to limit queue size to control memory usage here.
-	if checkMixProcessMode(plugins) == file {
+	fileInput := checkMixProcessMode(plugins) == file
+	if fileInput {
 		logger.Infof(contextImp.GetRuntimeContext(), "no inputs in config %v, maybe file input, limit queue size", configName)
 		logQueueSize = 10
 	}
 
-	logGroupSize := logstoreC.GlobalConfig.DefaultLogGroupQueueSize
+	flushQueueSize := logstoreC.GlobalConfig.DefaultLogGroupQueueSize
 
-	if err = logstoreC.PluginRunner.Init(logQueueSize, logGroupSize); err != nil {
+	if err = logstoreC.PluginRunner.Init(logQueueSize, flushQueueSize); err != nil {
 		return nil, err
+	}
+
+	if fileInput {
+		runner.InputPipeContext = newReservedInputQueue(runner.InputPipeContext, logQueueSize)
 	}
 
 	// extensions should be initialized first
@@ -493,6 +440,10 @@ func createLogstoreConfig(project string, logstore string, configName string, lo
 		}
 	}
 
+	if err = runner.addDefaultAggregatorIfEmpty(); err != nil {
+		return nil, err
+	}
+
 	pluginConfig, flushersFound := plugins["flushers"]
 	if flushersFound {
 		flushers, ok := pluginConfig.([]interface{})
@@ -522,6 +473,10 @@ func createLogstoreConfig(project string, logstore string, configName string, lo
 	if err = logstoreC.PluginRunner.AddDefaultFlusherIfEmpty(); err != nil {
 		return nil, err
 	}
+	// C++-managed pipelines use /1 or /2. Built-in Go pipelines have unsuffixed names.
+	if logstoreC.ConfigName != configName {
+		runner.initPipelineInputMetrics()
+	}
 	return logstoreC, nil
 }
 
@@ -547,7 +502,7 @@ func validateStructureType(plugins map[string]interface{}) error {
 	return nil
 }
 
-func initPluginRunner(lc *LogstoreConfig) PluginRunner {
+func initPluginRunner(lc *LogstoreConfig) *pluginRunner {
 	return &pluginRunner{
 		LogstoreConfig: lc,
 		FlushOutStore:  NewFlushOutStore[models.PipelineGroupEvents](),

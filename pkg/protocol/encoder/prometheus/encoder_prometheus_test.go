@@ -30,46 +30,46 @@ import (
 // 场景：性能测试，确定性能基线（UT粒度）
 // 因子：所有 Event type 均为 models.EventTypeMetric
 // 因子：所有 PipelineEvent interface 的实现均为 *models.Metric
-// 预期：EncodeV2 和 EncodeBatchV2 性能相当（实现上 EncodeBatchV2 会循环调用 EncodeV2）
+// 预期：Encode 和 EncodeBatch 性能相当（实现上 EncodeBatch 会循环调用 Encode）
 // Benchmark结果（每次在具体数值上可能会有差异，但数量级相同）：
 // goos: darwin
 // goarch: arm64
 // pkg: github.com/alibaba/ilogtail/pkg/protocol/encoder/prometheus
-// BenchmarkV2Encode
-// BenchmarkV2Encode/EncodeV2
-// BenchmarkV2Encode/EncodeV2-12         	     685	   1655657 ns/op
-// BenchmarkV2Encode/BatchEncodeV2
-// BenchmarkV2Encode/BatchEncodeV2-12    	     716	   1639491 ns/op
+// BenchmarkEncode
+// BenchmarkEncode/Encode
+// BenchmarkEncode/Encode-12         	     685	   1655657 ns/op
+// BenchmarkEncode/BatchEncode
+// BenchmarkEncode/BatchEncode-12    	     716	   1639491 ns/op
 // PASS
-func BenchmarkV2Encode(b *testing.B) {
+func BenchmarkEncode(b *testing.B) {
 	// given
 	p := NewPromEncoder(19)
 	groupEventsSlice := genNormalPipelineGroupEventsSlice(100)
 	want := append([]*models.PipelineGroupEvents(nil), groupEventsSlice...)
 
-	b.Run("EncodeV2", func(b *testing.B) {
+	b.Run("Encode", func(b *testing.B) {
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
 			for _, groupEvents := range groupEventsSlice {
-				p.EncodeV2(groupEvents)
+				p.Encode(groupEvents)
 			}
 		}
 	})
 	assert.Equal(b, want, groupEventsSlice)
 
-	b.Run("BatchEncodeV2", func(b *testing.B) {
+	b.Run("BatchEncode", func(b *testing.B) {
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
-			p.EncodeBatchV2(groupEventsSlice)
+			p.EncodeBatch(groupEventsSlice)
 		}
 	})
 	assert.Equal(b, want, groupEventsSlice)
 }
 
 // 场景：V2 Encode接口功能测试
-// 说明：EncodeBatchV2 内部会调用 EncodeV2，所以也同时测试了 EncodeV2 的正常逻辑的功能
+// 说明：EncodeBatch 内部会调用 Encode，所以也同时测试了 Encode 的正常逻辑的功能
 // 因子：所有 Event type 均为 models.EventTypeMetric
 // 因子：所有 PipelineEvent interface 的实现均为「正常的*models.Metric」（而不是new(models.Metric)），
 // 具体区别在于正常的*models.Metric，其中的Tags、Value等都不是nil（如果为nil，会触发序列化的异常逻辑）
@@ -82,17 +82,17 @@ func TestV2Encode_ShouldReturnNoError_GivenNormalDataOfPipelineGroupEvents(t *te
 
 	// when
 	// then
-	data1, err1 := p.EncodeBatchV2(groupEventsSlice1)
+	data1, err1 := p.EncodeBatch(groupEventsSlice1)
 	assert.NoError(t, err1)
-	data2, err2 := p.EncodeBatchV2(groupEventsSlice2)
+	data2, err2 := p.EncodeBatch(groupEventsSlice2)
 	assert.NoError(t, err2)
 
 	assert.Equal(t, len(data2), len(data1))
 }
 
 // 场景：V2 Encode接口功能测试（异常数据，非全nil或0值）
-// 说明：尽管 EncodeBatchV2 内部会调用 EncodeV2，但异常情况可能是 EncodeBatchV2 侧的防御，
-// 所以还需要测试异常情况下 EncodeV2 的功能
+// 说明：尽管 EncodeBatch 内部会调用 Encode，但异常情况可能是 EncodeBatch 侧的防御，
+// 所以还需要测试异常情况下 Encode 的功能
 // 因子：并非所有 Event type 均为 models.EventTypeMetric（e.g. 还可能是 models.EventTypeLogging 等）
 // 因子：PipelineEvent interface 的实现，部分是「正常的*models.Metric」，部分为 nil，部分为new(models.Metric)，
 // 部分为其它（e.g. *models.Log 等）
@@ -106,10 +106,10 @@ func TestV2Encode_ShouldReturnError_GivenAbNormalDataOfPipelineGroupEvents(t *te
 
 	// when
 	// then
-	t.Run("Test EncodeV2 with abnormal data input", func(t *testing.T) {
+	t.Run("Test Encode with abnormal data input", func(t *testing.T) {
 		for i, groupEvents := range groupEventsSlice1 {
-			data1, err1 := p.EncodeV2(groupEvents)
-			data2, err2 := p.EncodeV2(groupEventsSlice2[i])
+			data1, err1 := p.Encode(groupEvents)
+			data2, err2 := p.Encode(groupEventsSlice2[i])
 			if err1 != nil {
 				assert.Error(t, err2)
 				assert.Equal(t, err1, err2)
@@ -120,10 +120,10 @@ func TestV2Encode_ShouldReturnError_GivenAbNormalDataOfPipelineGroupEvents(t *te
 		}
 	})
 
-	t.Run("Test EncodeBatchV2 with abnormal data input", func(t *testing.T) {
-		data1, err1 := p.EncodeBatchV2(groupEventsSlice1)
+	t.Run("Test EncodeBatch with abnormal data input", func(t *testing.T) {
+		data1, err1 := p.EncodeBatch(groupEventsSlice1)
 		assert.NoError(t, err1)
-		data2, err2 := p.EncodeBatchV2(groupEventsSlice2)
+		data2, err2 := p.EncodeBatch(groupEventsSlice2)
 		assert.NoError(t, err2)
 
 		assert.Equal(t, len(data2), len(data1))
@@ -131,8 +131,8 @@ func TestV2Encode_ShouldReturnError_GivenAbNormalDataOfPipelineGroupEvents(t *te
 }
 
 // 场景：V2 Encode接口功能测试（异常数据，全nil或0值）
-// 说明：尽管 EncodeBatchV2 内部会调用 EncodeV2，但异常情况可能是 EncodeBatchV2 侧的防御，
-// 所以还需要测试异常情况下 EncodeV2 的功能
+// 说明：尽管 EncodeBatch 内部会调用 Encode，但异常情况可能是 EncodeBatch 侧的防御，
+// 所以还需要测试异常情况下 Encode 的功能
 // 因子：所有 *models.PipelineGroupEvents 及 []*models.PipelineGroupEvents 底层为 nil 或者 长度为0的切片
 // 预期：Encode逻辑正常（异常流程也能正确处理），返回的error类型不为nil，[][]byte为nil
 func TestV2Encode_ShouldReturnError_GivenNilOrZeroDataOfPipelineGroupEvents(t *testing.T) {
@@ -152,17 +152,17 @@ func TestV2Encode_ShouldReturnError_GivenNilOrZeroDataOfPipelineGroupEvents(t *t
 
 	// when
 	// then
-	t.Run("Test EncodeV2 with nil or zero data input", func(t *testing.T) {
+	t.Run("Test Encode with nil or zero data input", func(t *testing.T) {
 		for _, input := range nilOrZeroGroupEventsSlices {
-			data, err := p.EncodeV2(input)
+			data, err := p.Encode(input)
 			assert.Error(t, err)
 			assert.Nil(t, data)
 		}
 	})
 
-	t.Run("Test EncodeBatchV2 with nil or zero data input", func(t *testing.T) {
+	t.Run("Test EncodeBatch with nil or zero data input", func(t *testing.T) {
 		for _, input := range nilOrZeroGroupEventsSlicesEx {
-			data, err := p.EncodeBatchV2(input)
+			data, err := p.EncodeBatch(input)
 			assert.Error(t, err)
 			assert.Nil(t, data)
 		}
@@ -170,7 +170,7 @@ func TestV2Encode_ShouldReturnError_GivenNilOrZeroDataOfPipelineGroupEvents(t *t
 }
 
 // 场景：V2 Encode接口功能测试
-// 说明：EncoderBatchV2 内部会调用 EncoderV2，所以也同时测试了 EncoderV2 的功能
+// 说明：EncodeBatch 内部会调用 Encode，所以也同时测试了 Encode 的功能
 // 因子：所有 Event type 均为 models.EventTypeMetric
 // 因子：所有 PipelineEvent interface 的实现均为 *models.Metric
 // 因子：每个 metric event 生成的 *models.Metric.Tags 中的 tag 仅一个
@@ -178,7 +178,7 @@ func TestV2Encode_ShouldReturnError_GivenNilOrZeroDataOfPipelineGroupEvents(t *t
 // PS：如果不这么做，就要对map做转化，先变成 range 保序的 slice，再 Encode；
 // 但测试的功能点是Encode，所以采用上述方法绕过range go原生map每次顺序随机的特点，完成功能测试
 // 预期：Encode逻辑正常（正常流程都能正确处理），返回的error类型为nil，[][]byte不为nil，且两次Encode后返回的数据相同
-func TestEncoderBatchV2_ShouldReturnNoErrorAndEqualData_GivenNormalDataOfDataOfPipelineGroupEventsWithSingleTag(t *testing.T) {
+func TestEncodeBatch_ShouldReturnNoErrorAndEqualData_GivenNormalDataOfDataOfPipelineGroupEventsWithSingleTag(t *testing.T) {
 	// given
 	groupEventsSlice1 := genPipelineGroupEventsSliceSingleTag(100)
 	groupEventsSlice2 := genPipelineGroupEventsSliceSingleTag(100)
@@ -186,16 +186,16 @@ func TestEncoderBatchV2_ShouldReturnNoErrorAndEqualData_GivenNormalDataOfDataOfP
 
 	// when
 	// then
-	data1, err1 := p.EncodeBatchV2(groupEventsSlice1)
+	data1, err1 := p.EncodeBatch(groupEventsSlice1)
 	assert.NoError(t, err1)
-	data2, err2 := p.EncodeBatchV2(groupEventsSlice2)
+	data2, err2 := p.EncodeBatch(groupEventsSlice2)
 	assert.NoError(t, err2)
 
 	assert.Equal(t, data2, data1)
 }
 
 // 场景：V2 Encode接口功能测试
-// 说明：EncoderBatchV2 内部会调用 EncoderV2，所以也同时测试了 EncoderV2 的功能
+// 说明：EncodeBatch 内部会调用 Encode，所以也同时测试了 Encode 的功能
 // 因子：所有 Event type 均为 models.EventTypeMetric
 // 因子：所有 PipelineEvent interface 的实现均为 *models.Metric
 // 因子：每个 metric event 生成的 *models.Metric.Tags 中的 tag 仅一个
@@ -205,13 +205,13 @@ func TestEncoderBatchV2_ShouldReturnNoErrorAndEqualData_GivenNormalDataOfDataOfP
 // 因子：对Encode后的数据进行Decode
 // 因子：「构造的用例数据」的长度（len([]*models.PipelineGroupEvents)）未超过 series limit
 // 预期：「构造的用例数据」和「对用例数据先Encode再Decode后的数据」相等
-func TestEncoderBatchV2_ShouldDecodeSuccess_GivenNormalDataOfDataOfPipelineGroupEventsWithSingleTagNotExceedingSeriesLimit(t *testing.T) {
+func TestEncodeBatch_ShouldDecodeSuccess_GivenNormalDataOfDataOfPipelineGroupEventsWithSingleTagNotExceedingSeriesLimit(t *testing.T) {
 	// given
 	seriesLimit := 19
 	n := seriesLimit
 	wantGroupEventsSlice := genPipelineGroupEventsSliceSingleTag(n)
 	p := NewPromEncoder(seriesLimit)
-	data, err := p.EncodeBatchV2(wantGroupEventsSlice)
+	data, err := p.EncodeBatch(wantGroupEventsSlice)
 	assert.NoError(t, err)
 
 	// when
@@ -222,7 +222,7 @@ func TestEncoderBatchV2_ShouldDecodeSuccess_GivenNormalDataOfDataOfPipelineGroup
 }
 
 // 场景：V2 Encode接口功能测试
-// 说明：EncoderBatchV2 内部会调用 EncoderV2，所以也同时测试了 EncoderV2 的功能
+// 说明：EncodeBatch 内部会调用 Encode，所以也同时测试了 Encode 的功能
 // 因子：所有 Event type 均为 models.EventTypeMetric
 // 因子：所有 PipelineEvent interface 的实现均为 *models.Metric
 // 因子：每个 metric event 生成的 *models.Metric.Tags 中的 tag 仅一个
@@ -234,7 +234,7 @@ func TestEncoderBatchV2_ShouldDecodeSuccess_GivenNormalDataOfDataOfPipelineGroup
 // 预期：「构造的用例数据」的长度小于「对用例数据先Encode再Decode后的数据」的长度，且用 expectedLen 计算后的长度相等
 // PS：expectedLen 的计算方法，其实是和 genPipelineGroupEventsSlice 生成用例及根据series limit确定encode批次
 // 的逻辑相关，和 Encode 本身的逻辑无关
-func TestEncodeV2_MultiValueRespectsSeriesLimitWithoutDataLoss(t *testing.T) {
+func TestEncode_MultiValueRespectsSeriesLimitWithoutDataLoss(t *testing.T) {
 	seriesLimit := 2
 	multiValue := models.NewMetricMultiValueWithMap(map[string]float64{
 		"cpu":  0.1,
@@ -248,7 +248,7 @@ func TestEncodeV2_MultiValueRespectsSeriesLimitWithoutDataLoss(t *testing.T) {
 	}
 
 	p := NewPromEncoder(seriesLimit)
-	data, err := p.EncodeV2(groupEvents)
+	data, err := p.Encode(groupEvents)
 	assert.NoError(t, err)
 	assert.Len(t, data, 2)
 
@@ -269,7 +269,7 @@ func TestEncodeV2_MultiValueRespectsSeriesLimitWithoutDataLoss(t *testing.T) {
 	assert.Equal(t, 0.3, names["agent_disk"])
 }
 
-func TestEncodeV2_MultiValueSeriesLimitSplitAcrossBatchBoundary(t *testing.T) {
+func TestEncode_MultiValueSeriesLimitSplitAcrossBatchBoundary(t *testing.T) {
 	seriesLimit := 2
 	singleMetric := models.NewSingleValueMetric(
 		"prefill",
@@ -292,7 +292,7 @@ func TestEncodeV2_MultiValueSeriesLimitSplitAcrossBatchBoundary(t *testing.T) {
 	}
 
 	p := NewPromEncoder(seriesLimit)
-	data, err := p.EncodeV2(groupEvents)
+	data, err := p.Encode(groupEvents)
 	assert.NoError(t, err)
 
 	gotGroupEventsSlice, err := DecodeBatchV2(data)
@@ -312,14 +312,14 @@ func TestEncodeV2_MultiValueSeriesLimitSplitAcrossBatchBoundary(t *testing.T) {
 	assert.Len(t, names, 3)
 }
 
-func TestEncoderBatchV2_ShouldDecodeSuccess_GivenNormalDataOfDataOfPipelineGroupEventsWithSingleTagExceedingSeriesLimit(t *testing.T) {
+func TestEncodeBatch_ShouldDecodeSuccess_GivenNormalDataOfDataOfPipelineGroupEventsWithSingleTagExceedingSeriesLimit(t *testing.T) {
 	// given
 	seriesLimit := 19
 	n := 100
 	wantGroupEventsSlice := genPipelineGroupEventsSliceSingleTag(n)
 	assert.Equal(t, n, len(wantGroupEventsSlice))
 	p := NewPromEncoder(seriesLimit)
-	data, err := p.EncodeBatchV2(wantGroupEventsSlice)
+	data, err := p.EncodeBatch(wantGroupEventsSlice)
 	assert.NoError(t, err)
 	expectedLen := func(limit, length int) int {
 		// make sure limit > 0 && length > 0

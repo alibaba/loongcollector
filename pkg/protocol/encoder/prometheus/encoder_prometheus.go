@@ -21,7 +21,6 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline/extensions"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
 const defaultSeriesLimit = 1000
@@ -50,17 +49,7 @@ func newPromEncoder(seriesLimit int) *Encoder {
 	}
 }
 
-func (p *Encoder) EncodeV1(logGroups *protocol.LogGroup) ([][]byte, error) {
-	// TODO implement me
-	return nil, nil
-}
-
-func (p *Encoder) EncodeBatchV1(logGroups []*protocol.LogGroup) ([][]byte, error) {
-	// TODO implement me
-	return nil, nil
-}
-
-func (p *Encoder) EncodeV2(groupEvents *models.PipelineGroupEvents) ([][]byte, error) {
+func (p *Encoder) Encode(groupEvents *models.PipelineGroupEvents) ([][]byte, error) {
 	if groupEvents == nil || len(groupEvents.Events) == 0 {
 		return nil, errNilOrZeroGroupEvents
 	}
@@ -104,7 +93,7 @@ func (p *Encoder) EncodeV2(groupEvents *models.PipelineGroupEvents) ([][]byte, e
 	return res, nil
 }
 
-func (p *Encoder) EncodeBatchV2(groupEventsSlice []*models.PipelineGroupEvents) ([][]byte, error) {
+func (p *Encoder) EncodeBatch(groupEventsSlice []*models.PipelineGroupEvents) ([][]byte, error) {
 	if len(groupEventsSlice) == 0 {
 		return nil, errNilOrZeroGroupEvents
 	}
@@ -112,7 +101,7 @@ func (p *Encoder) EncodeBatchV2(groupEventsSlice []*models.PipelineGroupEvents) 
 	var res [][]byte
 
 	for _, groupEvents := range groupEventsSlice {
-		bytes, err := p.EncodeV2(groupEvents)
+		bytes, err := p.Encode(groupEvents)
 		if err != nil {
 			continue
 		}

@@ -28,7 +28,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 
@@ -462,7 +464,8 @@ func (s *Agent) GetTranslated() error {
 	return nil
 }
 
-func (s *Agent) Start(collector pipeline.Collector) error {
+func (s *Agent) StartService(ctx pipeline.PipelineContext) error {
+	collector := ctx.Collector()
 	runtime.GOMAXPROCS(len(s.gs))
 	for index, GsAgent := range s.gs {
 		// use anonymous function to avoid resource leak
@@ -554,14 +557,14 @@ func (s *Agent) Start(collector pipeline.Collector) error {
 						}
 					}
 
-					collector.AddData(nil, map[string]string{
+					collector.Collect(models.NewGroup(models.NewMetadata(), models.NewTags()), helper.NewInputLog(nil, map[string]string{
 						"_targetindex_": strconv.Itoa(thisIndex),
 						"_target_":      thisGsAgent.Target,
 						"_field_":       s.fieldContents[i].Name,
 						"_oid_":         variable.Name,
 						"_conversion_":  s.fieldContents[i].Conversion,
 						"_type_":        translatedType,
-						"_content_":     res})
+						"_content_":     res}))
 				}
 				return nil
 			}()
@@ -579,10 +582,6 @@ func (s *Agent) Stop() error {
 			defer GsAgent.Conn.Close()
 		}()
 	}
-	return nil
-}
-
-func (s *Agent) Collect(_ pipeline.Collector) error {
 	return nil
 }
 

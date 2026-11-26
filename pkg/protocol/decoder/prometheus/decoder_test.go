@@ -65,21 +65,10 @@ telemetry_requests_metrics_latency_microseconds_sum 1.7560473e+07
 telemetry_requests_metrics_latency_microseconds_count 2693
 `
 
-func TestNormal(t *testing.T) {
+func TestDecode(t *testing.T) {
 	decoder := &Decoder{}
 	req, _ := http.NewRequest("GET", "http://localhost", nil)
-	logs, err := decoder.Decode([]byte(textFormat), req, nil)
-	assert.Nil(t, err)
-	assert.Equal(t, len(logs), 20)
-	for _, log := range logs {
-		fmt.Printf("%s \n", log.String())
-	}
-}
-
-func TestDecodeV2(t *testing.T) {
-	decoder := &Decoder{}
-	req, _ := http.NewRequest("GET", "http://localhost", nil)
-	groupeEventsSlice, err := decoder.DecodeV2([]byte(textFormat), req)
+	groupeEventsSlice, err := decoder.Decode([]byte(textFormat), req)
 	assert.Nil(t, err)
 	metricCount := 0
 	for _, pg := range groupeEventsSlice {
@@ -92,7 +81,7 @@ func TestDecodeV2(t *testing.T) {
 	assert.Equal(t, 20, metricCount)
 }
 
-func BenchmarkDecodeV2(b *testing.B) {
+func BenchmarkDecode(b *testing.B) {
 	promRequest := &prompb.WriteRequest{
 		Timeseries: []prompb.TimeSeries{
 			{
@@ -111,7 +100,7 @@ func BenchmarkDecodeV2(b *testing.B) {
 	req.Header.Add(contentTypeKey, pbContentType)
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		_, err := decoder.DecodeV2(bytes, req)
+		_, err := decoder.Decode(bytes, req)
 		assert.Nil(b, err)
 	}
 }

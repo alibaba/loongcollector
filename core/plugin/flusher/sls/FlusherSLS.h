@@ -85,12 +85,17 @@ public:
     // Initialize the fixed container reporting endpoint without a native batcher.
     bool InitForProfile(CollectionPipelineContext& context);
 
-    // Go v2 batches are already formed. Preserve each call's routing overrides.
-    bool
-    Send(const models::PipelineEventGroup& group, const std::string& shardHashKey, const std::string& logstore = "");
+    // Go batches are already formed. Preserve each call's routing overrides.
+    bool Send(const models::PipelineEventGroup& group,
+              const std::string& shardHashKey,
+              const std::string& logstore = "",
+              bool* exceedsSizeLimit = nullptr);
 
-    // Legacy LogGroup wire data, for Go v1 and profile callers.
-    bool Send(std::string&& data, const std::string& shardHashKey, const std::string& logstore = "");
+    bool SendPBLogWire(const models::PipelineEventGroup& header,
+                       const SLSLogGroupWireView& wire,
+                       const std::string& shardHashKey,
+                       const std::string& logstore,
+                       bool* exceedsSizeLimit);
 
     const std::string& GetSubpath() const { return mSubpath; }
 
@@ -137,8 +142,17 @@ private:
     bool SerializeAndPush(BatchedEventsList&& groupList);
     bool SerializeAndPush(PipelineEventGroup&& g); // for exactly once only
     bool PushToQueue(QueueKey key, std::unique_ptr<SenderQueueItem>&& item, uint32_t retryTimes = 500);
-    std::string GetShardHashKey(const BatchedEvents& g) const;
-    void AddPackId(BatchedEvents& g) const;
+    bool compressEventGroup(std::string& data, std::string& compressedData);
+    // Send one serialized group through the same queue for native and Go inputs.
+    bool sendSerializedGroup(std::string&& data, const std::string& shardHashKey, const std::string& logstore);
+    bool sendPBLogs(const models::PipelineEventGroup& group,
+                    const std::string& shardHashKey,
+                    const std::string& logstore,
+                    const SLSLogGroupWireView* wire,
+                    bool* exceedsSizeLimit);
+    std::string GetShardHashKey(const GroupTags& tags) const;
+    SLSLogGroupOptions makeLogGroupOptions(StringView sourceId, const std::string& logstore, bool canSplit) const;
+    bool reportSerializationFailure(const std::string& errorMsg) const;
 
     std::unique_ptr<HttpSinkRequest> CreatePostLogStoreLogsRequest(const std::string& accessKeyId,
                                                                    const std::string& accessKeySecret,
@@ -167,7 +181,7 @@ private:
     std::string mWorkspace;
 
     Batcher<SLSEventBatchStatus> mBatcher;
-    std::unique_ptr<EventGroupSerializer> mGroupSerializer;
+    std::unique_ptr<SLSEventGroupSerializer> mGroupSerializer;
     std::unique_ptr<Serializer<std::vector<CompressedLogGroup>>> mGroupListSerializer;
 #ifdef __ENTERPRISE__
     // This may not be cached. However, this provides a simple way to control the lifetime of a CandidateDomainsInfo.

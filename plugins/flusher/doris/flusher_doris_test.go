@@ -25,15 +25,13 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/models"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	converter "github.com/alibaba/ilogtail/pkg/protocol/converter"
-	"github.com/alibaba/ilogtail/plugins/test"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
 )
 
@@ -226,59 +224,24 @@ func TestFlusherDoris_Init(t *testing.T) {
 	})
 }
 
-// makeTestLogGroupList creates a test log group list for testing
-func makeTestLogGroupList() *protocol.LogGroupList {
-	fields := map[string]string{}
-	lgl := &protocol.LogGroupList{
-		LogGroupList: make([]*protocol.LogGroup, 0, 10),
-	}
-
+func makeTestPipelineEventGroups() []*models.PipelineGroupEvents {
+	groups := make([]*models.PipelineGroupEvents, 0, 10)
+	timestamp := uint64(time.Now().Unix()) * uint64(time.Second)
 	for i := 1; i <= 10; i++ {
-		lg := &protocol.LogGroup{
-			Logs:   make([]*protocol.Log, 0, 10),
-			Source: "",
+		group := &models.PipelineGroupEvents{
+			Group:  models.NewGroup(models.NewMetadata(), models.NewTagsWithKeyValues("host.ip", "")),
+			Events: make([]models.PipelineEvent, 0, 10),
 		}
 		for j := 1; j <= 10; j++ {
-			fields["group"] = strconv.Itoa(i)
-			fields["message"] = "The message: " + strconv.Itoa(j)
-			fields["id"] = strconv.Itoa(i*100 + j)
-			l := test.CreateLogByFields(fields)
-			lg.Logs = append(lg.Logs, l)
+			log := models.NewSimpleLog(nil, models.NewTags(), timestamp)
+			log.GetIndices().Add("group", strconv.Itoa(i))
+			log.GetIndices().Add("message", "The message: "+strconv.Itoa(j))
+			log.GetIndices().Add("id", strconv.Itoa(i*100+j))
+			group.Events = append(group.Events, log)
 		}
-		lgl.LogGroupList = append(lgl.LogGroupList, lg)
+		groups = append(groups, group)
 	}
-	return lgl
-}
-
-func makeParityLogGroups() ([]*protocol.LogGroup, []*models.PipelineGroupEvents) {
-	v1Groups := makeTestLogGroupList().GetLogGroupList()[:1]
-	return v1Groups, makePipelineGroupEventsFromLogGroups(v1Groups)
-}
-
-func makePipelineGroupEventsFromLogGroups(v1Groups []*protocol.LogGroup) []*models.PipelineGroupEvents {
-	v2Groups := make([]*models.PipelineGroupEvents, 0, len(v1Groups))
-	for _, lg := range v1Groups {
-		groupTags := models.NewTags()
-		groupTags.Add("host.ip", lg.Source)
-		for _, tag := range lg.LogTags {
-			groupTags.Add(tag.Key, tag.Value)
-		}
-		group := models.NewGroup(models.NewMetadata(), groupTags)
-		events := make([]models.PipelineEvent, 0, len(lg.Logs))
-		for _, log := range lg.Logs {
-			ts := uint64(log.GetTime()) * 1e9
-			if log.TimeNs != nil {
-				ts += uint64(*log.TimeNs)
-			}
-			v2Log := models.NewLog("", nil, "", "", "", models.NewTags(), ts)
-			for _, c := range log.Contents {
-				v2Log.GetIndices().Add(c.Key, c.Value)
-			}
-			events = append(events, v2Log)
-		}
-		v2Groups = append(v2Groups, &models.PipelineGroupEvents{Group: group, Events: events})
-	}
-	return v2Groups
+	return groups
 }
 
 func newCustomSingleConverter(t *testing.T) *converter.Converter {
@@ -288,7 +251,6 @@ func newCustomSingleConverter(t *testing.T) *converter.Converter {
 		converter.EncodingJSON,
 		nil,
 		nil,
-		&config.GlobalConfig{},
 	)
 	require.NoError(t, err)
 	return cvt
@@ -360,22 +322,14 @@ func normalizeDorisPayload(payload string) []string {
 	return normalizeJSONLines(out)
 }
 
-func TestFlusherDoris_FlushExportParity(t *testing.T) {
-	v1Groups, v2Groups := makeParityLogGroups()
-
-	flushCapture := &dorisLoadCapture{}
-	flushServer := httptest.NewServer(http.HandlerFunc(flushCapture.handler))
-	defer flushServer.Close()
-	flushFlusher := newDorisParityFlusher(t, flushServer)
-	require.NoError(t, flushFlusher.Flush("", "", "", v1Groups))
-
-	exportCapture := &dorisLoadCapture{}
-	exportServer := httptest.NewServer(http.HandlerFunc(exportCapture.handler))
-	defer exportServer.Close()
-	exportFlusher := newDorisParityFlusher(t, exportServer)
-	require.NoError(t, exportFlusher.Export(v2Groups, nil))
-
-	require.Equal(t, normalizeDorisPayload(flushCapture.snapshot()), normalizeDorisPayload(exportCapture.snapshot()))
+func TestFlusherDorisExportLogs(t *testing.T) {
+	groups := makeTestPipelineEventGroups()[:1]
+	capture := &dorisLoadCapture{}
+	server := httptest.NewServer(http.HandlerFunc(capture.handler))
+	defer server.Close()
+	flusher := newDorisParityFlusher(t, server)
+	require.NoError(t, flusher.Export(groups, nil))
+	require.Equal(t, expectedLogRecords(t, groups), normalizeDorisPayload(capture.snapshot()))
 }
 
 // InvalidTestConnectAndWrite is an integration test (disabled by default)
@@ -405,8 +359,8 @@ func InvalidTestConnectAndWrite(t *testing.T) {
 	require.NoError(t, err, "Failed to initialize Doris flusher")
 
 	// Verify that we can successfully write data to Doris
-	lgl := makeTestLogGroupList()
-	err = flusher.Flush("projectName", "logstoreName", "configName", lgl.GetLogGroupList())
+	groups := makeTestPipelineEventGroups()
+	err = flusher.Export(groups, nil)
 	require.NoError(t, err, "Failed to flush data to Doris")
 
 	// Stop the flusher
@@ -414,12 +368,12 @@ func InvalidTestConnectAndWrite(t *testing.T) {
 	require.NoError(t, err, "Failed to stop Doris flusher")
 }
 
-// TestFlusherDoris_FlushWithoutInit tests that flush fails when client is not initialized
-func TestFlusherDoris_FlushWithoutInit(t *testing.T) {
+// TestFlusherDorisExportWithoutInit tests that flush fails when client is not initialized
+func TestFlusherDorisExportWithoutInit(t *testing.T) {
 	flusher := NewFlusherDoris()
-	lgl := makeTestLogGroupList()
+	groups := makeTestPipelineEventGroups()
 
-	err := flusher.Flush("projectName", "logstoreName", "configName", lgl.GetLogGroupList())
+	err := flusher.Export(groups, nil)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "not initialized")
 }
@@ -558,8 +512,8 @@ func TestFlusherDoris_SetUrgent(t *testing.T) {
 	flusher.SetUrgent(false)
 }
 
-// TestFlusherDoris_FlushEmptyLogGroupList tests flushing empty log group list
-func TestFlusherDoris_FlushEmptyLogGroupList(t *testing.T) {
+// TestFlusherDorisExportEmptyGroups tests flushing empty log group list
+func TestFlusherDorisExportEmptyGroups(t *testing.T) {
 	flusher := NewFlusherDoris()
 	flusher.Addresses = []string{"http://127.0.0.1:8030"}
 	flusher.Table = "test_table"
@@ -574,7 +528,7 @@ func TestFlusherDoris_FlushEmptyLogGroupList(t *testing.T) {
 	_ = flusher.Init(lctx)
 
 	// Flush empty list should return nil
-	err := flusher.Flush("project", "logstore", "config", []*protocol.LogGroup{})
+	err := flusher.Export(nil, nil)
 	assert.NoError(t, err)
 }
 
@@ -745,7 +699,7 @@ func TestFlusherDoris_ValidateAddresses(t *testing.T) {
 // BenchmarkFlusherDoris_MakeTestLogGroupList benchmarks log group creation
 func BenchmarkFlusherDoris_MakeTestLogGroupList(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		_ = makeTestLogGroupList()
+		_ = makeTestPipelineEventGroups()
 	}
 }
 
@@ -767,4 +721,22 @@ func BenchmarkFlusherDoris_BufferPool(b *testing.B) {
 		buf.Reset()
 		flusher.bufferPool.Put(buf)
 	}
+}
+
+// expectedLogRecords describes the external JSON record for the log fixtures.
+func expectedLogRecords(t *testing.T, groups []*models.PipelineGroupEvents) []string {
+	t.Helper()
+	var rows [][]byte
+	for _, group := range groups {
+		for _, event := range group.Events {
+			log := event.(*models.Log)
+			fields := log.GetIndices().Iterator()
+			data, err := json.Marshal(map[string]any{
+				"contents": fields, "tags": group.Group.GetTags().Iterator(), "time": log.Timestamp / uint64(time.Second),
+			})
+			require.NoError(t, err)
+			rows = append(rows, data)
+		}
+	}
+	return normalizeJSONLines(rows)
 }

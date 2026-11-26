@@ -10,7 +10,6 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/test/config"
 	"github.com/alibaba/ilogtail/test/engine/setup/controller"
@@ -143,10 +142,6 @@ func NewDockerComposeEnv() *DockerComposeEnv {
 
 func (d *DockerComposeEnv) GetType() string {
 	return "docker-compose"
-}
-
-func (d *DockerComposeEnv) GetData() (*protocol.LogGroup, error) {
-	return nil, fmt.Errorf("not implemented")
 }
 
 func (d *DockerComposeEnv) Clean() error {

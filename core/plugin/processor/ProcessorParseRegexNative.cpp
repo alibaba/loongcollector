@@ -112,9 +112,11 @@ void ProcessorParseRegexNative::Process(PipelineEventGroup& logGroup) {
     const StringView& logPath = logGroup.GetMetadata(EventGroupMetaKey::LOG_FILE_PATH_RESOLVED);
     EventsContainer& events = logGroup.MutableEvents();
 
+    // Boost resets the submatches on each call while retaining their storage.
+    boost::match_results<const char*> matches;
     size_t wIdx = 0;
     for (size_t rIdx = 0; rIdx < events.size(); ++rIdx) {
-        if (ProcessEvent(logPath, events[rIdx], logGroup.GetAllMetadata())) {
+        if (ProcessEvent(logPath, events[rIdx], logGroup.GetAllMetadata(), matches)) {
             if (wIdx != rIdx) {
                 events[wIdx] = std::move(events[rIdx]);
             }
@@ -131,7 +133,8 @@ bool ProcessorParseRegexNative::IsSupportedEvent(const PipelineEventPtr& e) cons
 
 bool ProcessorParseRegexNative::ProcessEvent(const StringView& logPath,
                                              PipelineEventPtr& e,
-                                             const GroupMetadata& metadata) {
+                                             const GroupMetadata& metadata,
+                                             boost::match_results<const char*>& matches) {
     if (!IsSupportedEvent(e)) {
         ADD_COUNTER(mOutFailedEventsTotal, 1);
         return true;
@@ -147,7 +150,7 @@ bool ProcessorParseRegexNative::ProcessEvent(const StringView& logPath,
     if (mIsWholeLineMode) {
         parseSuccess = WholeLineModeParser(sourceEvent, mKeys.empty() ? DEFAULT_CONTENT_KEY : mKeys[0]);
     } else {
-        parseSuccess = RegexLogLineParser(sourceEvent, GetReg(), mKeys, logPath);
+        parseSuccess = RegexLogLineParser(sourceEvent, GetReg(), mKeys, logPath, matches);
     }
 
     if (!parseSuccess || !mSourceKeyOverwritten) {
@@ -186,12 +189,12 @@ void ProcessorParseRegexNative::AddLog(const StringView& key,
 bool ProcessorParseRegexNative::RegexLogLineParser(LogEvent& sourceEvent,
                                                    const boost::regex& reg,
                                                    const std::vector<std::string>& keys,
-                                                   const StringView& logPath) {
-    boost::match_results<const char*> what;
+                                                   const StringView& logPath,
+                                                   boost::match_results<const char*>& matches) {
     std::string exception;
     StringView buffer = sourceEvent.GetContent(mSourceKey);
     bool parseSuccess = true;
-    if (!BoostRegexMatch(buffer.data(), buffer.size(), reg, exception, what, boost::match_default)) {
+    if (!BoostRegexMatch(buffer.data(), buffer.size(), reg, exception, matches, boost::match_default)) {
         if (!exception.empty()) {
             if (AppConfig::GetInstance()->IsLogParseAlarmValid()) {
                 if (GetContext().GetAlarm().IsLowLevelAlarmValid()) {
@@ -224,16 +227,16 @@ bool ProcessorParseRegexNative::RegexLogLineParser(LogEvent& sourceEvent,
         }
         ADD_COUNTER(mOutFailedEventsTotal, 1);
         parseSuccess = false;
-    } else if (what.size() <= keys.size()) {
+    } else if (matches.size() <= keys.size()) {
         if (AppConfig::GetInstance()->IsLogParseAlarmValid()) {
             if (GetContext().GetAlarm().IsLowLevelAlarmValid()) {
                 LOG_WARNING(GetContext().GetLogger(),
                             ("parse key count not match",
-                             what.size())("parse regex log fail", buffer)("project", GetContext().GetProjectName())(
+                             matches.size())("parse regex log fail", buffer)("project", GetContext().GetProjectName())(
                                 "logstore", GetContext().GetLogstoreName())("file", logPath));
             }
             GetContext().GetAlarm().SendAlarmWarning(REGEX_MATCH_ALARM,
-                                                     "parse key count not match" + ToString(what.size())
+                                                     "parse key count not match" + ToString(matches.size())
                                                          + "errorlog:" + buffer.to_string(),
                                                      GetContext().GetRegion(),
                                                      GetContext().GetProjectName(),
@@ -247,7 +250,7 @@ bool ProcessorParseRegexNative::RegexLogLineParser(LogEvent& sourceEvent,
     }
 
     for (uint32_t i = 0; i < keys.size(); i++) {
-        AddLog(keys[i], StringView(what[i + 1].begin(), what[i + 1].length()), sourceEvent);
+        AddLog(keys[i], StringView(matches[i + 1].begin(), matches[i + 1].length()), sourceEvent);
     }
     return true;
 }

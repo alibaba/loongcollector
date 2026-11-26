@@ -13,9 +13,9 @@ import (
 
 func (m *metaCollector) processInfraServerLink(data *k8smeta.ObjectWrapper, obj *v1.Node, method, serverID string) *models.Log {
 	// generate infra.server entity from k8s.node
-	logInfraLink := &models.Log{}
+	logInfraLink := &models.Log{Tags: models.NewTags()}
 	logInfraLink.Contents = models.NewLogContents()
-	logInfraLink.Timestamp = uint64(time.Now().Unix())
+	logInfraLink.Timestamp = uint64(time.Now().Truncate(time.Second).UnixNano())
 	logInfraLink.Contents.Add(entityLinkRelationTypeFieldName, crossDomainSameAs) // same as
 
 	logInfraLink.Contents.Add(entityLinkSrcDomainFieldName, m.serviceK8sMeta.domain) // e.g. scr is k8s.node

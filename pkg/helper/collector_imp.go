@@ -15,6 +15,8 @@
 package helper
 
 import (
+	"slices"
+
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 )
@@ -65,43 +67,71 @@ func (p *observePipeCollector) Close() {
 // so it can only return all the grouped data at one time.
 type groupedPipeCollector struct {
 	groupEvents map[*models.GroupInfo][]models.PipelineEvent
+	firstGroup  *models.PipelineGroupEvents
 }
 
 func (p *groupedPipeCollector) Collect(group *models.GroupInfo, events ...models.PipelineEvent) {
 	if len(events) == 0 {
 		return
 	}
-	store, has := p.groupEvents[group]
-	if !has {
-		store = make([]models.PipelineEvent, 0)
+	if first := p.firstGroup; first != nil {
+		p.groupEvents[first.Group] = append([]models.PipelineEvent(nil), first.Events...)
+		p.firstGroup = nil
 	}
-	p.groupEvents[group] = append(store, events...)
+	p.groupEvents[group] = append(p.groupEvents[group], events...)
 }
 
 func (p *groupedPipeCollector) CollectList(groups ...*models.PipelineGroupEvents) {
-	if len(groups) == 0 {
-		return
-	}
-	for _, g := range groups {
-		p.Collect(g.Group, g.Events...)
+	for _, group := range groups {
+		p.CollectGroup(group)
 	}
 }
 
-func (p *groupedPipeCollector) ToArray() []*models.PipelineGroupEvents {
-	len, idx := len(p.groupEvents), 0
-	results := make([]*models.PipelineGroupEvents, len)
-	if len == 0 {
-		return results
+func (p *groupedPipeCollector) CollectGroup(group *models.PipelineGroupEvents) {
+	if len(group.Events) == 0 {
+		return
 	}
+	if p.firstGroup == nil && len(p.groupEvents) == 0 {
+		// An in-place processor can forward the group it received.
+		p.firstGroup = group
+		return
+	}
+	p.Collect(group.Group, group.Events...)
+}
+
+func (p *groupedPipeCollector) ToArray() []*models.PipelineGroupEvents {
+	return p.appendDrained(make([]*models.PipelineGroupEvents, 0, len(p.groupEvents)))
+}
+
+// AppendDrainedPipelineGroups lets the runner reuse its output slice between
+// processors. It retains the ordering and ownership of the collected groups.
+func AppendDrainedPipelineGroups(collector pipeline.PipelineCollector, dst []*models.PipelineGroupEvents) []*models.PipelineGroupEvents {
+	if grouped, ok := collector.(*groupedPipeCollector); ok {
+		return grouped.appendDrained(dst)
+	}
+	return append(dst, collector.ToArray()...)
+}
+
+func (p *groupedPipeCollector) appendDrained(dst []*models.PipelineGroupEvents) []*models.PipelineGroupEvents {
+	if group := p.firstGroup; group != nil {
+		p.firstGroup = nil
+		return append(dst, group)
+	}
+	dst = slices.Grow(dst, len(p.groupEvents))
 	for group, events := range p.groupEvents {
-		results[idx] = &models.PipelineGroupEvents{
+		dst = append(dst, &models.PipelineGroupEvents{
 			Group:  group,
 			Events: events,
-		}
-		idx++
+		})
 	}
-	p.groupEvents = make(map[*models.GroupInfo][]models.PipelineEvent)
-	return results
+	switch len(p.groupEvents) {
+	case 0, 1:
+		clear(p.groupEvents)
+	default:
+		// Keep the common single-group map, but release storage after fan-out.
+		p.groupEvents = make(map[*models.GroupInfo][]models.PipelineEvent)
+	}
+	return dst
 }
 
 func (p *groupedPipeCollector) Observe() chan *models.PipelineGroupEvents {
@@ -109,9 +139,8 @@ func (p *groupedPipeCollector) Observe() chan *models.PipelineGroupEvents {
 }
 
 func (p *groupedPipeCollector) Close() {
-	for k := range p.groupEvents {
-		delete(p.groupEvents, k)
-	}
+	p.firstGroup = nil
+	clear(p.groupEvents)
 }
 
 // noopPipeCollector is an empty collector implementation.

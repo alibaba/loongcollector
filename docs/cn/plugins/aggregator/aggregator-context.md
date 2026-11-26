@@ -9,9 +9,9 @@
 
 列含义见 [概览 · 事件能力列说明](../overview.md#事件能力列说明)。
 
-| v1 接口 | v2 接口 | Log | Metric | Span |
-| --- | --- | --- | --- | --- |
-| ✓ | — | v1 | 透传未知 | 透传未知 |
+| Log | Metric | Span |
+| --- | --- | --- |
+| ✓ | ✓ | ✓ |
 
 ## 版本
 
@@ -26,10 +26,10 @@
 | 参数 | 类型 | 是否必选 | 说明 |
 | --- | --- | --- | --- |
 | Type | string | 是 | 插件类型，指定为`aggregator_context`。 |
-| MaxLogGroupCount | int | 否 | 在执行Flush之前，每一个日志来源所允许存在的最大LogGroup数量。如果未添加该参数，则默认每一个日志来源最多允许存在2个LogGroup。 |
-| MaxLogCount | int | 否 | 每个LogGroup最多可包含的日志条数。如果未添加该参数，则默认每个LogGroup最多可包含1024条日志。 |
-| PackFlag | bool | 否 | 是否需要在LogGroup的LogTag中添加__pack_id__字段。如果未添加改参数，则默认在LogGroup的LogTag中添加__pack_id__字段。 |
-| Topic | string | 否 | 额外设置的LogGroup的Topic名。如果未添加该参数，则每个LogGroup的Topic名默认值如下：<li>空，如果input插件不提供设置Topic的能力；<li>input插件中设置的topic名称，如果input插件提供设置Topic的能力。 |
+| MaxLogGroupCount | int | 否 | 每个来源在单次提交前可缓存的最大事件组数，默认 2。 |
+| MaxLogCount | int | 否 | 每个事件组允许的最大事件数，默认 1024。 |
+| PackFlag | bool | 否 | 是否为事件组添加 `__pack_id__` Tag，默认开启。 |
+| Topic | string | 否 | 输出事件组的 Topic。输入组的 `__topic__` Tag 或 `topic` Metadata 优先于此配置。 |
 
 ## 样例
 

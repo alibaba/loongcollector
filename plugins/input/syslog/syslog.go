@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pkg/util"
@@ -110,13 +111,9 @@ func (s *Syslog) Description() string {
 	return "A input plugin for syslog"
 }
 
-// Collect ...
-func (s *Syslog) Collect(collector pipeline.Collector) error {
-	return nil
-}
-
 // Start ...
-func (s *Syslog) Start(collector pipeline.Collector) error {
+func (s *Syslog) StartService(ctx pipeline.PipelineContext) error {
+	collector := ctx.Collector()
 	s.done = make(chan struct{}, 1)
 	scheme, host, err := getAddressParts(s.Address)
 	if err != nil {
@@ -431,7 +428,7 @@ func (s *Syslog) sleepWithChan(duration time.Duration) bool {
 	}
 }
 
-func (s *Syslog) listenStream(collector pipeline.Collector) {
+func (s *Syslog) listenStream(collector pipeline.PipelineCollector) {
 	defer s.wg.Done()
 
 	s.connections = map[string]net.Conn{}
@@ -483,17 +480,19 @@ Loop:
 	s.connectionsMu.Unlock()
 }
 
-func (s *Syslog) handle(conn net.Conn, collector pipeline.Collector) {
+func (s *Syslog) handle(conn net.Conn, collector pipeline.PipelineCollector) {
 	defer func() {
 		s.removeConnection(conn)
 		_ = conn.Close()
 		s.connectionsWg.Done()
 	}()
 
-	logger.Info(s.context.GetRuntimeContext(), "handle for connection", conn.RemoteAddr().String(), "begin")
-	buf := bufio.NewReader(conn)
-	scanner := bufio.NewScanner(buf)
-	byteBuf := make([]byte, s.MaxMessageSize)
+	remoteAddr := conn.RemoteAddr().String()
+	clientIP := clientIPField(remoteAddr)
+	logger.Info(s.context.GetRuntimeContext(), "handle for connection", remoteAddr, "begin")
+	scanner := bufio.NewScanner(conn)
+	// Grow the scanner for long messages instead of reserving the limit for each connection.
+	byteBuf := make([]byte, min(4*1024, s.MaxMessageSize))
 	scanner.Buffer(byteBuf, s.MaxMessageSize)
 	s.resetTimeout(conn)
 	backoff := newSimpleBackoff()
@@ -525,14 +524,14 @@ func (s *Syslog) handle(conn net.Conn, collector pipeline.Collector) {
 
 		data := scanner.Bytes()
 		if len(data) > 0 {
-			s.parse(data, conn.RemoteAddr().String(), collector)
+			s.parse(data, clientIP, collector)
 		}
 		s.resetTimeout(conn)
 	}
 	if err := scanner.Err(); err != nil {
 		logger.Warning(s.context.GetRuntimeContext(), selfmonitor.ServiceSyslogStreamAlarm, "quit stream connection because of scan error out of loop", err)
 	}
-	logger.Info(s.context.GetRuntimeContext(), "handle for connection", conn.RemoteAddr().String(), "quit")
+	logger.Info(s.context.GetRuntimeContext(), "handle for connection", remoteAddr, "quit")
 }
 
 func (s *Syslog) removeConnection(c net.Conn) {
@@ -543,7 +542,7 @@ func (s *Syslog) removeConnection(c net.Conn) {
 
 // TODO: There is a problem here, if for loop quit because of i/o timeout, the plugin quits
 // without any notification.
-func (s *Syslog) listenPacket(collector pipeline.Collector) {
+func (s *Syslog) listenPacket(collector pipeline.PipelineCollector) {
 	defer s.wg.Done()
 
 	b := make([]byte, s.MaxMessageSize)
@@ -576,19 +575,40 @@ func (s *Syslog) listenPacket(collector pipeline.Collector) {
 
 		data := b[:n]
 		if len(data) > 0 {
-			s.parse(data, fmt.Sprint(addr), collector)
+			s.parse(data, clientIPField(fmt.Sprint(addr)), collector)
 		}
 	}
 }
 
-func (s *Syslog) parse(b []byte, clientIP string, collector pipeline.Collector) {
-	lines := bytes.Split(b, []byte("\n"))
-	if '\n' == b[len(b)-1] {
-		lines = lines[:len(lines)-1]
-	}
+// clientIPField boxes the client IP once so a TCP connection can reuse it.
+func clientIPField(address string) any {
+	clientIP, _, _ := strings.Cut(address, ":")
+	return clientIP
+}
 
-	// Parse lines one by one, fill some fields of result if they are empty.
-	for _, line := range lines {
+// RFC priorities are bounded, so reuse their boxed string values for the
+// priority, facility and severity fields. Other accepted values still format normally.
+var syslogCodeFields = func() [192]any {
+	var fields [192]any
+	for code := range fields {
+		fields[code] = strconv.Itoa(code)
+	}
+	return fields
+}()
+
+func syslogCodeField(code int) any {
+	if code == -1 {
+		return "-1"
+	}
+	if code >= 0 && code < len(syslogCodeFields) {
+		return syslogCodeFields[code]
+	}
+	return strconv.Itoa(code)
+}
+
+func (s *Syslog) parse(b []byte, clientIP any, collector pipeline.PipelineCollector) {
+	for line := range bytes.Lines(b) {
+		line = bytes.TrimSuffix(line, []byte{'\n'})
 		rst, err := s.parser.Parse(line)
 		if err != nil {
 			logger.Warning(s.context.GetRuntimeContext(), selfmonitor.ServiceSyslogParseAlarm, "Parse failed with protocol '", s.ParseProtocol,
@@ -597,27 +617,23 @@ func (s *Syslog) parse(b []byte, clientIP string, collector pipeline.Collector) 
 			continue
 		}
 
-		fields := map[string]string{}
-		fields["_program_"] = rst.program
-		fields["_priority_"] = strconv.Itoa(rst.priority)
-		fields["_facility_"] = strconv.Itoa(rst.facility)
-		fields["_severity_"] = strconv.Itoa(rst.severity)
-		// use nano timestamp because RFC5424's timestamp is [RFC3339]
-		// eg: 2003-08-24T05:14:15.000003-07:00, 2003-10-11T22:14:15.003Z
-		fields["_unixtimestamp_"] = strconv.FormatInt(rst.time.UnixNano(), 10)
-		if rst.hostname == "" {
-			fields["_hostname_"] = util.GetHostName()
-		} else {
-			fields["_hostname_"] = rst.hostname
+		// RFC5424 timestamps can include fractional seconds.
+		timestamp := rst.time.UnixNano()
+		hostname := rst.hostname
+		if hostname == "" {
+			hostname = util.GetHostName()
 		}
-		if len(clientIP) > 0 {
-			fields["_client_ip_"] = strings.Split(clientIP, ":")[0]
-		} else {
-			fields["_client_ip_"] = ""
+		fields := map[string]any{
+			"_program_":       rst.program,
+			"_priority_":      syslogCodeField(rst.priority),
+			"_facility_":      syslogCodeField(rst.facility),
+			"_severity_":      syslogCodeField(rst.severity),
+			"_unixtimestamp_": strconv.FormatInt(timestamp, 10),
+			"_hostname_":      hostname,
+			"_client_ip_":     clientIP,
+			"_ip_":            util.GetIPAddress(),
+			"_content_":       rst.content,
 		}
-
-		fields["_ip_"] = util.GetIPAddress()
-		fields["_content_"] = rst.content
 
 		if rst.structuredData != nil {
 			structuredData, _ := json.Marshal(*rst.structuredData)
@@ -630,7 +646,12 @@ func (s *Syslog) parse(b []byte, clientIP string, collector pipeline.Collector) 
 			fields["_process_id_"] = *rst.procID
 		}
 
-		collector.AddData(nil, fields, rst.time)
+		log := &models.Log{
+			Contents:  models.NewLogContentsWithMap(fields),
+			Tags:      models.NewTags(),
+			Timestamp: uint64(timestamp),
+		}
+		collector.Collect(models.NewGroup(models.NewMetadata(), models.NewTags()), log)
 	}
 }
 

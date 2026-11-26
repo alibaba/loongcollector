@@ -28,7 +28,6 @@ import (
 
 	"github.com/alibaba/ilogtail/pkg/doc"
 	"github.com/alibaba/ilogtail/pkg/logger"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
@@ -55,7 +54,7 @@ func (d *DorisSubscriber) Description() string {
 	return "this's a doris subscriber, which will query inserted records from doris periodically."
 }
 
-func (d *DorisSubscriber) GetData(sqlStr string, startTime int32) ([]*protocol.LogGroup, error) {
+func (d *DorisSubscriber) GetData(sqlStr string, startTime int32) ([]*Batch, error) {
 	// Set timestamp on first call
 	if d.lastTimestamp == 0 {
 		d.lastTimestamp = int64(startTime)
@@ -97,12 +96,12 @@ func (d *DorisSubscriber) GetData(sqlStr string, startTime int32) ([]*protocol.L
 		logger.Infof(context.Background(), "doris subscriber connected to: %s", host)
 	}
 
-	logGroup, err := d.queryRecords()
+	batch, err := d.queryRecords()
 	if err != nil {
 		logger.Warning(context.Background(), selfmonitor.DorisSubscriberAlarm, "err", err)
 		return nil, err
 	}
-	return []*protocol.LogGroup{logGroup}, nil
+	return []*Batch{batch}, nil
 }
 
 func (d *DorisSubscriber) FlusherConfig() string {
@@ -116,9 +115,9 @@ func (d *DorisSubscriber) Stop() error {
 	return nil
 }
 
-func (d *DorisSubscriber) queryRecords() (logGroup *protocol.LogGroup, err error) {
-	logGroup = &protocol.LogGroup{
-		Logs: []*protocol.Log{},
+func (d *DorisSubscriber) queryRecords() (batch *Batch, err error) {
+	batch = &Batch{
+		Records: []*Record{},
 	}
 
 	query := fmt.Sprintf(dorisQuerySQL, d.Database, d.Table, d.lastTimestamp)
@@ -146,26 +145,26 @@ func (d *DorisSubscriber) queryRecords() (logGroup *protocol.LogGroup, err error
 			return
 		}
 
-		log := &protocol.Log{
-			Time: uint32(timestamp),
+		log := &Record{
+			Timestamp: uint64(timestamp) * uint64(time.Second),
 		}
 
 		// v2 Metric events are flushed structurally as canonical metric-log
 		// fields (__name__/__labels__/__value__), never a pass-through blob.
 		if name.Valid {
-			log.Contents = append(log.Contents, &protocol.Log_Content{
+			log.Fields = append(log.Fields, Field{
 				Key:   "__name__",
 				Value: name.String,
 			})
 		}
 		if value.Valid {
-			log.Contents = append(log.Contents, &protocol.Log_Content{
+			log.Fields = append(log.Fields, Field{
 				Key:   "__value__",
 				Value: value.String,
 			})
 		}
 		if labels.Valid {
-			log.Contents = append(log.Contents, &protocol.Log_Content{
+			log.Fields = append(log.Fields, Field{
 				Key:   "__labels__",
 				Value: labels.String,
 			})
@@ -176,7 +175,7 @@ func (d *DorisSubscriber) queryRecords() (logGroup *protocol.LogGroup, err error
 			d.lastTimestamp = timestamp
 		}
 
-		logGroup.Logs = append(logGroup.Logs, log)
+		batch.Records = append(batch.Records, log)
 	}
 
 	if err = rows.Err(); err != nil {
@@ -184,7 +183,7 @@ func (d *DorisSubscriber) queryRecords() (logGroup *protocol.LogGroup, err error
 		return
 	}
 
-	logger.Infof(context.Background(), "doris subscriber got %d logs", len(logGroup.Logs))
+	logger.Infof(context.Background(), "doris subscriber got %d logs", len(batch.Records))
 	return
 }
 

@@ -29,7 +29,6 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	converter "github.com/alibaba/ilogtail/pkg/protocol/converter"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pkg/util"
@@ -284,30 +283,27 @@ func (k *FlusherKafka) Description() string {
 	return "Kafka flusher for logtail"
 }
 
-func (k *FlusherKafka) Flush(projectName string, logstoreName string, configName string, logGroupList []*protocol.LogGroup) error {
-	for _, logGroup := range logGroupList {
-		logger.Debug(k.context.GetRuntimeContext(), "[LogGroup] topic", logGroup.Topic, "logstore", logGroup.Category, "logcount", len(logGroup.Logs), "tags", logGroup.LogTags)
-		logs, values, err := k.converter.ToByteStreamWithSelectedFields(logGroup, k.selectFields)
-		if err != nil {
-			logger.Warning(k.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "flush kafka convert log fail, error", err)
-		}
-		for index, log := range logs.([][]byte) {
-			k.flush(log, values[index])
-		}
-	}
-	return nil
-}
-
 func (k *FlusherKafka) Export(groupEventsArray []*models.PipelineGroupEvents, ctx pipeline.PipelineContext) error {
 	for _, groupEvents := range groupEventsArray {
 		logger.Debug(k.context.GetRuntimeContext(), "[GroupEvents] events count", len(groupEvents.Events),
 			"tags", groupEvents.Group.GetTags().Iterator())
-		logs, values, err := k.converter.ToByteStreamWithSelectedFieldsV2(groupEvents, k.selectFields)
+		logs, values, err := k.converter.ToByteStreamWithSelectedFields(groupEvents, k.selectFields)
 		if err != nil {
 			logger.Warning(k.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "flush kafka convert log fail, error", err)
+			continue
 		}
-		for index, log := range logs.([][]byte) {
-			k.flush(log, values[index])
+		rows, ok := logs.([][]byte)
+		if !ok {
+			if stream, ok := logs.([]byte); ok && len(stream) > 0 {
+				rows = [][]byte{stream}
+			}
+		}
+		for index, log := range rows {
+			var selected map[string]string
+			if index < len(values) {
+				selected = values[index]
+			}
+			k.flush(log, selected)
 		}
 	}
 	return nil
@@ -555,7 +551,7 @@ func (k *FlusherKafka) makeHeaders() []sarama.RecordHeader {
 
 func (k *FlusherKafka) getConverter() (*converter.Converter, error) {
 	logger.Debug(k.context.GetRuntimeContext(), "[ilogtail data convert config] Protocol", k.Convert.Protocol, "Encoding", k.Convert.Encoding, "TagFieldsRename", k.Convert.TagFieldsRename, "ProtocolFieldsRename", k.Convert.ProtocolFieldsRename)
-	return converter.NewConverter(k.Convert.Protocol, k.Convert.Encoding, k.Convert.TagFieldsRename, k.Convert.ProtocolFieldsRename, k.context.GetPipelineScopeConfig())
+	return converter.NewConverter(k.Convert.Protocol, k.Convert.Encoding, k.Convert.TagFieldsRename, k.Convert.ProtocolFieldsRename)
 }
 
 func init() {

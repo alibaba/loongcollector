@@ -28,7 +28,6 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	converter "github.com/alibaba/ilogtail/pkg/protocol/converter"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
@@ -69,7 +68,7 @@ type FlusherDoris struct {
 	bufferPool sync.Pool
 
 	// Async task queue for concurrent flushing
-	queue     chan []*protocol.LogGroup
+	queue     chan []*models.PipelineGroupEvents
 	counter   sync.WaitGroup
 	workersWg sync.WaitGroup // Separate WaitGroup for async workers
 
@@ -100,8 +99,6 @@ type convertConfig struct {
 	// Convert encoding, default value: json
 	Encoding string
 }
-
-type FlusherFunc func(projectName string, logstoreName string, configName string, logGroupList []*protocol.LogGroup) error
 
 func NewFlusherDoris() *FlusherDoris {
 	return &FlusherDoris{
@@ -171,7 +168,7 @@ func (f *FlusherDoris) Init(context pipeline.Context) error {
 		if f.QueueCapacity <= 0 {
 			f.QueueCapacity = 1024
 		}
-		f.queue = make(chan []*protocol.LogGroup, f.QueueCapacity)
+		f.queue = make(chan []*models.PipelineGroupEvents, f.QueueCapacity)
 
 		// Start worker goroutines
 		for i := 0; i < f.Concurrency; i++ {
@@ -194,7 +191,7 @@ func (f *FlusherDoris) Init(context pipeline.Context) error {
 func (f *FlusherDoris) getConverter() (*converter.Converter, error) {
 	logger.Debug(f.context.GetRuntimeContext(), "[ilogtail data convert config] Protocol", f.Convert.Protocol,
 		"Encoding", f.Convert.Encoding, "TagFieldsRename", f.Convert.TagFieldsRename, "ProtocolFieldsRename", f.Convert.ProtocolFieldsRename)
-	return converter.NewConverter(f.Convert.Protocol, f.Convert.Encoding, f.Convert.TagFieldsRename, f.Convert.ProtocolFieldsRename, f.context.GetPipelineScopeConfig())
+	return converter.NewConverter(f.Convert.Protocol, f.Convert.Encoding, f.Convert.TagFieldsRename, f.Convert.ProtocolFieldsRename)
 }
 
 func (f *FlusherDoris) Description() string {
@@ -265,33 +262,22 @@ func (f *FlusherDoris) Validate() error {
 	return nil
 }
 
-func (f *FlusherDoris) Flush(projectName string, logstoreName string, configName string, logGroupList []*protocol.LogGroup) error {
-	if f.dorisClient == nil {
-		return fmt.Errorf("doris client not initialized")
-	}
-
-	if len(logGroupList) == 0 {
-		return nil
-	}
-
-	// Async mode: add task to queue and return immediately
-	if f.Concurrency > 1 {
-		return f.addTask(logGroupList)
-	}
-
-	// Sync mode: process immediately
-	return f.flushSync(logGroupList)
-}
-
-// Export is the v2 pipeline entry point. It serializes PipelineGroupEvents with
-// the v2 converter and streams the resulting bytes to Doris directly, without
-// converting to protocol.LogGroup or going through Flush, both of which belong
-// to the v1 pipeline and are planned for removal.
+// Export submits event groups for Stream Load.
 func (f *FlusherDoris) Export(groups []*models.PipelineGroupEvents, _ pipeline.PipelineContext) error {
 	if f.dorisClient == nil {
 		return fmt.Errorf("doris client not initialized")
 	}
 
+	if len(groups) == 0 {
+		return nil
+	}
+	if f.Concurrency > 1 {
+		return f.addTask(groups)
+	}
+	return f.exportSync(groups)
+}
+
+func (f *FlusherDoris) exportSync(groups []*models.PipelineGroupEvents) error {
 	buffer := f.bufferPool.Get().(*bytes.Buffer)
 	buffer.Reset()
 	defer func() {
@@ -307,7 +293,7 @@ func (f *FlusherDoris) Export(groups []*models.PipelineGroupEvents, _ pipeline.P
 		if groupEvents == nil || len(groupEvents.Events) == 0 {
 			continue
 		}
-		serializedLogs, err := f.converter.ToByteStreamV2(groupEvents)
+		serializedLogs, err := f.converter.ToByteStream(groupEvents)
 		if err != nil {
 			logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "flush doris convert log fail, error", err)
 			continue
@@ -323,12 +309,12 @@ func (f *FlusherDoris) Export(groups []*models.PipelineGroupEvents, _ pipeline.P
 
 // addTask adds a flush task to the queue for async processing
 // This method will BLOCK if the queue is full, ensuring NO DATA LOSS
-func (f *FlusherDoris) addTask(logGroupList []*protocol.LogGroup) error {
+func (f *FlusherDoris) addTask(groups []*models.PipelineGroupEvents) error {
 	f.counter.Add(1)
 
 	// First, try non-blocking send to detect queue congestion
 	select {
-	case f.queue <- logGroupList:
+	case f.queue <- groups:
 		// Successfully sent without blocking
 		return nil
 	default:
@@ -340,7 +326,7 @@ func (f *FlusherDoris) addTask(logGroupList []*protocol.LogGroup) error {
 
 		// Now block until queue has space - NEVER drop data
 		// This creates backpressure to upstream components when system is overloaded
-		f.queue <- logGroupList
+		f.queue <- groups
 		return nil
 	}
 }
@@ -349,8 +335,8 @@ func (f *FlusherDoris) addTask(logGroupList []*protocol.LogGroup) error {
 func (f *FlusherDoris) runFlushWorker() {
 	defer f.workersWg.Done()
 
-	for logGroupList := range f.queue {
-		err := f.flushSync(logGroupList)
+	for groups := range f.queue {
+		err := f.exportSync(groups)
 		if err != nil {
 			logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "worker failed to flush data to doris, error", err)
 		}
@@ -358,50 +344,7 @@ func (f *FlusherDoris) runFlushWorker() {
 	}
 }
 
-// flushSync performs synchronous flush operation
-func (f *FlusherDoris) flushSync(logGroupList []*protocol.LogGroup) error {
-	// Get buffer from pool to reduce allocations
-	buffer := f.bufferPool.Get().(*bytes.Buffer)
-	buffer.Reset() // Reset buffer for reuse
-	defer func() {
-		// Shrink buffer if it's too large to prevent memory waste
-		// Keep buffers under 10MB to balance between performance and memory
-		if buffer.Cap() > 10*1024*1024 {
-			buffer = nil // Let GC reclaim large buffers
-		}
-		if buffer != nil {
-			f.bufferPool.Put(buffer)
-		}
-	}()
-
-	totalLogCount := 0
-
-	// Merge all LogGroups into a single batch
-	for _, logGroup := range logGroupList {
-		logger.Debug(f.context.GetRuntimeContext(), "[LogGroup] topic", logGroup.Topic, "logstore", logGroup.Category, "logcount", len(logGroup.Logs), "tags", logGroup.LogTags)
-
-		// Convert log group to byte stream
-		serializedLogs, err := f.converter.ToByteStream(logGroup)
-		if err != nil {
-			logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "flush doris convert log fail, error", err)
-			continue
-		}
-
-		// Append all logs to the same buffer
-		for _, log := range serializedLogs.([][]byte) {
-			buffer.Write(log)
-			buffer.WriteByte('\n') // Add newline separator for JSON object line format
-			totalLogCount++
-		}
-	}
-
-	return f.loadBuffer(buffer)
-}
-
-// loadBuffer streams the accumulated byte buffer to Doris via Stream Load and
-// handles the response and statistics. It is shared by the v1 flushSync and the
-// v2 Export paths; it operates purely on bytes and never touches
-// protocol.LogGroup.
+// loadBuffer submits a batch to Doris and updates its statistics.
 func (f *FlusherDoris) loadBuffer(buffer *bytes.Buffer) error {
 	if buffer.Len() == 0 {
 		logger.Debug(f.context.GetRuntimeContext(), "No logs to flush")

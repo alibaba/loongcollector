@@ -1,21 +1,12 @@
 # 数据模型（Golang）
 
-LoongCollector Golang 部分目前支持 `SLS Log Protocol` 和 `Pipeline Event` 两种数据模型，两种模型的描述和对比如下：  
-
-|  | SLS Log Protocol | Pipeline Event |
-|  ----  | ----  |  ---- |
-| 描述 | SLS 日志的专用处理结构 | 可扩展的可观测性数据模型，支持Metrics、Trace、Logging、Bytes、Profile等 |
-| 采集配置结构版本 |        v1              |          v2       |
-| Logging 数据结构 |      支持           |        支持         |
-| Metric 数据结构 |      不支持           |      支持           |
-| Trace 数据结构 |      不支持            |       支持          |
-| ByteArray 数据结构 |      不支持            |       支持          |
-| Profile 数据结构 |      不支持          |       支持          |
-| 自定义数据结构 |      不支持          |       支持          |
+LoongCollector Go 侧的采集配置使用 `Pipeline Event` 作为内部数据模型，支持日志、指标、链路和字节流等事件。
 
 ## SLS Log Protocol
 
-参考 [SLS 协议](log-protocol/protocol-spec/sls.md)
+采集插件通过 `PipelineContext` 直接提交事件。Go 的 `flusher_sls` 将 `PipelineEventGroup` PB 传回 C++，由 C++ Flusher 在 SLS 日志出口序列化为 `LogGroup`。Go 的 SLS 输入解码器解析外部 protobuf 后直接提交事件，Go 中没有 `LogGroup` 类型。协议结构见 [SLS 协议](log-protocol/protocol-spec/sls.md)。
+
+`flusher_grpc` 通过 `logtail.report.PipelineEventGroupReportService/Collect` 流式发送事件。接收端应先按 [事件 gRPC proto](../../../pkg/protocol/proto/pipeline_event_group_transfer.proto) 注册该服务并生成代码。每条请求携带一批同类事件及组元数据、组标签和可选发送目的地。组内事件的独立标签另行编码。接收端读完流后发送 `PipelineEventGroupReportResponse`，拒收时返回非 OK gRPC 状态。接收端需实现新的流式事件 RPC。
 
 ## Pipeline Event
 
@@ -37,6 +28,8 @@ type PipelineEvent interface {
 
  SetObservedTimestamp(uint64)
 
+ GetSize() int64
+
  Clone() PipelineEvent
 }
 ```  
@@ -50,10 +43,13 @@ type PipelineGroupEvents struct {
 }
 
 type GroupInfo struct {
- Metadata Metadata
- Tags     Tags
+ Metadata            Metadata
+ Tags                Tags
+ DestinationLogstore string
 }
 ```
+
+`DestinationLogstore` 由路由聚合器设置，用于指定目标日志库。
 
 ### Metric 模型
 

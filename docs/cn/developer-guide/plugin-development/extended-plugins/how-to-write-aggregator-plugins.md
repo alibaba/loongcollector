@@ -1,57 +1,33 @@
 # 如何开发 Aggregator 插件
 
-Aggregator 将多条事件聚合成 **LogGroup** / **PipelineGroupEvents** 再交给 Flusher。定义见 [`pkg/pipeline/aggregator.go`](https://github.com/alibaba/loongcollector/blob/main/pkg/pipeline/aggregator.go)。
+Aggregator 按插件定义的规则聚合 `models.PipelineGroupEvents`，将结果交给下游 Flusher。接口定义见 [`pkg/pipeline/aggregator.go`](../../../../../pkg/pipeline/aggregator.go)。
 
-## 公共接口 `Aggregator`
+## Aggregator 接口定义
 
-* **Init(Context, LogGroupQueue) (int, error)**：第一个返回值为 **Flush 调用周期（毫秒）**；为 `0` 时用全局默认。第二个返回值表示初始化错误。**LogGroupQueue** 定义见同目录 [`loggroup_queue.go`](https://github.com/alibaba/loongcollector/blob/main/pkg/pipeline/loggroup_queue.go)：`Add` / `AddWithWait` 可在聚合完成后 **立刻** 把 `LogGroup` 推入队列，而不必等到周期 `Flush`。
-* **Description**：插件一句描述。
-* **Reset**：清空内部状态；与 `RunningAggregator` 的并发约定见源码注释。
+- `Init` 初始化插件并返回 `GetResult` 的调用周期（毫秒）。返回 `0` 时使用采集配置的全局默认值。
+- `Description` 返回插件描述。
+- `Record` 接收一个事件组，可通过 `ctx.Collector().Collect` 或 `CollectList` 立即提交聚合完成的事件组。
+- `GetResult` 在定时触发和采集配置停止时提交剩余事件组。`Record` 和 `GetResult` 可能并发调用，插件需要保护共享状态。
+- `Reset` 清空待提交的状态。
 
 ```go
+package pipeline
+
+import "github.com/alibaba/ilogtail/pkg/models"
+
 type Aggregator interface {
-    Init(Context, LogGroupQueue) (int, error)
-    Description() string
-    Reset()
+	Init(Context) (int, error)
+	Description() string
+	Record(*models.PipelineGroupEvents, PipelineContext) error
+	GetResult(PipelineContext) error
+	Reset()
 }
 ```
-
-## AggregatorV1（`protocol.Log` / `LogGroup`）
-
-* **Add(log *protocol.Log, ctx map[string]interface{}) error**：写入 **一条数据**（V1 路径下的单条记录）。
-* **Flush() []*protocol.LogGroup**：取出当前聚合结果。
-
-```go
-type AggregatorV1 interface {
-    Aggregator
-    Add(log *protocol.Log, ctx map[string]interface{}) error
-    Flush() []*protocol.LogGroup
-}
-```
-
-注册入口参考 [`plugins/aggregator/aggregator_default.go`](https://github.com/alibaba/loongcollector/blob/main/plugins/aggregator/aggregator_default.go)（默认实现委托给 `plugins/aggregator/context`）。
-
-## AggregatorV2（`PipelineGroupEvents`）
-
-* **Record(*models.PipelineGroupEvents, PipelineContext) error**
-* **GetResult(PipelineContext) error**
-
-```go
-type AggregatorV2 interface {
-    Aggregator
-    Record(*models.PipelineGroupEvents, PipelineContext) error
-    GetResult(PipelineContext) error
-}
-```
-
-## LogGroupQueue 说明
-
-队列满时 **`Add` 会立即返回错误**，通常表示下游 Flusher 阻塞（如网络异常）。`AddWithWait` 可在队列满时短暂等待，不确定时不要使用。
 
 ## Aggregator 开发流程
 
 1. **创建 Issue**：描述插件能力与使用场景，由社区讨论可行性与排期；review 通过后再进入实现。
-2. **实现接口**：实现 **Aggregator**，并任选 **AggregatorV1** 或 **AggregatorV2**（或按框架实际调用路径实现对应方法）。可参考上文默认聚合实现与源码注释。
+2. **实现接口**：实现 **Aggregator**。可参考 [`aggregator_base`](../../../../../plugins/aggregator/baseagg/aggregator_base.go) 如何缓存和提交事件组。
 3. **注册插件**：在 `init` 中通过 [`pipeline.AddAggregatorCreator`](https://github.com/alibaba/loongcollector/blob/main/pkg/pipeline/plugin.go) 注册，或直接向 `pipeline.Aggregators` 写入构造函数。采集配置里的 **Type**（`plugin_type`）必须以 **`aggregator_`** 开头。
 4. **纳入构建**：将本插件所在包加入 [插件引用配置文件](https://github.com/alibaba/loongcollector/blob/main/plugins.yml) 的 **`common`** 节；若仅运行于指定系统，请写入 **`linux`** 或 **`windows`**。保存后执行 `make all`（或你常用的构建目标），由工具生成 `plugins/all/*.go`。**请勿手改**生成文件。
 5. **测试**：编写或补充单元测试、E2E 场景，具体流程与约定见 [单元测试](../../test/unit-test.md) 与 [E2E测试](../../test/e2e-test.md)。

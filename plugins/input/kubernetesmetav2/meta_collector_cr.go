@@ -19,9 +19,9 @@ func (m *metaCollector) processCustomResourceEntity(data *k8smeta.ObjectWrapper,
 	if !ok {
 		return nil
 	}
-	log := &models.Log{}
+	log := &models.Log{Tags: models.NewTags()}
 	log.Contents = models.NewLogContents()
-	log.Timestamp = uint64(time.Now().Unix())
+	log.Timestamp = uint64(time.Now().Truncate(time.Second).UnixNano())
 	kindKey := data.ResourceType
 	m.processEntityCommonPart(log.Contents, kindKey, obj.GetNamespace(), obj.GetName(), method, data.FirstObservedTime, data.LastObservedTime, obj.GetCreationTimestamp())
 	log.Contents.Add(entityKindFieldName, cfg.Kind)
@@ -54,12 +54,12 @@ func (m *metaCollector) processNamespaceCustomResourceLink(data *k8smeta.ObjectW
 	if cfg.EntityType == "" || cfg.Namespace2EntityRelation == "" {
 		return nil
 	}
-	log := &models.Log{}
+	log := &models.Log{Tags: models.NewTags()}
 	log.Contents = models.NewLogContents()
 	m.processEntityLinkCommonPart(log.Contents, obj.Namespace.Kind, obj.Namespace.Namespace, obj.Namespace.Name,
 		cfg.EntityType, obj.CR.GetNamespace(), obj.CR.GetName(), method, data.FirstObservedTime, data.LastObservedTime)
 	log.Contents.Add(entityLinkRelationTypeFieldName, cfg.Namespace2EntityRelation)
-	log.Timestamp = uint64(time.Now().Unix())
+	log.Timestamp = uint64(time.Now().Truncate(time.Second).UnixNano())
 	return []models.PipelineEvent{log}
 }
 
@@ -80,11 +80,11 @@ func (m *metaCollector) processPodCustomResourceLink(data *k8smeta.ObjectWrapper
 	if !ok || cfg.Entity2PodRelation == "" {
 		return nil
 	}
-	log := &models.Log{}
+	log := &models.Log{Tags: models.NewTags()}
 	log.Contents = models.NewLogContents()
 	m.processEntityLinkCommonPart(log.Contents, entityType, obj.CR.GetNamespace(), obj.CR.GetName(),
 		obj.Pod.Kind, obj.Pod.Namespace, obj.Pod.Name, method, data.FirstObservedTime, data.LastObservedTime)
 	log.Contents.Add(entityLinkRelationTypeFieldName, cfg.Entity2PodRelation)
-	log.Timestamp = uint64(time.Now().Unix())
+	log.Timestamp = uint64(time.Now().Truncate(time.Second).UnixNano())
 	return []models.PipelineEvent{log}
 }

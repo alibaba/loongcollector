@@ -37,6 +37,9 @@ type PipelineEvent interface {
 type GroupInfo struct {
 	Metadata Metadata
 	Tags     Tags
+
+	// DestinationLogstore is set by routing aggregators inside the pipeline.
+	DestinationLogstore string
 }
 
 func (g *GroupInfo) GetMetadata() Metadata {
@@ -53,6 +56,13 @@ func (g *GroupInfo) GetTags() Tags {
 	return NilStringValues
 }
 
+func (g *GroupInfo) GetDestinationLogstore() string {
+	if g == nil {
+		return ""
+	}
+	return g.DestinationLogstore
+}
+
 type PipelineGroupEvents struct {
 	Group  *GroupInfo
 	Events []PipelineEvent
@@ -65,11 +75,12 @@ func (g *PipelineGroupEvents) GetEventCount() int64 {
 	return int64(len(g.Events))
 }
 
+// GetSize estimates the current event data and counts group tags once per group.
 func (g *PipelineGroupEvents) GetSize() int64 {
 	if g == nil {
 		return 0
 	}
-	var size int64
+	size := stringKeyValuesSize(g.Group.GetTags())
 	for _, event := range g.Events {
 		size += event.GetSize()
 	}

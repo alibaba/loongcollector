@@ -17,34 +17,12 @@ package extensions
 import (
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
-// Encoder encodes data of iLogtail data models into bytes.
-// Different drivers with different encoding protocols implement Encoder interface.
-//
-// drivers: raw, influxdb, prometheus, sls, ...
+// Encoder encodes one or more pipeline event groups for a destination protocol.
 type Encoder interface {
-	EncoderV1
-	EncoderV2
-}
-
-// EncoderV1 supports v1 pipeline plugin interface,
-// encodes data of v1 model into bytes.
-//
-// drivers: sls, influxdb, ...
-type EncoderV1 interface {
-	EncodeV1(*protocol.LogGroup) ([][]byte, error)
-	EncodeBatchV1([]*protocol.LogGroup) ([][]byte, error)
-}
-
-// EncoderV2 supports v2 pipeline plugin interface,
-// encodes data of v2 model into bytes.
-//
-// drivers: raw, influxdb, prometheus, ...
-type EncoderV2 interface {
-	EncodeV2(*models.PipelineGroupEvents) ([][]byte, error)
-	EncodeBatchV2([]*models.PipelineGroupEvents) ([][]byte, error)
+	Encode(*models.PipelineGroupEvents) ([][]byte, error)
+	EncodeBatch([]*models.PipelineGroupEvents) ([][]byte, error)
 }
 
 type EncoderExtension interface {

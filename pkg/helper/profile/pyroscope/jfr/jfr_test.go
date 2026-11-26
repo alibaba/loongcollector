@@ -27,6 +27,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/alibaba/ilogtail/pkg/helper/profile"
+	"github.com/alibaba/ilogtail/pkg/models"
 )
 
 func TestRawProfile_Parse(t *testing.T) {
@@ -44,7 +45,7 @@ func TestParse(t *testing.T) {
 		RawData:             jfr,
 	}
 
-	logs, err := rp.Parse(context.Background(), &profile.Meta{
+	events, err := rp.Parse(context.Background(), &profile.Meta{
 		Tags:            map[string]string{"_app_name_": "12"},
 		SpyName:         "javaspy",
 		StartTime:       time.Now(),
@@ -57,7 +58,7 @@ func TestParse(t *testing.T) {
 		t.Fatalf("Failed to parse JFR: %s", err)
 		return
 	}
-	require.Equal(t, len(logs), 323)
+	require.Len(t, events, 323)
 }
 
 func TestParseJFR(t *testing.T) {
@@ -88,10 +89,16 @@ func TestParseJFR(t *testing.T) {
 		Units:           profile.SamplesUnits,
 		AggregationType: profile.SumAggType,
 	}
-	cb := r.extractProfileV1(meta, nil)
-	r.ParseJFR(context.Background(), meta, reader, &labels, cb)
-	logs := r.logs
-	require.Equal(t, len(logs), 3)
+	var events []models.PipelineEvent
+	cb := profileLogCallback(meta, map[string]string{"_app_name_": "override"}, &events)
+	require.NoError(t, r.ParseJFR(context.Background(), meta, reader, &labels, cb))
+	require.Len(t, events, 3)
+	for _, event := range events {
+		log := event.(*models.Log)
+		require.Equal(t, uint64(meta.StartTime.UnixNano()), log.GetTimestamp())
+		require.Equal(t, "CallStack", log.Contents.Get("dataType"))
+		require.Contains(t, log.Contents.Get("labels"), `"_app_name_":"override"`)
+	}
 }
 
 func readGzipFile(fname string) ([]byte, error) {

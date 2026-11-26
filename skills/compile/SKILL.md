@@ -13,7 +13,6 @@ description: 编译 LoongCollector C++ 与 Go 组件。涉及构建、单元测�
 | C++ 主程序 + UT（CI 同款） | `make core PATH_IN_DOCKER=$(pwd)` |
 | 跑 C++ UT | `./scripts/run_core_ut.sh` |
 | Go 插件（本机） | `make plugin_local` |
-| Go 插件（CI 风格） | `make plugin_main` |
 | E2E 运行时镜像 | `make e2edocker` → `aliyun/loongcollector:0.0.1` |
 | 发布镜像 | `make image` |
 | ARM64 交叉编译 | `make image ARCH=arm64` |
@@ -119,7 +118,6 @@ make -sj$(nproc)
 
 ```bash
 make plugin_local    # 输出到 output/libGoPluginBase.so，本机 c-shared
-make plugin_main     # CI / 发布风格
 ```
 
 修改 Go 插件后跑 E2E：需同步进 `aliyun/loongcollector:0.0.1` 镜像（见 e2e skill §4.1 增量更新）。
@@ -134,7 +132,7 @@ make e2edocker
 
 ## Native → Go 桥接（PPEG）
 
-批量数据仅走 **`ProcessPipelineEventGroup`**（`PipelineEventGroup` PB）。已移除 `ProcessLogGroup` / `ProcessLog` export；Go 侧统一通过事件 runner 的 `ReceivePipelineEventGroup` 接收，不再进行 Legacy LogGroup 回退转换。
+Native 批量数据通过 `ProcessPipelineEventGroup` 传入 `PipelineEventGroup` PB，Go runner 由 `ReceivePipelineEventGroup` 接收并处理事件组。Go 的 `flusher_sls` 通过 `SendPipelineEventGroup` 将事件传回 C++，由 C++ Flusher 在 SLS 日志出口序列化为 `LogGroup`。`flusher_grpc` 使用 `PipelineEventGroupReportService.Collect` 发送事件。
 
 ## 常见问题
 

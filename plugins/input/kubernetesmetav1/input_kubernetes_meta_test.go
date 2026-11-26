@@ -15,8 +15,8 @@
 package kubernetesmetav1
 
 import (
+	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/plugins/test"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
 
 	"testing"
@@ -43,13 +43,13 @@ func BenchmarkInputKubernetesMeta_Collect(b *testing.B) {
 		return
 	}
 	p.informerFactory.Start(p.informerStopChan)
-	c := &test.MockMetricCollector{Benchmark: true}
+	c := helper.NewNoopPipelineContext()
 	defer func() {
 		p.informerStopChan <- struct{}{}
 	}()
 	time.Sleep(time.Second * 5)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		p.Collect(c)
+		p.Read(c)
 	}
 }

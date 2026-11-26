@@ -24,10 +24,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alibaba/ilogtail/pkg/models"
+
+	"github.com/alibaba/ilogtail/plugins/processor/internal/processortest"
+
 	"github.com/dlclark/regexp2"
 
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
 )
 
@@ -37,7 +40,7 @@ type MockParam struct {
 	separator    string
 	separatorReg string
 	mockFunc1    func(int, string, string) (string, string)
-	mockFunc2    func(int, string, string) []*protocol.Log
+	mockFunc2    func(int, string, string) []*models.Log
 }
 
 /*
@@ -200,13 +203,11 @@ var params2 = []MockParam{
 	{"original", 10000, " ", "\\s", nil, mockData2},
 }
 
-func mockData2(num int, separator, separatorReg string) []*protocol.Log {
-	Logs := []*protocol.Log{}
+func mockData2(num int, separator, separatorReg string) []*models.Log {
+	Logs := []*models.Log{}
 
 	for i := 0; i < num; i++ {
-		log := new(protocol.Log)
-		log.Contents = make([]*protocol.Log_Content, 1)
-		log.Contents[0] = &protocol.Log_Content{Key: "content", Value: IPv4Int(RandomIpv4Int()).ip().String()}
+		log := processortest.Log("content", IPv4Int(RandomIpv4Int()).ip().String())
 		Logs = append(Logs, log)
 	}
 	return Logs
@@ -233,11 +234,11 @@ func BenchmarkGrokMatchOneTest(b *testing.B) {
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				processor.ProcessLogs(Logs)
+				processortest.Apply(processor, Logs...)
 			}
 			b.StopTimer()
 			for _, log := range Logs {
-				if log.Contents[1].Key != "ipv4" {
+				if !log.Contents.Contains("ipv4") {
 					b.Log("Parse error")
 				}
 			}
@@ -267,11 +268,11 @@ func BenchmarkGrokMatchTwoTest(b *testing.B) {
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				processor.ProcessLogs(Logs)
+				processortest.Apply(processor, Logs...)
 			}
 			b.StopTimer()
 			for _, log := range Logs {
-				if log.Contents[1].Key != "ipv4" {
+				if !log.Contents.Contains("ipv4") {
 					b.Log("Parse error")
 				}
 			}
@@ -302,11 +303,11 @@ func BenchmarkGrokMatchThreeTest(b *testing.B) {
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				processor.ProcessLogs(Logs)
+				processortest.Apply(processor, Logs...)
 			}
 			b.StopTimer()
 			for _, log := range Logs {
-				if log.Contents[1].Key != "ipv4" {
+				if !log.Contents.Contains("ipv4") {
 					b.Log("Parse error")
 				}
 			}
@@ -339,11 +340,11 @@ func BenchmarkGrokMatchFiveTest(b *testing.B) {
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				processor.ProcessLogs(Logs)
+				processortest.Apply(processor, Logs...)
 			}
 			b.StopTimer()
 			for _, log := range Logs {
-				if log.Contents[1].Key != "ipv4" {
+				if !log.Contents.Contains("ipv4") {
 					b.Log("Parse error")
 				}
 			}

@@ -124,7 +124,7 @@ func TestRfc3164(t *testing.T) {
 		r, err := p.Parse(test.log)
 		require.NoError(t, err)
 		require.NotEqual(t, string(test.log), r.content)
-		require.Equal(t, test.result, r)
+		require.Equal(t, *test.result, r)
 	}
 }
 
@@ -164,7 +164,7 @@ func TestRfc3164WithoutHostnameField(t *testing.T) {
 		if -1 == r.priority {
 			require.Equal(t, string(test.log), r.content)
 		} else {
-			require.Equal(t, test.result, r)
+			require.Equal(t, *test.result, r)
 		}
 	}
 }
@@ -341,7 +341,7 @@ func TestAutoParser(t *testing.T) {
 		if -1 == r.priority {
 			require.Equal(t, string(test.log), r.content)
 		} else {
-			require.Equal(t, test.result, r)
+			require.Equal(t, *test.result, r)
 		}
 	}
 

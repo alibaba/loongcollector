@@ -21,18 +21,23 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"syscall"
 	"testing"
 	"time"
 
+	"github.com/golang/snappy"
+	"github.com/prometheus/prometheus/prompb"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/encoding/protowire"
 	"gotest.tools/assert"
 
 	"github.com/alibaba/ilogtail/pkg/helper"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	pluginmanager "github.com/alibaba/ilogtail/pluginmanager"
 	_ "github.com/alibaba/ilogtail/plugins/extension/default_decoder"
+	"github.com/alibaba/ilogtail/plugins/test"
 )
 
 type ContextTest struct {
@@ -91,43 +96,6 @@ func newInputWithOpts(format string, option func(input *ServiceHTTP)) (*ServiceH
 
 func newInput(format string) (*ServiceHTTP, error) {
 	return newInputWithOpts(format, nil)
-}
-
-type mockLog struct {
-	tags   map[string]string
-	fields map[string]string
-}
-
-type mockCollector struct {
-	logs    []*mockLog
-	rawLogs []*protocol.Log
-}
-
-func (c *mockCollector) AddData(
-	tags map[string]string, fields map[string]string, t ...time.Time) {
-	c.AddDataWithContext(tags, fields, nil, t...)
-}
-
-func (c *mockCollector) AddDataArray(
-	tags map[string]string, columns []string, values []string, t ...time.Time) {
-	c.AddDataArrayWithContext(tags, columns, values, nil, t...)
-}
-
-func (c *mockCollector) AddRawLog(log *protocol.Log) {
-	c.AddRawLogWithContext(log, nil)
-}
-
-func (c *mockCollector) AddDataWithContext(
-	tags map[string]string, fields map[string]string, ctx map[string]interface{}, t ...time.Time) {
-	c.logs = append(c.logs, &mockLog{tags, fields})
-}
-
-func (c *mockCollector) AddDataArrayWithContext(
-	tags map[string]string, columns []string, values []string, ctx map[string]interface{}, t ...time.Time) {
-}
-
-func (c *mockCollector) AddRawLogWithContext(log *protocol.Log, ctx map[string]interface{}) {
-	c.rawLogs = append(c.rawLogs, log)
 }
 
 var textFormatProm = `# HELP http_requests_total The total number of HTTP requests.
@@ -196,76 +164,107 @@ cpu,host=server\ 01,region=uswest value=1,msg="all systems nominal"
 cpu,host=server\ 01,region=us\,west value_int=1i
 `
 
-func sendRequest(bodyToSend string, port int) error {
-	url := fmt.Sprintf("http://localhost:%d/notes", port)
-
-	var jsonStr = []byte(bodyToSend)
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonStr))
-	if err != nil {
-		return err
+func collectRequestEvents(t *testing.T, input *ServiceHTTP, body []byte, status int) []*models.PipelineGroupEvents {
+	t.Helper()
+	ctx := helper.NewObservePipelineContext(10)
+	input.collector = ctx.Collector()
+	request := httptest.NewRequest(http.MethodPost, "/notes?example_query=preserved", bytes.NewReader(body))
+	response := httptest.NewRecorder()
+	input.ServeHTTP(response, request)
+	require.Equal(t, status, response.Code)
+	if input.Format == "sls" && status == http.StatusOK {
+		require.NotEmpty(t, response.Header().Get("x-log-requestid"))
 	}
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	fmt.Println("response Status:", resp.Status)
-	fmt.Println("response Headers:", resp.Header)
-	body, _ := io.ReadAll(resp.Body)
-	fmt.Println("response Body:", string(body))
-	return nil
+	return ctx.Collector().ToArray()
 }
 
 func TestInputPrometheus(t *testing.T) {
-
 	input, err := newInput("prometheus")
 	require.NoError(t, err)
-	collector := &mockCollector{}
-	err = input.Start(collector)
-	require.NoError(t, err)
-	port := input.listener.Addr().(*net.TCPAddr).Port
-	defer func() {
-		require.NoError(t, input.Stop())
-	}()
-
-	err = sendRequest(textFormatProm, port)
-	require.NoError(t, err)
-	err = sendRequest(textFormatProm, port)
-	require.NoError(t, err)
-
-	time.Sleep(time.Second * 2)
-
-	assert.Equal(t, 40, len(collector.rawLogs))
-	for _, log := range collector.rawLogs {
-		fmt.Println(log.String())
+	groups := collectRequestEvents(t, input, []byte(textFormatProm), http.StatusOK)
+	count := 0
+	for _, group := range groups {
+		for _, event := range group.Events {
+			require.IsType(t, &models.Metric{}, event)
+			count++
+		}
 	}
+	require.Equal(t, 20, count)
+}
 
+func TestInputPrometheusRemoteWrite(t *testing.T) {
+	input, err := newInput("prometheus")
+	require.NoError(t, err)
+	input.collector = helper.NewObservePipelineContext(10).Collector()
+	write := &prompb.WriteRequest{Timeseries: []prompb.TimeSeries{{
+		Labels:  []prompb.Label{{Name: "__name__", Value: "requests"}},
+		Samples: []prompb.Sample{{Timestamp: 1700000000123, Value: 10}},
+	}}}
+	body, err := write.Marshal()
+	require.NoError(t, err)
+	request := httptest.NewRequest(http.MethodPost, "/write?db=metrics", bytes.NewReader(snappy.Encode(nil, body)))
+	request.Header.Set("Content-Encoding", "snappy")
+	request.Header.Set("Content-Type", "application/x-protobuf")
+	response := httptest.NewRecorder()
+	input.ServeHTTP(response, request)
+	require.Equal(t, http.StatusOK, response.Code)
+	groups := input.collector.ToArray()
+	require.Len(t, groups, 1)
+	require.Equal(t, "metrics", groups[0].Group.Metadata.Get("db"))
+	require.Len(t, groups[0].Events, 1)
+	require.IsType(t, &models.Metric{}, groups[0].Events[0])
+	metric := groups[0].Events[0].(*models.Metric)
+	require.Equal(t, "requests", metric.GetName())
+	require.Equal(t, uint64(1700000000123000000), metric.GetTimestamp())
+}
+
+func TestInputRawLog(t *testing.T) {
+	input, err := newInputWithOpts(" RAW ", func(input *ServiceHTTP) {
+		input.QueryParams = []string{"example_query"}
+	})
+	require.NoError(t, err)
+	for _, body := range []string{"raw\x00\xff", ""} {
+		before := time.Now().Unix()
+		groups := collectRequestEvents(t, input, []byte(body), http.StatusNoContent)
+		after := time.Now().Unix()
+		require.Len(t, groups, 1)
+		require.Equal(t, map[string]string{"example_query": "preserved"}, groups[0].Group.Metadata.Iterator())
+		require.Len(t, groups[0].Events, 1)
+		require.IsType(t, &models.Log{}, groups[0].Events[0])
+		event := groups[0].Events[0].(*models.Log)
+		require.Equal(t, body, event.Contents.Get(models.ContentKey))
+		log, err := helper.TransferLogEventToPB(event)
+		require.NoError(t, err)
+		require.Len(t, log.Contents, 1)
+		require.Equal(t, models.ContentKey, string(log.Contents[0].Key))
+		require.Equal(t, body, string(log.Contents[0].Value))
+		require.Zero(t, log.Timestamp%uint64(time.Second))
+		require.GreaterOrEqual(t, log.Timestamp, uint64(before)*uint64(time.Second))
+		require.LessOrEqual(t, log.Timestamp, uint64(after)*uint64(time.Second))
+	}
+}
+
+func TestInputRawWithCustomDecoder(t *testing.T) {
+	const customDecoder = "ext_http_raw_test_decoder"
+	pipeline.AddExtensionCreator(customDecoder, pipeline.Extensions[defaultDecoder])
+	t.Cleanup(func() { delete(pipeline.Extensions, customDecoder) })
+	input, err := newInputWithOpts("raw", func(input *ServiceHTTP) {
+		input.Decoder = customDecoder
+	})
+	require.NoError(t, err)
+	groups := collectRequestEvents(t, input, []byte("payload"), http.StatusNoContent)
+	require.Len(t, groups, 1)
+	require.Equal(t, []models.PipelineEvent{models.ByteArray("payload")}, groups[0].Events)
 }
 
 func TestInputInfluxDB(t *testing.T) {
 	input, err := newInput("influx")
 	require.NoError(t, err)
-	collector := &mockCollector{}
-	err = input.Start(collector)
-	require.NoError(t, err)
-	port := input.listener.Addr().(*net.TCPAddr).Port
-
-	defer func() {
-		require.NoError(t, input.Stop())
-	}()
-
-	err = sendRequest(textFormatInflux, port)
-	require.NoError(t, err)
-	err = sendRequest(textFormatInflux, port)
-	require.NoError(t, err)
-
-	time.Sleep(time.Second * 2)
-
-	assert.Equal(t, 30, len(collector.rawLogs))
-	for _, log := range collector.rawLogs {
-		fmt.Println(log.String())
+	groups := collectRequestEvents(t, input, []byte(textFormatInflux), http.StatusNoContent)
+	require.Len(t, groups, 1)
+	require.Len(t, groups[0].Events, 13)
+	for _, event := range groups[0].Events {
+		require.IsType(t, &models.Metric{}, event)
 	}
 }
 
@@ -274,26 +273,59 @@ func TestInputInfluxDBWithFieldsExtend(t *testing.T) {
 		input.FieldsExtend = true
 	})
 	require.NoError(t, err)
-	collector := &mockCollector{}
-	err = input.Start(collector)
-	require.NoError(t, err)
-	port := input.listener.Addr().(*net.TCPAddr).Port
-
-	defer func() {
-		require.NoError(t, input.Stop())
-	}()
-
-	err = sendRequest(textFormatInflux, port)
-	require.NoError(t, err)
-	err = sendRequest(textFormatInflux, port)
-	require.NoError(t, err)
-
-	time.Sleep(time.Second * 2)
-
-	assert.Equal(t, 36, len(collector.rawLogs))
-	for _, log := range collector.rawLogs {
-		fmt.Println(log.String())
+	groups := collectRequestEvents(t, input, []byte(textFormatInflux), http.StatusNoContent)
+	require.Len(t, groups, 1)
+	require.Len(t, groups[0].Events, 18)
+	for _, event := range groups[0].Events {
+		require.IsType(t, &models.Log{}, event)
 	}
+}
+
+func TestInputStatsD(t *testing.T) {
+	input, err := newInput("statsd")
+	require.NoError(t, err)
+	body := []byte("requests:5|c|#service:api\ninvalid:1|g|\nlatency:3.5|g\n")
+	groups := collectRequestEvents(t, input, body, http.StatusNoContent)
+	require.Len(t, groups, 1)
+	require.Len(t, groups[0].Events, 2)
+	counter := groups[0].Events[0].(*models.Log)
+	require.Equal(t, "requests", counter.GetIndices().Get("__name__"))
+	require.Equal(t, "5", counter.GetIndices().Get("__value__"))
+	require.Equal(t, "service#$#api", counter.GetIndices().Get("__labels__"))
+	require.NotEmpty(t, counter.GetIndices().Get("__time_nano__"))
+	gauge := groups[0].Events[1].(*models.Log)
+	require.Equal(t, "latency", gauge.GetIndices().Get("__name__"))
+	require.Equal(t, "3.5", gauge.GetIndices().Get("__value__"))
+}
+
+func TestInputSLS(t *testing.T) {
+	input, err := newInputWithOpts("sls", func(input *ServiceHTTP) {
+		input.QueryParams = []string{"example_query"}
+	})
+	require.NoError(t, err)
+	nanos := uint32(987654321)
+	body := test.AppendSLSWireLog(nil, 1700000000, &nanos,
+		[2]string{"content", "message"}, [2]string{"node", "field-not-tag"}, [2]string{"__tag__:as_content", "literal"})
+	body = test.AppendSLSWireLog(body, 1700000001, nil, [2]string{"empty", ""})
+	for i, value := range []string{"original-logstore", "access", "sender", "sender-id"} {
+		body = protowire.AppendString(protowire.AppendTag(body, protowire.Number(i+2), protowire.BytesType), value)
+	}
+	body = test.AppendSLSWireTag(body, "node", "edge")
+	groups := collectRequestEvents(t, input, body, http.StatusOK)
+	require.Len(t, groups, 1)
+	require.Equal(t, map[string]string{"node": "edge", pipeline.TopicTagKey: "access", "__machine_uuid__": "sender-id"}, groups[0].Group.GetTags().Iterator())
+	require.Equal(t, map[string]string{"source": "sender", "example_query": "preserved", "sls.category": "original-logstore"}, groups[0].Group.GetMetadata().Iterator())
+	require.Empty(t, groups[0].Group.GetDestinationLogstore())
+	require.Len(t, groups[0].Events, 2)
+
+	log := groups[0].Events[0].(*models.Log)
+	require.Equal(t, uint64(1700000000987654321), log.Timestamp)
+	require.Equal(t, map[string]interface{}{"content": "message", "node": "field-not-tag", "__tag__:as_content": "literal"}, log.GetIndices().Iterator())
+	require.Empty(t, log.GetTags().Iterator())
+	require.Equal(t, uint64(1700000001000000000), groups[0].Events[1].GetTimestamp())
+	require.Equal(t, map[string]interface{}{"empty": ""}, groups[0].Events[1].(*models.Log).GetIndices().Iterator())
+
+	require.Empty(t, collectRequestEvents(t, input, []byte{0x0a}, http.StatusBadRequest))
 }
 
 func TestUnlinkUnixSock(t *testing.T) {
@@ -314,8 +346,7 @@ func TestUnlinkUnixSock(t *testing.T) {
 	_, err = input.Init(ctx)
 	require.NoError(t, err)
 
-	collector := &mockCollector{}
-	require.NoError(t, input.Start(collector))
+	require.NoError(t, input.StartService(helper.NewNoopPipelineContext()))
 	require.NoError(t, input.Stop())
 }
 

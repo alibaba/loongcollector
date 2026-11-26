@@ -96,15 +96,11 @@ func (m *Mssql) dsnConfig() string {
 }
 
 // Start starts the ServiceInput's service, whatever that may be
-func (m *Mssql) Start(collector pipeline.Collector) error {
+func (m *Mssql) StartService(ctx pipeline.PipelineContext) error {
 	connStr := m.dsnConfig()
-	return m.Rdb.Start(collector, connStr, func() error {
+	return m.Rdb.Start(ctx.Collector(), connStr, func() error {
 		return nil
 	}, msColumnResolverFuncMap)
-}
-
-func (m *Mssql) Collect(collector pipeline.Collector) error {
-	return m.Rdb.Collect(collector, msColumnResolverFuncMap)
 }
 
 // Stop stops the services and closes any necessary channels and connections

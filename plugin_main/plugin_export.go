@@ -28,7 +28,6 @@ import (
 	"github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/flags"
 	"github.com/alibaba/ilogtail/pkg/helper"
-	"github.com/alibaba/ilogtail/pkg/helper/containercenter"
 	"github.com/alibaba/ilogtail/pkg/helper/k8smeta"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/protocol"
@@ -39,30 +38,6 @@ import (
 
 /*
 #include <stdlib.h>
-static char**makeCharArray(int size) {
-        return malloc(sizeof(char*) * size);
-}
-
-static void setArrayString(char **a, char *s, int n) {
-        a[n] = s;
-}
-
-struct containerMeta{
-	char* podName;
-	char* k8sNamespace;
-	char* containerName;
-	char* image;
-	int k8sLabelsSize;
-	int containerLabelsSize;
-	int envSize;
-	char** k8sLabelsKey;
-	char** k8sLabelsVal;
-	char** containerLabelsKey;
-	char** containerLabelsVal;
-	char** envsKey;
-	char** envsVal;
-};
-
 // PBBuffer carries a serialized PipelineEventGroup protobuf that the C++ self-monitor
 // timer pulls from Go via GetGoSelfMonitor*PB. Go marshals directly into data
 // allocated inside libGoPluginBase.so; after C++ finishes parsing the borrowed bytes it must
@@ -81,46 +56,36 @@ typedef struct {
 import "C" //nolint:typecheck
 
 var initOnce sync.Once
-var loadOnce sync.Once
-
-//export InitPluginBase
-func InitPluginBase() int {
-	return initPluginBase("")
-}
 
 //export InitPluginBaseV2
 func InitPluginBaseV2(cfgStr string) int {
 	return initPluginBase(cfgStr)
 }
 
-//export LoadGlobalConfig
-func LoadGlobalConfig(jsonStr string) int {
-	// Only the first call will return non-zero.
-	retcode := 0
-	loadOnce.Do(func() {
-		if len(jsonStr) >= 2 { // For invalid JSON, use default value and return 0
-			if err := json.Unmarshal([]byte(jsonStr), &config.LoongcollectorGlobalConfig); err != nil {
-				fmt.Println("load global config error", "GlobalConfig", jsonStr, "err", err)
-				retcode = 1
-			}
-			logger.InitLogger()
-			for _, log := range flags.LogsWaitToPrint {
-				switch log.LogType {
-				case flags.LogTypeError:
-					logger.Error(context.Background(), log.AlarmType, log.Content)
-				case flags.LogTypeInfo:
-					logger.Info(context.Background(), log.Content)
-				case flags.LogTypeDebug:
-					logger.Debug(context.Background(), log.Content)
-				case flags.LogTypeWarning:
-					logger.Warning(context.Background(), log.AlarmType, log.Content)
-				}
-			}
-			logger.Info(context.Background(), "load global config", jsonStr)
-			config.UserAgent = fmt.Sprintf("ilogtail/%v (%v) ip/%v", config.BaseVersion, runtime.GOOS, config.LoongcollectorGlobalConfig.HostIP)
+func loadGlobalConfig(jsonStr string) {
+	valid := true
+	if len(jsonStr) >= 2 {
+		if err := json.Unmarshal([]byte(jsonStr), &config.LoongcollectorGlobalConfig); err != nil {
+			fmt.Println("load global config error", "GlobalConfig", jsonStr, "err", err)
+			valid = false
 		}
-	})
-	if retcode == 0 {
+		logger.InitLogger()
+		for _, log := range flags.LogsWaitToPrint {
+			switch log.LogType {
+			case flags.LogTypeError:
+				logger.Error(context.Background(), log.AlarmType, log.Content)
+			case flags.LogTypeInfo:
+				logger.Info(context.Background(), log.Content)
+			case flags.LogTypeDebug:
+				logger.Debug(context.Background(), log.Content)
+			case flags.LogTypeWarning:
+				logger.Warning(context.Background(), log.AlarmType, log.Content)
+			}
+		}
+		logger.Info(context.Background(), "load global config", jsonStr)
+		config.UserAgent = fmt.Sprintf("ilogtail/%v (%v) ip/%v", config.BaseVersion, runtime.GOOS, config.LoongcollectorGlobalConfig.HostIP)
+	}
+	if valid {
 		// Update when both of them are not empty.
 		logger.Debugf(context.Background(), "host IP: %v, hostname: %v",
 			config.LoongcollectorGlobalConfig.HostIP, config.LoongcollectorGlobalConfig.Hostname)
@@ -128,7 +93,6 @@ func LoadGlobalConfig(jsonStr string) int {
 			util.SetNetworkIdentification(config.LoongcollectorGlobalConfig.HostIP, config.LoongcollectorGlobalConfig.Hostname)
 		}
 	}
-	return retcode
 }
 
 //export LoadPipeline
@@ -165,8 +129,7 @@ func UnloadPipeline(configName string) int {
 }
 
 // ProcessPipelineEventGroup is the C++ → Go PipelineEventGroup PB ingress.
-// The reverse Go → C++ PEG PB path is logtail.SendPipelineEventGroup (adapter
-// callback, sibling of SendPb); it is not a Go export.
+// Go sends events back to C++ through the logtail.SendPipelineEventGroup adapter.
 //
 //export ProcessPipelineEventGroup
 func ProcessPipelineEventGroup(configName string, pbBytes []byte, packID string) int {
@@ -220,11 +183,6 @@ func Start(configName string) {
 	logger.Info(context.Background(), "Start", "success", "config", configName)
 }
 
-//export CtlCmd
-func CtlCmd(configName string, cmdID int, cmdDetail string) {
-	logger.Info(context.Background(), "execute cmd", cmdID, "detail", cmdDetail, "config", configName)
-}
-
 //export GetAllContainers
 func GetAllContainers() *C.char {
 	return C.CString(pluginmanager.GetAllContainers())
@@ -233,62 +191,6 @@ func GetAllContainers() *C.char {
 //export GetDiffContainers
 func GetDiffContainers() *C.char {
 	return C.CString(pluginmanager.GetDiffContainers())
-}
-
-//export GetContainerMeta
-func GetContainerMeta(containerID string) *C.struct_containerMeta {
-	logger.InitLogger()
-	meta := containercenter.GetContainerMeta(containerID)
-	if meta == nil {
-		logger.Debug(context.Background(), "get meta", "")
-		return nil
-	}
-	if logger.DebugFlag() {
-		bytes, _ := json.Marshal(meta)
-		logger.Debug(context.Background(), "get meta", string(bytes))
-	}
-	returnStruct := (*C.struct_containerMeta)(C.malloc(C.size_t(unsafe.Sizeof(C.struct_containerMeta{}))))
-	returnStruct.podName = C.CString(meta.PodName)
-	returnStruct.k8sNamespace = C.CString(meta.K8sNamespace)
-	returnStruct.containerName = C.CString(meta.ContainerName)
-	returnStruct.image = C.CString(meta.Image)
-
-	returnStruct.k8sLabelsSize = C.int(len(meta.K8sLabels))
-	if len(meta.K8sLabels) > 0 {
-		returnStruct.k8sLabelsKey = C.makeCharArray(returnStruct.k8sLabelsSize)
-		returnStruct.k8sLabelsVal = C.makeCharArray(returnStruct.k8sLabelsSize)
-		count := 0
-		for k, v := range meta.K8sLabels {
-			C.setArrayString(returnStruct.k8sLabelsKey, C.CString(k), C.int(count))
-			C.setArrayString(returnStruct.k8sLabelsVal, C.CString(v), C.int(count))
-			count++
-		}
-	}
-
-	returnStruct.containerLabelsSize = C.int(len(meta.ContainerLabels))
-	if len(meta.ContainerLabels) > 0 {
-		returnStruct.containerLabelsKey = C.makeCharArray(returnStruct.containerLabelsSize)
-		returnStruct.containerLabelsVal = C.makeCharArray(returnStruct.containerLabelsSize)
-		count := 0
-		for k, v := range meta.ContainerLabels {
-			C.setArrayString(returnStruct.containerLabelsKey, C.CString(k), C.int(count))
-			C.setArrayString(returnStruct.containerLabelsVal, C.CString(v), C.int(count))
-			count++
-		}
-	}
-
-	returnStruct.envSize = C.int(len(meta.Env))
-	if len(meta.Env) > 0 {
-		returnStruct.envsKey = C.makeCharArray(returnStruct.envSize)
-		returnStruct.envsVal = C.makeCharArray(returnStruct.envSize)
-		count := 0
-		for k, v := range meta.Env {
-			C.setArrayString(returnStruct.envsKey, C.CString(k), C.int(count))
-			C.setArrayString(returnStruct.envsVal, C.CString(v), C.int(count))
-			count++
-		}
-	}
-	return returnStruct
 }
 
 // buildAlarmsPB sends business fields to C++; the final sender adds ip/os/ver.
@@ -446,7 +348,7 @@ func initPluginBase(cfgStr string) int {
 	// Only the first call will return non-zero.
 	rst := 0
 	initOnce.Do(func() {
-		LoadGlobalConfig(cfgStr)
+		loadGlobalConfig(cfgStr)
 		InitHTTPServer()
 		setGCPercentForSlowStart()
 		logger.Info(context.Background(), "init plugin base, version", config.BaseVersion)

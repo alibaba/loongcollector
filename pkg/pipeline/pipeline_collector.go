@@ -24,7 +24,8 @@ type PipelineCollector interface { //nolint
 	// Collect single group and events data belonging to this group
 	Collect(groupInfo *models.GroupInfo, eventList ...models.PipelineEvent)
 
-	// CollectList collect GroupEvents list that have been grouped
+	// CollectList transfers grouped events to the collector. The caller must
+	// not mutate the groups or their event slices after the call.
 	CollectList(groupEventsList ...*models.PipelineGroupEvents)
 
 	// ToArray returns an array containing all of the PipelineGroupEvents in this collector.

@@ -25,7 +25,6 @@ import (
 
 	"github.com/alibaba/ilogtail/pkg/doc"
 	"github.com/alibaba/ilogtail/pkg/logger"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/test/engine/setup/dockercompose"
 )
 
@@ -44,7 +43,7 @@ type Subscriber interface {
 	// Stop
 	Stop() error
 	// Get data
-	GetData(sql string, startTime int32) ([]*protocol.LogGroup, error)
+	GetData(sql string, startTime int32) ([]*Batch, error)
 	// FlusherConfig returns the default flusher config for loongcollector container to transfer the received or self telemetry data.
 	FlusherConfig() string
 }

@@ -21,6 +21,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/alibaba/ilogtail/pkg/helper"
+	"github.com/alibaba/ilogtail/pkg/models"
+
 	MQTT "github.com/eclipse/paho.mqtt.golang"
 	"github.com/pkg/errors"
 
@@ -35,7 +38,7 @@ type ServiceMQTT struct {
 	shutdown  chan struct{}
 	waitGroup sync.WaitGroup
 	context   pipeline.Context
-	collector pipeline.Collector
+	collector pipeline.PipelineCollector
 	keys      []string
 	id        int
 
@@ -91,12 +94,6 @@ func (p *ServiceMQTT) Description() string {
 	return "mqtt service input plugin for logtail"
 }
 
-// Collect takes in an accumulator and adds the metrics that the Input
-// gathers. This is called every "interval"
-func (p *ServiceMQTT) Collect(pipeline.Collector) error {
-	return nil
-}
-
 func (p *ServiceMQTT) onMessageReceived(client MQTT.Client, message MQTT.Message) {
 	logger.Debug(p.context.GetRuntimeContext(), "Received message on topic", message.Topic())
 	values := make([]string, 6)
@@ -117,7 +114,12 @@ func (p *ServiceMQTT) onMessageReceived(client MQTT.Client, message MQTT.Message
 	values[4] = strconv.Itoa(int(message.MessageID()))
 	values[5] = string(message.Payload())
 
-	p.collector.AddDataArray(nil, p.keys, values)
+	event, err := helper.NewInputLogRow(nil, p.keys, values)
+	if err != nil {
+		logger.Warning(p.context.GetRuntimeContext(), selfmonitor.InputCollectAlarm, "invalid log row", err)
+		return
+	}
+	p.collector.Collect(models.NewGroup(models.NewMetadata(), models.NewTags()), event)
 }
 
 func (p *ServiceMQTT) createClient(tlsConfig *tls.Config, connLostChannel chan struct{}) (MQTT.Client, error) {
@@ -196,9 +198,9 @@ func (p *ServiceMQTT) createClient(tlsConfig *tls.Config, connLostChannel chan s
 }
 
 // Start starts the ServiceInput's service, whatever that may be
-func (p *ServiceMQTT) Start(c pipeline.Collector) error {
+func (p *ServiceMQTT) StartService(ctx pipeline.PipelineContext) error {
 	p.shutdown = make(chan struct{})
-	p.collector = c
+	p.collector = ctx.Collector()
 	p.waitGroup.Add(1)
 	defer p.waitGroup.Done()
 

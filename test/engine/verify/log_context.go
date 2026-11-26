@@ -22,7 +22,6 @@ import (
 
 	"github.com/avast/retry-go/v4"
 
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/test/config"
 	"github.com/alibaba/ilogtail/test/engine/control"
 	"github.com/alibaba/ilogtail/test/engine/setup/subscriber"
@@ -47,7 +46,7 @@ func LogContext(ctx context.Context) (context.Context, error) {
 	timeoutCtx, cancel := context.WithTimeout(context.TODO(), config.TestConfig.RetryTimeout)
 	defer cancel()
 	var err error
-	var groups []*protocol.LogGroup
+	var groups []*subscriber.Batch
 	err = retry.Do(
 		func() error {
 			groups, err = subscriber.TestSubscriber.GetData(control.GetQuery(ctx), from)
@@ -64,24 +63,16 @@ func LogContext(ctx context.Context) (context.Context, error) {
 	if len(groups) == 0 {
 		return ctx, fmt.Errorf("no log group")
 	}
-	if len(groups[0].Logs) == 0 {
+	if len(groups[0].Records) == 0 {
 		return ctx, fmt.Errorf("no log in log group")
 	}
 
 	contextInfoMap := make(map[string]*contextInfo)
 	for _, group := range groups {
 
-		var packID string
-		found := true
-		for _, tag := range group.LogTags {
-			if tag.GetKey() == "__pack_id__" {
-				packID = tag.GetValue()
-				found = true
-				break
-			}
-		}
+		packID, found := group.Tags["__pack_id__"]
 		if !found {
-			return ctx, fmt.Errorf("key: __pack_id__ not found in log tags")
+			return ctx, fmt.Errorf("key: __pack_id__ not found in group tags")
 		}
 
 		packIDComponents := strings.Split(packID, "-")
@@ -96,7 +87,7 @@ func LogContext(ctx context.Context) (context.Context, error) {
 			}
 
 			found := false
-			for _, logContent := range group.Logs[0].Contents {
+			for _, logContent := range group.Records[0].Fields {
 				if logContent.Key == "content" {
 					ctxInfo.log = logContent.Value
 					found = true
@@ -117,9 +108,9 @@ func LogContext(ctx context.Context) (context.Context, error) {
 			return ctx, fmt.Errorf("expect the %dth pack for pack id prefix %s, got %d instead", ctxInfo.packSeq+1, packIDComponents[0], packIDNo)
 		}
 
-		for _, log := range group.Logs {
+		for _, log := range group.Records {
 			contentFound, seqFound := false, false
-			for _, logContent := range log.Contents {
+			for _, logContent := range log.Fields {
 				if logContent.Key == "content" {
 					contentFound = true
 					if logContent.Value != ctxInfo.log {

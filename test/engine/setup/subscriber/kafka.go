@@ -31,7 +31,6 @@ import (
 
 	"github.com/alibaba/ilogtail/pkg/doc"
 	"github.com/alibaba/ilogtail/pkg/logger"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/test/engine/setup/dockercompose"
 )
@@ -59,7 +58,7 @@ func (k *KafkaSubscriber) Description() string {
 	return "this's a kafka subscriber, which will consume messages from kafka topic to verify loongcollector sent data successfully"
 }
 
-func (k *KafkaSubscriber) GetData(sql string, startTime int32) ([]*protocol.LogGroup, error) {
+func (k *KafkaSubscriber) GetData(sql string, startTime int32) ([]*Batch, error) {
 	logger.Debugf(context.Background(), "Kafka subscriber getting data from topic: %s, brokers: %v", k.Topic, k.Brokers)
 
 	if err := k.testKafkaConnection(); err != nil {
@@ -136,7 +135,7 @@ func (k *KafkaSubscriber) GetData(sql string, startTime int32) ([]*protocol.LogG
 		defer pc.Close()
 	}
 
-	logGroup := &protocol.LogGroup{Logs: []*protocol.Log{}}
+	batch := &Batch{Records: []*Record{}}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -226,7 +225,7 @@ LOOP:
 				}
 
 				msgVal := extractMsgFromRaw(raw)
-				contents := []*protocol.Log_Content{
+				contents := []Field{
 					{Key: "content", Value: expectedContent},
 					{Key: "topic", Value: k.Topic},
 					{Key: "partition", Value: fmt.Sprintf("%d", msg.Partition)},
@@ -236,14 +235,14 @@ LOOP:
 						if h == nil || len(h.Key) == 0 {
 							continue
 						}
-						contents = append(contents, &protocol.Log_Content{Key: fmt.Sprintf("header.%s", string(h.Key)), Value: string(h.Value)})
+						contents = append(contents, Field{Key: fmt.Sprintf("header.%s", string(h.Key)), Value: string(h.Value)})
 					}
 				}
 				if msgVal != "" {
-					contents = append(contents, &protocol.Log_Content{Key: "msg", Value: msgVal})
+					contents = append(contents, Field{Key: "msg", Value: msgVal})
 				}
-				log := &protocol.Log{Contents: contents}
-				logGroup.Logs = append(logGroup.Logs, log)
+				log := &Record{Fields: contents}
+				batch.Records = append(batch.Records, log)
 				messageCount++
 				if messageCount >= maxMessages {
 					break
@@ -254,7 +253,7 @@ LOOP:
 			if messageCount == 0 {
 				return nil, fmt.Errorf("no messages received from kafka topic %s", k.Topic)
 			}
-			return []*protocol.LogGroup{logGroup}, nil
+			return []*Batch{batch}, nil
 		}
 	}
 
@@ -263,7 +262,7 @@ LOOP:
 	}
 
 	logger.Infof(context.Background(), "Successfully collected %d messages from topic %s", messageCount, k.Topic)
-	return []*protocol.LogGroup{logGroup}, nil
+	return []*Batch{batch}, nil
 }
 
 func (k *KafkaSubscriber) FlusherConfig() string {

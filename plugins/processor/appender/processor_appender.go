@@ -25,7 +25,6 @@ import (
 	"github.com/alibaba/ilogtail/pkg/helper/platformmeta"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
 
@@ -67,31 +66,7 @@ func (*ProcessorAppender) Description() string {
 	return "processor to append some value for specific key"
 }
 
-func (p *ProcessorAppender) ProcessLogs(logArray []*protocol.Log) []*protocol.Log {
-	for _, log := range logArray {
-		p.processLog(log)
-	}
-	return logArray
-}
-
-func (p *ProcessorAppender) processLog(log *protocol.Log) {
-	c := p.find(log, p.Key)
-	if c == nil {
-		c = &protocol.Log_Content{
-			Key: p.Key,
-		}
-		log.Contents = append(log.Contents, c)
-	}
-	p.processField(c)
-}
-
-func (p *ProcessorAppender) processField(c *protocol.Log_Content) {
-	c.Value = p.appendValue(c.Value)
-}
-
-// appendValue appends the (variable-substituted) configured Value onto base and,
-// when SortLabels is enabled, normalizes the result as sorted metric labels.
-// Shared by the v1 (protocol.Log) and v2 (models.Log) processing paths.
+// appendValue renders the configured fields and appends them to the existing value.
 func (p *ProcessorAppender) appendValue(base string) string {
 	r := p.realValue
 	for _, replaceFunc := range p.replaceFuncs {
@@ -114,7 +89,7 @@ func (p *ProcessorAppender) appendValue(base string) string {
 	return v
 }
 
-// Process implements the v2 ProcessorV2 interface: it appends the configured
+// Process implements the Processor interface: it appends the configured
 // value to the target Key of each Log event (creating the key if absent);
 // Metric/Span events pass through unchanged.
 func (p *ProcessorAppender) Process(in *models.PipelineGroupEvents, context pipeline.PipelineContext) {
@@ -128,15 +103,6 @@ func (p *ProcessorAppender) processLogEvent(log *models.Log) {
 		base = pipeline.GetStringValue(contents.Get(p.Key))
 	}
 	contents.Add(p.Key, p.appendValue(base))
-}
-
-func (p *ProcessorAppender) find(log *protocol.Log, key string) *protocol.Log_Content {
-	for idx := range log.Contents {
-		if log.Contents[idx].Key == key {
-			return log.Contents[idx]
-		}
-	}
-	return nil
 }
 
 // ParseVariableValue parse specific key with logic:

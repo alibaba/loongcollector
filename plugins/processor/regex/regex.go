@@ -17,11 +17,12 @@ package regex
 import (
 	"errors"
 	"regexp"
+	"regexp/syntax"
+	"strings"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
@@ -40,9 +41,11 @@ type ProcessorRegex struct {
 	KeepSourceIfParseError bool
 	SourceKey              string
 
-	context       pipeline.Context
-	logPairMetric selfmonitor.CounterMetric
-	re            *regexp.Regexp
+	context               pipeline.Context
+	logPairMetric         selfmonitor.CounterMetric
+	re                    *regexp.Regexp
+	trailingCapturePrefix *regexp.Regexp
+	requiredPrefix        string
 }
 
 var errNoRegexKey = errors.New("no regex key error")
@@ -55,10 +58,17 @@ func (p *ProcessorRegex) Init(context pipeline.Context) error {
 	}
 	var err error
 	// `(?s)` change the meaning of `.` in Golang to match the every character, and the default meaning is not match a newline.
-	p.re, err = regexp.Compile("(?s)" + p.Regex)
+	expression := "(?s)" + p.Regex
+	p.re, err = regexp.Compile(expression)
 	if err != nil {
 		logger.Warning(p.context.GetRuntimeContext(), selfmonitor.ProcessorInitAlarm, "init regex error", err, "regex", p.Regex)
 		return err
+	}
+
+	p.trailingCapturePrefix = compileTrailingCapturePrefix(expression, p.re.NumSubexp())
+	p.requiredPrefix = ""
+	if p.trailingCapturePrefix != nil {
+		p.requiredPrefix, _ = p.re.LiteralPrefix()
 	}
 
 	metricsRecord := p.context.GetMetricRecord()
@@ -66,85 +76,64 @@ func (p *ProcessorRegex) Init(context pipeline.Context) error {
 	return nil
 }
 
+// compileTrailingCapturePrefix strips a final anchored dot-all capture.
+// Every suffix after the prefix is a valid match for this capture, so the
+// regular expression engine only needs to find the preceding fields.
+func compileTrailingCapturePrefix(expression string, captures int) *regexp.Regexp {
+	tree, err := syntax.Parse(expression, syntax.Perl)
+	if err != nil || tree.Op != syntax.OpConcat || len(tree.Sub) < 4 {
+		return nil
+	}
+	parts := tree.Sub
+	tail := parts[len(parts)-2]
+	if parts[0].Op != syntax.OpBeginText || parts[len(parts)-1].Op != syntax.OpEndText ||
+		tail.Op != syntax.OpCapture || tail.Cap != captures {
+		return nil
+	}
+	star := tail.Sub[0]
+	if star.Op != syntax.OpStar || star.Sub[0].Op != syntax.OpAnyChar {
+		return nil
+	}
+	tree.Sub = parts[:len(parts)-2]
+	prefix, err := regexp.Compile(tree.String())
+	if err != nil || prefix.NumSubexp()+1 != captures {
+		return nil
+	}
+	return prefix
+}
+
 func (*ProcessorRegex) Description() string {
 	return "regex processor for logtail"
-}
-
-func (p *ProcessorRegex) ProcessLogs(logArray []*protocol.Log) []*protocol.Log {
-	if p.re == nil {
-		return logArray
-	}
-	for _, log := range logArray {
-		p.ProcessLog(log)
-	}
-	return logArray
-}
-
-func (p *ProcessorRegex) ProcessLog(log *protocol.Log) {
-	beginLen := len(log.Contents)
-	findKey := false
-	for i, cont := range log.Contents {
-		if len(p.SourceKey) == 0 || p.SourceKey == cont.Key {
-			findKey = true
-			parseResult := p.processRegex(log, &cont.Value)
-			if !p.shouldKeepSource(parseResult) {
-				log.Contents = append(log.Contents[:i], log.Contents[i+1:]...)
-			}
-			break
-		}
-	}
-	if !findKey && p.NoKeyError {
-		logger.Warning(p.context.GetRuntimeContext(), selfmonitor.RegexFindAlarm, "anchor cannot find key", p.SourceKey)
-	}
-	p.logPairMetric.Add(int64(len(log.Contents) - beginLen + 1))
 }
 
 func (p *ProcessorRegex) shouldKeepSource(parseResult bool) bool {
 	return p.KeepSource || (p.KeepSourceIfParseError && !parseResult)
 }
 
-func (p *ProcessorRegex) processRegex(log *protocol.Log, val *string) bool {
-	keys, values, ok := p.matchRegex(*val)
-	if !ok {
-		return false
+// configuredCaptures returns the offsets for the configured captures or nil on failure.
+func (p *ProcessorRegex) configuredCaptures(indices []int, size int, offsets []int, preview func() string) []int {
+	if p.trailingCapturePrefix != nil && len(indices) >= 2 {
+		offsets = append(offsets, indices...)
+		offsets = append(offsets, indices[1], size)
+		offsets[1] = size
+		indices = offsets
 	}
-	for i := range keys {
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: keys[i], Value: values[i]})
-	}
-	return true
-}
-
-// matchRegex applies the compiled regex to val and returns the extracted keys
-// and their values (in Keys order) plus whether the parse succeeded. It holds
-// the shared match + validation logic reused by both the v1 (ProcessLogs) and
-// v2 (Process) code paths, so their semantics stay identical.
-func (p *ProcessorRegex) matchRegex(val string) (keys []string, values []string, ok bool) {
-	indexArray := p.re.FindStringSubmatchIndex(val)
-	if len(indexArray) < 2 || (p.FullMatch && (indexArray[0] != 0 || indexArray[1] != len(val))) {
+	if len(indices) < 2 || (p.FullMatch && (indices[0] != 0 || indices[1] != size)) {
 		if p.NoMatchError {
-			logger.Warning(p.context.GetRuntimeContext(), selfmonitor.RegexUnmatchedAlarm, "unmatch this log content", util.CutString(val, 512))
+			logger.Warning(p.context.GetRuntimeContext(), selfmonitor.RegexUnmatchedAlarm, "unmatch this log content", preview())
 		}
-		return nil, nil, false
+		return nil
 	}
 
-	// Use bitwise operations to ignore first two values in indexArray.
-	if (len(indexArray)>>1 - 1) < len(p.Keys) {
+	const matchOffsets = 2
+	captureCount := (len(indices) - matchOffsets) / 2
+	if captureCount < len(p.Keys) {
 		if p.NoMatchError {
-			logger.Warning(p.context.GetRuntimeContext(), selfmonitor.RegexUnmatchedAlarm, "match result count less than key count, result count", len(indexArray)>>1-1, "key count", len(p.Keys))
+			logger.Warning(p.context.GetRuntimeContext(), selfmonitor.RegexUnmatchedAlarm, "match result count less than key count, result count", captureCount, "key count", len(p.Keys))
 		}
-		return nil, nil, false
+		return nil
 	}
-	keys = make([]string, 0, len(p.Keys))
-	values = make([]string, 0, len(p.Keys))
-	for i := 0; i < len(p.Keys); i++ {
-		leftIndex := indexArray[i<<1+2]
-		rightIndex := indexArray[i<<1+3]
-		if leftIndex >= 0 && rightIndex >= leftIndex {
-			keys = append(keys, p.Keys[i])
-			values = append(values, val[leftIndex:rightIndex])
-		}
-	}
-	return keys, values, true
+	return indices[matchOffsets : matchOffsets+2*len(p.Keys)]
 }
 
 func init() {
@@ -157,11 +146,7 @@ func init() {
 	}
 }
 
-// Process implements the v2 ProcessorV2 interface: it parses the SourceKey
-// value of each Log event with the compiled regex and writes the captured
-// groups into the configured Keys, faithfully reproducing the v1 transform
-// (KeepSource / KeepSourceIfParseError / NoKeyError / NoMatchError). Metric and
-// Span events pass through unchanged.
+// Process writes regex captures into each log. Other event types pass through unchanged.
 func (p *ProcessorRegex) Process(in *models.PipelineGroupEvents, context pipeline.PipelineContext) {
 	pipeline.ProcessLogEventsOnly(in, context, p.processLogEvent)
 }
@@ -176,7 +161,7 @@ func (p *ProcessorRegex) processLogEvent(log *models.Log) {
 		p.logPairMetric.Add(int64(contents.Len() - beginLen + 1))
 	}()
 
-	// v1 parses the field named by SourceKey, or the first field when SourceKey
+	// Parse the field named by SourceKey, or the first field when SourceKey
 	// is not configured.
 	sourceKey := p.SourceKey
 	if sourceKey == "" {
@@ -185,23 +170,102 @@ func (p *ProcessorRegex) processLogEvent(log *models.Log) {
 			break
 		}
 	}
-	if sourceKey == "" || !contents.Contains(sourceKey) {
+	value, found, owned := models.LookupLogContentForReplacement(contents, sourceKey)
+	if sourceKey == "" || !found {
 		if p.NoKeyError {
 			logger.Warning(p.context.GetRuntimeContext(), selfmonitor.RegexFindAlarm, "anchor cannot find key", p.SourceKey)
 		}
 		return
 	}
 
-	val := pipeline.GetStringValue(contents.Get(sourceKey))
-	keys, values, parseResult := p.matchRegex(val)
-	sourceOverwritten := false
-	for i := range keys {
-		contents.Add(keys[i], values[i])
-		if keys[i] == sourceKey {
-			sourceOverwritten = true
+	matcher := p.re
+	if p.trailingCapturePrefix != nil {
+		matcher = p.trailingCapturePrefix
+	}
+	var offsets [16]int
+	var val string
+	var captures []int
+	if body, ok := value.([]byte); ok {
+		var indices []int
+		if strings.HasPrefix(util.ZeroCopyBytesToString(body), p.requiredPrefix) {
+			indices = matcher.FindSubmatchIndex(body)
+		}
+		captures = p.configuredCaptures(indices, len(body), offsets[:0], func() string {
+			return string(body[:min(len(body), 512)])
+		})
+		val = copyCapturedText(body, captures, owned && !p.KeepSource)
+	} else {
+		val = pipeline.GetStringValue(value)
+		var indices []int
+		if strings.HasPrefix(val, p.requiredPrefix) {
+			indices = matcher.FindStringSubmatchIndex(val)
+		}
+		captures = p.configuredCaptures(indices, len(val), offsets[:0], func() string {
+			return util.CutString(val, 512)
+		})
+	}
+	dropSource := !p.shouldKeepSource(captures != nil)
+	if dropSource || len(captures) > 0 {
+		additional := 0
+		for i := 0; i < len(captures); i += 2 {
+			if captures[i] < 0 {
+				continue
+			}
+			if key := p.Keys[i/2]; key == sourceKey {
+				dropSource = false
+			} else if !contents.Contains(key) {
+				additional++
+			}
+		}
+		if dropSource {
+			contents.Delete(sourceKey)
+		}
+		models.ReserveLogContentKeys(contents, additional)
+	}
+	for i := 0; i < len(captures); i += 2 {
+		start, end := captures[i], captures[i+1]
+		if start < 0 || end < start {
+			continue
+		}
+		key := p.Keys[i/2]
+		contents.Add(key, val[start:end])
+	}
+}
+
+// copyCapturedText gives byte-backed logs one owned string for the matched
+// fields. Capture offsets are rebased to the compacted string.
+func copyCapturedText(body []byte, captures []int, owned bool) string {
+	// A long capture can reuse its original Go-owned buffer. Keep compact
+	// copies for short captures so they do not retain most of a raw message.
+	size := 0
+	for i := 0; i < len(captures); i += 2 {
+		start, end := captures[i], captures[i+1]
+		if start >= 0 && end >= start {
+			// Nested captures can overlap. Copy the original body if that
+			// would use less storage and preserve the original offsets.
+			if end-start >= len(body)-size {
+				if owned {
+					return util.ZeroCopyBytesToString(body)
+				}
+				return string(body)
+			}
+			size += end - start
 		}
 	}
-	if !p.shouldKeepSource(parseResult) && !sourceOverwritten {
-		contents.Delete(sourceKey)
+	if owned && size > 0 && size >= len(body)-len(body)/4 {
+		return util.ZeroCopyBytesToString(body)
 	}
+	text := make([]byte, size)
+	offset := 0
+	for i := 0; i < len(captures); i += 2 {
+		start, end := captures[i], captures[i+1]
+		if start < 0 || end < start {
+			continue
+		}
+		captures[i] = offset
+		offset += copy(text[offset:], body[start:end])
+		captures[i+1] = offset
+	}
+	// This allocation is owned by the capture strings and never mutated.
+	return util.ZeroCopyBytesToString(text)
 }

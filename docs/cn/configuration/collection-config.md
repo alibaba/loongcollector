@@ -25,7 +25,6 @@
 |----------------------------------|------------|----------|---------|---------------------------------|
 | enable                           | bool       | 否        | true    | 是否启用当前采集配置。                       |
 | global                           | object     | 否        | 空       | 采集配置级全局参数，C++ 与 Go 侧都会读取；未列出的键可能作为扩展字段传给 Go 插件（见 `GlobalConfig::Init` 与 `extendedParams`）。                           |
-| global.StructureType | string | 否 | v2 | Go 侧统一使用事件 Pipeline。省略或设置 `v2` 均启用统一 runner；`v1` 不再支持。 |
 | global.InputIntervalMs           | int        | 否        | 1000    | **扩展（Go）Input** 侧默认调度间隔，单位毫秒（不限于 MetricInput；与 `pkg/config.GlobalConfig.InputIntervalMs` 默认一致）。               |
 | global.InputMaxFirstCollectDelayMs| int       | 否        | 10000   | 扩展 Input 首次采集前随机等待上限（毫秒）；若大于 `InputIntervalMs` 则实际按间隔封顶（见 Go `GlobalConfig` 注释）。               |
 | global.EnableTimestampNanosecond | bool       | 否        | false   | 是否在序列化等路径中启用纳秒时间戳（C++ `GlobalConfig` 与传给 Go 的全局字段一致）。               |
@@ -84,10 +83,16 @@ flushers:
 | CLOUD_PROVIDER | 是（企业版） | **cloud_provider** |
 | AGENT_TAG | 是（企业版） | **agent_tag** |
 
-### 事件 Pipeline 迁移
+### Go 标准输出标签兼容
 
-Go 插件管理器统一使用 PipelineGroupEvents；Native 输入通过 PipelineEventGroup PB 直接进入处理链，不再回退为 LogGroup。已有配置可以省略 StructureType，显式填写时仅接受 v2；原来显式设置 v1 的配置需删除该项或改为 v2。
+`global.UsingOldContentTag` 适用于显式配置 `UsePipelineEventTags: true` 的 `service_docker_stdout` 和 `service_docker_stdout_raw`。此时默认 `false`，容器字段与原生 `input_container_stdio` 一样写入事件组标签。设置为 `true` 时写入日志正文。输入省略 `UsePipelineEventTags` 或设为 `false` 时，始终保留原有正文格式。
 
-未配置 aggregator 时，processor 输出直接交给 flusher，不再自动创建透传 aggregator 及其定时器。显式配置的 metadata 分组、攒批等 aggregator 仍有效。
+### Go 事件 Pipeline
 
-仍使用 Collector API 的输入插件在入口转换为事件对象；处理器、聚合器和发送插件使用事件接口。对外 gRPC/序列化协议可能仍使用 LogGroup，但不作为 runner 队列或 Native 桥接的中间模型。
+Go 插件管理器使用 `PipelineGroupEvents`，C++ 输入通过 `PipelineEventGroup` protobuf 进入处理链。旧配置中的 `global.StructureType: v2` 仍可读取。请从新配置省略该字段，并从原来显式填写 `v1` 的配置中移除。
+
+未配置 aggregator 时，Go Pipeline 使用默认的上下文聚合器，按来源、元数据和组标签攒批，并在达到容量或刷新周期时输出。显式配置的 aggregator 优先。
+
+发往 SLS 时，C++ 按最终日志组大小检查 `max_send_log_group_size`。超过上限的 Go 批次按原顺序拆分后重试。单个事件连同组标签仍超过上限时，该事件会被丢弃并告警，其他事件继续发送。
+
+采集、处理、聚合和发送统一使用事件接口。SLS protobuf 留在协议编码和解码边界。

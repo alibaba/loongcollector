@@ -16,40 +16,16 @@
         └── 测试文件
     ```
 
-2. 在`./pkg/protocol/converter`目录下新建一个以`<protocol>_log.go`命名的文件，并在该文件中实现下列函数：
+2. 在 `pkg/protocol/converter` 目录下新增 `<protocol>_log.go`，实现以事件组为输入的转换方法。
 
-    ```Go
-    func (c *Converter) ConvertToXXXProtocolLogs(logGroup *sls.LogGroup, targetFields []string) (logs interface{}, values [][]string, err error)
-
-    func (c *Converter) ConvertToXXXProtocolStream(logGroup *sls.LogGroup, targetFields []string) (stream interface{}, values [][]string, err error)
+    ```go
+    func (c *Converter) ConvertToXXXProtocolStream(group *models.PipelineGroupEvents, targetFields []string) (stream interface{}, values []map[string]string, err error)
     ```
 
-    其中，函数名中的“XXX”为协议名（可缩写），参数中的`logGroup`为sls日志组，`targetFields`为需要提取值的字段名，返回值中的`logs`为与协议对应的数据结构组成的数组，`stream`为代表该日志组的字节流，`values`为每条日志或日志组tag中`targetFields`字段对应的值，`err`为返回的错误。
+    函数名中的 `XXX` 为协议名。`stream` 为编码结果。协议支持字段提取时，`values` 保存 `targetFields` 对应的值。支持哪些事件、字段提取和字段重命名，取决于目标协议。
 
-    该函数必须支持以下功能：
-    1. 对输入日志进行相应的转换
-    2. 能够根据`c.TagKeyRenameMap`重命名sls协议中LogTag字段的Key
-    3. 能够根据`targetFields`找到对应字段的值
-    4. 对于部分编码格式，能够根据`c.ProtocolKeyRenameMap`重命名协议字段的Key
+    实现 Log 转换时，可复用 `convertPipelineLogToMap` 读取事件内容、事件 Tag 和组 Tag，并按 `c.TagKeyRenameMap` 重命名 Tag。`findTargetValues` 可按 `content.XXX` 和 `tag.XXX` 从转换后的内容及 Tag 中取值。可参考 [单条协议转换实现](../../../../pkg/protocol/converter/converter_events.go)。
 
-    为了完成上述第2和第3点，LoongCollector 提供了下列帮助函数：
+3. 在 `pkg/protocol/converter/converter.go` 中新增协议常量，并在 `supportedEncodingMap` 中登记支持的编码方式。在 `ToByteStreamWithSelectedFields` 的 `switch` 中加入该协议，调用新增的转换方法。为新协议补充测试。
 
-    ```Go
-    func convertLogToMap(log *sls.Log, logTags []*sls.LogTag, src, topic string, tagKeyRenameMap map[string]string) (contents map[string]string, tags map[string]string)
-
-    func findTargetValues(targetFields []string, contents, tags, tagKeyRenameMap map[string]string) (values map[string]string, err error)
-    ```
-
-    各函数的用途如下：
-    - `convertLogToMap`：将符合sls协议的日志以及对应logGroup中的其他元信息转换成以map形式存储的`contents`和`tags`，同时根据`tagKeyRenameMap`重命名sls协议中LogTag字段的Key。
-    - `findTargetValues`：在`convertLogToMap`获得的`contents`和`tags`中寻找`targetFields`字段对应的值，如果`targetFields`中包含被更名的默认tag键，则寻找过程还需要借助`tagKeyRenameMap`。
-
-3. 在`./pkg/protocol/converter/converter.go`中，依次做出如下改变：
-
-    - 新增`protocolXXX`常量，“XXX”为协议名，常量的值也为协议名
-    - 如果协议支持新的编码方式，则新增`encodingXXX`常量，“XXX”为编码方式，常量的值也为编码方式
-    - 在`supportedEncodingMap`中，增加该协议支持的编码类型
-    - 在`c.DoWithSelectedFields`方法的`switch`语句中新增一个`case`子句，`case`名为协议名，子句内容为`return c.ConvertToXXXProtocolLogs(logGroup, targetFields)`，其中涉及的函数即为第2步中编写的函数
-    - 在`c.ToByteStreamWithSelectedFields`方法的`switch`语句中新增一个`case`子句，`case`名为协议名，子句内容为`return c.ConvertToXXXProtocolStream(logGroup, targetFields)`，其中涉及的函数即为第2步中编写的函数
-
-4. 在`./doc/cn/developer-guide/log-protocol/converter.md`的附录、`log-protocol.md`中增加协议相关内容，并在`./doc/cn/developer-guide/log-protocol/protocol-spec`文件夹下新增`<protocol>.md`文件描述具体的协议形式。
+4. 更新 [协议转换](converter.md) 和 [日志协议](log-protocol.md)，在 `protocol-spec` 目录中说明新增协议的具体格式。

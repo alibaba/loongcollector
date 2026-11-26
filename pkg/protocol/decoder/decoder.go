@@ -34,6 +34,7 @@ type Option struct {
 	FieldsExtend      bool
 	DisableUncompress bool
 	AllowUnsafeMode   bool
+	Tags              map[string]string
 }
 
 // GetDecoder return a new decoder for specific format
@@ -63,7 +64,7 @@ func GetDecoderWithOptions(format string, option Option) (extensions.Decoder, er
 		return &raw.Decoder{DisableUncompress: option.DisableUncompress}, nil
 
 	case common.ProtocolPyroscope:
-		return &pyroscope.Decoder{}, nil
+		return &pyroscope.Decoder{Tags: option.Tags}, nil
 	default:
 		return nil, fmt.Errorf("not supported format: %s", format)
 	}

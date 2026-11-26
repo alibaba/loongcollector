@@ -19,6 +19,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/alibaba/ilogtail/plugins/processor/internal/processortest"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -26,7 +28,6 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
 )
 
@@ -85,30 +86,22 @@ func newProcessor() (*ProcessorAnchor, error) {
 func TestSourceKey(t *testing.T) {
 	processor, err := newProcessor()
 	require.NoError(t, err)
-	log := &protocol.Log{Time: 0}
+	log := processortest.Log()
 	value := "time:2017.09.12 20:55:36" +
 		"\\tlevel:info" +
 		"\\tjson:{\"key1\" :\"xx\", \"key2\": false, \"key3\":123.456, \"key4\" : { \"inner1\" : 1, \"inner2\" : false}}" +
 		"\\tjson2:{\"key\" : { \"inner1\" : 1, \"inner2\" : false}}"
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "content", Value: value})
-	processor.ProcessLogs([]*protocol.Log{log})
-	assert.Equal(t, "time", log.Contents[0].Key)
-	assert.Equal(t, "level", log.Contents[1].Key)
-	assert.Equal(t, "val_key1", log.Contents[2].Key)
-	assert.Equal(t, "val_key2", log.Contents[3].Key)
-	assert.Equal(t, "val_key3", log.Contents[4].Key)
-	assert.Equal(t, "val_key4_inner1", log.Contents[5].Key)
-	assert.Equal(t, "val_key4_inner2", log.Contents[6].Key)
-	assert.Equal(t, "val2-key", log.Contents[7].Key)
+	log.Contents.Add("content", value)
+	processortest.Apply(processor, log)
 
-	assert.Equal(t, "2017.09.12 20:55:36", log.Contents[0].Value)
-	assert.Equal(t, "info", log.Contents[1].Value)
-	assert.Equal(t, "xx", log.Contents[2].Value)
-	assert.Equal(t, "false", log.Contents[3].Value)
-	assert.Equal(t, "123.456", log.Contents[4].Value)
-	assert.Equal(t, "1", log.Contents[5].Value)
-	assert.Equal(t, "false", log.Contents[6].Value)
-	assert.Equal(t, "{ \"inner1\" : 1, \"inner2\" : false}", log.Contents[7].Value)
+	assert.Equal(t, "2017.09.12 20:55:36", pipeline.GetStringValue(log.Contents.Get("time")))
+	assert.Equal(t, "info", pipeline.GetStringValue(log.Contents.Get("level")))
+	assert.Equal(t, "xx", pipeline.GetStringValue(log.Contents.Get("val_key1")))
+	assert.Equal(t, "false", pipeline.GetStringValue(log.Contents.Get("val_key2")))
+	assert.Equal(t, "123.456", pipeline.GetStringValue(log.Contents.Get("val_key3")))
+	assert.Equal(t, "1", pipeline.GetStringValue(log.Contents.Get("val_key4_inner1")))
+	assert.Equal(t, "false", pipeline.GetStringValue(log.Contents.Get("val_key4_inner2")))
+	assert.Equal(t, "{ \"inner1\" : 1, \"inner2\" : false}", pipeline.GetStringValue(log.Contents.Get("val2-key")))
 }
 
 func TestDescription(t *testing.T) {
@@ -133,9 +126,9 @@ func TestNoKeyError(t *testing.T) {
 	}
 	err := processor.Init(ctx)
 	require.NoError(t, err)
-	log := &protocol.Log{Time: 0}
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "test_key", Value: "test_value"})
-	processor.ProcessLog(log)
+	log := processortest.Log()
+	log.Contents.Add("test_key", "test_value")
+	processortest.Apply(processor, log)
 	memoryLog, ok := logger.ReadMemoryLog(1)
 	assert.True(t, ok)
 	assert.Equal(t, 1, logger.GetMemoryLogCount())
@@ -162,9 +155,9 @@ func TestNoAnchorErrorNoStart(t *testing.T) {
 	}
 	err := processor.Init(ctx)
 	require.NoError(t, err)
-	log := &protocol.Log{Time: 0}
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "content", Value: "json:{\"key\" : { \"inner1\" : 1, \"inner2\" : false}}"})
-	processor.ProcessLog(log)
+	log := processortest.Log()
+	log.Contents.Add("content", "json:{\"key\" : { \"inner1\" : 1, \"inner2\" : false}}")
+	processortest.Apply(processor, log)
 	memoryLog, ok := logger.ReadMemoryLog(1)
 	assert.True(t, ok)
 	assert.Equal(t, 1, logger.GetMemoryLogCount())
@@ -191,9 +184,9 @@ func TestNoAnchorErrorNoStop(t *testing.T) {
 	}
 	err := processor.Init(ctx)
 	require.NoError(t, err)
-	log := &protocol.Log{Time: 0}
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "content", Value: "json:{\"key\" : { \"inner1\" : 1, \"inner2\" : false}}"})
-	processor.ProcessLog(log)
+	log := processortest.Log()
+	log.Contents.Add("content", "json:{\"key\" : { \"inner1\" : 1, \"inner2\" : false}}")
+	processortest.Apply(processor, log)
 	memoryLog, ok := logger.ReadMemoryLog(1)
 	assert.True(t, ok)
 	assert.Equal(t, 1, logger.GetMemoryLogCount())
@@ -219,9 +212,9 @@ func TestIgnoreJSONError(t *testing.T) {
 	}
 	err := processor.Init(ctx)
 	require.NoError(t, err)
-	log := &protocol.Log{Time: 0}
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "content", Value: "json:{\"key\" : { \"inner1\" : 1, \"inner2\" : false}"})
-	processor.ProcessLog(log)
+	log := processortest.Log()
+	log.Contents.Add("content", "json:{\"key\" : { \"inner1\" : 1, \"inner2\" : false}")
+	processortest.Apply(processor, log)
 	memoryLog, ok := logger.ReadMemoryLog(1)
 	assert.True(t, ok)
 	assert.Equal(t, 1, logger.GetMemoryLogCount())
@@ -231,11 +224,10 @@ func TestIgnoreJSONError(t *testing.T) {
 func TestInit(t *testing.T) {
 	p := pipeline.Processors["processor_anchor"]()
 	assert.Equal(t, reflect.TypeOf(p).String(), "*anchor.ProcessorAnchor")
+	require.ErrorContains(t, p.Init(mock.NewEmptyContext("p", "l", "c")), "SourceKey")
 }
 
-// ---- v2 (PipelineEvent / SendPb) Process path tests ----
-
-func TestProcessorAnchor_ProcessV2Extracts(t *testing.T) {
+func TestProcessorAnchor_ProcessExtracts(t *testing.T) {
 	processor, err := newProcessor()
 	require.NoError(t, err)
 
@@ -266,7 +258,7 @@ func TestProcessorAnchor_ProcessV2Extracts(t *testing.T) {
 	assert.False(t, contents.Contains("content"), "source key must be removed when KeepSource is false")
 }
 
-func TestProcessorAnchor_ProcessV2KeepSource(t *testing.T) {
+func TestProcessorAnchor_ProcessKeepSource(t *testing.T) {
 	ctx := mock.NewEmptyContext("p", "l", "c")
 	processor := &ProcessorAnchor{
 		Anchors: []Anchor{
@@ -288,7 +280,7 @@ func TestProcessorAnchor_ProcessV2KeepSource(t *testing.T) {
 	assert.True(t, contents.Contains("content"), "source key must be kept when KeepSource is true")
 }
 
-func TestProcessorAnchor_ProcessV2PassesThroughMetric(t *testing.T) {
+func TestProcessorAnchor_ProcessPassesThroughMetric(t *testing.T) {
 	processor, err := newProcessor()
 	require.NoError(t, err)
 

@@ -15,12 +15,12 @@
 package anchor
 
 import (
+	"errors"
 	"strings"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pkg/util"
 
@@ -59,7 +59,6 @@ type Anchor struct {
 
 // ProcessorAnchor is a processor plugin to process field with anchors.
 // Field specified by SourceKey will be processed by all Anchors.
-// If no SourceKey is specified, the first field in log contents will be processed.
 type ProcessorAnchor struct {
 	Anchors       []Anchor
 	NoKeyError    bool
@@ -73,6 +72,9 @@ type ProcessorAnchor struct {
 
 // Init called for init some system resources, like socket, mutex...
 func (p *ProcessorAnchor) Init(context pipeline.Context) error {
+	if p.SourceKey == "" {
+		return errors.New("parameter SourceKey should not be empty")
+	}
 	p.context = context
 	for i := range p.Anchors {
 		switch p.Anchors[i].FieldType {
@@ -101,32 +103,6 @@ func (p *ProcessorAnchor) Init(context pipeline.Context) error {
 
 func (*ProcessorAnchor) Description() string {
 	return "anchor processor for logtail"
-}
-
-func (p *ProcessorAnchor) ProcessLogs(logArray []*protocol.Log) []*protocol.Log {
-	for _, log := range logArray {
-		p.ProcessLog(log)
-	}
-	return logArray
-}
-
-func (p *ProcessorAnchor) ProcessLog(log *protocol.Log) {
-	beginLen := len(log.Contents)
-	findKey := false
-	for i, cont := range log.Contents {
-		if len(p.SourceKey) == 0 || p.SourceKey == cont.Key {
-			findKey = true
-			if !p.KeepSource {
-				log.Contents = append(log.Contents[:i], log.Contents[i+1:]...)
-			}
-			p.ProcessAnchor(log, &cont.Value)
-			break
-		}
-	}
-	if !findKey && p.NoKeyError {
-		logger.Warning(p.context.GetRuntimeContext(), selfmonitor.AnchorFindAlarm, "anchor cannot find key", p.SourceKey)
-	}
-	p.logPairMetric.Add(int64(len(log.Contents) - beginLen + 1))
 }
 
 type ExpondParam struct {
@@ -161,15 +137,7 @@ func (p *ExpondParam) ExpondJSONCallBack(key []byte, value []byte, dataType json
 	return nil
 }
 
-func (p *ProcessorAnchor) ProcessAnchor(log *protocol.Log, val *string) {
-	p.applyAnchors(*val, func(key, value string) {
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: key, Value: value})
-	})
-}
-
-// applyAnchors runs every configured anchor against val and emits the extracted
-// key/value pairs via add. It is shared by the v1 (ProcessAnchor) and v2
-// (processLogEvent) paths so both stay behaviorally identical.
+// applyAnchors extracts fields from anchored content.
 func (p *ProcessorAnchor) applyAnchors(val string, add func(key, value string)) {
 	for _, anchor := range p.Anchors {
 		// Start is "", startIndex is 0
@@ -228,7 +196,7 @@ func init() {
 	}
 }
 
-// Process implements the v2 ProcessorV2 interface: for each Log event it applies
+// Process implements the Processor interface: for each Log event it applies
 // every configured anchor to the SourceKey value and writes the extracted
 // fields into the log contents; Metric/Span events pass through unchanged.
 func (p *ProcessorAnchor) Process(in *models.PipelineGroupEvents, context pipeline.PipelineContext) {

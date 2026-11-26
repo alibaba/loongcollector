@@ -19,9 +19,12 @@ package systemv2
 
 import (
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/alibaba/ilogtail/pkg/helper"
+	"github.com/alibaba/ilogtail/pkg/models"
 
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/plugins/test"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
 
 	"testing"
@@ -34,16 +37,16 @@ func TestInputSystem_CollectOpenFD(t *testing.T) {
 		t.Errorf("cannot init the mock process plugin: %v", err)
 		return
 	}
-	c := &test.MockMetricCollector{}
-	p.CollectOpenFD(c)
-	assert.Equal(t, 2, len(c.Logs))
+	ctx := helper.NewGroupedPipelineContext()
+	p.CollectOpenFD(ctx.Collector())
+	groups := ctx.Collector().ToArray()
+	require.Len(t, groups, 2)
 	m := make(map[string]string)
-	for _, log := range c.Logs {
-		for _, content := range log.Contents {
-			if content.Key == "__name__" {
-				m[content.Value] = "exist"
-			}
-		}
+	for _, group := range groups {
+		require.Len(t, group.Events, 1)
+		metric, ok := group.Events[0].(*models.Metric)
+		require.True(t, ok)
+		m[metric.GetName()] = "exist"
 	}
 	assert.NotEqual(t, "", m["fd_allocated"])
 	assert.NotEqual(t, "", m["fd_max"])

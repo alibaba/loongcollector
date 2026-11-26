@@ -20,7 +20,9 @@ import (
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/registry"
 
+	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
@@ -98,7 +100,7 @@ type EtwInput struct {
 	parsedGUID  windows.GUID
 	session     etwSession
 	context     pipeline.Context
-	collector   pipeline.Collector
+	collector   pipeline.PipelineCollector
 	hostname    string
 	domain      string
 	domainType  string
@@ -290,8 +292,8 @@ func (d *EtwInput) Description() string {
 	return "Generic ETW (Event Tracing for Windows) real-time event consumer"
 }
 
-func (d *EtwInput) Start(collector pipeline.Collector) error {
-	d.collector = collector
+func (d *EtwInput) StartService(ctx pipeline.PipelineContext) error {
+	d.collector = ctx.Collector()
 	d.resetStats()
 	stopCh := d.prepareRun()
 	d.waitGroup.Add(1)
@@ -588,6 +590,7 @@ func (d *EtwInput) currentStopCh() <-chan struct{} {
 
 func (d *EtwInput) processEvent(event etwEventData) {
 	fields := make(map[string]string, len(event.properties)+20)
+	fields["source"] = d.Source
 	fields["event_id"] = strconv.FormatUint(uint64(event.eventID), 10)
 	fields["opcode"] = strconv.FormatUint(uint64(event.opcode), 10)
 	fields["level"] = strconv.FormatUint(uint64(event.level), 10)
@@ -605,10 +608,9 @@ func (d *EtwInput) processEvent(event etwEventData) {
 		d.enrichDNSFields(fields, event.eventID)
 	}
 
-	tags := map[string]string{"source": d.Source}
 	d.collectorMu.Lock()
 	defer d.collectorMu.Unlock()
-	d.collector.AddData(tags, fields, event.timestamp)
+	d.collector.Collect(models.NewGroup(models.NewMetadata(), models.NewTags()), helper.NewInputLog(nil, fields, event.timestamp))
 }
 
 func normalizeETWFieldName(name string) string {

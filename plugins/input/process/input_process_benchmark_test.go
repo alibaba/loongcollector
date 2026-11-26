@@ -20,8 +20,9 @@ package process
 import (
 	"testing"
 
+	"github.com/alibaba/ilogtail/pkg/helper"
+
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/plugins/test"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
 )
 
@@ -37,11 +38,11 @@ func Benchmark_CollectDefault(b *testing.B) {
 		b.Errorf("cannot init the mock process plugin: %v", err)
 		return
 	}
-	c := &test.MockMetricCollector{}
-	_ = p.Collect(c)
+	c := helper.NewNoopPipelineContext()
+	_ = p.Read(c)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		if err := p.Collect(c); err != nil {
+		if err := p.Read(c); err != nil {
 			b.Errorf("error in collect process metrics: %v", err)
 			return
 		}

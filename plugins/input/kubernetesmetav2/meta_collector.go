@@ -18,14 +18,13 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
 const emptyJSONObjectString = "{}"
 
 type metaCollector struct {
 	serviceK8sMeta *ServiceK8sMeta
-	collector      pipeline.Collector
+	collector      pipeline.PipelineCollector
 
 	entityBuffer     chan models.PipelineEvent
 	entityLinkBuffer chan models.PipelineEvent
@@ -498,11 +497,10 @@ func (m *metaCollector) sendInBackground() {
 	entityGroup := &models.PipelineGroupEvents{}
 	linkGroup := &models.PipelineGroupEvents{}
 	sendFunc := func(group *models.PipelineGroupEvents) {
-		for _, e := range group.Events {
-			// TODO: temporary convert from event group back to log, will fix after pipeline support Go input to C++ processor
-			log := m.convertPipelineEvent2Log(e)
-			m.collector.AddRawLog(log)
+		for _, event := range group.Events {
+			m.collector.Collect(models.NewGroup(models.NewMetadata(), models.NewTags()), event)
 		}
+		clear(group.Events)
 		group.Events = group.Events[:0]
 	}
 	lastSendClusterTime := time.Now()
@@ -598,7 +596,7 @@ func (m *metaCollector) sendInBackground() {
 
 func (m *metaCollector) sendClusterEntity() {
 	clusterEntity := m.generateClusterEntity()
-	m.collector.AddRawLog(m.convertPipelineEvent2Log(clusterEntity))
+	m.collector.Collect(models.NewGroup(models.NewMetadata(), models.NewTags()), clusterEntity)
 }
 
 func (m *metaCollector) genKey(kind, namespace, name string) string {
@@ -613,9 +611,9 @@ func (m *metaCollector) genOtherKey(key string) string {
 }
 
 func (m *metaCollector) generateClusterEntity() models.PipelineEvent {
-	log := &models.Log{}
+	log := &models.Log{Tags: models.NewTags()}
 	log.Contents = models.NewLogContents()
-	log.Timestamp = uint64(time.Now().Unix())
+	log.Timestamp = uint64(time.Now().Truncate(time.Second).UnixNano())
 	log.Contents.Add(entityDomainFieldName, m.serviceK8sMeta.domain)
 	log.Contents.Add(entityTypeFieldName, m.genEntityTypeKey(clusterKindName))
 	log.Contents.Add(entityIDFieldName, m.genKey(clusterKindName, "", ""))
@@ -632,7 +630,7 @@ func (m *metaCollector) generateClusterEntity() models.PipelineEvent {
 
 func (m *metaCollector) generateEntityClusterLink(entityEvent models.PipelineEvent, linkRelationType string) models.PipelineEvent {
 	content := entityEvent.(*models.Log).Contents
-	log := &models.Log{}
+	log := &models.Log{Tags: models.NewTags()}
 	log.Contents = models.NewLogContents()
 	log.Contents.Add(entityLinkSrcDomainFieldName, m.serviceK8sMeta.domain)
 	log.Contents.Add(entityLinkSrcEntityTypeFieldName, m.genEntityTypeKey(clusterKindName))
@@ -645,36 +643,15 @@ func (m *metaCollector) generateEntityClusterLink(entityEvent models.PipelineEve
 
 	log.Contents.Add(entityFirstObservedTimeFieldName, content.Get(entityFirstObservedTimeFieldName))
 	log.Contents.Add(entityLastObservedTimeFieldName, content.Get(entityLastObservedTimeFieldName))
-	log.Contents.Add(entityKeepAliveSecondsFieldName, m.serviceK8sMeta.Interval*2)
+	log.Contents.Add(entityKeepAliveSecondsFieldName, strconv.FormatInt(int64(m.serviceK8sMeta.Interval*2), 10))
 	log.Contents.Add(entityCategoryFieldName, defaultEntityLinkCategory)
-	log.Timestamp = uint64(time.Now().Unix())
+	log.Timestamp = uint64(time.Now().Truncate(time.Second).UnixNano())
 	return log
 }
 
 func (m *metaCollector) genEntityTypeKey(kind string) string {
 	// assert domain is initialized
 	return m.serviceK8sMeta.domain + "." + strings.ToLower(kind)
-}
-
-func (m *metaCollector) convertPipelineEvent2Log(event models.PipelineEvent) *protocol.Log {
-	if modelLog, ok := event.(*models.Log); ok {
-		log := &protocol.Log{}
-		log.Contents = make([]*protocol.Log_Content, 0)
-		for k, v := range modelLog.Contents.Iterator() {
-			if _, ok := v.(string); !ok {
-				if intValue, ok := v.(int); !ok {
-					logger.Warning(context.Background(), k8smeta.K8sMetaUnifyErrorCode, "convert event to log fail, value is not string", v, "key", k)
-					continue
-				} else {
-					v = strconv.Itoa(intValue)
-				}
-			}
-			log.Contents = append(log.Contents, &protocol.Log_Content{Key: k, Value: v.(string)})
-		}
-		protocol.SetLogTime(log, uint32(modelLog.GetTimestamp()))
-		return log
-	}
-	return nil
 }
 
 func isEntity(resourceType string) bool {

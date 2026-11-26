@@ -35,24 +35,20 @@ import (
 )
 
 const (
-	v1 = iota
-	v2
+	name           = "service_http_server"
+	defaultDecoder = "ext_default_decoder"
 )
-
-const name = "service_http_server"
 
 // ServiceHTTP ...
 type ServiceHTTP struct {
-	context     pipeline.Context
-	collector   pipeline.Collector
-	decoder     extensions.Decoder
-	server      *http.Server
-	listener    net.Listener
-	wg          sync.WaitGroup
-	collectorV2 pipeline.PipelineCollector
-	version     int8
-	paramCount  int
-	dumper      *helper.Dumper
+	context    pipeline.Context
+	collector  pipeline.PipelineCollector
+	decoder    extensions.Decoder
+	server     *http.Server
+	listener   net.Listener
+	wg         sync.WaitGroup
+	paramCount int
+	dumper     *helper.Dumper
 
 	DumpDataKeepFiles  int
 	DumpData           bool   // would dump the received data to a local file, which is only used to valid data by the developers.
@@ -67,9 +63,8 @@ type ServiceHTTP struct {
 	FieldsExtend       bool
 	DisableUncompress  bool
 	AllowUnsafeMode    bool
-	Tags               map[string]string // todo for v2
+	Tags               map[string]string // Additional tags for Pyroscope profiles.
 
-	// params below works only for version v2
 	QueryParams       []string
 	HeaderParams      []string
 	QueryParamPrefix  string
@@ -86,11 +81,13 @@ func (s *ServiceHTTP) Init(context pipeline.Context) (int, error) {
 		FieldsExtend      bool
 		DisableUncompress bool
 		AllowUnsafeMode   bool
+		Tags              map[string]string `json:",omitempty"`
 	}{
 		Format:            s.Format,
 		FieldsExtend:      s.FieldsExtend,
 		DisableUncompress: s.DisableUncompress,
 		AllowUnsafeMode:   s.AllowUnsafeMode,
+		Tags:              s.Tags,
 	}
 	ext, err := context.GetExtension(s.Decoder, options)
 	if err != nil {
@@ -131,12 +128,6 @@ func (s *ServiceHTTP) Description() string {
 	return "HTTP service input plugin for logtail"
 }
 
-// Collect takes in an accumulator and adds the metrics that the Input
-// gathers. This is called every "interval"
-func (s *ServiceHTTP) Collect(pipeline.Collector) error {
-	return nil
-}
-
 func (s *ServiceHTTP) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.ContentLength > s.MaxBodySize {
 		TooLarge(w)
@@ -168,31 +159,32 @@ func (s *ServiceHTTP) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			},
 		}
 	}
-	switch s.version {
-	case v1:
-		logs, err := s.decoder.Decode(data, r, s.Tags)
-		if err != nil {
-			logger.Warning(s.context.GetRuntimeContext(), selfmonitor.DecodeBodyFailAlarm, "decode body failed", err, "request", r.URL.String())
-			BadRequest(w)
-			return
-		}
-		for _, log := range logs {
-			s.collector.AddRawLog(log)
-		}
-	case v2:
-		groups, err := s.decoder.DecodeV2(data, r)
-		if err != nil {
-			logger.Warning(s.context.GetRuntimeContext(), selfmonitor.DecodeBodyFailAlarm, "decode body failed", err, "request", r.URL.String())
-			BadRequest(w)
-			return
-		}
-		if reqParams := s.extractRequestParams(r); len(reqParams) != 0 {
-			for _, g := range groups {
-				g.Group.Metadata.Merge(models.NewMetadataWithMap(reqParams))
+	groups, err := s.decoder.Decode(data, r)
+	if err != nil {
+		logger.Warning(s.context.GetRuntimeContext(), selfmonitor.DecodeBodyFailAlarm, "decode body failed", err, "request", r.URL.String())
+		BadRequest(w)
+		return
+	}
+	decoderType, _, _ := strings.Cut(s.Decoder, "/")
+	if decoderType == defaultDecoder && strings.EqualFold(strings.TrimSpace(s.Format), common.ProtocolRaw) {
+		// The raw protocol decoder is shared with inputs that emit bytes.
+		for _, group := range groups {
+			for i, event := range group.Events {
+				if body, ok := event.(models.ByteArray); ok {
+					log := models.NewLogWithOrderedContents(1)
+					log.Timestamp = uint64(time.Now().Truncate(time.Second).UnixNano())
+					log.Contents.Add(models.ContentKey, string(body))
+					group.Events[i] = log
+				}
 			}
 		}
-		s.collectorV2.CollectList(groups...)
 	}
+	if reqParams := s.extractRequestParams(r); len(reqParams) != 0 {
+		for _, group := range groups {
+			group.Group.Metadata.Merge(models.NewMetadataWithMap(reqParams))
+		}
+	}
+	s.collector.CollectList(groups...)
 
 	switch s.Format {
 	case common.ProtocolSLS:
@@ -228,22 +220,9 @@ func BadRequest(res http.ResponseWriter) {
 	_, _ = res.Write([]byte(`{"error":"http: bad request"}`))
 }
 
-// Start starts the ServiceInput's service, whatever that may be
-func (s *ServiceHTTP) Start(c pipeline.Collector) error {
-	s.collector = c
-	s.version = v1
-	return s.start()
-}
-
-// StartService start the ServiceInput's service by plugin runner v2
-func (s *ServiceHTTP) StartService(context pipeline.PipelineContext) error {
-	s.collectorV2 = context.Collector()
-	s.version = v2
-	return s.start()
-}
-
-func (s *ServiceHTTP) start() error {
-	s.wg.Add(1)
+// StartService starts the HTTP listener and sends decoded event groups to the pipeline.
+func (s *ServiceHTTP) StartService(ctx pipeline.PipelineContext) error {
+	s.collector = ctx.Collector()
 
 	server := &http.Server{
 		Addr:        s.Address,
@@ -275,6 +254,7 @@ func (s *ServiceHTTP) start() error {
 	}
 	s.listener = listener
 	s.server = server
+	s.wg.Add(1)
 	go func() {
 		logger.Info(s.context.GetRuntimeContext(), "http server start", s.Address, "listener", listener.Addr().String())
 		err := server.Serve(listener)
@@ -340,7 +320,7 @@ func (s *ServiceHTTP) Stop() error {
 func init() {
 	pipeline.ServiceInputs[name] = func() pipeline.ServiceInput {
 		return &ServiceHTTP{
-			Decoder:            "ext_default_decoder",
+			Decoder:            defaultDecoder,
 			ReadTimeoutSec:     10,
 			ShutdownTimeoutSec: 5,
 			MaxBodySize:        64 * 1024 * 1024,

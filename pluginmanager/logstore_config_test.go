@@ -32,7 +32,6 @@ import (
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
-	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/plugins/extension/basicauth"
 	"github.com/alibaba/ilogtail/plugins/input"
 	"github.com/alibaba/ilogtail/plugins/processor/regex"
@@ -117,7 +116,8 @@ func (s *logstoreConfigTestSuite) TestPluginGlobalConfig() {
 	s.Equal(config.GlobalConfig.InputIntervalMs, 9999)
 	s.Equal(config.GlobalConfig.FlushIntervalMs, 323)
 	s.Equal(config.PluginRunner.(*pluginRunner).MetricPlugins[0].Interval, time.Duration(9999)*time.Millisecond)
-	s.Empty(config.PluginRunner.(*pluginRunner).AggregatorPlugins)
+	s.Len(config.PluginRunner.(*pluginRunner).AggregatorPlugins, 1)
+	s.Equal(369*time.Millisecond, config.PluginRunner.(*pluginRunner).AggregatorPlugins[0].Interval)
 	s.Equal(config.PluginRunner.(*pluginRunner).FlusherPlugins[0].Interval, time.Duration(323)*time.Millisecond)
 }
 
@@ -398,39 +398,6 @@ func Test_hasDockerStdoutInput(t *testing.T) {
 	}
 }
 
-func Test_extractTagsToLogTags(t *testing.T) {
-	logTag := extractTagsToLogTags([]byte("k1~=~v1^^^k2~=~v2"))
-	assert.Equal(t, logTag[0].Key, "k1")
-	assert.Equal(t, logTag[0].Value, "v1")
-	assert.Equal(t, logTag[1].Key, "k2")
-	assert.Equal(t, logTag[1].Value, "v2")
-
-	logTag = extractTagsToLogTags([]byte("^^^k2~=~v2"))
-	assert.Equal(t, logTag[0].Key, "k2")
-	assert.Equal(t, logTag[0].Value, "v2")
-
-	logTag = extractTagsToLogTags([]byte("^^^k2"))
-	assert.Equal(t, logTag[0].Key, "__tag__:__prefix__0")
-	assert.Equal(t, logTag[0].Value, "k2")
-}
-
-func TestLogstoreConfig_ProcessRawLogV2(t *testing.T) {
-	for _, rawTags := range []string{"", "k1~=~v1^^^k2~=~v2", "^^^k2~=~v2", "^^^k2^^^k3"} {
-		t.Run(rawTags, func(t *testing.T) {
-			runner := &rawLogCaptureRunner{LogsChan: make(chan *pipeline.LogWithContext, 1)}
-			config := &LogstoreConfig{PluginRunner: runner}
-			assert.Equal(t, 0, config.ProcessRawLogV2([]byte("12345"), "pack", "topic", []byte(rawTags)))
-			in := <-runner.LogsChan
-			require.Len(t, in.Log.Contents, 2)
-			assert.Equal(t, "12345", in.Log.Contents[0].Value)
-			assert.Equal(t, "topic", in.Log.Contents[1].Value)
-			assert.Equal(t, "pack", in.Context["source"])
-			assert.Equal(t, "topic", in.Context["topic"])
-			assert.Equal(t, extractTagsToLogTags([]byte(rawTags)), in.Context["tags"])
-		})
-	}
-}
-
 func Test_genPluginMeta(t *testing.T) {
 	l := new(LogstoreConfig)
 	{
@@ -486,15 +453,6 @@ func TestUnknownInputFailsConfiguration(t *testing.T) {
 	}
 }
 
-// Capture the public raw-log input boundary independently of its runtime.
-type rawLogCaptureRunner struct {
-	PluginRunner
-	LogstoreConfig *LogstoreConfig
-	LogsChan       chan *pipeline.LogWithContext
-}
-
-func (r *rawLogCaptureRunner) ReceiveRawLog(log *pipeline.LogWithContext) { r.LogsChan <- log }
-
 func TestLogstoreConfig_ProcessPipelineEventGroup_Topic(t *testing.T) {
 	tests := []struct {
 		name string
@@ -530,4 +488,16 @@ func TestLogstoreConfig_ProcessPipelineEventGroup_Topic(t *testing.T) {
 			assert.IsType(t, &models.Log{}, ctx.logs[0].Events[0])
 		})
 	}
+}
+
+func TestLogstoreConfigProcessPipelineEventGroupErrorStatus(t *testing.T) {
+	ctx := &mockContect{}
+	lc := &LogstoreConfig{Context: &ContextImp{}}
+	lc.Context.InitContext("", "", "native-errors")
+	lc.PluginRunner = &pluginRunner{LogstoreConfig: lc, InputPipeContext: ctx}
+	// A truncated protobuf varint must be reported to the native caller.
+	require.Equal(t, -1, lc.ProcessPipelineEventGroup([]byte{0x80}, "pack"))
+	// An empty message decodes but has no supported event type.
+	require.Equal(t, 0, lc.ProcessPipelineEventGroup(nil, "pack"))
+	require.Empty(t, ctx.logs)
 }

@@ -21,22 +21,22 @@ import (
 
 	"google.golang.org/grpc/metadata"
 
+	"github.com/alibaba/ilogtail/pkg/helper"
 	v3 "github.com/alibaba/ilogtail/plugins/input/skywalkingv3/skywalking/network/common/v3"
 	logging "github.com/alibaba/ilogtail/plugins/input/skywalkingv3/skywalking/network/logging/v3"
-	"github.com/alibaba/ilogtail/plugins/test"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
 )
 
 func TestJsonLogging(t *testing.T) {
 	ctx := mock.NewEmptyContext("p", "l", "c")
 	ctx.InitContext("a", "b", "c")
-	collector := &test.MockCollector{}
+	collector := helper.NewObservePipelineContext(256).Collector()
 
 	handler := &loggingHandler{ctx, collector}
 
 	handler.Collect(&MockRequest{1})
 
-	validate("./testdata/logging.json", collector.RawLogs, t)
+	validate("./testdata/logging.json", collector.ToArray(), t)
 }
 
 type MockRequest struct {

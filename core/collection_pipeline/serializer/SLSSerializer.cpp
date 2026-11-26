@@ -14,7 +14,9 @@
 
 #include "collection_pipeline/serializer/SLSSerializer.h"
 
+#include <algorithm>
 #include <array>
+#include <chrono>
 #include <vector>
 
 #include "rapidjson/stringbuffer.h"
@@ -22,6 +24,7 @@
 
 #include "collection_pipeline/serializer/JsonSerializer.h"
 #include "common/Flags.h"
+#include "common/HashUtil.h"
 #include "common/StringTools.h"
 #include "common/compression/CompressType.h"
 #include "constants/Constants.h"
@@ -29,6 +32,8 @@
 #include "logger/Logger.h"
 #include "models/MetricValue.h"
 #include "plugin/flusher/sls/FlusherSLS.h"
+#include "plugin/flusher/sls/PackIdManager.h"
+#include "protobuf/models/pipeline_event_group.pb.h"
 
 DECLARE_FLAG_INT32(max_send_log_group_size);
 
@@ -159,7 +164,361 @@ void SerializeSpanAttributesToString(const SpanEvent& event, std::string& result
     result.assign(buffer.GetString(), buffer.GetSize());
 }
 
+namespace {
+
+bool ConsumeWireTag(StringView& wire, char tag) {
+    if (wire.empty() || wire.front() != tag) {
+        return false;
+    }
+    wire.remove_prefix(1);
+    return true;
+}
+
+bool ConsumeWireVarint(StringView& wire, uint64_t& value) {
+    value = 0;
+    for (size_t i = 0; i < wire.size() && i < 10; ++i) {
+        const auto byte = static_cast<uint8_t>(wire[i]);
+        if (i == 9 && byte > 1) {
+            return false;
+        }
+        value |= uint64_t(byte & 0x7f) << (i * 7);
+        if (byte < 0x80) {
+            // A noncanonical encoding is accepted by the fallback parser.
+            if (i != 0 && byte == 0) {
+                return false;
+            }
+            wire.remove_prefix(i + 1);
+            return true;
+        }
+    }
+    return false;
+}
+
+bool ConsumeWireBytes(StringView& wire, StringView& value) {
+    uint64_t size;
+    if (!ConsumeWireVarint(wire, size) || size > wire.size()) {
+        return false;
+    }
+    value = wire.substr(0, static_cast<size_t>(size));
+    wire.remove_prefix(static_cast<size_t>(size));
+    return true;
+}
+
+bool ParseSLSLogWire(StringView event, SLSLogGroupWireView& result) {
+    uint64_t timestamp = 0;
+    if (ConsumeWireTag(event, 0x08) && !ConsumeWireVarint(event, timestamp)) {
+        return false;
+    }
+    const auto contentsBegin = event;
+    // A group's native log conversion uses the first key position and last
+    // value for duplicates. Delegate duplicates and wider logs to that path.
+    array<StringView, 16> keys;
+    auto keysEnd = keys.begin();
+    size_t contentSize = 0;
+    while (ConsumeWireTag(event, 0x12)) {
+        StringView field, key, value;
+        if (keysEnd == keys.end() || !ConsumeWireBytes(event, field) || !ConsumeWireTag(field, 0x0a)
+            || !ConsumeWireBytes(field, key) || !ConsumeWireTag(field, 0x12) || !ConsumeWireBytes(field, value)
+            || !field.empty() || find(keys.begin(), keysEnd, key) != keysEnd) {
+            return false;
+        }
+        *keysEnd++ = key;
+        contentSize += key.size() + value.size();
+    }
+    // PEG and SLS use the same wire fields for Contents, Key, and Value.
+    auto contents = contentsBegin.substr(0, contentsBegin.size() - event.size());
+    StringView level;
+    uint64_t ignored;
+    if ((ConsumeWireTag(event, 0x1a) && !ConsumeWireBytes(event, level))
+        || (ConsumeWireTag(event, 0x20) && !ConsumeWireVarint(event, ignored))
+        || (ConsumeWireTag(event, 0x28) && !ConsumeWireVarint(event, ignored)) || !event.empty()) {
+        return false;
+    }
+    ++result.mEventCount;
+    result.mLogInputSize += LogEvent::DataSizeForContents(contentSize);
+    if (!contents.empty()) {
+        result.mLogs.push_back({timestamp, contents});
+    }
+    return true;
+}
+
+optional<string> ReservePackId(const SLSLogGroupOptions& options, size_t availableBytes) {
+    const string source = options.mPackIdPrefix.to_string();
+    string prefix = ToHexString(HashString(source)) + "-";
+    // Pack sequences are uint32_t and are written without leading zeroes.
+    // Reject an oversized group before reserving a sequence, including at
+    // boundaries where the next sequence needs an extra hexadecimal digit.
+    size_t digits = 8;
+    while (GetLogTagSize(LOG_RESERVED_KEY_PACKAGE_ID.size(), prefix.size() + digits) > availableBytes) {
+        if (--digits == 0) {
+            return nullopt;
+        }
+    }
+    const uint32_t maxSequence = (uint64_t{1} << (4 * digits)) - 1;
+    string sequenceSource = source + "_" + options.mProject.to_string() + "_" + options.mLogstore.to_string();
+    const auto sequence = PackIdManager::GetInstance()->TryGetAndIncPackSeq(HashString(sequenceSource), maxSequence);
+    if (!sequence) {
+        return nullopt;
+    }
+    prefix += ToHexString(*sequence);
+    return prefix;
+}
+
+bool PrepareSLSLogGroup(LogGroupSerializer& serializer,
+                        const GroupTags& tags,
+                        size_t logGroupSize,
+                        string& errorMsg,
+                        SLSLogGroupOptions* options,
+                        string& packId) {
+    if (logGroupSize == 0) {
+        errorMsg = "all empty logs";
+        return false;
+    }
+
+    for (const auto& tag : tags) {
+        if (tag.first == LOG_RESERVED_KEY_TOPIC || tag.first == LOG_RESERVED_KEY_SOURCE
+            || tag.first == LOG_RESERVED_KEY_MACHINE_UUID) {
+            logGroupSize += GetStringSize(tag.second.size());
+        } else if (options == nullptr || tag.first != LOG_RESERVED_KEY_PACKAGE_ID) {
+            logGroupSize += GetLogTagSize(tag.first.size(), tag.second.size());
+        }
+    }
+
+    const auto limit = INT32_FLAG(max_send_log_group_size);
+    if (limit > 0 && logGroupSize <= static_cast<size_t>(limit)) {
+        if (options == nullptr) {
+            serializer.Prepare(logGroupSize);
+            return true;
+        }
+        if (auto reserved = ReservePackId(*options, static_cast<size_t>(limit) - logGroupSize)) {
+            packId = std::move(*reserved);
+            serializer.Prepare(logGroupSize + GetLogTagSize(LOG_RESERVED_KEY_PACKAGE_ID.size(), packId.size()));
+            return true;
+        }
+    }
+
+    if (options != nullptr) {
+        options->mExceedsSizeLimit = true;
+    }
+    errorMsg = "log group exceeds size limit\tgroup size before generated pack ID: " + ToString(logGroupSize)
+        + "\tsize limit: " + ToString(limit);
+    return false;
+}
+
+void SerializeSLSLogGroupTags(LogGroupSerializer& serializer, const GroupTags& tags, const string& packId) {
+    bool packIdPending = !packId.empty();
+    for (const auto& tag : tags) {
+        if (packIdPending && !(tag.first < LOG_RESERVED_KEY_PACKAGE_ID)) {
+            serializer.AddLogTag(LOG_RESERVED_KEY_PACKAGE_ID, packId);
+            packIdPending = false;
+        }
+        if (tag.first == LOG_RESERVED_KEY_TOPIC) {
+            serializer.AddTopic(tag.second);
+        } else if (tag.first == LOG_RESERVED_KEY_SOURCE) {
+            serializer.AddSource(tag.second);
+        } else if (tag.first == LOG_RESERVED_KEY_MACHINE_UUID) {
+            serializer.AddMachineUUID(tag.second);
+        } else if (packId.empty() || tag.first != LOG_RESERVED_KEY_PACKAGE_ID) {
+            serializer.AddLogTag(tag.first, tag.second);
+        }
+    }
+    if (packIdPending) {
+        serializer.AddLogTag(LOG_RESERVED_KEY_PACKAGE_ID, packId);
+    }
+}
+
+bool FinishSLSLogGroup(LogGroupSerializer& serializer,
+                       const GroupTags& tags,
+                       const string& packId,
+                       string& result,
+                       string& errorMsg,
+                       SLSLogGroupOptions* options) {
+    SerializeSLSLogGroupTags(serializer, tags, packId);
+    const auto limit = INT32_FLAG(max_send_log_group_size);
+    if (limit <= 0 || serializer.GetResult().size() > static_cast<size_t>(limit)) {
+        if (options != nullptr) {
+            options->mExceedsSizeLimit = true;
+        }
+        errorMsg = "serialized log group exceeds size limit";
+        return false;
+    }
+    result = std::move(serializer.GetResult());
+    return true;
+}
+
+const bool* RetryableSizeRejection(const SLSLogGroupOptions* options) {
+    return options != nullptr && options->mCanSplit ? &options->mExceedsSizeLimit : nullptr;
+}
+
+} // namespace
+
+std::optional<SLSLogGroupWireView> SLSLogGroupWireView::Parse(StringView wire, size_t eventCountHint) {
+    const auto original = wire;
+    StringView mapEntry;
+    // Decode metadata and tags with the generated parser. Only the last,
+    // single logs field is handled by the borrowed view.
+    while (ConsumeWireTag(wire, 0x0a) || ConsumeWireTag(wire, 0x12)) {
+        if (!ConsumeWireBytes(wire, mapEntry)) {
+            return nullopt;
+        }
+    }
+    SLSLogGroupWireView group;
+    group.mHeader = original.substr(0, original.size() - wire.size());
+    StringView logs;
+    if (!ConsumeWireTag(wire, 0x1a) || !ConsumeWireBytes(wire, logs) || !wire.empty()) {
+        return nullopt;
+    }
+    group.mLogs.reserve(min({eventCountHint, logs.size() / 2, size_t{1024}}));
+    while (ConsumeWireTag(logs, 0x0a)) {
+        StringView event;
+        if (!ConsumeWireBytes(logs, event) || !ParseSLSLogWire(event, group)) {
+            return nullopt;
+        }
+    }
+    if (!logs.empty()) {
+        return nullopt;
+    }
+    return group;
+}
+
+bool SLSEventGroupSerializer::DoSerializePBLogWire(const SLSLogGroupWireView& group,
+                                                   const GroupTags& tags,
+                                                   size_t originalTagSize,
+                                                   string& res,
+                                                   string& errorMsg,
+                                                   SLSLogGroupOptions* options) {
+    const size_t inputSize = sizeof(EventsContainer) + originalTagSize + group.mLogInputSize;
+    return SerializeWithMetrics(
+        inputSize,
+        res,
+        [&] {
+            const bool enableNs = mFlusher->GetContext().GetGlobalConfig().mEnableTimestampNanosecond;
+            size_t groupSize = 0;
+            for (const auto& log : group.mLogs) {
+                size_t logSize;
+                groupSize += GetLogSize(log.mContents.size(), enableNs, logSize);
+            }
+            LogGroupSerializer serializer;
+            string packId;
+            if (!PrepareSLSLogGroup(serializer, tags, groupSize, errorMsg, options, packId)) {
+                return false;
+            }
+            for (const auto& log : group.mLogs) {
+                size_t logSize;
+                GetLogSize(log.mContents.size(), enableNs, logSize);
+                const chrono::nanoseconds timestamp(log.mTimestamp);
+                const auto seconds = chrono::duration_cast<chrono::seconds>(timestamp);
+                serializer.StartToAddLog(logSize);
+                serializer.AddLogTime(seconds.count());
+                serializer.GetResult().append(log.mContents.data(), log.mContents.size());
+                if (enableNs) {
+                    serializer.AddLogTimeNs((timestamp - seconds).count());
+                }
+            }
+            return FinishSLSLogGroup(serializer, tags, packId, res, errorMsg, options);
+        },
+        RetryableSizeRejection(options));
+}
+
+bool SLSEventGroupSerializer::DoSerializePBLogs(const models::PipelineEventGroup& group,
+                                                const GroupTags& tags,
+                                                size_t originalTagSize,
+                                                string& res,
+                                                string& errorMsg,
+                                                SLSLogGroupOptions* options) {
+    const auto& events = group.logs().events();
+    // BatchedEvents measures the input before the flusher adds the PackId.
+    size_t inputSize = sizeof(EventsContainer) + originalTagSize;
+    return SerializeWithMetrics(
+        inputSize,
+        res,
+        [&] {
+            struct LogSlice {
+                size_t mSize;
+                size_t mContentsEnd;
+            };
+            vector<LogSlice> logs;
+            logs.reserve(events.size());
+            vector<const models::LogEvent::Content*> contents;
+            contents.reserve(events.size());
+
+            const bool enableNs = mFlusher->GetContext().GetGlobalConfig().mEnableTimestampNanosecond;
+            size_t logGroupSize = 0;
+            for (const auto& event : events) {
+                const auto contentsBegin = contents.size();
+                size_t fieldSize = 0;
+                size_t contentSize = 0;
+                for (const auto& content : event.contents()) {
+                    const auto existing = find_if(contents.begin() + contentsBegin,
+                                                  contents.end(),
+                                                  [&](const auto* item) { return item->key() == content.key(); });
+                    if (existing != contents.end()) {
+                        // LogEvent::SetContentNoCopy keeps the first position and the last value.
+                        fieldSize -= GetLogContentSize((*existing)->key().size(), (*existing)->value().size());
+                        contentSize -= (*existing)->key().size() + (*existing)->value().size();
+                        *existing = &content;
+                    } else {
+                        contents.emplace_back(&content);
+                    }
+                    fieldSize += GetLogContentSize(content.key().size(), content.value().size());
+                    contentSize += content.key().size() + content.value().size();
+                }
+                inputSize += LogEvent::DataSizeForContents(contentSize);
+                size_t logSize = 0;
+                if (contentsBegin != contents.size()) {
+                    logGroupSize += GetLogSize(fieldSize, enableNs, logSize);
+                }
+                logs.push_back({logSize, contents.size()});
+            }
+
+            LogGroupSerializer serializer;
+            string packId;
+            if (!PrepareSLSLogGroup(serializer, tags, logGroupSize, errorMsg, options, packId)) {
+                return false;
+            }
+
+            size_t contentIndex = 0;
+            for (int i = 0; i < events.size(); ++i) {
+                if (logs[i].mSize == 0) {
+                    continue;
+                }
+                const chrono::nanoseconds timestamp(events[i].timestamp());
+                const auto seconds = chrono::duration_cast<chrono::seconds>(timestamp);
+                serializer.StartToAddLog(logs[i].mSize);
+                serializer.AddLogTime(seconds.count());
+                for (; contentIndex < logs[i].mContentsEnd; ++contentIndex) {
+                    const auto& content = *contents[contentIndex];
+                    serializer.AddLogContent(content.key(), content.value());
+                }
+                if (enableNs) {
+                    serializer.AddLogTimeNs((timestamp - seconds).count());
+                }
+            }
+            return FinishSLSLogGroup(serializer, tags, packId, res, errorMsg, options);
+        },
+        RetryableSizeRejection(options));
+}
+
 bool SLSEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, string& errorMsg) {
+    return SerializeGroup(group, res, errorMsg, nullptr);
+}
+
+bool SLSEventGroupSerializer::DoSerializeEventGroup(BatchedEvents& group,
+                                                    string& res,
+                                                    string& errorMsg,
+                                                    SLSLogGroupOptions& options) {
+    const auto inputSize = GetInputSize(group);
+    return SerializeWithMetrics(
+        inputSize,
+        res,
+        [&] { return SerializeGroup(group, res, errorMsg, &options); },
+        RetryableSizeRejection(&options));
+}
+
+bool SLSEventGroupSerializer::SerializeGroup(BatchedEvents& group,
+                                             string& res,
+                                             string& errorMsg,
+                                             SLSLogGroupOptions* options) {
     if (group.mEvents.empty()) {
         errorMsg = "empty event group";
         return false;
@@ -176,8 +535,8 @@ bool SLSEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, stri
 
     // caculate serialized logGroup size first, where some critical results can be cached
     vector<size_t> logSZ(group.mEvents.size());
-    vector<MetricEventContentCacheItem> metricEventContentCache(group.mEvents.size());
-    vector<array<string, 6>> spanEventContentCache(group.mEvents.size());
+    vector<MetricEventContentCacheItem> metricEventContentCache;
+    vector<array<string, 6>> spanEventContentCache;
     size_t logGroupSZ = 0;
     switch (eventType) {
         case PipelineEvent::Type::LOG: {
@@ -185,10 +544,12 @@ bool SLSEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, stri
             break;
         }
         case PipelineEvent::Type::METRIC: {
+            metricEventContentCache.resize(group.mEvents.size());
             CalculateMetricEventSize(group, logGroupSZ, metricEventContentCache, logSZ);
             break;
         }
         case PipelineEvent::Type::SPAN:
+            spanEventContentCache.resize(group.mEvents.size());
             CalculateSpanEventSize(group, logGroupSZ, spanEventContentCache, logSZ);
             break;
         case PipelineEvent::Type::RAW:
@@ -197,29 +558,11 @@ bool SLSEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, stri
         default:
             break;
     }
-    if (logGroupSZ == 0) {
-        errorMsg = "all empty logs";
-        return false;
-    }
-
-    // loggroup.category is deprecated, no need to set
-    for (const auto& tag : group.mTags.mInner) {
-        if (tag.first == LOG_RESERVED_KEY_TOPIC || tag.first == LOG_RESERVED_KEY_SOURCE
-            || tag.first == LOG_RESERVED_KEY_MACHINE_UUID) {
-            logGroupSZ += GetStringSize(tag.second.size());
-        } else {
-            logGroupSZ += GetLogTagSize(tag.first.size(), tag.second.size());
-        }
-    }
-
-    if (static_cast<int32_t>(logGroupSZ) > INT32_FLAG(max_send_log_group_size)) {
-        errorMsg = "log group exceeds size limit\tgroup size: " + ToString(logGroupSZ)
-            + "\tsize limit: " + ToString(INT32_FLAG(max_send_log_group_size));
-        return false;
-    }
-
     thread_local LogGroupSerializer serializer;
-    serializer.Prepare(logGroupSZ);
+    string packId;
+    if (!PrepareSLSLogGroup(serializer, group.mTags.mInner, logGroupSZ, errorMsg, options, packId)) {
+        return false;
+    }
     switch (eventType) {
         case PipelineEvent::Type::LOG:
             SerializeLogEvent(serializer, group, logSZ, enableNs);
@@ -236,19 +579,7 @@ bool SLSEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, stri
         default:
             break;
     }
-    for (const auto& tag : group.mTags.mInner) {
-        if (tag.first == LOG_RESERVED_KEY_TOPIC) {
-            serializer.AddTopic(tag.second);
-        } else if (tag.first == LOG_RESERVED_KEY_SOURCE) {
-            serializer.AddSource(tag.second);
-        } else if (tag.first == LOG_RESERVED_KEY_MACHINE_UUID) {
-            serializer.AddMachineUUID(tag.second);
-        } else {
-            serializer.AddLogTag(tag.first, tag.second);
-        }
-    }
-    res = std::move(serializer.GetResult());
-    return true;
+    return FinishSLSLogGroup(serializer, group.mTags.mInner, packId, res, errorMsg, options);
 }
 
 void SLSEventGroupSerializer::CalculateLogEventSize(const BatchedEvents& group,
@@ -533,9 +864,9 @@ bool SLSEventGroupListSerializer::Serialize(vector<CompressedLogGroup>&& v, stri
         return false;
     }
     sls_logs::SlsLogPackageList logPackageList;
-    for (const auto& item : v) {
+    for (auto& item : v) {
         auto package = logPackageList.add_packages();
-        package->set_data(item.mData);
+        package->set_data(std::move(item.mData));
         package->set_uncompress_size(item.mRawSize);
 
         CompressType compressType = static_cast<const FlusherSLS*>(mFlusher)->GetCompressType();

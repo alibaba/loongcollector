@@ -16,6 +16,7 @@ package csv
 
 import (
 	"encoding/csv"
+	"errors"
 	"fmt"
 	"io"
 	"strconv"
@@ -24,13 +25,12 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
 
 type ProcessorCSVDecoder struct {
-	SourceKey        string   `comment:"The source key containing the CSV record"`
+	SourceKey        string   `comment:"Required. The source key containing the CSV record"`
 	NoKeyError       bool     `comment:"Optional. Whether to report error if no key in the log mathes the SourceKey, default to false"`
 	SplitKeys        []string `comment:"The keys matching the decoded CSV fields"`
 	SplitSep         string   `comment:"Optional. The Separator, default to ,"`
@@ -45,6 +45,9 @@ type ProcessorCSVDecoder struct {
 }
 
 func (p *ProcessorCSVDecoder) Init(context pipeline.Context) error {
+	if p.SourceKey == "" {
+		return errors.New("parameter SourceKey should not be empty")
+	}
 	sepRunes := []rune(p.SplitSep)
 	if len(sepRunes) != 1 {
 		return fmt.Errorf("invalid separator: %s", p.SplitSep)
@@ -58,16 +61,7 @@ func (*ProcessorCSVDecoder) Description() string {
 	return "csv decoder for logtail"
 }
 
-func (p *ProcessorCSVDecoder) decodeCSV(log *protocol.Log, value string) bool {
-	return p.emitCSVFields(value, func(key, val string) {
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: key, Value: val})
-	})
-}
-
-// emitCSVFields decodes value as a CSV record and emits the decoded fields via
-// add, returning false only when the record cannot be decoded. It is shared by
-// the v1 (decodeCSV) and v2 (processLogEvent) paths so both stay behaviorally
-// identical.
+// emitCSVFields decodes a CSV record and emits each decoded field. It reports whether decoding succeeded.
 func (p *ProcessorCSVDecoder) emitCSVFields(value string, add func(key, value string)) bool {
 	if len(p.SplitKeys) == 0 {
 		if p.PreserveOthers {
@@ -120,26 +114,6 @@ func (p *ProcessorCSVDecoder) emitCSVFields(value string, add func(key, value st
 	return true
 }
 
-func (p *ProcessorCSVDecoder) ProcessLogs(logArray []*protocol.Log) []*protocol.Log {
-	for _, log := range logArray {
-		findKey := false
-		for i, cont := range log.Contents {
-			if len(p.SourceKey) == 0 || p.SourceKey == cont.Key {
-				findKey = true
-				res := p.decodeCSV(log, cont.Value)
-				if !p.shouldKeepSrc(res) {
-					log.Contents = append(log.Contents[:i], log.Contents[i+1:]...)
-				}
-				break
-			}
-		}
-		if !findKey && p.NoKeyError {
-			logger.Warning(p.context.GetRuntimeContext(), selfmonitor.DecodeFindAlarm, "cannot find key", p.SourceKey)
-		}
-	}
-	return logArray
-}
-
 func (p *ProcessorCSVDecoder) shouldKeepSrc(res bool) bool {
 	return p.KeepSource || !res
 }
@@ -152,7 +126,7 @@ func init() {
 	}
 }
 
-// Process implements the v2 ProcessorV2 interface: for each Log event it decodes
+// Process implements the Processor interface: for each Log event it decodes
 // the SourceKey value into the configured SplitKeys (honoring PreserveOthers,
 // ExpandOthers and KeepSource); Metric/Span events pass through unchanged.
 func (p *ProcessorCSVDecoder) Process(in *models.PipelineGroupEvents, context pipeline.PipelineContext) {

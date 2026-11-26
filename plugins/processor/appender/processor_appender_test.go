@@ -19,6 +19,8 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/alibaba/ilogtail/plugins/processor/internal/processortest"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -26,9 +28,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/helper/platformmeta"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/util"
-	"github.com/alibaba/ilogtail/plugins/test"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
 )
 
@@ -45,26 +45,26 @@ func newProcessor() (*ProcessorAppender, error) {
 func TestIgnoreIfExistTrue(t *testing.T) {
 	_ = os.Setenv("my", "xxx")
 	processor, _ := newProcessor()
-	log := &protocol.Log{Time: 0}
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "test_key", Value: "test_value"})
-	processor.processLog(log)
-	assert.Equal(t, "test_value", log.Contents[0].Value)
-	assert.Equal(t, "|host#$#"+util.GetHostName()+"|ip#$#"+util.GetIPAddress()+"|env:"+os.Getenv("my")+"|switch#$#__cloud_image_id__", log.Contents[1].Value)
-	processor.processLog(log)
-	assert.Equal(t, "test_value", log.Contents[0].Value)
-	assert.Equal(t, "|host#$#"+util.GetHostName()+"|ip#$#"+util.GetIPAddress()+"|env:"+os.Getenv("my")+"|switch#$#__cloud_image_id__"+"|host#$#"+util.GetHostName()+"|ip#$#"+util.GetIPAddress()+"|env:"+os.Getenv("my")+"|switch#$#__cloud_image_id__", log.Contents[1].Value)
+	log := processortest.Log()
+	log.Contents.Add("test_key", "test_value")
+	processortest.Apply(processor, log)
+	assert.Equal(t, "test_value", pipeline.GetStringValue(log.Contents.Get("test_key")))
+	assert.Equal(t, "|host#$#"+util.GetHostName()+"|ip#$#"+util.GetIPAddress()+"|env:"+os.Getenv("my")+"|switch#$#__cloud_image_id__", pipeline.GetStringValue(log.Contents.Get("a")))
+	processortest.Apply(processor, log)
+	assert.Equal(t, "test_value", pipeline.GetStringValue(log.Contents.Get("test_key")))
+	assert.Equal(t, "|host#$#"+util.GetHostName()+"|ip#$#"+util.GetIPAddress()+"|env:"+os.Getenv("my")+"|switch#$#__cloud_image_id__"+"|host#$#"+util.GetHostName()+"|ip#$#"+util.GetIPAddress()+"|env:"+os.Getenv("my")+"|switch#$#__cloud_image_id__", pipeline.GetStringValue(log.Contents.Get("a")))
 
 	processor.SortLabels = true
-	log.Contents[1].Value = ""
-	processor.processLog(log)
-	assert.Equal(t, "host#$#"+util.GetHostName()+"|ip#$#"+util.GetIPAddress()+"|switch#$#__cloud_image_id__", log.Contents[1].Value)
-	log.Contents[1].Value = "z#$#x"
-	processor.processLog(log)
-	assert.Equal(t, "host#$#"+util.GetHostName()+"|ip#$#"+util.GetIPAddress()+"|switch#$#__cloud_image_id__"+"|z#$#x", log.Contents[1].Value)
+	log.Contents.Add("a", "")
+	processortest.Apply(processor, log)
+	assert.Equal(t, "host#$#"+util.GetHostName()+"|ip#$#"+util.GetIPAddress()+"|switch#$#__cloud_image_id__", pipeline.GetStringValue(log.Contents.Get("a")))
+	log.Contents.Add("a", "z#$#x")
+	processortest.Apply(processor, log)
+	assert.Equal(t, "host#$#"+util.GetHostName()+"|ip#$#"+util.GetIPAddress()+"|switch#$#__cloud_image_id__"+"|z#$#x", pipeline.GetStringValue(log.Contents.Get("a")))
 }
 
 func TestReadDynamic(t *testing.T) {
-	log := &protocol.Log{Time: 0}
+	log := processortest.Log()
 	ctx := mock.NewEmptyContext("p", "l", "c")
 	processor := &ProcessorAppender{
 		Key:   "a",
@@ -73,19 +73,19 @@ func TestReadDynamic(t *testing.T) {
 	processor.Platform = platformmeta.Mock
 	err := processor.Init(ctx)
 	require.NoError(t, err)
-	processor.processLog(log)
-	require.Equal(t, test.ReadLogVal(log, "a"), "|__cloud_instance_id__#$#id_xxx|__cloud_instance_name__#$#name_xxx|__cloud_region__#$#region_xxx|__cloud_zone__#$#zone_xxx|__cloud_vpc_id__#$#vpc_xxx|__cloud_vswitch_id__#$#vswitch_xxx|__cloud_instance_type__#$#type_xxx|__cloud_image_id__#$#image_xxx|__cloud_max_ingress__#$#0|__cloud_max_egress__#$#0")
+	processortest.Apply(processor, log)
+	require.Equal(t, log.Contents.Get("a"), "|__cloud_instance_id__#$#id_xxx|__cloud_instance_name__#$#name_xxx|__cloud_region__#$#region_xxx|__cloud_zone__#$#zone_xxx|__cloud_vpc_id__#$#vpc_xxx|__cloud_vswitch_id__#$#vswitch_xxx|__cloud_instance_type__#$#type_xxx|__cloud_image_id__#$#image_xxx|__cloud_max_ingress__#$#0|__cloud_max_egress__#$#0")
 
 	atomic.AddInt64(&platformmeta.MockManagerNum, 100)
-	log.Contents = log.Contents[:0]
-	processor.processLog(log)
-	require.Equal(t, test.ReadLogVal(log, "a"), "|__cloud_instance_id__#$#id_xxx|__cloud_instance_name__#$#name_xxx|__cloud_region__#$#region_xxx|__cloud_zone__#$#zone_xxx|__cloud_vpc_id__#$#vpc_xxx|__cloud_vswitch_id__#$#vswitch_xxx|__cloud_instance_type__#$#type_xxx|__cloud_image_id__#$#image_xxx|__cloud_max_ingress__#$#100|__cloud_max_egress__#$#1000")
+	log = processortest.Log()
+	processortest.Apply(processor, log)
+	require.Equal(t, log.Contents.Get("a"), "|__cloud_instance_id__#$#id_xxx|__cloud_instance_name__#$#name_xxx|__cloud_region__#$#region_xxx|__cloud_zone__#$#zone_xxx|__cloud_vpc_id__#$#vpc_xxx|__cloud_vswitch_id__#$#vswitch_xxx|__cloud_instance_type__#$#type_xxx|__cloud_image_id__#$#image_xxx|__cloud_max_ingress__#$#100|__cloud_max_egress__#$#1000")
 
 }
 
 func TestReadOnce(t *testing.T) {
 	atomic.StoreInt64(&platformmeta.MockManagerNum, 0)
-	log := &protocol.Log{Time: 0}
+	log := processortest.Log()
 	ctx := mock.NewEmptyContext("p", "l", "c")
 	processor := &ProcessorAppender{
 		Key:   "a",
@@ -95,14 +95,14 @@ func TestReadOnce(t *testing.T) {
 	processor.Platform = platformmeta.Mock
 	err := processor.Init(ctx)
 	require.NoError(t, err)
-	processor.processLog(log)
-	require.Equal(t, test.ReadLogVal(log, "a"), "|__cloud_instance_id__#$#id_xxx|__cloud_instance_name__#$#name_xxx|__cloud_region__#$#region_xxx|__cloud_zone__#$#zone_xxx|__cloud_vpc_id__#$#vpc_xxx|__cloud_vswitch_id__#$#vswitch_xxx|__cloud_instance_type__#$#type_xxx|__cloud_image_id__#$#image_xxx|__cloud_max_ingress__#$#0|__cloud_max_egress__#$#0")
+	processortest.Apply(processor, log)
+	require.Equal(t, log.Contents.Get("a"), "|__cloud_instance_id__#$#id_xxx|__cloud_instance_name__#$#name_xxx|__cloud_region__#$#region_xxx|__cloud_zone__#$#zone_xxx|__cloud_vpc_id__#$#vpc_xxx|__cloud_vswitch_id__#$#vswitch_xxx|__cloud_instance_type__#$#type_xxx|__cloud_image_id__#$#image_xxx|__cloud_max_ingress__#$#0|__cloud_max_egress__#$#0")
 
 	require.Equal(t, len(processor.replaceFuncs), 0)
 	atomic.AddInt64(&platformmeta.MockManagerNum, 100)
-	log.Contents = log.Contents[:0]
-	processor.processLog(log)
-	require.Equal(t, test.ReadLogVal(log, "a"), "|__cloud_instance_id__#$#id_xxx|__cloud_instance_name__#$#name_xxx|__cloud_region__#$#region_xxx|__cloud_zone__#$#zone_xxx|__cloud_vpc_id__#$#vpc_xxx|__cloud_vswitch_id__#$#vswitch_xxx|__cloud_instance_type__#$#type_xxx|__cloud_image_id__#$#image_xxx|__cloud_max_ingress__#$#0|__cloud_max_egress__#$#0")
+	log = processortest.Log()
+	processortest.Apply(processor, log)
+	require.Equal(t, log.Contents.Get("a"), "|__cloud_instance_id__#$#id_xxx|__cloud_instance_name__#$#name_xxx|__cloud_region__#$#region_xxx|__cloud_zone__#$#zone_xxx|__cloud_vpc_id__#$#vpc_xxx|__cloud_vswitch_id__#$#vswitch_xxx|__cloud_instance_type__#$#type_xxx|__cloud_image_id__#$#image_xxx|__cloud_max_ingress__#$#0|__cloud_max_egress__#$#0")
 }
 
 func TestParameterCheck(t *testing.T) {
@@ -112,9 +112,7 @@ func TestParameterCheck(t *testing.T) {
 	assert.Error(t, err)
 }
 
-// ---- v2 (PipelineEvent / SendPb) Process path tests ----
-
-func newAppenderV2(t *testing.T, key, value string) *ProcessorAppender {
+func newAppender(t *testing.T, key, value string) *ProcessorAppender {
 	processor := pipeline.Processors["processor_appender"]().(*ProcessorAppender)
 	processor.Key = key
 	processor.Value = value
@@ -122,8 +120,8 @@ func newAppenderV2(t *testing.T, key, value string) *ProcessorAppender {
 	return processor
 }
 
-func TestProcessorAppender_ProcessV2AppendsToExistingKey(t *testing.T) {
-	processor := newAppenderV2(t, "k", "_suffix")
+func TestProcessorAppender_ProcessAppendsToExistingKey(t *testing.T) {
+	processor := newAppender(t, "k", "_suffix")
 
 	log := models.NewLog("", nil, "", "", "", models.NewTags(), 0)
 	log.GetIndices().Add("k", "base")
@@ -134,8 +132,8 @@ func TestProcessorAppender_ProcessV2AppendsToExistingKey(t *testing.T) {
 	assert.Equal(t, "base_suffix", log.GetIndices().Get("k"))
 }
 
-func TestProcessorAppender_ProcessV2CreatesMissingKey(t *testing.T) {
-	processor := newAppenderV2(t, "k", "_suffix")
+func TestProcessorAppender_ProcessCreatesMissingKey(t *testing.T) {
+	processor := newAppender(t, "k", "_suffix")
 
 	log := models.NewLog("", nil, "", "", "", models.NewTags(), 0)
 
@@ -145,8 +143,8 @@ func TestProcessorAppender_ProcessV2CreatesMissingKey(t *testing.T) {
 	assert.Equal(t, "_suffix", log.GetIndices().Get("k"))
 }
 
-func TestProcessorAppender_ProcessV2PassesThroughMetric(t *testing.T) {
-	processor := newAppenderV2(t, "k", "_suffix")
+func TestProcessorAppender_ProcessPassesThroughMetric(t *testing.T) {
+	processor := newAppender(t, "k", "_suffix")
 
 	metric := models.NewSingleValueMetric("m", models.MetricTypeGauge, models.NewTags(), 0, 1.0)
 	context := helper.NewObservePipelineContext(10)

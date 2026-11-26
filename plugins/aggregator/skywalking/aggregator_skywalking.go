@@ -1,4 +1,4 @@
-// Copyright 2021 iLogtail Authors
+// Copyright 2022 iLogtail Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,24 +16,17 @@ package skywalking
 
 import (
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
-	"github.com/alibaba/ilogtail/pkg/util"
 	"github.com/alibaba/ilogtail/plugins/aggregator/baseagg"
-
-	"sync"
-	"time"
 )
 
 const (
-	MaxLogCount     = 1024
-	MaxLogGroupSize = 3 * 1024 * 1024
+	DefaultMetricsLogstore = "skywalking-metrics"
+	DefaultTraceLogstore   = "skywalking-traces"
+	DefaultLogLogstore     = "skywalking-logs"
 )
-
-const DefaultMetricsLogstore = "skywalking-metrics"
-const DefaultTraceLogstore = "skywalking-traces"
-const DefaultLogLogstore = "skywalking-logs"
 
 type AggregatorSkywalking struct {
 	MaxLogGroupCount int
@@ -44,15 +37,11 @@ type AggregatorSkywalking struct {
 	TraceLogstore    string
 	LogLogstore      string
 
-	metricsAgg *baseagg.AggregatorBase
-	traceAgg   *baseagg.AggregatorBase
-	logAgg     *baseagg.AggregatorBase
-	Lock       *sync.Mutex
-	context    pipeline.Context
-	queue      pipeline.LogGroupQueue
+	context pipeline.Context
+	batches baseagg.Batcher
 }
 
-func (p *AggregatorSkywalking) Init(context pipeline.Context, que pipeline.LogGroupQueue) (int, error) {
+func (p *AggregatorSkywalking) Init(ctx pipeline.Context) (int, error) {
 	if p.MetricsLogstore == "" {
 		p.MetricsLogstore = DefaultMetricsLogstore
 	}
@@ -62,76 +51,79 @@ func (p *AggregatorSkywalking) Init(context pipeline.Context, que pipeline.LogGr
 	if p.LogLogstore == "" {
 		p.LogLogstore = DefaultLogLogstore
 	}
-
-	p.context = context
-	p.queue = que
-	p.metricsAgg = baseagg.NewAggregatorBase()
-	if _, err := p.metricsAgg.Init(context, que); err != nil {
-		return 0, err
-	}
-	p.metricsAgg.InitInner(p.PackFlag, p.context.GetConfigName()+p.MetricsLogstore+util.GetIPAddress()+time.Now().String(), p.Lock, p.MetricsLogstore, p.Topic, p.MaxLogCount, p.MaxLogGroupCount)
-
-	p.traceAgg = baseagg.NewAggregatorBase()
-	if _, err := p.traceAgg.Init(context, que); err != nil {
-		return 0, err
-	}
-	p.traceAgg.InitInner(p.PackFlag, p.context.GetConfigName()+p.TraceLogstore+util.GetIPAddress()+time.Now().String(), p.Lock, p.TraceLogstore, p.Topic, p.MaxLogCount, p.MaxLogGroupCount)
-
-	p.logAgg = baseagg.NewAggregatorBase()
-	if _, err := p.logAgg.Init(context, que); err != nil {
-		return 0, err
-	}
-	p.logAgg.InitInner(p.PackFlag, p.context.GetConfigName()+p.LogLogstore+util.GetIPAddress()+time.Now().String(), p.Lock, p.LogLogstore, p.Topic, p.MaxLogCount, p.MaxLogGroupCount)
-	return 0, nil
+	p.context = ctx
+	return 0, p.batches.Init(ctx, p.MaxLogCount, p.MaxLogGroupCount, p.PackFlag)
 }
 
 func (*AggregatorSkywalking) Description() string {
 	return "aggregator router for skywalking"
 }
 
-// Add adds @log to aggregator.
-// Add use first content as route key
-// Add returns any error encountered, nil means success.
-func (p *AggregatorSkywalking) Add(log *protocol.Log, ctx map[string]interface{}) error {
-	if len(log.Contents) > 0 {
-		routeKey := log.Contents[0]
-		switch routeKey.Key {
-		case "__name__":
-			return p.metricsAgg.Add(log, ctx)
-		case "links":
-			return p.traceAgg.Add(log, ctx)
-		case "otlp.name":
-			return p.logAgg.Add(log, ctx)
-		default:
-			logger.Warning(p.context.GetRuntimeContext(), selfmonitor.SkywalkingTopicNotRecognized, "error", "topic not recognized", "topic", routeKey.Value)
-			return p.logAgg.Add(log, ctx)
-		}
+func (p *AggregatorSkywalking) Record(in *models.PipelineGroupEvents, ctx pipeline.PipelineContext) error {
+	if in == nil {
+		return nil
+	}
+	routes := make(map[string][]models.PipelineEvent, 3)
+	for _, event := range in.Events {
+		logstore := p.destination(event)
+		routes[logstore] = append(routes[logstore], event)
+	}
+	for logstore, events := range routes {
+		p.batches.CollectRoute(ctx, in.Group, events, logstore, p.Topic)
 	}
 	return nil
 }
 
-func (p *AggregatorSkywalking) Flush() []*protocol.LogGroup {
-	logGroups := []*protocol.LogGroup{}
-	logGroups = append(logGroups, p.metricsAgg.Flush()...)
-	logGroups = append(logGroups, p.traceAgg.Flush()...)
-	logGroups = append(logGroups, p.logAgg.Flush()...)
-	return logGroups
+func (p *AggregatorSkywalking) destination(event models.PipelineEvent) string {
+	switch event.GetType() {
+	case models.EventTypeMetric:
+		return p.MetricsLogstore
+	case models.EventTypeSpan:
+		return p.TraceLogstore
+	case models.EventTypeLogging:
+		log := event.(*models.Log)
+		fields := log.GetIndices()
+		key, ordered := models.FirstLogContentKey(fields)
+		if !ordered {
+			for _, candidate := range []string{"__name__", "links", "otlp.name"} {
+				if fields.Contains(candidate) {
+					key = candidate
+					break
+				}
+			}
+		}
+		switch key {
+		case "__name__":
+			return p.MetricsLogstore
+		case "links":
+			return p.TraceLogstore
+		case "otlp.name":
+			return p.LogLogstore
+		}
+		logger.Warning(p.context.GetRuntimeContext(), selfmonitor.SkywalkingTopicNotRecognized, "topic not recognized")
+		return p.LogLogstore
+	default:
+		return ""
+	}
+}
+
+func (p *AggregatorSkywalking) GetResult(ctx pipeline.PipelineContext) error {
+	p.batches.CollectPending(ctx)
+	return nil
 }
 
 func (p *AggregatorSkywalking) Reset() {
-	p.metricsAgg.Reset()
-	p.traceAgg.Reset()
-	p.logAgg.Reset()
+	p.batches.Reset()
 }
 
 func NewAggregatorSkywalking() *AggregatorSkywalking {
 	return &AggregatorSkywalking{
 		MaxLogGroupCount: 4,
-		MaxLogCount:      MaxLogCount,
+		MaxLogCount:      baseagg.MaxLogCount,
 		PackFlag:         true,
-		Lock:             &sync.Mutex{},
 	}
 }
+
 func init() {
 	pipeline.Aggregators["aggregator_skywalking"] = func() pipeline.Aggregator {
 		return NewAggregatorSkywalking()

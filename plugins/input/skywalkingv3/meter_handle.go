@@ -17,10 +17,12 @@ package skywalkingv3
 import (
 	"io"
 	"math"
+	"strconv"
 	"time"
 
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	v3 "github.com/alibaba/ilogtail/plugins/input/skywalkingv3/skywalking/network/common/v3"
@@ -29,7 +31,7 @@ import (
 
 type MeterHandler struct {
 	context   pipeline.Context
-	collector pipeline.Collector
+	collector pipeline.PipelineCollector
 }
 
 func (m *MeterHandler) Collect(srv agent.MeterReportService_CollectServer) error {
@@ -93,7 +95,7 @@ func convertHistogramData(histogramData *agent.MeterHistogram) *helper.Histogram
 	return hd
 }
 
-func handleMeterData(context pipeline.Context, collector pipeline.Collector, meterData *agent.MeterData, service string, serviceInstance string, ts int64) {
+func handleMeterData(context pipeline.Context, collector pipeline.PipelineCollector, meterData *agent.MeterData, service string, serviceInstance string, ts int64) {
 	singleValue := meterData.GetSingleValue()
 	logger.Debug(context.GetRuntimeContext(), "service", meterData.Service, "serviceInstance", meterData.ServiceInstance)
 	if singleValue != nil {
@@ -106,9 +108,7 @@ func handleMeterData(context pipeline.Context, collector pipeline.Collector, met
 		labels.Append("service", service)
 		labels.Append("serviceInstance", serviceInstance)
 
-		metricLog := helper.NewMetricLog(name, ts, value, &labels)
-		// logger.Info("meter", meterData)
-		collector.AddRawLog(metricLog)
+		collector.Collect(models.NewGroup(models.NewMetadata(), models.NewTags()), helper.NewInputMetric(name, ts, value, &labels))
 	}
 	histogramData := meterData.GetHistogram()
 
@@ -120,10 +120,13 @@ func handleMeterData(context pipeline.Context, collector pipeline.Collector, met
 			labels.Append(l.Name, l.Value)
 		}
 
-		hd := convertHistogramData(histogramData)
-		logs := hd.ToMetricLogs(histogramData.Name, ts, &labels)
-		for _, logIns := range logs {
-			collector.AddRawLog(logIns)
+		histogram := convertHistogramData(histogramData)
+		name := histogramData.Name
+		collector.Collect(models.NewGroup(models.NewMetadata(), models.NewTags()), helper.NewInputMetric(name+"_count", ts, float64(histogram.Count), &labels))
+		collector.Collect(models.NewGroup(models.NewMetadata(), models.NewTags()), helper.NewInputMetric(name+"_sum", ts, histogram.Sum, &labels))
+		for _, bucket := range histogram.Buckets {
+			labels.Replace("le", strconv.FormatFloat(bucket.Le, 'g', -1, 64))
+			collector.Collect(models.NewGroup(models.NewMetadata(), models.NewTags()), helper.NewInputMetric(name+"_bucket", ts, float64(bucket.Count), &labels))
 		}
 	}
 }

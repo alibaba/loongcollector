@@ -20,7 +20,7 @@ import (
 	"time"
 
 	"github.com/alibaba/ilogtail/pkg/config"
-	"github.com/alibaba/ilogtail/pkg/protocol"
+	converter "github.com/alibaba/ilogtail/pkg/protocol/converter"
 
 	"github.com/aliyun/aliyun-odps-go-sdk/odps/data"
 	"github.com/aliyun/aliyun-odps-go-sdk/odps/datatype"
@@ -35,7 +35,7 @@ const (
 
 type RecordBuilder interface {
 	Init()
-	Log2Record(logGroup *protocol.LogGroup, log *protocol.Log, schema *tableschema.TableSchema) (data.Record, error)
+	Build(row converter.EventRecord, schema *tableschema.TableSchema) (data.Record, error)
 }
 
 type ExtraInfo struct {
@@ -63,7 +63,7 @@ func (rb *RecordBuilderImpl) Init() {
 	rb.hostname = config.LoongcollectorGlobalConfig.Hostname
 }
 
-func (rb *RecordBuilderImpl) genExtraInfo(log *protocol.Log) ExtraInfo {
+func (rb *RecordBuilderImpl) genExtraInfo(row converter.EventRecord) ExtraInfo {
 	info := ExtraInfo{}
 
 	if rb.extraLevel >= 1 {
@@ -72,18 +72,18 @@ func (rb *RecordBuilderImpl) genExtraInfo(log *protocol.Log) ExtraInfo {
 
 	if rb.extraLevel >= 2 {
 		info.Hostname = rb.hostname
-		info.CollectTime = strconv.FormatUint(uint64(log.Time), 10)
+		info.CollectTime = strconv.FormatUint(row.Timestamp/1e9, 10)
 		info.FlushTime = strconv.FormatInt(time.Now().UnixMilli(), 10)
 	}
 	return info
 }
 
-func (rb *RecordBuilderImpl) Log2Record(logGroup *protocol.LogGroup, log *protocol.Log, schema *tableschema.TableSchema) (data.Record, error) {
+func (rb *RecordBuilderImpl) Build(row converter.EventRecord, schema *tableschema.TableSchema) (data.Record, error) {
 	record := data.NewRecord(len(schema.Columns))
 
 	for idx, column := range schema.Columns {
 		if column.Name == ExtraInfoColumn && column.Type.ID() == datatype.JSON {
-			val, err := data.NewJson(rb.genExtraInfo(log))
+			val, err := data.NewJson(rb.genExtraInfo(row))
 			if err != nil {
 				return nil, err
 			}
@@ -91,20 +91,13 @@ func (rb *RecordBuilderImpl) Log2Record(logGroup *protocol.LogGroup, log *protoc
 			continue
 		}
 
-		var value *string
-		for _, content := range log.Contents {
-			if column.Name == content.Key {
-				value = &content.Value
-				break
-			}
-		}
-
-		if value == nil {
+		value, found := row.Fields[column.Name]
+		if !found {
 			record[idx] = nil
 			continue
 		}
 
-		if *value == "" &&
+		if value == "" &&
 			column.Type.ID() != datatype.STRING &&
 			column.Type.ID() != datatype.CHAR &&
 			column.Type.ID() != datatype.VARCHAR {
@@ -116,89 +109,89 @@ func (rb *RecordBuilderImpl) Log2Record(logGroup *protocol.LogGroup, log *protoc
 		case datatype.NULL:
 			continue
 		case datatype.BOOLEAN:
-			val, err := strconv.ParseBool(*value)
+			val, err := strconv.ParseBool(value)
 			if err != nil {
 				return nil, err
 			}
 			record[idx] = data.Bool(val)
 		case datatype.TINYINT:
-			val, err := strconv.Atoi(*value)
+			val, err := strconv.Atoi(value)
 			if err != nil {
 				return nil, err
 			}
 			record[idx] = data.TinyInt(val)
 		case datatype.SMALLINT:
-			val, err := strconv.Atoi(*value)
+			val, err := strconv.Atoi(value)
 			if err != nil {
 				return nil, err
 			}
 			record[idx] = data.SmallInt(val)
 		case datatype.INT:
-			val, err := strconv.Atoi(*value)
+			val, err := strconv.Atoi(value)
 			if err != nil {
 				return nil, err
 			}
 			record[idx] = data.Int(val)
 		case datatype.BIGINT:
-			val, err := strconv.ParseInt(*value, 10, 64)
+			val, err := strconv.ParseInt(value, 10, 64)
 			if err != nil {
 				return nil, err
 			}
 			record[idx] = data.BigInt(val)
 		case datatype.FLOAT:
-			fVal, err := strconv.ParseFloat(*value, 32)
+			fVal, err := strconv.ParseFloat(value, 32)
 			if err != nil {
 				return nil, err
 			}
 			record[idx] = data.Float(fVal)
 		case datatype.DOUBLE:
-			dVal, err := strconv.ParseFloat(*value, 64)
+			dVal, err := strconv.ParseFloat(value, 64)
 			if err != nil {
 				return nil, err
 			}
 			record[idx] = data.Double(dVal)
 		case datatype.DATE:
-			t, err := data.NewDate(*value)
+			t, err := data.NewDate(value)
 			if err != nil {
 				return nil, err
 			}
 			record[idx] = t
 		case datatype.DATETIME:
-			t, err := data.NewDateTime(*value)
+			t, err := data.NewDateTime(value)
 			if err != nil {
 				return nil, err
 			}
 			record[idx] = t
 		case datatype.TIMESTAMP:
-			tVal, err := data.NewTimestamp(*value)
+			tVal, err := data.NewTimestamp(value)
 			if err != nil {
 				return nil, err
 			}
 			record[idx] = tVal
 		case datatype.TIMESTAMP_NTZ:
-			tVal, err := data.NewTimestampNtz(*value)
+			tVal, err := data.NewTimestampNtz(value)
 			if err != nil {
 				return nil, err
 			}
 			record[idx] = tVal
 		case datatype.STRING:
-			record[idx] = data.String(*value)
+			record[idx] = data.String(value)
 		case datatype.CHAR:
-			val, err := data.NewChar(255, *value)
+			val, err := data.NewChar(255, value)
 			if err != nil {
 				return nil, err
 			}
 			record[idx] = val
 		case datatype.VARCHAR:
-			val, err := data.NewVarChar(65536, *value)
+			val, err := data.NewVarChar(65536, value)
 			if err != nil {
 				return nil, err
 			}
 			record[idx] = val
 		case datatype.BINARY:
-			record[idx] = data.Binary(*value)
+			record[idx] = data.Binary(value)
 		case datatype.JSON:
-			val, err := data.NewJson(*value)
+			val, err := data.NewJson(value)
 			if err != nil {
 				return nil, err
 			}

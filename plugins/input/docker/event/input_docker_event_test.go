@@ -16,17 +16,17 @@ package event
 
 import (
 	"testing"
-	"time"
+
+	"github.com/alibaba/ilogtail/pkg/models"
 
 	"github.com/moby/moby/api/types/events"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/alibaba/ilogtail/pkg/helper"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
-func TestServiceDockerEventsCollectClampsQueueSize(t *testing.T) {
+func TestServiceDockerEventsClampsQueueSize(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    int
@@ -43,7 +43,7 @@ func TestServiceDockerEventsCollectClampsQueueSize(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			input := &ServiceDockerEvents{EventQueueSize: test.input}
 
-			require.NoError(t, input.Collect(nil))
+			input.clampEventQueueSize()
 
 			assert.Equal(t, test.expected, input.EventQueueSize)
 		})
@@ -66,31 +66,38 @@ func TestServiceDockerEventsFire(t *testing.T) {
 	}
 
 	t.Run("includes attributes", func(t *testing.T) {
-		collector := &helper.LocalCollector{}
+		ctx := helper.NewObservePipelineContext(1)
 		input := &ServiceDockerEvents{}
 
-		input.fire(collector, message)
+		input.fire(ctx.Collector(), message)
 
-		require.Len(t, collector.Logs, 1)
-		fields := logFields(collector.Logs[0].Contents)
+		groups := ctx.Collector().ToArray()
+		require.Len(t, groups, 1)
+		require.Len(t, groups[0].Events, 1)
+		log, ok := groups[0].Events[0].(*models.Log)
+		require.True(t, ok)
+		fields := log.GetIndices().Iterator()
 		assert.Equal(t, "1700000000123456789", fields["_time_nano_"])
 		assert.Equal(t, "start", fields["_action_"])
 		assert.Equal(t, "container", fields["_type_"])
 		assert.Equal(t, "container-id", fields["_id_"])
 		assert.Equal(t, "example/image:latest", fields["image"])
 		assert.Equal(t, "example-container", fields["name"])
-		assert.Equal(t, time.Unix(0, eventTimeNano).Unix(), int64(collector.Logs[0].GetTime()))
-		assert.Equal(t, uint32(time.Unix(0, eventTimeNano).Nanosecond()), collector.Logs[0].GetTimeNs())
+		assert.Equal(t, uint64(eventTimeNano), log.GetTimestamp())
 	})
 
 	t.Run("ignores attributes", func(t *testing.T) {
-		collector := &helper.LocalCollector{}
+		ctx := helper.NewObservePipelineContext(1)
 		input := &ServiceDockerEvents{IgnoreAttributes: true}
 
-		input.fire(collector, message)
+		input.fire(ctx.Collector(), message)
 
-		require.Len(t, collector.Logs, 1)
-		fields := logFields(collector.Logs[0].Contents)
+		groups := ctx.Collector().ToArray()
+		require.Len(t, groups, 1)
+		require.Len(t, groups[0].Events, 1)
+		log, ok := groups[0].Events[0].(*models.Log)
+		require.True(t, ok)
+		fields := log.GetIndices().Iterator()
 		assert.Equal(t, "1700000000123456789", fields["_time_nano_"])
 		assert.Equal(t, "start", fields["_action_"])
 		assert.Equal(t, "container", fields["_type_"])
@@ -100,12 +107,4 @@ func TestServiceDockerEventsFire(t *testing.T) {
 		assert.NotContains(t, fields, "")
 		assert.Len(t, fields, 4)
 	})
-}
-
-func logFields(contents []*protocol.Log_Content) map[string]string {
-	fields := make(map[string]string, len(contents))
-	for _, content := range contents {
-		fields[content.GetKey()] = content.GetValue()
-	}
-	return fields
 }

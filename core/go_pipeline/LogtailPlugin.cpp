@@ -30,6 +30,7 @@
 #include "common/TimeUtil.h"
 #include "common/compression/CompressorFactory.h"
 #include "file_server/ConfigManager.h"
+#include "google/protobuf/arena.h"
 #include "logger/Logger.h"
 #include "models/PipelineEventGroup.h"
 #include "monitor/AlarmManager.h"
@@ -61,7 +62,6 @@ LogtailPlugin::LogtailPlugin() {
     mStopAllPipelinesFun = NULL;
     mStopFun = NULL;
     mStartFun = NULL;
-    mLoadGlobalConfigFun = NULL;
     mPluginValid = false;
     mPluginContainerConfig.mLogstore = "logtail_containers";
     mPluginContainerContext.SetConfigName("logtail_containers");
@@ -219,86 +219,28 @@ int LogtailPlugin::IsValidToSend(long long logstoreKey) {
     return SenderQueueManager::GetInstance()->IsValidToPush(logstoreKey) ? 0 : -1;
 }
 
-int LogtailPlugin::SendPb(const char* configName,
-                          int32_t configNameSize,
-                          const char* logstoreName,
-                          int logstoreSize,
-                          char* pbBuffer,
-                          int32_t pbSize,
-                          int32_t lines) {
-    return SendPbV2(configName, configNameSize, logstoreName, logstoreSize, pbBuffer, pbSize, lines, NULL, 0);
-}
-
-int LogtailPlugin::SendPbV2(const char* configName,
-                            int32_t configNameSize,
-                            const char* logstoreName,
-                            int logstoreSize,
-                            char* pbBuffer,
-                            int32_t pbSize,
-                            int32_t /*lines*/,
-                            const char* shardHash,
-                            int shardHashSize) {
-    static FlusherSLS* containerConfig = &(LogtailPlugin::GetInstance()->mPluginContainerConfig);
-
-    string configNameStr = string(configName, configNameSize);
-
-    string logstore;
-    if (logstoreSize > 0 && logstoreName != NULL) {
-        logstore.assign(logstoreName, (size_t)logstoreSize);
-    }
-
-    // LOG_DEBUG(sLogger, ("send pb", configNameStr)("pb size", pbSize)("lines", lines));
-    FlusherSLS* pConfig = NULL;
-    if (configNameStr == containerConfig->mLogstore) {
-        auto* plugin = LogtailPlugin::GetInstance();
-        lock_guard<mutex> lock(plugin->mPluginContainerMutex);
-        pConfig = containerConfig;
-        pConfig->mProject = GetProfileSender()->GetDefaultProfileProjectName();
-        pConfig->mRegion = GetProfileSender()->GetDefaultProfileRegion();
-        if (pConfig->mProject.empty()) {
-            return 0;
-        }
-        if (!pConfig->InitForProfile(plugin->mPluginContainerContext)) {
-            return -1;
-        }
-        string hash;
-        if (shardHashSize > 0 && shardHash != nullptr) {
-            hash.assign(shardHash, static_cast<size_t>(shardHashSize));
-        }
-        return pConfig->Send(string(pbBuffer, pbSize), hash, logstore) ? 0 : -1;
-    } else {
-        shared_ptr<CollectionPipeline> p = CollectionPipelineManager::GetInstance()->FindConfigByName(configNameStr);
-        if (!p) {
-            LOG_INFO(sLogger,
-                     ("error", "SendPbV2 can not find config, maybe config updated")("config", configNameStr)(
-                         "logstore", logstore));
-            return -2;
-        }
-        // TODO: support multi-flusher
-        pConfig = const_cast<FlusherSLS*>(static_cast<const FlusherSLS*>(p->GetFlushers()[0]->GetPlugin()));
-    }
-    std::string shardHashStr;
-    if (shardHashSize > 0) {
-        shardHashStr.assign(shardHash, static_cast<size_t>(shardHashSize));
-    }
-    return pConfig->Send(std::string(pbBuffer, pbSize), shardHashStr, logstore) ? 0 : -1;
-}
-
 int LogtailPlugin::SendPipelineEventGroup(const char* configName,
                                           int32_t configNameSize,
                                           const char* logstoreName,
                                           int logstoreSize,
                                           char* pbBuffer,
                                           int32_t pbSize,
-                                          int32_t /*eventCount*/,
+                                          int32_t eventCount,
                                           const char* shardHash,
                                           int shardHashSize) {
     if (configName == NULL || configNameSize <= 0 || pbBuffer == NULL || pbSize <= 0) {
         return -1;
     }
 
-    models::PipelineEventGroup pbGroup;
-    if (!pbGroup.ParseFromArray(pbBuffer, pbSize)) {
+    // Canonical logs can borrow the already encoded content fields until
+    // serialization finishes. The generated parser handles other PEG layouts.
+    auto wire = SLSLogGroupWireView::Parse(StringView(pbBuffer, pbSize), max(eventCount, int32_t{0}));
+    google::protobuf::Arena arena;
+    auto* pbGroup = google::protobuf::Arena::Create<models::PipelineEventGroup>(&arena);
+    if (wire && !pbGroup->ParseFromArray(wire->mHeader.data(), wire->mHeader.size())) {
+        wire.reset();
+    }
+    if (!wire && !pbGroup->ParseFromArray(pbBuffer, pbSize)) {
         LOG_WARNING(sLogger,
                     ("error", "SendPipelineEventGroup invalid PipelineEventGroup PB")("pb size", pbSize)(
                         "config", std::string(configName, configNameSize)));
@@ -313,6 +255,15 @@ int LogtailPlugin::SendPipelineEventGroup(const char* configName,
     if (logstoreSize > 0 && logstoreName != NULL) {
         logstore.assign(logstoreName, (size_t)logstoreSize);
     }
+
+    const auto send = [&](FlusherSLS& flusher, const string& hash) {
+        bool exceedsSizeLimit = false;
+        const bool sent = wire ? flusher.SendPBLogWire(*pbGroup, *wire, hash, logstore, &exceedsSizeLimit)
+                               : flusher.Send(*pbGroup, hash, logstore, &exceedsSizeLimit);
+        // Keep this result in sync with pkg/logtail.SendPipelineEventGroupTooLarge.
+        // It means serialization stopped before anything was added to the sender queue.
+        return sent ? 0 : (exceedsSizeLimit ? -3 : -1);
+    };
 
     if (configNameStr == containerConfig->mLogstore) {
         auto* plugin = LogtailPlugin::GetInstance();
@@ -330,7 +281,7 @@ int LogtailPlugin::SendPipelineEventGroup(const char* configName,
         if (!containerConfig->InitForProfile(plugin->mPluginContainerContext)) {
             return -1;
         }
-        return containerConfig->Send(pbGroup, hash, logstore) ? 0 : -1;
+        return send(*containerConfig, hash);
     }
 
     shared_ptr<CollectionPipeline> p = CollectionPipelineManager::GetInstance()->FindConfigByName(configNameStr);
@@ -355,12 +306,12 @@ int LogtailPlugin::SendPipelineEventGroup(const char* configName,
     if (shardHashSize > 0 && shardHash != nullptr) {
         hash.assign(shardHash, static_cast<size_t>(shardHashSize));
     }
-    return pConfig->Send(pbGroup, hash, logstore) ? 0 : -1;
+    return send(*pConfig, hash);
 }
 
 bool LogtailPlugin::LoadPluginBase() {
-    if (mPluginValid) {
-        return true;
+    if (mPluginValid || mPluginBasePtr != nullptr) {
+        return mPluginValid;
     }
 
     // load plugin adapter
@@ -379,42 +330,30 @@ bool LogtailPlugin::LoadPluginBase() {
             return mPluginValid;
         }
         int version = versionFun();
-        if (!(version / 100 == 2 || version / 100 == 3 || version / 100 == 4)) {
+        if (version / 100 != 5) {
             LOG_ERROR(sLogger, ("invalid plugin adapter version, version", version));
             return mPluginValid;
         }
         LOG_INFO(sLogger, ("valid plugin adapter version, version", version));
 
-        // Be compatible with old libGoPluginAdapter.so, V2 -> V1.
-        auto registerV2Fun = (RegisterLogtailCallBackV2)loader.LoadMethod("RegisterLogtailCallBackV2", error);
-        if (error.empty()) {
-            registerV2Fun(LogtailPlugin::IsValidToSend, LogtailPlugin::SendPb, LogtailPlugin::SendPbV2);
-        } else {
-            LOG_WARNING(sLogger, ("load RegisterLogtailCallBackV2 failed", error)("try to load V1", ""));
-
-            auto registerFun = (RegisterLogtailCallBack)loader.LoadMethod("RegisterLogtailCallBack", error);
-            if (!error.empty()) {
-                LOG_WARNING(sLogger, ("load RegisterLogtailCallBack failed", error));
-                return mPluginValid;
-            }
-            registerFun(LogtailPlugin::IsValidToSend, LogtailPlugin::SendPb);
+        auto registerCheck = (RegisterIsValidToSendFun)loader.LoadMethod("RegisterIsValidToSend", error);
+        if (!error.empty()) {
+            LOG_ERROR(sLogger, ("load RegisterIsValidToSend failed", error));
+            return mPluginValid;
         }
 
-        // Additive: SendPipelineEventGroup coexists with SendPb. Old adapters
-        // without this symbol keep working; Go calls then return -1.
-        auto registerPegFun
+        auto registerSend
             = (RegisterSendPipelineEventGroupFun)loader.LoadMethod("RegisterSendPipelineEventGroup", error);
-        if (error.empty()) {
-            registerPegFun(LogtailPlugin::SendPipelineEventGroup);
-        } else {
-            LOG_WARNING(sLogger,
-                        ("load RegisterSendPipelineEventGroup failed", error)("SendPipelineEventGroup", "unavailable"));
+        if (!error.empty()) {
+            LOG_ERROR(sLogger, ("load RegisterSendPipelineEventGroup failed", error));
+            return mPluginValid;
         }
+        registerCheck(LogtailPlugin::IsValidToSend);
+        registerSend(LogtailPlugin::SendPipelineEventGroup);
 
         mPluginAdapterPtr = loader.Release();
     }
 
-    InitPluginBaseFun initBase = NULL;
     InitPluginBaseV2Fun initBaseV2 = NULL;
     // load plugin base
     if (mPluginBasePtr == NULL) {
@@ -426,21 +365,9 @@ bool LogtailPlugin::LoadPluginBase() {
             return mPluginValid;
         }
 
-        // Try V2 -> V1.
         initBaseV2 = (InitPluginBaseV2Fun)loader.LoadMethod("InitPluginBaseV2", error);
         if (!error.empty()) {
-            LOG_WARNING(sLogger, ("load InitPluginBaseFunV2 error", error)("try to load V1", ""));
-
-            initBase = (InitPluginBaseFun)loader.LoadMethod("InitPluginBase", error);
-            if (!error.empty()) {
-                LOG_ERROR(sLogger, ("load InitPluginBase error", error));
-                return mPluginValid;
-            }
-        }
-        // 加载全局配置，目前应该没有调用点
-        mLoadGlobalConfigFun = (LoadGlobalConfigFun)loader.LoadMethod("LoadGlobalConfig", error);
-        if (!error.empty()) {
-            LOG_ERROR(sLogger, ("load LoadGlobalConfig error, Message", error));
+            LOG_ERROR(sLogger, ("load InitPluginBaseV2 failed", error));
             return mPluginValid;
         }
         // 加载单个配置
@@ -477,12 +404,6 @@ bool LogtailPlugin::LoadPluginBase() {
         mStartFun = (StartFun)loader.LoadMethod("Start", error);
         if (!error.empty()) {
             LOG_ERROR(sLogger, ("load Start error, Message", error));
-            return mPluginValid;
-        }
-        // C++获取单个容器信息的
-        mGetContainerMetaFun = (GetContainerMetaFun)loader.LoadMethod("GetContainerMeta", error);
-        if (!error.empty()) {
-            LOG_ERROR(sLogger, ("load GetContainerMeta error, Message", error));
             return mPluginValid;
         }
         // C++获取全量容器信息的
@@ -525,17 +446,11 @@ bool LogtailPlugin::LoadPluginBase() {
         mPluginBasePtr = loader.Release();
     }
 
-    GoInt initRst = 0;
-    if (initBaseV2) {
-        std::string cfgStr = mPluginCfg.toStyledString();
-        GoString goCfgStr;
-        goCfgStr.p = cfgStr.c_str();
-        goCfgStr.n = cfgStr.length();
-
-        initRst = initBaseV2(goCfgStr);
-    } else {
-        initRst = initBase();
-    }
+    const std::string cfgStr = mPluginCfg.toStyledString();
+    GoString goCfgStr;
+    goCfgStr.p = cfgStr.c_str();
+    goCfgStr.n = cfgStr.length();
+    const GoInt initRst = initBaseV2(goCfgStr);
     if (initRst != 0) {
         LOG_ERROR(sLogger, ("Go plugin system init", "failed")("res", initRst));
         mPluginValid = false;
@@ -632,75 +547,4 @@ std::string LogtailPlugin::GetDiffContainersMeta() {
 #else
     return LogtailPluginMock::GetInstance()->GetDiffContainersMeta();
 #endif
-}
-
-K8sContainerMeta LogtailPlugin::GetContainerMeta(const string& containerID) {
-    return GetContainerMeta(StringView(containerID));
-}
-K8sContainerMeta LogtailPlugin::GetContainerMeta(StringView containerID) {
-    if (mPluginValid && mGetContainerMetaFun != nullptr) {
-        GoString id;
-        id.n = containerID.size();
-        id.p = containerID.data();
-        auto* innerMeta = mGetContainerMetaFun(id);
-        if (innerMeta != NULL) {
-            K8sContainerMeta meta;
-            meta.ContainerName.assign(innerMeta->containerName);
-            meta.Image.assign(innerMeta->image);
-            meta.K8sNamespace.assign(innerMeta->k8sNamespace);
-            meta.PodName.assign(innerMeta->podName);
-            for (int i = 0; i < innerMeta->containerLabelsSize; ++i) {
-                std::string key;
-                std::string value;
-                key.assign(innerMeta->containerLabelsKey[i]);
-                value.assign(innerMeta->containerLabelsVal[i]);
-                meta.containerLabels.insert(std::make_pair(std::move(key), std::move(key)));
-            }
-            for (int i = 0; i < innerMeta->k8sLabelsSize; ++i) {
-                std::string key;
-                std::string value;
-                key.assign(innerMeta->k8sLabelsKey[i]);
-                value.assign(innerMeta->k8sLabelsVal[i]);
-                meta.k8sLabels.insert(std::make_pair(std::move(key), std::move(key)));
-            }
-            for (int i = 0; i < innerMeta->envSize; ++i) {
-                std::string key;
-                std::string value;
-                key.assign(innerMeta->envsKey[i]);
-                value.assign(innerMeta->envsVal[i]);
-                meta.envs.insert(std::make_pair(std::move(key), std::move(key)));
-            }
-            free(innerMeta->containerName);
-            free(innerMeta->image);
-            free(innerMeta->k8sNamespace);
-            free(innerMeta->podName);
-            if (innerMeta->containerLabelsSize > 0) {
-                for (int i = 0; i < innerMeta->containerLabelsSize; ++i) {
-                    free(innerMeta->containerLabelsKey[i]);
-                    free(innerMeta->containerLabelsVal[i]);
-                }
-                free(innerMeta->containerLabelsKey);
-                free(innerMeta->containerLabelsVal);
-            }
-            if (innerMeta->k8sLabelsSize > 0) {
-                for (int i = 0; i < innerMeta->k8sLabelsSize; ++i) {
-                    free(innerMeta->k8sLabelsKey[i]);
-                    free(innerMeta->k8sLabelsVal[i]);
-                }
-                free(innerMeta->k8sLabelsKey);
-                free(innerMeta->k8sLabelsVal);
-            }
-            if (innerMeta->envSize > 0) {
-                for (int i = 0; i < innerMeta->envSize; ++i) {
-                    free(innerMeta->envsKey[i]);
-                    free(innerMeta->envsVal[i]);
-                }
-                free(innerMeta->envsKey);
-                free(innerMeta->envsVal);
-            }
-            free(innerMeta);
-            return meta;
-        }
-    }
-    return K8sContainerMeta();
 }

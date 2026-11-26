@@ -22,6 +22,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/alibaba/ilogtail/pkg/helper/telemetrytest"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
@@ -41,7 +42,7 @@ func TestAlarmBatchStorageIsolation(t *testing.T) {
 	require.NoError(t, err)
 	var decoded protocol.PipelineEventGroup
 	require.NoError(t, decoded.Unmarshal(data))
-	assert.Equal(t, alarms, TransferPipelineEventGroupToAlarms(&decoded))
+	assert.Equal(t, alarms, telemetrytest.TransferPipelineEventGroupToAlarms(&decoded))
 	for _, event := range decoded.GetLogs().Events {
 		assert.Equal(t, uint64(now.UnixNano()), event.Timestamp)
 	}
@@ -51,11 +52,11 @@ func TestAlarmBatchStorageIsolation(t *testing.T) {
 	first.Contents = append(first.Contents, &protocol.LogEvent_Content{
 		Key: []byte("extra"), Value: []byte("only-first"),
 	})
-	assert.Equal(t, alarms[1], transferLogEventToAlarm(group.GetLogs().Events[1]))
+	assert.Equal(t, alarms[1], telemetrytest.TransferPipelineEventGroupToAlarms(group)[1])
 	other, err := TransferAlarmsToPipelineEventGroup(alarms, now)
 	require.NoError(t, err)
 	first.Contents[0].Value = []byte("changed")
-	assert.Equal(t, "FIRST", transferLogEventToAlarm(other.GetLogs().Events[0]).AlarmType)
+	assert.Equal(t, "FIRST", telemetrytest.TransferPipelineEventGroupToAlarms(other)[0].AlarmType)
 }
 
 // Bridge fields match what C++ ReceiveGoAlarmsPB consumes. Output metadata is
@@ -183,7 +184,7 @@ func TestTransferPipelineEventGroupToAlarms_RoundTrip(t *testing.T) {
 	group, err := TransferAlarmsToPipelineEventGroup(original, ts)
 	require.NoError(t, err)
 
-	restored := TransferPipelineEventGroupToAlarms(group)
+	restored := telemetrytest.TransferPipelineEventGroupToAlarms(group)
 	require.Len(t, restored, 2)
 
 	assert.Equal(t, original[0].AlarmType, restored[0].AlarmType)
@@ -258,7 +259,7 @@ func TestAlarmCountSerialization(t *testing.T) {
 	contentMap := logEventToMap(group.GetLogs().Events[0])
 	assert.Equal(t, "42", contentMap[AlarmFieldCount])
 
-	restored := TransferPipelineEventGroupToAlarms(group)
+	restored := telemetrytest.TransferPipelineEventGroupToAlarms(group)
 	assert.Equal(t, 42, restored[0].Count)
 }
 
@@ -302,7 +303,7 @@ func TestCppAlarmTypeStringAlignment(t *testing.T) {
 // TestTransferPipelineEventGroupToAlarms_NilLogs verifies nil logs returns nil.
 func TestTransferPipelineEventGroupToAlarms_NilLogs(t *testing.T) {
 	group := &protocol.PipelineEventGroup{}
-	result := TransferPipelineEventGroupToAlarms(group)
+	result := telemetrytest.TransferPipelineEventGroupToAlarms(group)
 	assert.Nil(t, result)
 }
 
@@ -323,4 +324,25 @@ func logEventToMap(logEvent *protocol.LogEvent) map[string]string {
 		m[string(c.Key)] = string(c.Value)
 	}
 	return m
+}
+
+// AlarmContractFields returns the ordered list of required field keys in the
+// Go-to-C++ bridge contract. Final output metadata (ip/os/ver) is added by C++;
+// optional project_name, category and config are sent only when non-empty.
+func AlarmContractFields() []string {
+	return []string{
+		AlarmFieldType,
+		AlarmFieldLevel,
+		AlarmFieldMessage,
+		AlarmFieldCount,
+	}
+}
+
+// AlarmContractOptionalFields returns field keys that are conditionally included.
+func AlarmContractOptionalFields() []string {
+	return []string{
+		AlarmFieldProject,
+		AlarmFieldCategory,
+		AlarmFieldConfig,
+	}
 }

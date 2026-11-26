@@ -16,11 +16,11 @@ package event
 
 import (
 	"github.com/alibaba/ilogtail/pkg/helper/containercenter"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 
 	"strconv"
 	"sync"
-	"time"
 
 	"github.com/moby/moby/api/types/events"
 )
@@ -46,48 +46,44 @@ func (p *ServiceDockerEvents) Description() string {
 	return "docker event input plugin for logtail"
 }
 
-// Collect takes in an accumulator and adds the metrics that the Input
-// gathers. This is called every "interval"
-func (p *ServiceDockerEvents) Collect(pipeline.Collector) error {
+func (p *ServiceDockerEvents) clampEventQueueSize() {
 	if p.EventQueueSize < 4 {
 		p.EventQueueSize = 4
 	}
 	if p.EventQueueSize > 10000 {
 		p.EventQueueSize = 10000
 	}
-	return nil
 }
 
-func (p *ServiceDockerEvents) fire(c pipeline.Collector, event events.Message) {
+func (p *ServiceDockerEvents) fire(collector pipeline.PipelineCollector, event events.Message) {
 	fieldCount := 4
 	if !p.IgnoreAttributes {
 		fieldCount += len(event.Actor.Attributes)
 	}
-	key := make([]string, fieldCount)
-	value := make([]string, len(key))
-	value[0] = strconv.FormatInt(event.TimeNano, 10)
-	value[1] = string(event.Action)
-	value[2] = string(event.Type)
-	value[3] = event.Actor.ID
-	key[0] = "_time_nano_"
-	key[1] = "_action_"
-	key[2] = "_type_"
-	key[3] = "_id_"
-
+	log := &models.Log{
+		Timestamp: uint64(event.TimeNano),
+		Contents:  models.NewOrderedLogContents(fieldCount),
+		Tags:      models.NewTags(),
+	}
+	log.Contents.Add("_time_nano_", strconv.FormatInt(event.TimeNano, 10))
+	log.Contents.Add("_action_", string(event.Action))
+	log.Contents.Add("_type_", string(event.Type))
+	log.Contents.Add("_id_", event.Actor.ID)
 	if !p.IgnoreAttributes {
-		index := 4
-		for k, v := range event.Actor.Attributes {
-			key[index] = k
-			value[index] = v
-			index++
+		for key, value := range event.Actor.Attributes {
+			if key == models.BodyKey {
+				log.SetBody([]byte(value))
+			} else {
+				log.Contents.Add(key, value)
+			}
 		}
 	}
-
-	c.AddDataArray(nil, key, value, time.Unix(0, event.TimeNano))
+	collector.Collect(models.NewGroup(models.NewMetadata(), models.NewTags()), log)
 }
 
-// Start starts the ServiceInput's service, whatever that may be
-func (p *ServiceDockerEvents) Start(c pipeline.Collector) error {
+func (p *ServiceDockerEvents) StartService(ctx pipeline.PipelineContext) error {
+	collector := ctx.Collector()
+	p.clampEventQueueSize()
 	p.shutdown = make(chan struct{})
 	p.waitGroup.Add(1)
 	p.innerEventQueue = make(chan events.Message, p.EventQueueSize)
@@ -102,7 +98,7 @@ func (p *ServiceDockerEvents) Start(c pipeline.Collector) error {
 		case <-p.shutdown:
 			return nil
 		case event := <-p.innerEventQueue:
-			p.fire(c, event)
+			p.fire(collector, event)
 		}
 	}
 }

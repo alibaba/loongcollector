@@ -48,7 +48,7 @@ type InputMysqlBinlog struct {
 	checkpoint   CheckPoint
 	context      pipeline.Context
 	parser       *replication.BinlogParser
-	collector    pipeline.Collector
+	collector    pipeline.PipelineCollector
 	rotateFile   string
 	collectCount int
 }
@@ -199,7 +199,7 @@ func (b *InputMysqlBinlog) BinlogEventToLog(event *replication.BinlogEvent) erro
 	return nil
 }
 
-func (b *InputMysqlBinlog) collectOneFile(collector pipeline.Collector) error {
+func (b *InputMysqlBinlog) collectOneFile(collector pipeline.PipelineCollector) error {
 	b.collector = collector
 	b.rotateFile = ""
 	b.collectCount = 0
@@ -220,7 +220,8 @@ func (b *InputMysqlBinlog) collectOneFile(collector pipeline.Collector) error {
 	return nil
 }
 
-func (b *InputMysqlBinlog) Collect(collector pipeline.Collector) error {
+func (b *InputMysqlBinlog) Read(ctx pipeline.PipelineContext) error {
+	collector := ctx.Collector()
 	if b.checkpoint.Offset == 0 {
 		err := b.findOffset(b.FromBegining)
 		if err != nil {

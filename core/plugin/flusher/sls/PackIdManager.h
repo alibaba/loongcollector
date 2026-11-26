@@ -20,6 +20,7 @@
 #include <ctime>
 
 #include <mutex>
+#include <optional>
 #include <unordered_map>
 
 namespace logtail {
@@ -34,7 +35,8 @@ public:
         return &instance;
     }
 
-    int64_t GetAndIncPackSeq(int64_t key);
+    // Reserve a sequence only when its hexadecimal representation can fit.
+    std::optional<uint32_t> TryGetAndIncPackSeq(int64_t key, uint32_t maxSequence);
     void CleanTimeoutEntry();
 
 private:

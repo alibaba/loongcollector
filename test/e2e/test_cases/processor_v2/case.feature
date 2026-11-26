@@ -1,19 +1,16 @@
 @processor
-Feature: processor v2 pipeline
-  Test migrated processors on a pure v2 log pipeline.
-  metric_debug_file (Log input, v2 Read) -> processors -> flusher_grpc (FlusherV2.Export).
-  Each scenario feeds a crafted line, runs the processor(s) under test, and asserts the
-  converted contents that reach the gRPC sink, so the v2 Process path is really exercised
-  (not a no-op passthrough over Metric events).
+Feature: processor event pipeline
+  Each scenario reads Log events from metric_debug_file and verifies the resulting
+  contents after processing and sending them through flusher_grpc.
 
   @e2e @docker-compose
-  Scenario: TestProcessorV2SplitKeyValueAddFieldsReplaceAppend
+  Scenario: TestProcessorSplitKeyValueAddFieldsReplaceAppend
     Given {docker-compose} environment
     Given subcribe data from {grpc} with config
     """
     """
     Given loongcollector container mount {./content_kv.log} to {/root/test/content_kv.log}
-    Given {processor-v2-kv-case} local config as below
+    Given {processor-event-kv-case} local config as below
     """
     enable: true
     global:
@@ -28,7 +25,7 @@ Feature: processor v2 pipeline
         Separator: "="
       - Type: processor_add_fields
         Fields:
-          source: e2e_v2
+          source: e2e_processor
       - Type: processor_string_replace
         SourceKey: msg
         Method: const
@@ -45,17 +42,17 @@ Feature: processor v2 pipeline
     level: "INFO-checked"
     msg: "world"
     status: "200"
-    source: "e2e_v2"
+    source: "e2e_processor"
     """
 
   @e2e @docker-compose
-  Scenario: TestProcessorV2RegexBase64MD5
+  Scenario: TestProcessorRegexBase64MD5
     Given {docker-compose} environment
     Given subcribe data from {grpc} with config
     """
     """
     Given loongcollector container mount {./regex_hash.log} to {/root/test/regex_hash.log}
-    Given {processor-v2-regex-case} local config as below
+    Given {processor-event-regex-case} local config as below
     """
     enable: true
     global:
@@ -93,13 +90,13 @@ Feature: processor v2 pipeline
     """
 
   @e2e @docker-compose
-  Scenario: TestProcessorV2SplitCharDictMap
+  Scenario: TestProcessorSplitCharDictMap
     Given {docker-compose} environment
     Given subcribe data from {grpc} with config
     """
     """
     Given loongcollector container mount {./split_pipe.log} to {/root/test/split_pipe.log}
-    Given {processor-v2-splitchar-case} local config as below
+    Given {processor-event-splitchar-case} local config as below
     """
     enable: true
     global:
@@ -133,13 +130,13 @@ Feature: processor v2 pipeline
     """
 
   @e2e @docker-compose
-  Scenario: TestProcessorV2Csv
+  Scenario: TestProcessorCsv
     Given {docker-compose} environment
     Given subcribe data from {grpc} with config
     """
     """
     Given loongcollector container mount {./csv_line.log} to {/root/test/csv_line.log}
-    Given {processor-v2-csv-case} local config as below
+    Given {processor-event-csv-case} local config as below
     """
     enable: true
     global:
@@ -165,13 +162,13 @@ Feature: processor v2 pipeline
     """
 
   @e2e @docker-compose
-  Scenario: TestProcessorV2Grok
+  Scenario: TestProcessorGrok
     Given {docker-compose} environment
     Given subcribe data from {grpc} with config
     """
     """
     Given loongcollector container mount {./grok_line.log} to {/root/test/grok_line.log}
-    Given {processor-v2-grok-case} local config as below
+    Given {processor-event-grok-case} local config as below
     """
     enable: true
     global:

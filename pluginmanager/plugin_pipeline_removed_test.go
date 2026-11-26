@@ -22,25 +22,25 @@ import (
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 )
 
-// fakeRemovableServiceInput is a minimal ServiceInputV1 that also implements
+// fakeRemovableServiceInput is a minimal ServiceInput that also implements
 // pipeline.PipelineRemovedCleaner, used to verify removal-hook routing.
 type fakeRemovableServiceInput struct {
 	removedCount int
 }
 
-func (f *fakeRemovableServiceInput) Init(pipeline.Context) (int, error) { return 0, nil }
-func (f *fakeRemovableServiceInput) Description() string                { return "fake-removable" }
-func (f *fakeRemovableServiceInput) Stop() error                        { return nil }
-func (f *fakeRemovableServiceInput) Start(pipeline.Collector) error     { return nil }
-func (f *fakeRemovableServiceInput) OnPipelineRemoved()                 { f.removedCount++ }
+func (f *fakeRemovableServiceInput) Init(pipeline.Context) (int, error)          { return 0, nil }
+func (f *fakeRemovableServiceInput) Description() string                         { return "fake-removable" }
+func (f *fakeRemovableServiceInput) Stop() error                                 { return nil }
+func (f *fakeRemovableServiceInput) StartService(pipeline.PipelineContext) error { return nil }
+func (f *fakeRemovableServiceInput) OnPipelineRemoved()                          { f.removedCount++ }
 
 // fakePlainServiceInput does NOT implement PipelineRemovedCleaner.
 type fakePlainServiceInput struct{}
 
-func (f *fakePlainServiceInput) Init(pipeline.Context) (int, error) { return 0, nil }
-func (f *fakePlainServiceInput) Description() string                { return "fake-plain" }
-func (f *fakePlainServiceInput) Stop() error                        { return nil }
-func (f *fakePlainServiceInput) Start(pipeline.Collector) error     { return nil }
+func (f *fakePlainServiceInput) Init(pipeline.Context) (int, error)          { return 0, nil }
+func (f *fakePlainServiceInput) Description() string                         { return "fake-plain" }
+func (f *fakePlainServiceInput) Stop() error                                 { return nil }
+func (f *fakePlainServiceInput) StartService(pipeline.PipelineContext) error { return nil }
 
 func TestNotifyPipelineRemoved(t *testing.T) {
 	removable := &fakeRemovableServiceInput{}

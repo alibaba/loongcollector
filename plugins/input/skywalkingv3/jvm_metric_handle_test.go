@@ -15,25 +15,28 @@
 package skywalkingv3
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"testing"
 
-	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/stretchr/testify/require"
+
+	"github.com/alibaba/ilogtail/pkg/helper"
+	"github.com/alibaba/ilogtail/pkg/models"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
 	common "github.com/alibaba/ilogtail/plugins/input/skywalkingv3/skywalking/network/common/v3"
 	v3 "github.com/alibaba/ilogtail/plugins/input/skywalkingv3/skywalking/network/language/agent/v3"
-	"github.com/alibaba/ilogtail/plugins/test"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
 )
 
 func TestJvmMetrics(t *testing.T) {
 	ctx := mock.NewEmptyContext("p", "l", "c")
 	ctx.InitContext("a", "b", "c")
-	collector := &test.MockCollector{}
+	collector := helper.NewObservePipelineContext(256).Collector()
 	handler := &JVMMetricHandler{
 		ctx,
 		collector,
@@ -41,18 +44,58 @@ func TestJvmMetrics(t *testing.T) {
 		-1,
 	}
 	_, _ = handler.Collect(context.Background(), buildMockJvmMetricRequest())
-	validate("./testdata/jvm_metrics.json", collector.RawLogs, t)
+	validate("./testdata/jvm_metrics.json", collector.ToArray(), t)
 }
 
-func validate(expectedResultPath string, result []*protocol.Log, t *testing.T) {
-	jsonBytes, _ := json.MarshalIndent(result, "", "    ")
-	fmt.Println(string(jsonBytes))
-	expected, _ := os.ReadFile(filepath.Clean(expectedResultPath))
-	temp := make([]*protocol.Log, 0, 16)
-	json.Unmarshal(expected, &temp)
-	expected, _ = json.MarshalIndent(temp, "", "    ")
-	if !bytes.Equal(jsonBytes, expected) {
-		t.Fail()
+func validate(expectedResultPath string, groups []*models.PipelineGroupEvents, t *testing.T) {
+	t.Helper()
+	raw, err := os.ReadFile(filepath.Clean(expectedResultPath))
+	require.NoError(t, err)
+	var expected []struct {
+		Time     uint32
+		TimeNs   uint32 `json:"Time_ns"`
+		Contents []struct {
+			Key   string
+			Value string
+		}
+	}
+	require.NoError(t, json.Unmarshal(raw, &expected))
+	require.Len(t, groups, len(expected))
+	for i, group := range groups {
+		require.Len(t, group.Events, 1)
+		fields := make(map[string]string, len(expected[i].Contents))
+		for _, field := range expected[i].Contents {
+			fields[field.Key] = field.Value
+		}
+		if name := fields["__name__"]; name != "" {
+			metric, ok := group.Events[0].(*models.Metric)
+			require.True(t, ok, "event %d should be a metric", i)
+			sample, err := strconv.ParseFloat(fields["__value__"], 64)
+			require.NoError(t, err)
+			timestamp, err := strconv.ParseUint(fields["__time_nano__"], 10, 64)
+			require.NoError(t, err)
+			tags := make(map[string]string)
+			for _, label := range strings.Split(fields["__labels__"], "|") {
+				if key, value, found := strings.Cut(label, "#$#"); found {
+					tags[key] = value
+				}
+			}
+			require.Equal(t, name, metric.GetName())
+			require.Equal(t, models.MetricTypeUntyped, metric.GetMetricType())
+			require.Equal(t, timestamp, metric.GetTimestamp())
+			require.Equal(t, sample, metric.GetValue().GetSingleValue())
+			require.Equal(t, tags, metric.GetTags().Iterator())
+			continue
+		}
+		log, ok := group.Events[0].(*models.Log)
+		require.True(t, ok, "event %d should be a log", i)
+		require.Equal(t, uint64(expected[i].Time)*1e9+uint64(expected[i].TimeNs), log.GetTimestamp())
+		got := make(map[string]string, log.GetIndices().Len())
+		for key, value := range models.LogContentEntries(log.GetIndices()) {
+			got[key] = pipeline.GetStringValue(value)
+		}
+		require.Equal(t, fields, got)
+		require.Empty(t, log.GetTags().Iterator())
 	}
 }
 

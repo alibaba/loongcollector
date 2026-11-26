@@ -18,9 +18,9 @@ import (
 	"context"
 	"testing"
 
+	"github.com/alibaba/ilogtail/pkg/helper"
 	commonv3 "github.com/alibaba/ilogtail/plugins/input/skywalkingv3/skywalking/network/common/v3"
 	v3 "github.com/alibaba/ilogtail/plugins/input/skywalkingv3/skywalking/network/language/agent/v3"
-	"github.com/alibaba/ilogtail/plugins/test"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
 
 	"github.com/stretchr/testify/require"
@@ -29,7 +29,7 @@ import (
 func TestTrace(t *testing.T) {
 	ctx := mock.NewEmptyContext("p", "l", "c")
 	ctx.InitContext("a", "b", "c")
-	collector := &test.MockCollector{}
+	collector := helper.NewObservePipelineContext(256).Collector()
 	resourcePropertiesCache := &ResourcePropertiesCache{
 		cache:    make(map[string]map[string]string),
 		cacheKey: ctx.GetConfigName() + "#" + CheckpointKey,
@@ -52,7 +52,7 @@ func TestTrace(t *testing.T) {
 	require.Equal(t, resourcePropertiesCache.load(ctx), true)
 	require.Equal(t, len(resourcePropertiesCache.cache), 1)
 	_, _ = handler.CollectInSync(context.Background(), buildMockTraceRequest())
-	validate("./testdata/trace.json", collector.RawLogs, t)
+	validate("./testdata/trace.json", collector.ToArray(), t)
 }
 
 func buildMockTraceRequest() *v3.SegmentCollection {

@@ -1,4 +1,4 @@
-// Copyright 2021 iLogtail Authors
+// Copyright 2022 iLogtail Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,23 +15,16 @@
 package opentelemetry
 
 import (
-	"sync"
-	"time"
-
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
-	"github.com/alibaba/ilogtail/pkg/util"
-	baseagg "github.com/alibaba/ilogtail/plugins/aggregator/baseagg"
+	"github.com/alibaba/ilogtail/plugins/aggregator/baseagg"
 )
 
 const (
-	MaxLogCount     = 1024
-	MaxLogGroupSize = 3 * 1024 * 1024
+	DefaultMetricsLogstore = "otlp-metrics"
+	DefaultTraceLogstore   = "otlp-traces"
+	DefaultLogLogstore     = "otlp-logs"
 )
-
-const DefaultMetricsLogstore = "otlp-metrics"
-const DefaultTraceLogstore = "otlp-traces"
-const DefaultLogLogstore = "otlp-logs"
 
 type AggregatorOpenTelemetry struct {
 	MaxLogGroupCount int
@@ -42,15 +35,10 @@ type AggregatorOpenTelemetry struct {
 	TraceLogstore    string
 	LogLogstore      string
 
-	metricsAgg *baseagg.AggregatorBase
-	traceAgg   *baseagg.AggregatorBase
-	logAgg     *baseagg.AggregatorBase
-	Lock       *sync.Mutex
-	context    pipeline.Context
-	queue      pipeline.LogGroupQueue
+	batches baseagg.Batcher
 }
 
-func (p *AggregatorOpenTelemetry) Init(context pipeline.Context, que pipeline.LogGroupQueue) (int, error) {
+func (p *AggregatorOpenTelemetry) Init(ctx pipeline.Context) (int, error) {
 	if p.MetricsLogstore == "" {
 		p.MetricsLogstore = DefaultMetricsLogstore
 	}
@@ -60,72 +48,68 @@ func (p *AggregatorOpenTelemetry) Init(context pipeline.Context, que pipeline.Lo
 	if p.LogLogstore == "" {
 		p.LogLogstore = DefaultLogLogstore
 	}
-
-	p.context = context
-	p.queue = que
-	p.metricsAgg = baseagg.NewAggregatorBase()
-	if _, err := p.metricsAgg.Init(context, que); err != nil {
-		return 0, err
-	}
-
-	p.metricsAgg.InitInner(p.PackFlag, p.context.GetConfigName()+p.MetricsLogstore+util.GetIPAddress()+time.Now().String(), p.Lock, p.MetricsLogstore, p.Topic, p.MaxLogCount, p.MaxLogGroupCount)
-
-	p.traceAgg = baseagg.NewAggregatorBase()
-	if _, err := p.traceAgg.Init(context, que); err != nil {
-		return 0, err
-	}
-	p.traceAgg.InitInner(p.PackFlag, p.context.GetConfigName()+p.TraceLogstore+util.GetIPAddress()+time.Now().String(), p.Lock, p.TraceLogstore, p.Topic, p.MaxLogCount, p.MaxLogGroupCount)
-
-	p.logAgg = baseagg.NewAggregatorBase()
-	if _, err := p.logAgg.Init(context, que); err != nil {
-		return 0, err
-	}
-	p.logAgg.InitInner(p.PackFlag, p.context.GetConfigName()+p.LogLogstore+util.GetIPAddress()+time.Now().String(), p.Lock, p.LogLogstore, p.Topic, p.MaxLogCount, p.MaxLogGroupCount)
-	return 0, nil
+	return 0, p.batches.Init(ctx, p.MaxLogCount, p.MaxLogGroupCount, p.PackFlag)
 }
 
 func (*AggregatorOpenTelemetry) Description() string {
 	return "aggregator router for opentelemetry"
 }
 
-// Add adds @log to aggregator.
-// Add use first content as route key
-// Add returns any error encountered, nil means success.
-func (p *AggregatorOpenTelemetry) Add(log *protocol.Log, ctx map[string]interface{}) error {
-	if len(log.Contents) > 0 {
-		if len(log.Contents) <= 5 {
-			return p.metricsAgg.Add(log, ctx)
-		}
-		if len(log.Contents) >= 19 {
-			return p.traceAgg.Add(log, ctx)
-		}
-		return p.logAgg.Add(log, ctx)
+func (p *AggregatorOpenTelemetry) Record(in *models.PipelineGroupEvents, ctx pipeline.PipelineContext) error {
+	if in == nil {
+		return nil
+	}
+	routes := make(map[string][]models.PipelineEvent, 3)
+	for _, event := range in.Events {
+		logstore := p.destination(event)
+		routes[logstore] = append(routes[logstore], event)
+	}
+	for logstore, events := range routes {
+		p.batches.CollectRoute(ctx, in.Group, events, logstore, p.Topic)
 	}
 	return nil
 }
 
-func (p *AggregatorOpenTelemetry) Flush() []*protocol.LogGroup {
-	logGroups := []*protocol.LogGroup{}
-	logGroups = append(logGroups, p.metricsAgg.Flush()...)
-	logGroups = append(logGroups, p.traceAgg.Flush()...)
-	logGroups = append(logGroups, p.logAgg.Flush()...)
-	return logGroups
+func (p *AggregatorOpenTelemetry) destination(event models.PipelineEvent) string {
+	switch event.GetType() {
+	case models.EventTypeMetric:
+		return p.MetricsLogstore
+	case models.EventTypeSpan:
+		return p.TraceLogstore
+	case models.EventTypeLogging:
+		fields := event.(*models.Log).GetIndices()
+		// Older OTLP receivers could send flattened metrics or traces through
+		// the raw log API. Ordinary logs may have few fields as well.
+		switch {
+		case fields.Contains("__name__") && fields.Contains("__time_nano__"):
+			return p.MetricsLogstore
+		case fields.Contains("traceID") && fields.Contains("spanID") && fields.Contains("start") && fields.Contains("end"):
+			return p.TraceLogstore
+		default:
+			return p.LogLogstore
+		}
+	default:
+		return ""
+	}
+}
+
+func (p *AggregatorOpenTelemetry) GetResult(ctx pipeline.PipelineContext) error {
+	p.batches.CollectPending(ctx)
+	return nil
 }
 
 func (p *AggregatorOpenTelemetry) Reset() {
-	p.metricsAgg.Reset()
-	p.traceAgg.Reset()
-	p.logAgg.Reset()
+	p.batches.Reset()
 }
 
 func NewAggregatorOpenTelemetry() *AggregatorOpenTelemetry {
 	return &AggregatorOpenTelemetry{
 		MaxLogGroupCount: 4,
-		MaxLogCount:      MaxLogCount,
+		MaxLogCount:      baseagg.MaxLogCount,
 		PackFlag:         true,
-		Lock:             &sync.Mutex{},
 	}
 }
+
 func init() {
 	pipeline.Aggregators["aggregator_opentelemetry"] = func() pipeline.Aggregator {
 		return NewAggregatorOpenTelemetry()

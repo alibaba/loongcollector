@@ -34,10 +34,6 @@ this is a test doc demo
 |field_5|map[string]string|field five|{"k":"v"}|
 ```
 
-## Register to the doc center
+## Contribute documentation
 
-## Commands
-
-1. execute `make docs` to generate plugin docs. Notice: Please run the commands under the OS if your contribute plugin
-   only supports the specific OS, such as linux.
-2. Because history documentation needs to be replenished constantly，you should purpose only append your plugins to `plugin-list.md` and only your plugin doc is tracked by git.
+Document the plugin's configuration fields and defaults, then add the new plugin to `plugin-list.md`.

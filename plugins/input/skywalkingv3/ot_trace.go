@@ -19,7 +19,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/models"
 
 	"github.com/pkg/errors"
 )
@@ -66,98 +66,50 @@ type OtSpanRef struct {
 	Attributes []map[string]string `json:"attributes"`
 }
 
-func (ot *OtSpan) ToLog() (*protocol.Log, error) {
-	log := &protocol.Log{}
-	if ot.End != 0 {
-		protocol.SetLogTimeWithNano(log, uint32(ot.End/int64(1000000)), uint32((ot.End*1000)%1e9))
-	} else {
-		nowTime := time.Now()
-		protocol.SetLogTime(log, uint32(nowTime.Unix()))
+func (ot *OtSpan) ToLog() (*models.Log, error) {
+	timestamp := time.UnixMicro(ot.End)
+	if ot.End == 0 {
+		timestamp = time.Now().Truncate(time.Second)
+	} else if timestamp.Unix() == 0 {
+		timestamp = time.Now()
 	}
-	log.Contents = make([]*protocol.Log_Content, 0)
+	log := &models.Log{
+		Contents:  models.NewOrderedLogContents(17),
+		Tags:      models.NewTags(),
+		Timestamp: uint64(timestamp.UnixNano()),
+	}
 	linksJSON, err := json.Marshal(ot.Links)
 	if err != nil {
 		return nil, errors.Wrap(err, "links cannot marshal to json")
 	}
-	log.Contents = append(log.Contents, &protocol.Log_Content{
-		Key:   "links",
-		Value: string(linksJSON),
-	})
-	log.Contents = append(log.Contents, &protocol.Log_Content{
-		Key:   "host",
-		Value: ot.Host,
-	})
-	log.Contents = append(log.Contents, &protocol.Log_Content{
-		Key:   "service",
-		Value: ot.Service,
-	})
+	log.Contents.Add("links", string(linksJSON))
+	log.Contents.Add("host", ot.Host)
+	log.Contents.Add("service", ot.Service)
 	resourceJSON, err := json.Marshal(ot.Resource)
 	if err != nil {
 		return nil, errors.Wrap(err, "resource cannot marshal to json")
 	}
-	log.Contents = append(log.Contents, &protocol.Log_Content{
-		Key:   "resource",
-		Value: string(resourceJSON),
-	})
-	log.Contents = append(log.Contents, &protocol.Log_Content{
-		Key:   "name",
-		Value: ot.Name,
-	})
-	log.Contents = append(log.Contents, &protocol.Log_Content{
-		Key:   "kind",
-		Value: ot.Kind,
-	})
-	log.Contents = append(log.Contents, &protocol.Log_Content{
-		Key:   "traceID",
-		Value: ot.TraceID,
-	})
-	log.Contents = append(log.Contents, &protocol.Log_Content{
-		Key:   "spanID",
-		Value: ot.SpanID,
-	})
-	log.Contents = append(log.Contents, &protocol.Log_Content{
-		Key:   "parentSpanID",
-		Value: ot.ParentSpanID,
-	})
+	log.Contents.Add("resource", string(resourceJSON))
+	log.Contents.Add("name", ot.Name)
+	log.Contents.Add("kind", ot.Kind)
+	log.Contents.Add("traceID", ot.TraceID)
+	log.Contents.Add("spanID", ot.SpanID)
+	log.Contents.Add("parentSpanID", ot.ParentSpanID)
 	logsJSON, err := json.Marshal(ot.Logs)
 	if err != nil {
 		return nil, errors.Wrap(err, "logs cannot marshal to json")
 	}
-	log.Contents = append(log.Contents, &protocol.Log_Content{
-		Key:   "logs",
-		Value: string(logsJSON),
-	})
-	log.Contents = append(log.Contents, &protocol.Log_Content{
-		Key:   "traceState",
-		Value: ot.TraceState,
-	})
-	log.Contents = append(log.Contents, &protocol.Log_Content{
-		Key:   "start",
-		Value: strconv.FormatInt(ot.Start, 10),
-	})
-	log.Contents = append(log.Contents, &protocol.Log_Content{
-		Key:   "end",
-		Value: strconv.FormatInt(ot.End, 10),
-	})
-	log.Contents = append(log.Contents, &protocol.Log_Content{
-		Key:   "duration",
-		Value: strconv.FormatInt(ot.Duration, 10),
-	})
+	log.Contents.Add("logs", string(logsJSON))
+	log.Contents.Add("traceState", ot.TraceState)
+	log.Contents.Add("start", strconv.FormatInt(ot.Start, 10))
+	log.Contents.Add("end", strconv.FormatInt(ot.End, 10))
+	log.Contents.Add("duration", strconv.FormatInt(ot.Duration, 10))
 	attrJSON, err := json.Marshal(ot.Attribute)
 	if err != nil {
 		return nil, errors.Wrap(err, "attribute cannot marshal to json")
 	}
-	log.Contents = append(log.Contents, &protocol.Log_Content{
-		Key:   "attribute",
-		Value: string(attrJSON),
-	})
-	log.Contents = append(log.Contents, &protocol.Log_Content{
-		Key:   "statusCode",
-		Value: string(ot.StatusCode),
-	})
-	log.Contents = append(log.Contents, &protocol.Log_Content{
-		Key:   "statusMessage",
-		Value: ot.StatusMessage,
-	})
+	log.Contents.Add("attribute", string(attrJSON))
+	log.Contents.Add("statusCode", string(ot.StatusCode))
+	log.Contents.Add("statusMessage", ot.StatusMessage)
 	return log, nil
 }

@@ -14,10 +14,39 @@ import (
 
 	"github.com/miekg/dns"
 
+	"github.com/alibaba/ilogtail/pkg/helper"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestEtwInput_ProcessEventSourceContents(t *testing.T) {
+	for _, tt := range []struct {
+		name       string
+		properties map[string]any
+		wantSource string
+	}{
+		{name: "configured source", wantSource: "etw"},
+		{name: "event source", properties: map[string]any{"Source": "event source"}, wantSource: "event source"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := helper.NewObservePipelineContext(1)
+			input := &EtwInput{Source: "etw", collector: ctx.Collector()}
+			timestamp := time.Unix(1_750_000_000, 123_456_789)
+			input.processEvent(etwEventData{eventID: 42, timestamp: timestamp, properties: tt.properties})
+
+			groups := ctx.Collector().ToArray()
+			require.Len(t, groups, 1)
+			require.Len(t, groups[0].Events, 1)
+			log := groups[0].Events[0].(*models.Log)
+			assert.Equal(t, tt.wantSource, log.Contents.Get("source"))
+			assert.Equal(t, "42", log.Contents.Get("event_id"))
+			assert.Zero(t, log.Tags.Len())
+			assert.Equal(t, uint64(timestamp.UnixNano()), log.Timestamp)
+		})
+	}
+}
 
 func TestEtwInput_Init_WithProviderName(t *testing.T) {
 	input := &EtwInput{

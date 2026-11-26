@@ -15,8 +15,8 @@
 package skywalkingv3
 
 import (
+	"github.com/alibaba/ilogtail/pkg/helper"
 	v3 "github.com/alibaba/ilogtail/plugins/input/skywalkingv3/skywalking/network/language/agent/v3"
-	"github.com/alibaba/ilogtail/plugins/test"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
 
 	"testing"
@@ -25,17 +25,17 @@ import (
 func TestHandleSingleValue(t *testing.T) {
 	ctx := mock.NewEmptyContext("p", "l", "c")
 	ctx.InitContext("a", "b", "c")
-	collector := &test.MockCollector{}
+	collector := helper.NewObservePipelineContext(256).Collector()
 	handleMeterData(ctx, collector, buildMockSingleValueRequest(), "service_111", "instance_222", 123456789)
-	validate("./testdata/meter_singlevalue.json", collector.RawLogs, t)
+	validate("./testdata/meter_singlevalue.json", collector.ToArray(), t)
 }
 
 func TestHandleHistogram(t *testing.T) {
 	ctx := mock.NewEmptyContext("p", "l", "c")
 	ctx.InitContext("a", "b", "c")
-	collector := &test.MockCollector{}
+	collector := helper.NewObservePipelineContext(256).Collector()
 	handleMeterData(ctx, collector, buildMockHistogramRequest(), "service_111", "instance_222", 123456789)
-	validate("./testdata/meter_histogram.json", collector.RawLogs, t)
+	validate("./testdata/meter_histogram.json", collector.ToArray(), t)
 }
 
 func buildMockSingleValueRequest() *v3.MeterData {

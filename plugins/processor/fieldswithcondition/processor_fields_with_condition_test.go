@@ -18,13 +18,14 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/alibaba/ilogtail/plugins/processor/internal/processortest"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
 )
 
@@ -106,33 +107,31 @@ func newProcessor() (*ProcessorFieldsWithCondition, error) {
 func TestSuccessCase(t *testing.T) {
 	processor, err := newProcessor()
 	require.NoError(t, err)
-	log1 := &protocol.Log{Time: 0}
+	log1 := processortest.Log()
 	value1 := "time:2017.09.12 20:55:36" +
 		"\\tOut of memory: Kill process "
-	log1.Contents = append(log1.Contents, &protocol.Log_Content{Key: "content", Value: value1})
+	log1.Contents.Add("content", value1)
 
-	log2 := &protocol.Log{Time: 0}
+	log2 := processortest.Log()
 	value2 := "time:2017.09.12 20:55:36" +
 		"\\tBIOS-provided physical RAM map "
-	log2.Contents = append(log2.Contents, &protocol.Log_Content{Key: "content", Value: value2})
-	processor.ProcessLogs([]*protocol.Log{log1, log2})
+	log2.Contents.Add("content", value2)
+	processortest.Apply(processor, log1, log2)
 
-	assert.Equal(t, 3, len(log1.Contents))
-	assert.Equal(t, 3, len(log2.Contents))
-	for idx := range log1.Contents {
-		key := log1.Contents[idx].Key
+	assert.Equal(t, 3, log1.Contents.Len())
+	assert.Equal(t, 3, log2.Contents.Len())
+	for key, value := range log1.Contents.Iterator() {
 		if key == "eventcode" {
-			assert.Equal(t, "c1", log1.Contents[idx].Value)
+			assert.Equal(t, "c1", value)
 		} else if key == "cid" {
-			assert.Equal(t, "c-1", log1.Contents[idx].Value)
+			assert.Equal(t, "c-1", value)
 		}
 	}
-	for idx := range log2.Contents {
-		key := log2.Contents[idx].Key
+	for key, value := range log2.Contents.Iterator() {
 		if key == "eventcode" {
-			assert.Equal(t, "c2", log2.Contents[idx].Value)
+			assert.Equal(t, "c2", value)
 		} else if key == "cid" {
-			assert.Equal(t, "c-2", log2.Contents[idx].Value)
+			assert.Equal(t, "c-2", value)
 		}
 	}
 }
@@ -182,15 +181,14 @@ func TestRelationOperatorFail(t *testing.T) {
 	assert.True(t, ok)
 	assert.Equal(t, 1, logger.GetMemoryLogCount())
 	assert.True(t, strings.Contains(memoryLog, "AlarmType:CONDITION_INIT_ALARM\tinit relationOpertor error"))
-	log1 := &protocol.Log{Time: 0}
+	log1 := processortest.Log()
 	value1 := "dummy"
-	log1.Contents = append(log1.Contents, &protocol.Log_Content{Key: "content", Value: value1})
-	processor.ProcessLogs([]*protocol.Log{log1})
-	assert.Equal(t, 2, len(log1.Contents))
-	for idx := range log1.Contents {
-		key := log1.Contents[idx].Key
+	log1.Contents.Add("content", value1)
+	processortest.Apply(&processor, log1)
+	assert.Equal(t, 2, log1.Contents.Len())
+	for key, value := range log1.Contents.Iterator() {
 		if key == "eventcode" {
-			assert.Equal(t, "c1", log1.Contents[idx].Value)
+			assert.Equal(t, "c1", value)
 		}
 	}
 }
@@ -272,50 +270,46 @@ func TestAllRelationsCase(t *testing.T) {
 	json.Unmarshal([]byte(jsonStr), &processor)
 	err := processor.Init(ctx)
 	require.NoError(t, err)
-	log1 := &protocol.Log{Time: 0}
+	log1 := processortest.Log()
 	value1 := "dummy test1 regexp end"
-	log1.Contents = append(log1.Contents, &protocol.Log_Content{Key: "content", Value: value1})
+	log1.Contents.Add("content", value1)
 
-	log2 := &protocol.Log{Time: 0}
+	log2 := processortest.Log()
 	value2 := "contains start dummy test2 contains end"
-	log2.Contents = append(log2.Contents, &protocol.Log_Content{Key: "content", Value: value2})
+	log2.Contents.Add("content", value2)
 
-	log3 := &protocol.Log{Time: 0}
+	log3 := processortest.Log()
 	value3 := "dummy test3 startwith end"
-	log3.Contents = append(log3.Contents, &protocol.Log_Content{Key: "content", Value: value3})
+	log3.Contents.Add("content", value3)
 
-	log4 := &protocol.Log{Time: 0}
+	log4 := processortest.Log()
 	value4 := "dummy test4"
-	log4.Contents = append(log4.Contents, &protocol.Log_Content{Key: "content", Value: value4})
-	processor.ProcessLogs([]*protocol.Log{log1, log2, log3, log4})
+	log4.Contents.Add("content", value4)
+	processortest.Apply(&processor, log1, log2, log3, log4)
 
-	assert.Equal(t, 2, len(log1.Contents))
-	assert.Equal(t, 2, len(log2.Contents))
-	assert.Equal(t, 2, len(log3.Contents))
-	assert.Equal(t, 2, len(log4.Contents))
+	assert.Equal(t, 2, log1.Contents.Len())
+	assert.Equal(t, 2, log2.Contents.Len())
+	assert.Equal(t, 2, log3.Contents.Len())
+	assert.Equal(t, 2, log4.Contents.Len())
 
-	for idx := range log1.Contents {
-		key := log1.Contents[idx].Key
+	for key, value := range log1.Contents.Iterator() {
 		if key == "eventcode" {
-			assert.Equal(t, "c1", log1.Contents[idx].Value)
+			assert.Equal(t, "c1", value)
 		}
 	}
-	for idx := range log2.Contents {
-		key := log2.Contents[idx].Key
+	for key, value := range log2.Contents.Iterator() {
 		if key == "eventcode" {
-			assert.Equal(t, "c2", log2.Contents[idx].Value)
+			assert.Equal(t, "c2", value)
 		}
 	}
-	for idx := range log3.Contents {
-		key := log3.Contents[idx].Key
+	for key, value := range log3.Contents.Iterator() {
 		if key == "eventcode" {
-			assert.Equal(t, "c3", log3.Contents[idx].Value)
+			assert.Equal(t, "c3", value)
 		}
 	}
-	for idx := range log4.Contents {
-		key := log4.Contents[idx].Key
+	for key, value := range log4.Contents.Iterator() {
 		if key == "eventcode" {
-			assert.Equal(t, "c4", log4.Contents[idx].Value)
+			assert.Equal(t, "c4", value)
 		}
 	}
 }
@@ -361,11 +355,11 @@ func TestNoMatchCase(t *testing.T) {
 	json.Unmarshal([]byte(jsonStr), &processor)
 	err := processor.Init(ctx)
 	require.NoError(t, err)
-	log1 := &protocol.Log{Time: 0}
+	log1 := processortest.Log()
 	value1 := "time:2017.09.12 20:55:36" +
 		"\\tOut of memory: Kill process "
-	log1.Contents = append(log1.Contents, &protocol.Log_Content{Key: "content", Value: value1})
-	logArray := processor.ProcessLogs([]*protocol.Log{log1})
+	log1.Contents.Add("content", value1)
+	logArray := processortest.Apply(&processor, log1)
 	// Drop
 	assert.Equal(t, 0, len(logArray))
 
@@ -406,7 +400,7 @@ func TestNoMatchCase(t *testing.T) {
 	json.Unmarshal([]byte(jsonStr), &processor)
 	err = processor.Init(ctx)
 	require.NoError(t, err)
-	logArray = processor.ProcessLogs([]*protocol.Log{log1})
+	logArray = processortest.Apply(&processor, log1)
 	// Retain
 	assert.Equal(t, 1, len(logArray))
 }
@@ -525,11 +519,11 @@ func TestActionNoFieldsCase(t *testing.T) {
 	json.Unmarshal([]byte(jsonStr), &processor)
 	err := processor.Init(ctx)
 	require.NoError(t, err)
-	log1 := &protocol.Log{Time: 0}
+	log1 := processortest.Log()
 	value1 := "dummy"
-	log1.Contents = append(log1.Contents, &protocol.Log_Content{Key: "content", Value: value1})
-	processor.ProcessLogs([]*protocol.Log{log1})
-	assert.Equal(t, 1, len(log1.Contents))
+	log1.Contents.Add("content", value1)
+	processortest.Apply(&processor, log1)
+	assert.Equal(t, 1, log1.Contents.Len())
 }
 
 // Test actions process order
@@ -573,11 +567,11 @@ func TestActionProcessOrderCase(t *testing.T) {
 	json.Unmarshal([]byte(jsonStr), &processor)
 	err := processor.Init(ctx)
 	require.NoError(t, err)
-	log1 := &protocol.Log{Time: 0}
+	log1 := processortest.Log()
 	value1 := "dummy"
-	log1.Contents = append(log1.Contents, &protocol.Log_Content{Key: "content", Value: value1})
-	processor.ProcessLogs([]*protocol.Log{log1})
-	assert.Equal(t, 3, len(log1.Contents))
+	log1.Contents.Add("content", value1)
+	processortest.Apply(&processor, log1)
+	assert.Equal(t, 3, log1.Contents.Len())
 
 	jsonStr = `{
 		"DropIfNotMatchCondition":true,
@@ -616,11 +610,11 @@ func TestActionProcessOrderCase(t *testing.T) {
 	json.Unmarshal([]byte(jsonStr), &processor)
 	err = processor.Init(ctx)
 	require.NoError(t, err)
-	log2 := &protocol.Log{Time: 0}
+	log2 := processortest.Log()
 	value2 := "dummy"
-	log2.Contents = append(log2.Contents, &protocol.Log_Content{Key: "content", Value: value2})
-	processor.ProcessLogs([]*protocol.Log{log2})
-	assert.Equal(t, 5, len(log2.Contents))
+	log2.Contents.Add("content", value2)
+	processortest.Apply(&processor, log2)
+	assert.Equal(t, 5, log2.Contents.Len())
 }
 
 // Test multiple case1
@@ -688,22 +682,21 @@ func TestMulti1Case(t *testing.T) {
 	json.Unmarshal([]byte(jsonStr), &processor)
 	err := processor.Init(ctx)
 	require.NoError(t, err)
-	log1 := &protocol.Log{Time: 0}
-	log1.Contents = append(log1.Contents, &protocol.Log_Content{Key: "content", Value: `{"t1": "2022-05-06 12:50:08.571218122", "t2": "2022-05-06 12:50:08", "a":"b","c":2,"d":10, "seq": 20}`})
-	log1.Contents = append(log1.Contents, &protocol.Log_Content{Key: "t1", Value: `2022-05-06 12:50:08.571218122`})
-	log1.Contents = append(log1.Contents, &protocol.Log_Content{Key: "t2", Value: `2022-05-06 12:50:08`})
-	log1.Contents = append(log1.Contents, &protocol.Log_Content{Key: "a", Value: `b`})
-	log1.Contents = append(log1.Contents, &protocol.Log_Content{Key: "c", Value: `2`})
-	log1.Contents = append(log1.Contents, &protocol.Log_Content{Key: "d", Value: `10`})
-	log1.Contents = append(log1.Contents, &protocol.Log_Content{Key: "seq", Value: `20`})
-	processor.ProcessLogs([]*protocol.Log{log1})
-	assert.Equal(t, 9, len(log1.Contents))
-	for idx := range log1.Contents {
-		key := log1.Contents[idx].Key
+	log1 := processortest.Log()
+	log1.Contents.Add("content", `{"t1": "2022-05-06 12:50:08.571218122", "t2": "2022-05-06 12:50:08", "a":"b","c":2,"d":10, "seq": 20}`)
+	log1.Contents.Add("t1", `2022-05-06 12:50:08.571218122`)
+	log1.Contents.Add("t2", `2022-05-06 12:50:08`)
+	log1.Contents.Add("a", `b`)
+	log1.Contents.Add("c", `2`)
+	log1.Contents.Add("d", `10`)
+	log1.Contents.Add("seq", `20`)
+	processortest.Apply(&processor, log1)
+	assert.Equal(t, 9, log1.Contents.Len())
+	for key, value := range log1.Contents.Iterator() {
 		if key == "eventcode" {
-			assert.Equal(t, "event_00002", log1.Contents[idx].Value)
+			assert.Equal(t, "event_00002", value)
 		} else if key == "name" {
-			assert.Equal(t, "error_oom2", log1.Contents[idx].Value)
+			assert.Equal(t, "error_oom2", value)
 		}
 	}
 }
@@ -767,21 +760,19 @@ func TestMulti2Case(t *testing.T) {
 	json.Unmarshal([]byte(jsonStr), &processor)
 	err := processor.Init(ctx)
 	require.NoError(t, err)
-	log1 := &protocol.Log{Time: 0}
-	log1.Contents = append(log1.Contents, &protocol.Log_Content{Key: "content", Value: `{"t1": "2022-05-06 12:50:08.571218122", "t2": "2022-05-06 12:50:08", "a":"b","c":2,"d":1, "seq": 21}`})
-	log1.Contents = append(log1.Contents, &protocol.Log_Content{Key: "t1", Value: `2022-05-06 12:50:08.571218122`})
-	log1.Contents = append(log1.Contents, &protocol.Log_Content{Key: "t2", Value: `2022-05-06 12:50:08`})
-	log1.Contents = append(log1.Contents, &protocol.Log_Content{Key: "a", Value: `b`})
-	log1.Contents = append(log1.Contents, &protocol.Log_Content{Key: "c", Value: `2`})
-	log1.Contents = append(log1.Contents, &protocol.Log_Content{Key: "d", Value: `1`})
-	log1.Contents = append(log1.Contents, &protocol.Log_Content{Key: "seq", Value: `21`})
-	processor.ProcessLogs([]*protocol.Log{log1})
-	assert.Equal(t, 7, len(log1.Contents))
+	log1 := processortest.Log()
+	log1.Contents.Add("content", `{"t1": "2022-05-06 12:50:08.571218122", "t2": "2022-05-06 12:50:08", "a":"b","c":2,"d":1, "seq": 21}`)
+	log1.Contents.Add("t1", `2022-05-06 12:50:08.571218122`)
+	log1.Contents.Add("t2", `2022-05-06 12:50:08`)
+	log1.Contents.Add("a", `b`)
+	log1.Contents.Add("c", `2`)
+	log1.Contents.Add("d", `1`)
+	log1.Contents.Add("seq", `21`)
+	processortest.Apply(&processor, log1)
+	assert.Equal(t, 7, log1.Contents.Len())
 }
 
-// ---- v2 (PipelineEvent / SendPb) Process path tests ----
-
-func TestProcessLogEventMatchV2(t *testing.T) {
+func TestProcessLogEventMatch(t *testing.T) {
 	processor, err := newProcessor()
 	require.NoError(t, err)
 
@@ -799,7 +790,7 @@ func TestProcessLogEventMatchV2(t *testing.T) {
 	require.True(t, contents.Contains("content"))
 }
 
-func TestProcessLogEventSecondCaseV2(t *testing.T) {
+func TestProcessLogEventSecondCase(t *testing.T) {
 	processor, err := newProcessor()
 	require.NoError(t, err)
 
@@ -815,9 +806,9 @@ func TestProcessLogEventSecondCaseV2(t *testing.T) {
 	require.False(t, contents.Contains("test2.2"))
 }
 
-func TestProcessLogEventNoMatchDropsEventV2(t *testing.T) {
+func TestProcessLogEventNoMatchDropsEvent(t *testing.T) {
 	// newProcessor sets DropIfNotMatchCondition=true: an unmatched Log event is
-	// dropped (matching v1); a Metric event still passes through unchanged.
+	// dropped; a Metric event still passes through unchanged.
 	processor, err := newProcessor()
 	require.NoError(t, err)
 
@@ -836,7 +827,7 @@ func TestProcessLogEventNoMatchDropsEventV2(t *testing.T) {
 	require.Equal(t, models.EventTypeMetric, results[0].Events[0].GetType())
 }
 
-func TestProcessMetricPassThroughV2(t *testing.T) {
+func TestProcessMetricPassThrough(t *testing.T) {
 	processor, err := newProcessor()
 	require.NoError(t, err)
 

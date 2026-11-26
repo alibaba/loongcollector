@@ -22,7 +22,6 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
@@ -110,63 +109,6 @@ func (*ProcessorGotime) Description() string {
 	return "the time format processor to parse time field with golang format pattern. More details please see [here](https://golang.org/pkg/time/#Time.Format)"
 }
 
-func (p *ProcessorGotime) ProcessLogs(logs []*protocol.Log) []*protocol.Log {
-	for _, log := range logs {
-		p.processLog(log)
-	}
-	return logs
-}
-
-func (p *ProcessorGotime) processLog(log *protocol.Log) {
-	found := false
-	for idx, content := range log.Contents {
-		if content.Key == p.SourceKey {
-			var parsedTime time.Time
-			if p.timestampFormat {
-				i, err := strconv.ParseInt(content.Value, 10, 64)
-				if err != nil && p.AlarmIfFail {
-					logger.Warningf(p.context.GetRuntimeContext(), selfmonitor.GotimeParseAlarm, "ParseInt(%v, %v) failed: %v",
-						p.SourceFormat, content.Value, err)
-					return
-				}
-				parsedTime = p.timestampParseFunc(i)
-			} else {
-				parsedStringTime, err := time.ParseInLocation(p.SourceFormat, content.Value, p.sourceLocation)
-				if err != nil && p.AlarmIfFail {
-					logger.Warningf(p.context.GetRuntimeContext(), selfmonitor.GotimeParseAlarm, "ParseInLocation(%v, %v, %v) failed: %v",
-						p.SourceFormat, content.Value, p.sourceLocation, err)
-					return
-				}
-				parsedTime = parsedStringTime
-			}
-			if p.SetTime {
-				if p.context.GetPipelineScopeConfig().EnableTimestampNanosecond {
-					protocol.SetLogTimeWithNano(log, uint32(parsedTime.Unix()), uint32(parsedTime.Nanosecond()))
-				} else {
-					protocol.SetLogTime(log, uint32(parsedTime.Unix()))
-				}
-			}
-			if !p.KeepSource {
-				log.Contents = append(log.Contents[:idx], log.Contents[idx+1:]...)
-			}
-			if p.DestKey != "" {
-				destLocationTime := parsedTime.In(p.destLocation)
-				parsedValue := destLocationTime.Format(p.DestFormat)
-				newContent := &protocol.Log_Content{
-					Key:   p.DestKey,
-					Value: parsedValue,
-				}
-				log.Contents = append(log.Contents, newContent)
-			}
-			found = true
-			break
-		}
-	}
-	if !found && p.NoKeyError {
-		logger.Warningf(p.context.GetRuntimeContext(), selfmonitor.GotimeFindAlarm, "cannot find key %v", p.SourceKey)
-	}
-}
-
 func init() {
 	pipeline.Processors[pluginType] = func() pipeline.Processor {
 		return &ProcessorGotime{
@@ -184,14 +126,13 @@ func init() {
 	}
 }
 
-// Process implements the v2 ProcessorV2 interface: it parses the SourceKey value
+// Process implements the Processor interface: it parses the SourceKey value
 // of each Log event and writes the reformatted value into DestKey (optionally
 // setting the log timestamp); Metric/Span events pass through unchanged.
 func (p *ProcessorGotime) Process(in *models.PipelineGroupEvents, context pipeline.PipelineContext) {
 	pipeline.ProcessLogEventsOnly(in, context, p.processLogEvent)
 }
 
-// processLogEvent reproduces processLog on the v2 models.Log data model.
 func (p *ProcessorGotime) processLogEvent(log *models.Log) {
 	contents := log.GetIndices()
 	if !contents.Contains(p.SourceKey) {
@@ -221,9 +162,7 @@ func (p *ProcessorGotime) processLogEvent(log *models.Log) {
 		parsedTime = parsedStringTime
 	}
 	if p.SetTime {
-		// models.Log.Timestamp is in nanoseconds (see plugin_runner_v2 conversion:
-		// uint64(time.Second * time.Duration(in.Time)) [+ TimeNs]). Reproduce the v1
-		// SetLogTime/SetLogTimeWithNano behavior on that unit.
+		// Event timestamps use nanoseconds.
 		if p.context.GetPipelineScopeConfig().EnableTimestampNanosecond {
 			log.Timestamp = uint64(parsedTime.Unix())*uint64(time.Second) + uint64(parsedTime.Nanosecond())
 		} else {

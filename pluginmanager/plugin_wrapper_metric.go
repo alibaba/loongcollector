@@ -24,15 +24,9 @@ type MetricInputWrapper struct {
 	MetricWrapper
 	pipelineCtxWrapper *PipelineContextWrapper // keep the pointer to avoid alloc and GC
 	Input              pipeline.MetricInput
-	collector          *inputCollector
 }
 
 func (wrapper *MetricInputWrapper) Init(pluginMeta *pipeline.PluginMeta, inputInterval int) error {
-	if _, ok := wrapper.Input.(pipeline.MetricInputV2); !ok {
-		if _, ok := wrapper.Input.(pipeline.MetricInputV1); !ok {
-			return pluginUnImplementError(pluginMetricInput, pluginMeta.PluginType)
-		}
-	}
 	wrapper.InitMetricRecord(pluginMeta)
 
 	interval, err := wrapper.Input.Init(wrapper.Config.Context)
@@ -44,18 +38,10 @@ func (wrapper *MetricInputWrapper) Init(pluginMeta *pipeline.PluginMeta, inputIn
 	}
 	wrapper.Interval = time.Duration(interval) * time.Millisecond
 	wrapper.pipelineCtxWrapper = newPipelineContextWrapper(nil, wrapper.outEventsTotal, wrapper.outEventGroupsTotal, wrapper.outSizeBytes)
-	wrapper.collector = &inputCollector{
-		context:        wrapper.pipelineCtxWrapper,
-		configTags:     wrapper.Tags,
-		runtimeContext: wrapper.Config.Context.GetRuntimeContext(),
-	}
 	return nil
 }
 
 func (wrapper *MetricInputWrapper) Read(pipelineContext pipeline.PipelineContext) error {
 	wrapper.pipelineCtxWrapper.PipelineCollectorWrapper.inner = pipelineContext.Collector()
-	if input, ok := wrapper.Input.(pipeline.MetricInputV2); ok {
-		return input.Read(wrapper.pipelineCtxWrapper)
-	}
-	return wrapper.Input.(pipeline.MetricInputV1).Collect(wrapper.collector)
+	return wrapper.Input.Read(wrapper.pipelineCtxWrapper)
 }

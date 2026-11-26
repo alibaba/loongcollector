@@ -18,6 +18,8 @@ import (
 	"context"
 	"testing"
 
+	"github.com/alibaba/ilogtail/plugins/processor/internal/processortest"
+
 	"github.com/pingcap/check"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -26,8 +28,6 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
-	"github.com/alibaba/ilogtail/plugins/test"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
 )
 
@@ -39,11 +39,11 @@ func Test(t *testing.T) {
 }
 
 type processorTestSuite struct {
-	processor pipeline.ProcessorV1
+	processor pipeline.Processor
 }
 
 func (s *processorTestSuite) SetUpTest(c *check.C) {
-	s.processor = pipeline.Processors["processor_split_string"]().(pipeline.ProcessorV1)
+	s.processor = pipeline.Processors["processor_split_string"]()
 	_ = s.processor.Init(mock.NewEmptyContext("p", "l", "c"))
 	logger.Info(context.Background(), "set up", s.processor.Description())
 }
@@ -61,33 +61,27 @@ func (s *processorTestSuite) TestInitError(c *check.C) {
 func (s *processorTestSuite) TestDefault(c *check.C) {
 	{
 		var log = "xxxx\nyyyy\nzzzz"
-		logPb := test.CreateLogs("content", log)
-		logArray := make([]*protocol.Log, 1)
-		logArray[0] = logPb
-		outLogs := s.processor.ProcessLogs(logArray)
+		logEvent := processortest.Log("content", log)
+		outLogs := processortest.Apply(s.processor, logEvent)
 		c.Assert(len(outLogs), check.Equals, 1)
-		c.Assert(len(outLogs[0].Contents), check.Equals, 1)
-		c.Assert(outLogs[0].Contents[0].GetValue(), check.Equals, log)
+		c.Assert(outLogs[0].Contents.Len(), check.Equals, 1)
+		c.Assert(pipeline.GetStringValue(outLogs[0].Contents.Get("_split_preserve_")), check.Equals, log)
 	}
 	{
 		var log = "xxxx\nyyyy\nzzzz\n"
-		logPb := test.CreateLogs("content", log)
-		logArray := make([]*protocol.Log, 1)
-		logArray[0] = logPb
-		outLogs := s.processor.ProcessLogs(logArray)
+		logEvent := processortest.Log("content", log)
+		outLogs := processortest.Apply(s.processor, logEvent)
 		c.Assert(len(outLogs), check.Equals, 1)
-		c.Assert(len(outLogs[0].Contents), check.Equals, 1)
-		c.Assert(outLogs[0].Contents[0].GetValue(), check.Equals, log)
+		c.Assert(outLogs[0].Contents.Len(), check.Equals, 1)
+		c.Assert(pipeline.GetStringValue(outLogs[0].Contents.Get("_split_preserve_")), check.Equals, log)
 	}
 	{
 		var log = "\nxxxx\nyyyy\nzzzz\n"
-		logPb := test.CreateLogs("content", log)
-		logArray := make([]*protocol.Log, 1)
-		logArray[0] = logPb
-		outLogs := s.processor.ProcessLogs(logArray)
+		logEvent := processortest.Log("content", log)
+		outLogs := processortest.Apply(s.processor, logEvent)
 		c.Assert(len(outLogs), check.Equals, 1)
-		c.Assert(len(outLogs[0].Contents), check.Equals, 1)
-		c.Assert(outLogs[0].Contents[0].GetValue(), check.Equals, log)
+		c.Assert(outLogs[0].Contents.Len(), check.Equals, 1)
+		c.Assert(pipeline.GetStringValue(outLogs[0].Contents.Get("_split_preserve_")), check.Equals, log)
 	}
 }
 
@@ -103,26 +97,15 @@ func (s *processorTestSuite) TestNormal(c *check.C) {
 		_ = s.processor.Init(mock.NewEmptyContext("p", "l", "c"))
 
 		var log = "你好[2017-12-12 00:00:00] 你好\n  hello\n\t\n[2017xxxxxx]yyyy\nzzzz\n\t你好[你好"
-		logPb := test.CreateLogs("preserve_1", "1", "content", log, "preserve_2", "2")
-		logArray := make([]*protocol.Log, 1)
-		logArray[0] = logPb
-		outLogs := s.processor.ProcessLogs(logArray)
+		logEvent := processortest.Log("preserve_1", "1", "content", log, "preserve_2", "2")
+		outLogs := processortest.Apply(s.processor, logEvent)
 		c.Assert(len(outLogs), check.Equals, 1)
-		c.Assert(len(outLogs[0].Contents), check.Equals, 5)
-		c.Assert(outLogs[0].Contents[0].GetKey(), check.Equals, "preserve_1")
-		c.Assert(outLogs[0].Contents[0].GetValue(), check.Equals, "1")
-
-		c.Assert(outLogs[0].Contents[1].GetKey(), check.Equals, "content")
-		c.Assert(outLogs[0].Contents[1].GetValue(), check.Equals, log)
-
-		c.Assert(outLogs[0].Contents[2].GetKey(), check.Equals, "preserve_2")
-		c.Assert(outLogs[0].Contents[2].GetValue(), check.Equals, "2")
-
-		c.Assert(outLogs[0].Contents[3].GetKey(), check.Equals, "key1")
-		c.Assert(outLogs[0].Contents[3].GetValue(), check.Equals, "")
-
-		c.Assert(outLogs[0].Contents[4].GetKey(), check.Equals, "key2")
-		c.Assert(outLogs[0].Contents[4].GetValue(), check.Equals, "[2017-12-12 00:00:00] ")
+		c.Assert(outLogs[0].Contents.Len(), check.Equals, 5)
+		c.Assert(pipeline.GetStringValue(outLogs[0].Contents.Get("preserve_1")), check.Equals, "1")
+		c.Assert(pipeline.GetStringValue(outLogs[0].Contents.Get("content")), check.Equals, log)
+		c.Assert(pipeline.GetStringValue(outLogs[0].Contents.Get("preserve_2")), check.Equals, "2")
+		c.Assert(pipeline.GetStringValue(outLogs[0].Contents.Get("key1")), check.Equals, "")
+		c.Assert(pipeline.GetStringValue(outLogs[0].Contents.Get("key2")), check.Equals, "[2017-12-12 00:00:00] ")
 	}
 
 	{
@@ -136,25 +119,16 @@ func (s *processorTestSuite) TestNormal(c *check.C) {
 		_ = s.processor.Init(mock.NewEmptyContext("p", "l", "c"))
 
 		var log = "你好[2017-12-12 00:00:00] 你好\n  hello\n\t\n[2017xxxxxx]yyyy\nzzzz\n\t你好[你好"
-		logPb := test.CreateLogs("preserve_1", "1", "content", log, "preserve_2", "2")
-		logArray := make([]*protocol.Log, 1)
-		logArray[0] = logPb
-		outLogs := s.processor.ProcessLogs(logArray)
+		logEvent := processortest.Log("preserve_1", "1", "content", log, "preserve_2", "2")
+		outLogs := processortest.Apply(s.processor, logEvent)
 		c.Assert(len(outLogs), check.Equals, 1)
-		c.Assert(len(outLogs[0].Contents), check.Equals, 5)
-		c.Assert(outLogs[0].Contents[0].GetKey(), check.Equals, "preserve_1")
-		c.Assert(outLogs[0].Contents[0].GetValue(), check.Equals, "1")
+		c.Assert(outLogs[0].Contents.Len(), check.Equals, 5)
+		c.Assert(pipeline.GetStringValue(outLogs[0].Contents.Get("preserve_1")), check.Equals, "1")
+		c.Assert(pipeline.GetStringValue(outLogs[0].Contents.Get("preserve_2")), check.Equals, "2")
+		c.Assert(pipeline.GetStringValue(outLogs[0].Contents.Get("key1")), check.Equals, "")
+		c.Assert(pipeline.GetStringValue(outLogs[0].Contents.Get("key2")), check.Equals, "[2017-12-12 00:00:00] ")
 
-		c.Assert(outLogs[0].Contents[1].GetKey(), check.Equals, "preserve_2")
-		c.Assert(outLogs[0].Contents[1].GetValue(), check.Equals, "2")
-
-		c.Assert(outLogs[0].Contents[2].GetKey(), check.Equals, "key1")
-		c.Assert(outLogs[0].Contents[2].GetValue(), check.Equals, "")
-
-		c.Assert(outLogs[0].Contents[3].GetKey(), check.Equals, "key2")
-		c.Assert(outLogs[0].Contents[3].GetValue(), check.Equals, "[2017-12-12 00:00:00] ")
-
-		c.Assert(outLogs[0].Contents[4].GetValue(), check.Equals, "\n  hello\n\t\n[2017xxxxxx]yyyy\nzzzz\n\t你好[你好")
+		c.Assert(pipeline.GetStringValue(outLogs[0].Contents.Get("_split_preserve_")), check.Equals, "\n  hello\n\t\n[2017xxxxxx]yyyy\nzzzz\n\t你好[你好")
 	}
 }
 
@@ -168,12 +142,10 @@ func (s *processorTestSuite) TestNoKeyAlarmAndPreserve(c *check.C) {
 		_ = s.processor.Init(mock.NewEmptyContext("p", "l", "c"))
 
 		var log = "[2017-12-12 00:00:00] 你好\n  hello\n\t\n[2017xxxxxx]yyyy\nzzzz\n\t["
-		logPb := test.CreateLogs("preserve_1", "1", "content", log, "preserve_2", "2")
-		logArray := make([]*protocol.Log, 1)
-		logArray[0] = logPb
-		outLogs := s.processor.ProcessLogs(logArray)
+		logEvent := processortest.Log("preserve_1", "1", "content", log, "preserve_2", "2")
+		outLogs := processortest.Apply(s.processor, logEvent)
 		c.Assert(len(outLogs), check.Equals, 1)
-		c.Assert(len(outLogs[0].Contents), check.Equals, 3)
+		c.Assert(outLogs[0].Contents.Len(), check.Equals, 3)
 	}
 
 	{
@@ -187,13 +159,11 @@ func (s *processorTestSuite) TestNoKeyAlarmAndPreserve(c *check.C) {
 		_ = s.processor.Init(mock.NewEmptyContext("p", "l", "c"))
 
 		var log = "[2017-12-12 00:00:00] 你好\n  hello\n\t\n[2017xxxxxx]yyyy\nzzzz\n\t["
-		logPb := test.CreateLogs("preserve_1", "1", "content", log, "preserve_2", "2")
-		logArray := make([]*protocol.Log, 1)
-		logArray[0] = logPb
-		outLogs := s.processor.ProcessLogs(logArray)
+		logEvent := processortest.Log("preserve_1", "1", "content", log, "preserve_2", "2")
+		outLogs := processortest.Apply(s.processor, logEvent)
 		c.Assert(len(outLogs), check.Equals, 1)
-		c.Assert(len(outLogs[0].Contents), check.Equals, 3)
-		c.Assert(outLogs[0].Contents[2].GetValue(), check.Equals, log)
+		c.Assert(outLogs[0].Contents.Len(), check.Equals, 3)
+		c.Assert(pipeline.GetStringValue(outLogs[0].Contents.Get("key_1")), check.Equals, log)
 	}
 }
 
@@ -211,29 +181,16 @@ func (s *processorTestSuite) TestExpand(c *check.C) {
 		_ = s.processor.Init(mock.NewEmptyContext("p", "l", "c"))
 
 		var log = "abc&def&gh"
-		logPb := test.CreateLogs("preserve_1", "1", "content", log, "preserve_2", "2")
-		logArray := make([]*protocol.Log, 1)
-		logArray[0] = logPb
-		outLogs := s.processor.ProcessLogs(logArray)
+		logEvent := processortest.Log("preserve_1", "1", "content", log, "preserve_2", "2")
+		outLogs := processortest.Apply(s.processor, logEvent)
 		c.Assert(len(outLogs), check.Equals, 1)
-		c.Assert(len(outLogs[0].Contents), check.Equals, 6)
-		c.Assert(outLogs[0].Contents[0].GetKey(), check.Equals, "preserve_1")
-		c.Assert(outLogs[0].Contents[0].GetValue(), check.Equals, "1")
-
-		c.Assert(outLogs[0].Contents[1].GetKey(), check.Equals, "content")
-		c.Assert(outLogs[0].Contents[1].GetValue(), check.Equals, log)
-
-		c.Assert(outLogs[0].Contents[2].GetKey(), check.Equals, "preserve_2")
-		c.Assert(outLogs[0].Contents[2].GetValue(), check.Equals, "2")
-
-		c.Assert(outLogs[0].Contents[3].GetKey(), check.Equals, "param_1")
-		c.Assert(outLogs[0].Contents[3].GetValue(), check.Equals, "abc")
-
-		c.Assert(outLogs[0].Contents[4].GetKey(), check.Equals, "param_2")
-		c.Assert(outLogs[0].Contents[4].GetValue(), check.Equals, "def")
-
-		c.Assert(outLogs[0].Contents[5].GetKey(), check.Equals, "param_3")
-		c.Assert(outLogs[0].Contents[5].GetValue(), check.Equals, "gh")
+		c.Assert(outLogs[0].Contents.Len(), check.Equals, 6)
+		c.Assert(pipeline.GetStringValue(outLogs[0].Contents.Get("preserve_1")), check.Equals, "1")
+		c.Assert(pipeline.GetStringValue(outLogs[0].Contents.Get("content")), check.Equals, log)
+		c.Assert(pipeline.GetStringValue(outLogs[0].Contents.Get("preserve_2")), check.Equals, "2")
+		c.Assert(pipeline.GetStringValue(outLogs[0].Contents.Get("param_1")), check.Equals, "abc")
+		c.Assert(pipeline.GetStringValue(outLogs[0].Contents.Get("param_2")), check.Equals, "def")
+		c.Assert(pipeline.GetStringValue(outLogs[0].Contents.Get("param_3")), check.Equals, "gh")
 	}
 
 	{
@@ -249,35 +206,20 @@ func (s *processorTestSuite) TestExpand(c *check.C) {
 		_ = s.processor.Init(mock.NewEmptyContext("p", "l", "c"))
 
 		var log = "abc&def&gh"
-		logPb := test.CreateLogs("preserve_1", "1", "content", log, "preserve_2", "2")
-		logArray := make([]*protocol.Log, 1)
-		logArray[0] = logPb
-		outLogs := s.processor.ProcessLogs(logArray)
+		logEvent := processortest.Log("preserve_1", "1", "content", log, "preserve_2", "2")
+		outLogs := processortest.Apply(s.processor, logEvent)
 		c.Assert(len(outLogs), check.Equals, 1)
-		c.Assert(len(outLogs[0].Contents), check.Equals, 6)
-		c.Assert(outLogs[0].Contents[0].GetKey(), check.Equals, "preserve_1")
-		c.Assert(outLogs[0].Contents[0].GetValue(), check.Equals, "1")
-
-		c.Assert(outLogs[0].Contents[1].GetKey(), check.Equals, "content")
-		c.Assert(outLogs[0].Contents[1].GetValue(), check.Equals, log)
-
-		c.Assert(outLogs[0].Contents[2].GetKey(), check.Equals, "preserve_2")
-		c.Assert(outLogs[0].Contents[2].GetValue(), check.Equals, "2")
-
-		c.Assert(outLogs[0].Contents[3].GetKey(), check.Equals, "key")
-		c.Assert(outLogs[0].Contents[3].GetValue(), check.Equals, "abc")
-
-		c.Assert(outLogs[0].Contents[4].GetKey(), check.Equals, "param_1")
-		c.Assert(outLogs[0].Contents[4].GetValue(), check.Equals, "def")
-
-		c.Assert(outLogs[0].Contents[5].GetKey(), check.Equals, "param_2")
-		c.Assert(outLogs[0].Contents[5].GetValue(), check.Equals, "gh")
+		c.Assert(outLogs[0].Contents.Len(), check.Equals, 6)
+		c.Assert(pipeline.GetStringValue(outLogs[0].Contents.Get("preserve_1")), check.Equals, "1")
+		c.Assert(pipeline.GetStringValue(outLogs[0].Contents.Get("content")), check.Equals, log)
+		c.Assert(pipeline.GetStringValue(outLogs[0].Contents.Get("preserve_2")), check.Equals, "2")
+		c.Assert(pipeline.GetStringValue(outLogs[0].Contents.Get("key")), check.Equals, "abc")
+		c.Assert(pipeline.GetStringValue(outLogs[0].Contents.Get("param_1")), check.Equals, "def")
+		c.Assert(pipeline.GetStringValue(outLogs[0].Contents.Get("param_2")), check.Equals, "gh")
 	}
 }
 
-// ---- v2 (PipelineEvent / SendPb) Process path tests ----
-
-func TestProcessorSplitString_ProcessV2SplitsIntoKeys(t *testing.T) {
+func TestProcessorSplitString_ProcessSplitsIntoKeys(t *testing.T) {
 	processor := &ProcessorSplitString{
 		SplitSep:  "|",
 		SplitKeys: []string{"k1", "k2", "k3"},
@@ -299,7 +241,7 @@ func TestProcessorSplitString_ProcessV2SplitsIntoKeys(t *testing.T) {
 	assert.False(t, contents.Contains("src"), "source key must be removed by default")
 }
 
-func TestProcessorSplitString_ProcessV2KeepSource(t *testing.T) {
+func TestProcessorSplitString_ProcessKeepSource(t *testing.T) {
 	processor := &ProcessorSplitString{
 		SplitSep:   "|",
 		SplitKeys:  []string{"k1", "k2"},
@@ -320,7 +262,7 @@ func TestProcessorSplitString_ProcessV2KeepSource(t *testing.T) {
 	assert.True(t, contents.Contains("src"), "source key must be kept when KeepSource is set")
 }
 
-func TestProcessorSplitString_ProcessV2MissingSourceKey(t *testing.T) {
+func TestProcessorSplitString_ProcessMissingSourceKey(t *testing.T) {
 	processor := &ProcessorSplitString{
 		SplitSep:  "|",
 		SplitKeys: []string{"k1", "k2"},
@@ -339,7 +281,7 @@ func TestProcessorSplitString_ProcessV2MissingSourceKey(t *testing.T) {
 	assert.Equal(t, "a|b", contents.Get("other"), "unrelated key must be untouched")
 }
 
-func TestProcessorSplitString_ProcessV2PassesThroughMetric(t *testing.T) {
+func TestProcessorSplitString_ProcessPassesThroughMetric(t *testing.T) {
 	processor := &ProcessorSplitString{
 		SplitSep:  "|",
 		SplitKeys: []string{"k1"},

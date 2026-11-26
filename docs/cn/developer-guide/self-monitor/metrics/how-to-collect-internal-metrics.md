@@ -29,15 +29,13 @@
 
 ### 支持的 Flusher
 
-#### 扩展 Flusher（须 `global.StructureType: v2`）
+#### 扩展 Flusher
 
-在 v2 Plugin Runner 下，能与 Native Input 桥接并消费 `PipelineGroupEvents` 的扩展 Flusher，须实现 `FlusherV2` 接口（`Export` 接收 Metric 等事件）。当前代码中**仅**下列插件满足：
+统一 Go Pipeline 通过 `Flusher.Export` 接收来自原生 Input 的事件组。若要将多值 Metric 按 Prometheus Remote Write 导出，可使用 `flusher_prometheus`。它将每个值展开为一条 `{category}_{field}` 时序，例如 `agent_cpu`。
 
-| 插件 | 说明 |
-|------|------|
-| `flusher_prometheus` | Remote Write；多值 Metric 按 `{category}_{field}` 展开为多条 series（如 `agent_cpu`） |
+使用 `flusher_http` 的 `influxdb` 协议可将多值 Metric 写成 InfluxDB 行协议。使用 `custom_single`、`custom_single_flatten` 或 `jsonline` 的 Flusher 可将指标值写成日志记录。具体以目标插件的协议配置为准。
 
-配置须设置 `global.StructureType: v2`。可与可选 Go Processor（如 `processor_add_fields`）组合。
+可以在采集配置中加入 Go Processor，例如 `processor_add_fields`。处理器直接接收事件组。
 
 #### 原生 Flusher（C++，无需 Go 桥接）
 
@@ -53,10 +51,10 @@
 
 | 类型 | 插件示例 | 原因 |
 |------|----------|------|
-| 扩展 Flusher（v2 Runner） | `flusher_http`、`flusher_kafka`、`flusher_kafka_v2`、`flusher_loki`、`flusher_elasticsearch`、`flusher_clickhouse`、`flusher_doris`、`flusher_otlp`、`flusher_pulsar`、`flusher_stdout` 等 | 未实现 `FlusherV2`；v2 配置下无法与 Native 桥接 Metric 同配；v1 路径对桥接 Metric 会丢弃 |
+| 扩展 Flusher | `flusher_otlp` | OTLP 转换器不为自监控使用的 `Untyped` 指标生成数据点。 |
 | 原生 Flusher | `flusher_kafka` / `flusher_kafka_native` | C++ 实现中尚未支持 MetricEvent 写出（见 `FlusherKafka.cpp` 注释） |
 
-> 若目标为 Prometheus 而版本 ≤ v3.3.5，或需使用上表「不支持」的扩展 Flusher，请改用 [方式二](#方式二经文件中转两段采集配置)。
+> 若目标为 Prometheus 而版本 ≤ v3.3.5，或目标 Flusher 的输出格式无法导出这种多值指标，请改用 [方式二](#方式二经文件中转两段采集配置)。
 
 ### 示例：直连 Prometheus RemoteWrite
 
@@ -64,8 +62,6 @@
 
 ```yaml
 enable: true
-global:
-  StructureType: v2
 inputs:
   - Type: input_internal_metrics
     Agent:
@@ -117,7 +113,7 @@ flushers:
 
 ## 方式二：经文件中转（两段采集配置）
 
-适用于 **LoongCollector ≤ v3.3.5**，或需使用方式一「不支持」列表中的扩展 Flusher、或需在第二段做 JSON 解析与字段转换的场景。
+适用于 **LoongCollector ≤ v3.3.5**，或目标 Flusher 需要日志形式的输入、或需在第二段做 JSON 解析与字段转换的场景。
 
 ```text
 Pipeline 1（写文件）:  input_internal_metrics  →  flusher_file
@@ -170,8 +166,6 @@ flushers:
 
 ```yaml
 enable: true
-global:
-  StructureType: v2
 inputs:
   - Type: input_file
     FilePaths:

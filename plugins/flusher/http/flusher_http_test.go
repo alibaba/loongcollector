@@ -21,6 +21,8 @@ import (
 	"io"
 	"net/http"
 	"sort"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -34,7 +36,6 @@ import (
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/pipeline/extensions"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	converter "github.com/alibaba/ilogtail/pkg/protocol/converter"
 	"github.com/alibaba/ilogtail/pkg/protocol/encoder/prometheus"
 	defaultencoder "github.com/alibaba/ilogtail/plugins/extension/default_encoder"
@@ -157,7 +158,7 @@ func TestHttpFlusherInit(t *testing.T) {
 	})
 }
 
-func TestHttpFlusherFlush(t *testing.T) {
+func TestHttpFlusherExportCompatibility(t *testing.T) {
 	Convey("Given a http flusher with protocol: Influxdb, encoding: custom, query: contains variable '%{tag.db}'", t, func() {
 
 		var actualRequests []string
@@ -191,52 +192,38 @@ func TestHttpFlusherFlush(t *testing.T) {
 		So(err, ShouldBeNil)
 
 		Convey("When Flush with logGroupList contains 2 valid Log in influxdb format metrics, each with LogTag: '__tag__:db'", func() {
-			logGroups := []*protocol.LogGroup{
-				{
-					Logs: []*protocol.Log{
-						{
-							Contents: []*protocol.Log_Content{
-								{Key: "__time_nano__", Value: "1668653452000000000"},
-								{Key: "__name__", Value: "weather"},
-								{Key: "__labels__", Value: "location#$#hangzhou|province#$#zhejiang"},
-								{Key: "__value__", Value: "30"},
-							},
-						},
-						{
-							Contents: []*protocol.Log_Content{
-								{Key: "__time_nano__", Value: "1668653452000000001"},
-								{Key: "__name__", Value: "weather"},
-								{Key: "__labels__", Value: "location#$#hangzhou|province#$#zhejiang"},
-								{Key: "__value__", Value: "32"},
-							},
-						},
+			groups := []*models.PipelineGroupEvents{
+				httpFixtureGroup(flusher.Convert.Protocol == converter.ProtocolInfluxdb, []map[string]string{
+					{
+						"__time_nano__": "1668653452000000000",
+						"__name__":      "weather",
+						"__labels__":    "location#$#hangzhou|province#$#zhejiang",
+						"__value__":     "30",
 					},
-					LogTags: []*protocol.LogTag{{Key: "__tag__:db", Value: "mydb"}},
-				},
-				{
-					Logs: []*protocol.Log{
-						{
-							Contents: []*protocol.Log_Content{
-								{Key: "__time_nano__", Value: "1668653452000000003"},
-								{Key: "__name__", Value: "weather"},
-								{Key: "__labels__", Value: "location#$#hangzhou|province#$#zhejiang"},
-								{Key: "__value__", Value: "30"},
-							},
-						},
-						{
-							Contents: []*protocol.Log_Content{
-								{Key: "__time_nano__", Value: "1668653452000000004"},
-								{Key: "__name__", Value: "weather"},
-								{Key: "__labels__", Value: "location#$#hangzhou|province#$#zhejiang"},
-								{Key: "__value__", Value: "32"},
-							},
-						},
+					{
+						"__time_nano__": "1668653452000000001",
+						"__name__":      "weather",
+						"__labels__":    "location#$#hangzhou|province#$#zhejiang",
+						"__value__":     "32",
 					},
-					LogTags: []*protocol.LogTag{{Key: "__tag__:db", Value: "mydb"}},
-				},
+				}, map[string]string{"db": "mydb"}),
+				httpFixtureGroup(flusher.Convert.Protocol == converter.ProtocolInfluxdb, []map[string]string{
+					{
+						"__time_nano__": "1668653452000000003",
+						"__name__":      "weather",
+						"__labels__":    "location#$#hangzhou|province#$#zhejiang",
+						"__value__":     "30",
+					},
+					{
+						"__time_nano__": "1668653452000000004",
+						"__name__":      "weather",
+						"__labels__":    "location#$#hangzhou|province#$#zhejiang",
+						"__value__":     "32",
+					},
+				}, map[string]string{"db": "mydb"}),
 			}
 
-			err := flusher.Flush("", "", "", logGroups)
+			err := flusher.Export(groups, nil)
 			flusher.Stop()
 			Convey("Then", func() {
 				Convey("Flush() should not return error", func() {
@@ -290,54 +277,42 @@ func TestHttpFlusherFlush(t *testing.T) {
 		So(err, ShouldBeNil)
 
 		Convey("When Flush with logGroupList contains 2 valid Log in influxdb format metrics, each LOG with Content: '__tag__:db'", func() {
-			logGroups := []*protocol.LogGroup{
-				{
-					Logs: []*protocol.Log{
-						{
-							Contents: []*protocol.Log_Content{
-								{Key: "__time_nano__", Value: "1668653452000000000"},
-								{Key: "__name__", Value: "weather"},
-								{Key: "__labels__", Value: "location#$#hangzhou|province#$#zhejiang"},
-								{Key: "__value__", Value: "30"},
-								{Key: "__tag__:db", Value: "mydb"},
-							},
-						},
-						{
-							Contents: []*protocol.Log_Content{
-								{Key: "__time_nano__", Value: "1668653452000000001"},
-								{Key: "__name__", Value: "weather"},
-								{Key: "__labels__", Value: "location#$#hangzhou|province#$#zhejiang"},
-								{Key: "__value__", Value: "32"},
-								{Key: "__tag__:db", Value: "mydb"},
-							},
-						},
+			groups := []*models.PipelineGroupEvents{
+				httpFixtureGroup(flusher.Convert.Protocol == converter.ProtocolInfluxdb, []map[string]string{
+					{
+						"__time_nano__": "1668653452000000000",
+						"__name__":      "weather",
+						"__labels__":    "location#$#hangzhou|province#$#zhejiang",
+						"__value__":     "30",
+						"__tag__:db":    "mydb",
 					},
-				},
-				{
-					Logs: []*protocol.Log{
-						{
-							Contents: []*protocol.Log_Content{
-								{Key: "__time_nano__", Value: "1668653452000000003"},
-								{Key: "__name__", Value: "weather"},
-								{Key: "__labels__", Value: "location#$#hangzhou|province#$#zhejiang"},
-								{Key: "__value__", Value: "30"},
-								{Key: "__tag__:db", Value: "mydb"},
-							},
-						},
-						{
-							Contents: []*protocol.Log_Content{
-								{Key: "__time_nano__", Value: "1668653452000000004"},
-								{Key: "__name__", Value: "weather"},
-								{Key: "__labels__", Value: "location#$#hangzhou|province#$#zhejiang"},
-								{Key: "__value__", Value: "32"},
-								{Key: "__tag__:db", Value: "mydb"},
-							},
-						},
+					{
+						"__time_nano__": "1668653452000000001",
+						"__name__":      "weather",
+						"__labels__":    "location#$#hangzhou|province#$#zhejiang",
+						"__value__":     "32",
+						"__tag__:db":    "mydb",
 					},
-				},
+				}, nil),
+				httpFixtureGroup(flusher.Convert.Protocol == converter.ProtocolInfluxdb, []map[string]string{
+					{
+						"__time_nano__": "1668653452000000003",
+						"__name__":      "weather",
+						"__labels__":    "location#$#hangzhou|province#$#zhejiang",
+						"__value__":     "30",
+						"__tag__:db":    "mydb",
+					},
+					{
+						"__time_nano__": "1668653452000000004",
+						"__name__":      "weather",
+						"__labels__":    "location#$#hangzhou|province#$#zhejiang",
+						"__value__":     "32",
+						"__tag__:db":    "mydb",
+					},
+				}, nil),
 			}
 
-			err := flusher.Flush("", "", "", logGroups)
+			err := flusher.Export(groups, nil)
 			flusher.Stop()
 			Convey("Then", func() {
 				Convey("Flush() should not return error", func() {
@@ -362,7 +337,7 @@ func TestHttpFlusherFlush(t *testing.T) {
 	})
 }
 
-func TestHttpFlusherFlushWithAuthenticator(t *testing.T) {
+func TestHttpFlusherExportWithAuthenticator(t *testing.T) {
 	Convey("Given a http flusher with protocol: Influxdb, encoding: custom,with basicauth authenticator, query: contains variable '%{tag.db}'", t, func() {
 
 		var actualRequests []string
@@ -398,52 +373,38 @@ func TestHttpFlusherFlushWithAuthenticator(t *testing.T) {
 		So(err, ShouldBeNil)
 
 		Convey("When Flush with logGroupList contains 2 valid Log in influxdb format metrics, each with LogTag: '__tag__:db'", func() {
-			logGroups := []*protocol.LogGroup{
-				{
-					Logs: []*protocol.Log{
-						{
-							Contents: []*protocol.Log_Content{
-								{Key: "__time_nano__", Value: "1668653452000000000"},
-								{Key: "__name__", Value: "weather"},
-								{Key: "__labels__", Value: "location#$#hangzhou|province#$#zhejiang"},
-								{Key: "__value__", Value: "30"},
-							},
-						},
-						{
-							Contents: []*protocol.Log_Content{
-								{Key: "__time_nano__", Value: "1668653452000000001"},
-								{Key: "__name__", Value: "weather"},
-								{Key: "__labels__", Value: "location#$#hangzhou|province#$#zhejiang"},
-								{Key: "__value__", Value: "32"},
-							},
-						},
+			groups := []*models.PipelineGroupEvents{
+				httpFixtureGroup(flusher.Convert.Protocol == converter.ProtocolInfluxdb, []map[string]string{
+					{
+						"__time_nano__": "1668653452000000000",
+						"__name__":      "weather",
+						"__labels__":    "location#$#hangzhou|province#$#zhejiang",
+						"__value__":     "30",
 					},
-					LogTags: []*protocol.LogTag{{Key: "__tag__:db", Value: "mydb"}},
-				},
-				{
-					Logs: []*protocol.Log{
-						{
-							Contents: []*protocol.Log_Content{
-								{Key: "__time_nano__", Value: "1668653452000000003"},
-								{Key: "__name__", Value: "weather"},
-								{Key: "__labels__", Value: "location#$#hangzhou|province#$#zhejiang"},
-								{Key: "__value__", Value: "30"},
-							},
-						},
-						{
-							Contents: []*protocol.Log_Content{
-								{Key: "__time_nano__", Value: "1668653452000000004"},
-								{Key: "__name__", Value: "weather"},
-								{Key: "__labels__", Value: "location#$#hangzhou|province#$#zhejiang"},
-								{Key: "__value__", Value: "32"},
-							},
-						},
+					{
+						"__time_nano__": "1668653452000000001",
+						"__name__":      "weather",
+						"__labels__":    "location#$#hangzhou|province#$#zhejiang",
+						"__value__":     "32",
 					},
-					LogTags: []*protocol.LogTag{{Key: "__tag__:db", Value: "mydb"}},
-				},
+				}, map[string]string{"db": "mydb"}),
+				httpFixtureGroup(flusher.Convert.Protocol == converter.ProtocolInfluxdb, []map[string]string{
+					{
+						"__time_nano__": "1668653452000000003",
+						"__name__":      "weather",
+						"__labels__":    "location#$#hangzhou|province#$#zhejiang",
+						"__value__":     "30",
+					},
+					{
+						"__time_nano__": "1668653452000000004",
+						"__name__":      "weather",
+						"__labels__":    "location#$#hangzhou|province#$#zhejiang",
+						"__value__":     "32",
+					},
+				}, map[string]string{"db": "mydb"}),
 			}
 
-			err := flusher.Flush("", "", "", logGroups)
+			err := flusher.Export(groups, nil)
 			flusher.Stop()
 			Convey("Then", func() {
 				Convey("Flush() should not return error", func() {
@@ -701,7 +662,7 @@ func TestGetNextRetryDelay(t *testing.T) {
 	}
 }
 
-func TestHttpFlusherFlushWithInterceptor(t *testing.T) {
+func TestHttpFlusherExportWithInterceptor(t *testing.T) {
 	Convey("Given a http flusher with sync intercepter", t, func() {
 		mockIntercepter := &mockInterceptor{}
 		flusher := &FlusherHTTP{
@@ -714,7 +675,7 @@ func TestHttpFlusherFlushWithInterceptor(t *testing.T) {
 			AsyncIntercept: false,
 			Timeout:        defaultTimeout,
 			Concurrency:    1,
-			queue:          make(chan interface{}, 10),
+			queue:          make(chan *models.PipelineGroupEvents, 10),
 		}
 
 		Convey("should discard all events", func() {
@@ -744,7 +705,7 @@ func TestHttpFlusherFlushWithInterceptor(t *testing.T) {
 			AsyncIntercept: true,
 			Timeout:        defaultTimeout,
 			Concurrency:    1,
-			queue:          make(chan interface{}, 10),
+			queue:          make(chan *models.PipelineGroupEvents, 10),
 		}
 
 		Convey("should discard all events", func() {
@@ -780,7 +741,7 @@ func TestHttpFlusherDropEvents(t *testing.T) {
 			AsyncIntercept:         true,
 			Timeout:                defaultTimeout,
 			Concurrency:            1,
-			queue:                  make(chan interface{}, 1),
+			queue:                  make(chan *models.PipelineGroupEvents, 1),
 			DropEventWhenQueueFull: true,
 		}
 
@@ -847,52 +808,38 @@ func TestFlusherHTTP_GzipCompression(t *testing.T) {
 		So(err, ShouldBeNil)
 
 		Convey("When Flush with logGroupList contains 2 valid Log in influxdb format metrics, each with LogTag: '__tag__:db'", func() {
-			logGroups := []*protocol.LogGroup{
-				{
-					Logs: []*protocol.Log{
-						{
-							Contents: []*protocol.Log_Content{
-								{Key: "__time_nano__", Value: "1668653452000000000"},
-								{Key: "__name__", Value: "weather"},
-								{Key: "__labels__", Value: "location#$#hangzhou|province#$#zhejiang"},
-								{Key: "__value__", Value: "30"},
-							},
-						},
-						{
-							Contents: []*protocol.Log_Content{
-								{Key: "__time_nano__", Value: "1668653452000000001"},
-								{Key: "__name__", Value: "weather"},
-								{Key: "__labels__", Value: "location#$#hangzhou|province#$#zhejiang"},
-								{Key: "__value__", Value: "32"},
-							},
-						},
+			groups := []*models.PipelineGroupEvents{
+				httpFixtureGroup(flusher.Convert.Protocol == converter.ProtocolInfluxdb, []map[string]string{
+					{
+						"__time_nano__": "1668653452000000000",
+						"__name__":      "weather",
+						"__labels__":    "location#$#hangzhou|province#$#zhejiang",
+						"__value__":     "30",
 					},
-					LogTags: []*protocol.LogTag{{Key: "__tag__:db", Value: "mydb"}},
-				},
-				{
-					Logs: []*protocol.Log{
-						{
-							Contents: []*protocol.Log_Content{
-								{Key: "__time_nano__", Value: "1668653452000000003"},
-								{Key: "__name__", Value: "weather"},
-								{Key: "__labels__", Value: "location#$#hangzhou|province#$#zhejiang"},
-								{Key: "__value__", Value: "30"},
-							},
-						},
-						{
-							Contents: []*protocol.Log_Content{
-								{Key: "__time_nano__", Value: "1668653452000000004"},
-								{Key: "__name__", Value: "weather"},
-								{Key: "__labels__", Value: "location#$#hangzhou|province#$#zhejiang"},
-								{Key: "__value__", Value: "32"},
-							},
-						},
+					{
+						"__time_nano__": "1668653452000000001",
+						"__name__":      "weather",
+						"__labels__":    "location#$#hangzhou|province#$#zhejiang",
+						"__value__":     "32",
 					},
-					LogTags: []*protocol.LogTag{{Key: "__tag__:db", Value: "mydb"}},
-				},
+				}, map[string]string{"db": "mydb"}),
+				httpFixtureGroup(flusher.Convert.Protocol == converter.ProtocolInfluxdb, []map[string]string{
+					{
+						"__time_nano__": "1668653452000000003",
+						"__name__":      "weather",
+						"__labels__":    "location#$#hangzhou|province#$#zhejiang",
+						"__value__":     "30",
+					},
+					{
+						"__time_nano__": "1668653452000000004",
+						"__name__":      "weather",
+						"__labels__":    "location#$#hangzhou|province#$#zhejiang",
+						"__value__":     "32",
+					},
+				}, map[string]string{"db": "mydb"}),
 			}
 
-			err := flusher.Flush("", "", "", logGroups)
+			err := flusher.Export(groups, nil)
 			flusher.Stop()
 			Convey("Then", func() {
 				Convey("Flush() should not return error", func() {
@@ -946,54 +893,42 @@ func TestFlusherHTTP_GzipCompression(t *testing.T) {
 		So(err, ShouldBeNil)
 
 		Convey("When Flush with logGroupList contains 2 valid Log in influxdb format metrics, each LOG with Content: '__tag__:db'", func() {
-			logGroups := []*protocol.LogGroup{
-				{
-					Logs: []*protocol.Log{
-						{
-							Contents: []*protocol.Log_Content{
-								{Key: "__time_nano__", Value: "1668653452000000000"},
-								{Key: "__name__", Value: "weather"},
-								{Key: "__labels__", Value: "location#$#hangzhou|province#$#zhejiang"},
-								{Key: "__value__", Value: "30"},
-								{Key: "__tag__:db", Value: "mydb"},
-							},
-						},
-						{
-							Contents: []*protocol.Log_Content{
-								{Key: "__time_nano__", Value: "1668653452000000001"},
-								{Key: "__name__", Value: "weather"},
-								{Key: "__labels__", Value: "location#$#hangzhou|province#$#zhejiang"},
-								{Key: "__value__", Value: "32"},
-								{Key: "__tag__:db", Value: "mydb"},
-							},
-						},
+			groups := []*models.PipelineGroupEvents{
+				httpFixtureGroup(flusher.Convert.Protocol == converter.ProtocolInfluxdb, []map[string]string{
+					{
+						"__time_nano__": "1668653452000000000",
+						"__name__":      "weather",
+						"__labels__":    "location#$#hangzhou|province#$#zhejiang",
+						"__value__":     "30",
+						"__tag__:db":    "mydb",
 					},
-				},
-				{
-					Logs: []*protocol.Log{
-						{
-							Contents: []*protocol.Log_Content{
-								{Key: "__time_nano__", Value: "1668653452000000003"},
-								{Key: "__name__", Value: "weather"},
-								{Key: "__labels__", Value: "location#$#hangzhou|province#$#zhejiang"},
-								{Key: "__value__", Value: "30"},
-								{Key: "__tag__:db", Value: "mydb"},
-							},
-						},
-						{
-							Contents: []*protocol.Log_Content{
-								{Key: "__time_nano__", Value: "1668653452000000004"},
-								{Key: "__name__", Value: "weather"},
-								{Key: "__labels__", Value: "location#$#hangzhou|province#$#zhejiang"},
-								{Key: "__value__", Value: "32"},
-								{Key: "__tag__:db", Value: "mydb"},
-							},
-						},
+					{
+						"__time_nano__": "1668653452000000001",
+						"__name__":      "weather",
+						"__labels__":    "location#$#hangzhou|province#$#zhejiang",
+						"__value__":     "32",
+						"__tag__:db":    "mydb",
 					},
-				},
+				}, nil),
+				httpFixtureGroup(flusher.Convert.Protocol == converter.ProtocolInfluxdb, []map[string]string{
+					{
+						"__time_nano__": "1668653452000000003",
+						"__name__":      "weather",
+						"__labels__":    "location#$#hangzhou|province#$#zhejiang",
+						"__value__":     "30",
+						"__tag__:db":    "mydb",
+					},
+					{
+						"__time_nano__": "1668653452000000004",
+						"__name__":      "weather",
+						"__labels__":    "location#$#hangzhou|province#$#zhejiang",
+						"__value__":     "32",
+						"__tag__:db":    "mydb",
+					},
+				}, nil),
 			}
 
-			err := flusher.Flush("", "", "", logGroups)
+			err := flusher.Export(groups, nil)
 			flusher.Stop()
 			Convey("Then", func() {
 				Convey("Flush() should not return error", func() {
@@ -1102,5 +1037,37 @@ func (mi *mockInterceptor) Intercept(group *models.PipelineGroupEvents) *models.
 		return nil
 	}
 	group.Events = group.Events[:0]
+	return group
+}
+
+func httpFixtureGroup(asMetric bool, rows []map[string]string, groupTags map[string]string) *models.PipelineGroupEvents {
+	group := &models.PipelineGroupEvents{
+		Group:  models.NewGroup(models.NewMetadata(), models.NewTagsWithKeyValues("host.ip", "")),
+		Events: make([]models.PipelineEvent, 0, len(rows)),
+	}
+	group.Group.Tags.AddAll(groupTags)
+	for _, row := range rows {
+		if asMetric {
+			tags := models.NewTags()
+			for _, label := range strings.Split(row["__labels__"], "|") {
+				if key, value, ok := strings.Cut(label, "#$#"); ok {
+					tags.Add(key, value)
+				}
+			}
+			timestamp, _ := strconv.ParseInt(row["__time_nano__"], 10, 64)
+			value, _ := strconv.ParseFloat(row["__value__"], 64)
+			group.Events = append(group.Events, models.NewSingleValueMetric(row["__name__"], models.MetricTypeGauge, tags, timestamp, value))
+			continue
+		}
+		event := models.NewSimpleLog(nil, models.NewTags(), 0)
+		for key, value := range row {
+			if tag, ok := strings.CutPrefix(key, "__tag__:"); ok {
+				event.Tags.Add(tag, value)
+			} else {
+				event.Contents.Add(key, value)
+			}
+		}
+		group.Events = append(group.Events, event)
+	}
 	return group
 }

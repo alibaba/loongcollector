@@ -22,13 +22,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/alibaba/ilogtail/pkg/models"
-	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
 type mockFlusherRecordBuilder struct {
-	groups  []*protocol.LogGroup
-	logs    []*protocol.Log
+	rows    []map[string]string
 	records []datahub.IRecord
 	failAt  int
 	err     error
@@ -36,13 +33,12 @@ type mockFlusherRecordBuilder struct {
 
 func (b *mockFlusherRecordBuilder) Init() error { return nil }
 
-func (b *mockFlusherRecordBuilder) Log2Record(group *protocol.LogGroup, log *protocol.Log) (datahub.IRecord, error) {
-	b.groups = append(b.groups, group)
-	b.logs = append(b.logs, log)
-	if b.err != nil && len(b.logs) == b.failAt {
+func (b *mockFlusherRecordBuilder) Build(fields map[string]string) (datahub.IRecord, error) {
+	b.rows = append(b.rows, fields)
+	if b.err != nil && len(b.rows) == b.failAt {
 		return nil, b.err
 	}
-	record := datahub.NewBlobRecord([]byte(log.String()), 0)
+	record := datahub.NewBlobRecord([]byte(fields["content"]), 0)
 	b.records = append(b.records, record)
 	return record, nil
 }
@@ -61,21 +57,6 @@ func (p *mockFlusherProducer) Send(records []datahub.IRecord) error {
 
 func newTestPipelineLog(content string, timestamp uint64) *models.Log {
 	return models.NewSimpleLog([]byte(content), models.NewTags(), timestamp)
-}
-
-func logContentMap(log *protocol.Log) map[string]string {
-	fields := make(map[string]string, len(log.Contents))
-	for _, content := range log.Contents {
-		fields[content.Key] = content.Value
-	}
-	return fields
-}
-
-func TestFlusherDatahubV2Only(t *testing.T) {
-	flusher := pipeline.Flushers["flusher_aliyun_datahub"]()
-	require.Implements(t, (*pipeline.FlusherV2)(nil), flusher)
-	_, supportsV1 := flusher.(pipeline.FlusherV1)
-	require.False(t, supportsV1, "DataHub must not be loadable by the v1 pipeline")
 }
 
 func TestFlusherDatahubExport(t *testing.T) {
@@ -98,19 +79,10 @@ func TestFlusherDatahubExport(t *testing.T) {
 	}
 
 	require.NoError(t, flusher.Export(groups, nil))
-	require.Len(t, builder.logs, 3)
-	require.Equal(t, map[string]string{"content": "first", "field": "value", "bytes": "raw"}, logContentMap(builder.logs[0]))
-	require.Equal(t, map[string]string{"content": "second"}, logContentMap(builder.logs[1]))
-	require.Equal(t, map[string]string{"content": "third"}, logContentMap(builder.logs[2]))
-	require.Equal(t, uint32(1700000000), builder.logs[0].GetTime())
-	require.Equal(t, uint32(123456789), builder.logs[0].GetTimeNs())
-	tags := make(map[string]string)
-	for _, tag := range builder.groups[0].LogTags {
-		tags[tag.Key] = tag.Value
-	}
-	require.Equal(t, map[string]string{"host": "node-1", "env": "test"}, tags)
-	require.Same(t, builder.groups[0], builder.groups[1])
-	require.NotSame(t, builder.groups[1], builder.groups[2])
+	require.Len(t, builder.rows, 3)
+	require.Equal(t, map[string]string{"content": "first", "field": "value", "bytes": "raw"}, builder.rows[0])
+	require.Equal(t, map[string]string{"content": "second"}, builder.rows[1])
+	require.Equal(t, map[string]string{"content": "third"}, builder.rows[2])
 	require.Len(t, producer.batches, 2)
 	require.Equal(t, builder.records[:2], producer.batches[0])
 	require.Equal(t, builder.records[2:], producer.batches[1])
@@ -127,7 +99,7 @@ func TestFlusherDatahubExportEmptyGroups(t *testing.T) {
 		{},
 		{Group: models.NewGroup(models.NewMetadata(), models.NewTags())},
 	}, nil))
-	require.Empty(t, builder.logs)
+	require.Empty(t, builder.rows)
 	require.Empty(t, producer.batches)
 }
 
@@ -142,15 +114,15 @@ func TestFlusherDatahubExportMetricAndSpan(t *testing.T) {
 	span := models.NewSpan("operation", "trace-id", "span-id", models.SpanKindServer, 3e9, 4e9, models.NewTags(), nil, nil)
 
 	require.NoError(t, flusher.Export([]*models.PipelineGroupEvents{{Events: []models.PipelineEvent{metric, span}}}, nil))
-	require.Len(t, builder.logs, 3, "multi-value metrics must emit every value, followed by the span")
-	firstMetric := logContentMap(builder.logs[0])
+	require.Len(t, builder.rows, 3, "multi-value metrics must emit every value, followed by the span")
+	firstMetric := builder.rows[0]
 	require.Equal(t, "cpu_one", firstMetric["__name__"])
 	require.Equal(t, "1", firstMetric["__value__"])
 	require.Contains(t, firstMetric["__labels__"], "host#$#node-1")
-	secondMetric := logContentMap(builder.logs[1])
+	secondMetric := builder.rows[1]
 	require.Equal(t, "cpu_two", secondMetric["__name__"])
 	require.Equal(t, "2", secondMetric["__value__"])
-	spanFields := logContentMap(builder.logs[2])
+	spanFields := builder.rows[2]
 	require.Equal(t, "trace-id", spanFields["traceID"])
 	require.Equal(t, "span-id", spanFields["spanID"])
 	require.Equal(t, "operation", spanFields["name"])
@@ -191,8 +163,26 @@ func TestFlusherDatahubExportStopsOnError(t *testing.T) {
 			} else {
 				require.ErrorIs(t, err, expectedErr)
 			}
-			require.Len(t, builder.logs, test.builds)
+			require.Len(t, builder.rows, test.builds)
 			require.Len(t, producer.batches, test.sends)
 		})
 	}
+}
+
+func TestFlusherDatahubExportKeepsTagRuns(t *testing.T) {
+	builder := &mockFlusherRecordBuilder{}
+	producer := &mockFlusherProducer{}
+	flusher := &FlusherDatahub{recordBuilder: builder, producer: producer}
+
+	group := &models.PipelineGroupEvents{}
+	for _, tag := range []string{"a", "a", "b", "a"} {
+		log := newTestPipelineLog(tag, 1700000000000000000)
+		log.Tags.Add("container", tag)
+		group.Events = append(group.Events, log)
+	}
+	require.NoError(t, flusher.Export([]*models.PipelineGroupEvents{group}, nil))
+	require.Len(t, producer.batches, 3)
+	require.Equal(t, builder.records[:2], producer.batches[0])
+	require.Equal(t, builder.records[2:3], producer.batches[1])
+	require.Equal(t, builder.records[3:], producer.batches[2])
 }

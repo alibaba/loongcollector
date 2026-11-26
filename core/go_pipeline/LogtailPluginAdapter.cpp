@@ -14,65 +14,24 @@
 
 #include "LogtailPluginAdapter.h"
 
-#include <stdio.h>
+namespace {
+IsValidToSendFun gIsValidToSend = nullptr;
+SendPipelineEventGroupFun gSendPipelineEventGroup = nullptr;
+} // namespace
 
-IsValidToSendFun gAdapterIsValidToSendFun = NULL;
-SendPbFun gAdapterSendPbFun = NULL;
-SendPbV2Fun gAdapterSendPbV2Fun = NULL;
-SendPipelineEventGroupFun gAdapterSendPipelineEventGroupFun = NULL;
-
-void RegisterLogtailCallBack(IsValidToSendFun checkFun, SendPbFun sendFun) {
-    fprintf(stderr, "[GoPluginAdapter] register fun %p %p\n", checkFun, sendFun);
-    gAdapterIsValidToSendFun = checkFun;
-    gAdapterSendPbFun = sendFun;
-}
-
-void RegisterLogtailCallBackV2(IsValidToSendFun checkFun, SendPbFun sendV1Fun, SendPbV2Fun sendV2Fun) {
-    fprintf(stderr, "register fun v2 %p %p %p \n", checkFun, sendV1Fun, sendV2Fun);
-    gAdapterIsValidToSendFun = checkFun;
-    gAdapterSendPbFun = sendV1Fun;
-    gAdapterSendPbV2Fun = sendV2Fun;
+void RegisterIsValidToSend(IsValidToSendFun checkFun) {
+    gIsValidToSend = checkFun;
 }
 
 void RegisterSendPipelineEventGroup(SendPipelineEventGroupFun sendFun) {
-    fprintf(stderr, "[GoPluginAdapter] register SendPipelineEventGroup %p\n", sendFun);
-    gAdapterSendPipelineEventGroupFun = sendFun;
+    gSendPipelineEventGroup = sendFun;
 }
 
 int LogtailIsValidToSend(long long logstoreKey) {
-    if (gAdapterIsValidToSendFun == NULL) {
+    if (gIsValidToSend == nullptr) {
         return -1;
     }
-    return gAdapterIsValidToSendFun(logstoreKey);
-}
-
-int LogtailSendPb(const char* configName,
-                  int configNameSize,
-                  const char* logstore,
-                  int logstoreSize,
-                  char* pbBuffer,
-                  int pbSize,
-                  int lines) {
-    if (gAdapterSendPbFun == NULL) {
-        return -1;
-    }
-    return gAdapterSendPbFun(configName, configNameSize, logstore, logstoreSize, pbBuffer, pbSize, lines);
-}
-
-int LogtailSendPbV2(const char* configName,
-                    int configNameSize,
-                    const char* logstore,
-                    int logstoreSize,
-                    char* pbBuffer,
-                    int pbSize,
-                    int lines,
-                    const char* shardHash,
-                    int shardHashSize) {
-    if (NULL == gAdapterSendPbV2Fun) {
-        return -1;
-    }
-    return gAdapterSendPbV2Fun(
-        configName, configNameSize, logstore, logstoreSize, pbBuffer, pbSize, lines, shardHash, shardHashSize);
+    return gIsValidToSend(logstoreKey);
 }
 
 int LogtailSendPipelineEventGroup(const char* configName,
@@ -84,19 +43,13 @@ int LogtailSendPipelineEventGroup(const char* configName,
                                   int eventCount,
                                   const char* shardHash,
                                   int shardHashSize) {
-    if (NULL == gAdapterSendPipelineEventGroupFun) {
+    if (gSendPipelineEventGroup == nullptr) {
         return -1;
     }
-    return gAdapterSendPipelineEventGroupFun(
+    return gSendPipelineEventGroup(
         configName, configNameSize, logstore, logstoreSize, pbBuffer, pbSize, eventCount, shardHash, shardHashSize);
 }
 
-// # 300
-//   - Add LogtailSendPbV2.
-//   - Update RegisterLogtailCallBack to register LogtailSendPBV2.
-// # 400
-//   - Add LogtailSendPipelineEventGroup (coexists with SendPb/V2).
-//   - Add RegisterSendPipelineEventGroup (does not change the V2 ABI).
 int PluginAdapterVersion() {
-    return 400;
+    return 500;
 }

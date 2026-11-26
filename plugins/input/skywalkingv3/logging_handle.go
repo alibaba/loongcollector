@@ -20,9 +20,10 @@ import (
 	"io"
 	"strconv"
 	"strings"
+	"time"
 
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	v3 "github.com/alibaba/ilogtail/plugins/input/skywalkingv3/skywalking/network/common/v3"
 	agent "github.com/alibaba/ilogtail/plugins/input/skywalkingv3/skywalking/network/language/agent/v3"
 	loggingV3 "github.com/alibaba/ilogtail/plugins/input/skywalkingv3/skywalking/network/logging/v3"
@@ -30,7 +31,7 @@ import (
 
 type loggingHandler struct {
 	context   pipeline.Context
-	collector pipeline.Collector
+	collector pipeline.PipelineCollector
 }
 
 func (l *loggingHandler) collectorErrorLogs(logs []*agent.BrowserErrorLog) (*v3.Commands, error) {
@@ -48,7 +49,7 @@ func (l *loggingHandler) collectorErrorLog(data *agent.BrowserErrorLog) (*v3.Com
 		return &v3.Commands{}, nil
 	}
 
-	l.collector.AddRawLog(l.convertBrowserErrorLog(data))
+	l.collector.Collect(models.NewGroup(models.NewMetadata(), models.NewTags()), l.convertBrowserErrorLog(data))
 
 	return &v3.Commands{}, nil
 }
@@ -91,51 +92,56 @@ func (l *loggingHandler) sendLogging(data *loggingV3.LogData) {
 		return
 	}
 
-	l.collector.AddRawLog(l.convertFormat(data))
+	l.collector.Collect(models.NewGroup(models.NewMetadata(), models.NewTags()), l.convertFormat(data))
 }
 
-func (l *loggingHandler) convertFormat(data *loggingV3.LogData) *protocol.Log {
-	r := &protocol.Log{
-		Contents: make([]*protocol.Log_Content, 0),
+func (l *loggingHandler) convertFormat(data *loggingV3.LogData) *models.Log {
+	log := &models.Log{
+		Contents:  models.NewOrderedLogContents(16),
+		Tags:      models.NewTags(),
+		Timestamp: uint64(time.UnixMilli(data.Timestamp).UnixNano()),
 	}
-	protocol.SetLogTimeWithNano(r, uint32(data.Timestamp/1000), uint32((data.Timestamp*1e6)%1e9))
+	if data.Timestamp/1000 == 0 {
+		log.Timestamp = uint64(time.Now().UnixNano())
+	}
 
-	r.Contents = append(r.Contents, &protocol.Log_Content{Key: "otlp.name", Value: "apache-skywalking"})
-	r.Contents = append(r.Contents, &protocol.Log_Content{
-		Key:   "attribute",
-		Value: convertAttribute(data),
-	})
-	r.Contents = append(r.Contents, &protocol.Log_Content{Key: "service", Value: data.Service})
-	r.Contents = append(r.Contents, &protocol.Log_Content{Key: "content", Value: convertContent(data.Body)})
+	log.Contents.Add("otlp.name", "apache-skywalking")
+	log.Contents.Add("attribute", convertAttribute(data))
+	log.Contents.Add("service", data.Service)
+	log.SetBody([]byte(convertContent(data.Body)))
 	if data.TraceContext != nil {
-		r.Contents = append(r.Contents, &protocol.Log_Content{Key: "traceID", Value: data.TraceContext.TraceId})
-		r.Contents = append(r.Contents, &protocol.Log_Content{Key: "spanID", Value: fmt.Sprintf("%s.%d", data.TraceContext.TraceSegmentId, data.TraceContext.SpanId)})
+		log.Contents.Add("traceID", data.TraceContext.TraceId)
+		log.Contents.Add("spanID", fmt.Sprintf("%s.%d", data.TraceContext.TraceSegmentId, data.TraceContext.SpanId))
 	}
-	r.Contents = append(r.Contents, &protocol.Log_Content{Key: "resource", Value: convertResource(data)})
-	r.Contents = append(r.Contents, &protocol.Log_Content{Key: "timeUnixNano", Value: strconv.FormatInt(data.Timestamp, 10)})
-	return r
+	log.Contents.Add("resource", convertResource(data))
+	log.Contents.Add("timeUnixNano", strconv.FormatInt(data.Timestamp, 10))
+	return log
 }
 
-func (l *loggingHandler) convertBrowserErrorLog(data *agent.BrowserErrorLog) *protocol.Log {
-	r := &protocol.Log{
-		Contents: make([]*protocol.Log_Content, 0),
+func (l *loggingHandler) convertBrowserErrorLog(data *agent.BrowserErrorLog) *models.Log {
+	log := &models.Log{
+		Contents:  models.NewOrderedLogContents(16),
+		Tags:      models.NewTags(),
+		Timestamp: uint64(time.UnixMilli(data.Time).UnixNano()),
 	}
-	protocol.SetLogTimeWithNano(r, uint32(data.Time/1000), uint32((data.Time*1e6)%1e9))
+	if data.Time/1000 == 0 {
+		log.Timestamp = uint64(time.Now().UnixNano())
+	}
 
-	r.Contents = append(r.Contents, &protocol.Log_Content{Key: "otlp.name", Value: "apache-skywalking"})
-	r.Contents = append(r.Contents, &protocol.Log_Content{Key: "service", Value: data.Service})
-	r.Contents = append(r.Contents, &protocol.Log_Content{Key: "uniqueId", Value: data.UniqueId})
-	r.Contents = append(r.Contents, &protocol.Log_Content{Key: "serviceVersion", Value: data.ServiceVersion})
-	r.Contents = append(r.Contents, &protocol.Log_Content{Key: "category", Value: data.Category.String()})
-	r.Contents = append(r.Contents, &protocol.Log_Content{Key: "pagePath", Value: data.PagePath})
-	r.Contents = append(r.Contents, &protocol.Log_Content{Key: "grade", Value: data.Grade})
-	r.Contents = append(r.Contents, &protocol.Log_Content{Key: "message", Value: data.Message})
-	r.Contents = append(r.Contents, &protocol.Log_Content{Key: "line", Value: string(data.Line)})
-	r.Contents = append(r.Contents, &protocol.Log_Content{Key: "col", Value: string(data.Col)})
-	r.Contents = append(r.Contents, &protocol.Log_Content{Key: "stack", Value: data.Stack})
-	r.Contents = append(r.Contents, &protocol.Log_Content{Key: "errorUrl", Value: string(data.Col)})
-	r.Contents = append(r.Contents, &protocol.Log_Content{Key: "firstReportedError", Value: strconv.FormatBool(data.FirstReportedError)})
-	return r
+	log.Contents.Add("otlp.name", "apache-skywalking")
+	log.Contents.Add("service", data.Service)
+	log.Contents.Add("uniqueId", data.UniqueId)
+	log.Contents.Add("serviceVersion", data.ServiceVersion)
+	log.Contents.Add("category", data.Category.String())
+	log.Contents.Add("pagePath", data.PagePath)
+	log.Contents.Add("grade", data.Grade)
+	log.Contents.Add("message", data.Message)
+	log.Contents.Add("line", string(data.Line))
+	log.Contents.Add("col", string(data.Col))
+	log.Contents.Add("stack", data.Stack)
+	log.Contents.Add("errorUrl", string(data.Col))
+	log.Contents.Add("firstReportedError", strconv.FormatBool(data.FirstReportedError))
+	return log
 }
 
 func convertResource(data *loggingV3.LogData) string {

@@ -14,27 +14,16 @@
 
 package pipeline
 
-import (
-	"github.com/alibaba/ilogtail/pkg/models"
-	"github.com/alibaba/ilogtail/pkg/protocol"
-)
+import "github.com/alibaba/ilogtail/pkg/models"
 
-// Processor also can be a filter
+// Processor transforms pipeline event groups.
 type Processor interface {
-	// Init called for init some system resources, like socket, mutex...
-	Init(pipelineContext Context) error
+	// Init initializes plugin resources.
+	Init(Context) error
 
-	// Description returns a one-sentence description on the Input
+	// Description returns a short description of the processor.
 	Description() string
-}
 
-type ProcessorV1 interface {
-	Processor
-	// ProcessLogs the filter to the given metric
-	ProcessLogs(logArray []*protocol.Log) []*protocol.Log
-}
-
-type ProcessorV2 interface {
-	Processor
-	Process(in *models.PipelineGroupEvents, context PipelineContext)
+	// Process handles an event group and collects its output.
+	Process(*models.PipelineGroupEvents, PipelineContext)
 }

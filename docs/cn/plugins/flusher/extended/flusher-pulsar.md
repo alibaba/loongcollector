@@ -8,9 +8,9 @@
 
 列含义见 [概览 · 事件能力列说明](../../overview.md#事件能力列说明)。
 
-| v1 接口 | v2 接口 | Log | Metric | Span |
-| --- | --- | --- | --- | --- |
-| ✓ | ✓ | v1&v2 | 透传未知 | 透传未知 |
+| Log | Metric | Span |
+| --- | --- | --- |
+| ✓ | 日志记录 | 日志记录 |
 
 ## 版本
 
@@ -29,8 +29,8 @@
 | Topic                                 | string   | 是    | Pulsar Topic,支持动态topic, 例如: `test_%{contents.appname}`                                                     |
 | Name                                  | string   | 否    | producer 名称，默认 `ilogtail`（LoongCollector 历史命名）                                                                                      |
 | Convert                               | Struct   | 否    | LoongCollector 数据转换协议配置                                                                                           |
-| Convert.Protocol                      | string   | 否    | LoongCollector 数据转换协议，kafka flusher 可选值：`custom_single`,`custom_single_flatten`,`otlp_log_v1`。默认值：`custom_single` |
-| Convert.Encoding                      | string   | 否    | LoongCollector Flusher 数据转换编码，可选值：`json`、`none`、`protobuf`，默认值：`json`                                             |
+| Convert.Protocol                      | string   | 否    | 数据转换协议。支持 `custom_single` 和 `custom_single_flatten`，默认值为 `custom_single`。 |
+| Convert.Encoding                      | string   | 否    | 数据转换编码，使用 `json`。 |
 | Convert.TagFieldsRename               | Map      | 否    | 对日志中tags中的json字段重命名                                                                                        |
 | Convert.ProtocolFieldsRename          | Map      | 否    | LoongCollector 日志协议字段重命名，可当前可重命名的字段：`contents`,`tags`和`time`                                                      |
 | EnableTLS                             | bool  | 否    | 是否启用TLS安全连接，对应采用TLS和Athenz两种认证模式都需要设置为true，默认值：`false`                                                     |

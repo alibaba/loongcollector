@@ -21,7 +21,6 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
@@ -68,10 +67,10 @@ func (*ProcessorSplitChar) Description() string {
 	return "single char splitor for logtail"
 }
 
-func (p *ProcessorSplitChar) splitValue(log *protocol.Log, value string) bool {
+func (p *ProcessorSplitChar) splitValue(value string, add func(key, value string)) bool {
 	if len(p.SplitKeys) == 0 {
 		if p.PreserveOthers {
-			log.Contents = append(log.Contents, &protocol.Log_Content{Key: "_split_preserve_", Value: value})
+			add("_split_preserve_", value)
 		}
 		return true
 	}
@@ -85,7 +84,7 @@ func (p *ProcessorSplitChar) splitValue(log *protocol.Log, value string) bool {
 			// quota flag
 			switch value[i] {
 			case p.splitSepChar:
-				log.Contents = append(log.Contents, &protocol.Log_Content{Key: p.SplitKeys[keyIndex], Value: ""})
+				add(p.SplitKeys[keyIndex], "")
 				lastValueIndex = i + 1
 				i++
 			case p.quoteChar:
@@ -98,7 +97,7 @@ func (p *ProcessorSplitChar) splitValue(log *protocol.Log, value string) bool {
 					if value[i] == p.quoteChar {
 						if i == len(value)-1 || value[i+1] == p.splitSepChar { // Case 1 and 2.
 							i++
-							log.Contents = append(log.Contents, &protocol.Log_Content{Key: p.SplitKeys[keyIndex], Value: string(newValue)})
+							add(p.SplitKeys[keyIndex], string(newValue))
 							lastValueIndex = i + 1
 							i++
 							break
@@ -116,7 +115,7 @@ func (p *ProcessorSplitChar) splitValue(log *protocol.Log, value string) bool {
 				}
 			default:
 				if nextIndex := strings.IndexByte(value[i:], p.splitSepChar); nextIndex >= 0 {
-					log.Contents = append(log.Contents, &protocol.Log_Content{Key: p.SplitKeys[keyIndex], Value: value[i : i+nextIndex]})
+					add(p.SplitKeys[keyIndex], value[i:i+nextIndex])
 					lastValueIndex = i + nextIndex + 1
 					i = lastValueIndex
 					continue
@@ -127,20 +126,20 @@ func (p *ProcessorSplitChar) splitValue(log *protocol.Log, value string) bool {
 		}
 		if keyIndex >= len(p.SplitKeys) && lastValueIndex < len(value) {
 			if p.PreserveOthers {
-				log.Contents = append(log.Contents, &protocol.Log_Content{Key: "_split_preserve_", Value: value[lastValueIndex:]})
+				add("_split_preserve_", value[lastValueIndex:])
 				lastValueIndex = len(value)
 			}
 		}
 	} else {
 		for i = 0; i < len(value); i++ {
 			if value[i] == p.splitSepChar {
-				log.Contents = append(log.Contents, &protocol.Log_Content{Key: p.SplitKeys[keyIndex], Value: value[lastValueIndex:i]})
+				add(p.SplitKeys[keyIndex], value[lastValueIndex:i])
 				keyIndex++
 				lastValueIndex = i + 1
 
 				if keyIndex >= len(p.SplitKeys) && i != len(value)-1 {
 					if p.PreserveOthers {
-						log.Contents = append(log.Contents, &protocol.Log_Content{Key: "_split_preserve_", Value: value[i+1:]})
+						add("_split_preserve_", value[i+1:])
 					}
 					break
 				}
@@ -148,34 +147,13 @@ func (p *ProcessorSplitChar) splitValue(log *protocol.Log, value string) bool {
 		}
 	}
 	if keyIndex < len(p.SplitKeys) && lastValueIndex < len(value) {
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: p.SplitKeys[keyIndex], Value: value[lastValueIndex:]})
+		add(p.SplitKeys[keyIndex], value[lastValueIndex:])
 		keyIndex++
 	}
 	if keyIndex < len(p.SplitKeys) && p.NoMatchError {
 		logger.Warning(p.context.GetRuntimeContext(), selfmonitor.SplitLogAlarm, "split keys not match, split len", keyIndex, "log", util.CutString(value, 1024))
 	}
 	return true
-}
-
-func (p *ProcessorSplitChar) ProcessLogs(logArray []*protocol.Log) []*protocol.Log {
-	for _, log := range logArray {
-		findKey := false
-		for i, cont := range log.Contents {
-			if len(p.SourceKey) == 0 || p.SourceKey == cont.Key {
-				findKey = true
-				splitResult := p.splitValue(log, cont.Value)
-				if !p.shouldKeepSource(splitResult) {
-					log.Contents = append(log.Contents[:i], log.Contents[i+1:]...)
-				}
-				break
-			}
-		}
-		if !findKey && p.NoKeyError {
-			logger.Warning(p.context.GetRuntimeContext(), selfmonitor.SplitFindAlarm, "cannot find key", p.SourceKey)
-		}
-	}
-
-	return logArray
 }
 
 func (p *ProcessorSplitChar) shouldKeepSource(splitResult bool) bool {
@@ -192,7 +170,7 @@ func init() {
 	}
 }
 
-// Process implements the v2 ProcessorV2 interface: it splits the SourceKey value
+// Process implements the Processor interface: it splits the SourceKey value
 // of each Log event into SplitKeys on the same log. Metric/Span events pass
 // through unchanged.
 func (p *ProcessorSplitChar) Process(in *models.PipelineGroupEvents, context pipeline.PipelineContext) {
@@ -203,13 +181,16 @@ func (p *ProcessorSplitChar) processLogEvent(log *models.Log) {
 	contents := log.GetIndices()
 	sourceKey := p.SourceKey
 	if sourceKey == "" {
-		// v1 splits the first content when SourceKey is empty. The v2 index map
-		// iteration order is unspecified, so this picks the first key best-effort.
-		for k := range contents.Iterator() {
-			sourceKey = k
-			break
+		firstKey, ordered := models.FirstLogContentKey(contents)
+		if ordered {
+			sourceKey = firstKey
+		} else {
+			for key := range contents.Iterator() {
+				sourceKey = key
+				break
+			}
 		}
-		if sourceKey == "" {
+		if contents.Len() == 0 {
 			if p.NoKeyError {
 				logger.Warning(p.context.GetRuntimeContext(), selfmonitor.SplitFindAlarm, "cannot find key", p.SourceKey)
 			}
@@ -223,13 +204,9 @@ func (p *ProcessorSplitChar) processLogEvent(log *models.Log) {
 	}
 
 	value := pipeline.GetStringValue(contents.Get(sourceKey))
-	// Reuse the tested v1 quote/escape parsing on a temporary protocol.Log.
-	tmp := &protocol.Log{}
-	splitResult := p.splitValue(tmp, value)
-	for _, c := range tmp.Contents {
-		contents.Add(c.Key, c.Value)
-	}
-	// v1 char removes the source key AFTER splitting (see ProcessLogs).
+	splitResult := p.splitValue(value, func(key, value string) {
+		contents.Add(key, value)
+	})
 	if !p.shouldKeepSource(splitResult) {
 		contents.Delete(sourceKey)
 	}

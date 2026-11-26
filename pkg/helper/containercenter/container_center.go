@@ -36,6 +36,7 @@ import (
 	"github.com/moby/moby/api/types/network"
 	docker "github.com/moby/moby/client"
 
+	"github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/flags"
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
@@ -364,6 +365,48 @@ func (did *DockerInfoDetail) GetExternalTags(envs, k8sLabels map[string]string) 
 		return tags
 	}
 	did.GetCustomExternalTags(tags, envs, k8sLabels)
+	return tags
+}
+
+// UseOldStdoutContentTags keeps legacy stdout fields in log contents unless the
+// input explicitly opts into the pipeline's tag placement setting.
+func UseOldStdoutContentTags(usePipelineEventTags bool, settings *config.GlobalConfig) bool {
+	return !usePipelineEventTags || (settings != nil && settings.UsingOldContentTag)
+}
+
+// GetStdoutTags selects container tags for the Go stdout inputs. In the current
+// format, configured mappings override built-in keys and missing values are
+// omitted, matching input_container_stdio.
+func (did *DockerInfoDetail) GetStdoutTags(envs, k8sLabels map[string]string, usingOldContentTag bool) map[string]string {
+	if usingOldContentTag {
+		tags := did.GetExternalTags(envs, k8sLabels)
+		for key, value := range did.ContainerNameTag {
+			tags[key] = value
+		}
+		return tags
+	}
+
+	tags := make(map[string]string, len(did.ContainerNameTag)+len(envs)+len(k8sLabels))
+	for key, value := range did.ContainerNameTag {
+		tags[key] = value
+	}
+	if len(envs) > 0 && did.ContainerInfo.Config != nil {
+		for _, env := range did.ContainerInfo.Config.Env {
+			key, value, ok := strings.Cut(env, "=")
+			if tag, matched := envs[key]; ok && matched {
+				tags[tag] = value
+			}
+		}
+	}
+	if did.K8SInfo != nil {
+		did.K8SInfo.mu.RLock()
+		defer did.K8SInfo.mu.RUnlock()
+		for key, tag := range k8sLabels {
+			if value, ok := did.K8SInfo.Labels[key]; ok {
+				tags[tag] = value
+			}
+		}
+	}
 	return tags
 }
 
@@ -1402,7 +1445,7 @@ func (dc *ContainerCenter) fetchAll() error {
 	return nil
 }
 
-func (dc *ContainerCenter) fetchOne(containerID string, tryFindSandbox bool) error {
+func (dc *ContainerCenter) fetchOne(containerID string) error {
 	dc.containerStateLock.Lock()
 	defer dc.containerStateLock.Unlock()
 	ctx, cancel := getContextWithTimeout(defaultContextTimeout)
@@ -1415,28 +1458,9 @@ func (dc *ContainerCenter) fetchOne(containerID string, tryFindSandbox bool) err
 	if containerDetail.State.Status == ContainerStatusRunning && !dc.containerHelper.ContainerProcessAlive(containerDetail.State.Pid) {
 		containerDetail.State.Status = ContainerStatusExited
 	}
-	// docker 场景下
-	// tryFindSandbox如果是false, 那么fetchOne的地方应该会调用两次，一次是sandbox的id，一次是业务容器的id
-	// tryFindSandbox如果是true, 调用的地方只会有一个业务容器的id，然后依赖fetchOne内部把sandbox信息补全
 	dc.updateContainer(containerID, dc.CreateInfoDetail(containerDetail, envConfigPrefix, false))
 	logger.Debug(context.Background(), "update container", containerID, "detail", containerDetail)
-	if tryFindSandbox && containerDetail.Config != nil {
-		if id := containerDetail.Config.Labels["io.kubernetes.sandbox.id"]; id != "" {
-			ctx, cancel := getContextWithTimeout(defaultContextTimeout)
-			defer cancel()
-			containerDetail, err = dc.client.ContainerInspect(ctx, id)
-			if err != nil {
-				dc.setLastError(err, "inspect sandbox container error "+id)
-			} else {
-				if containerDetail.State.Status == ContainerStatusRunning && !dc.containerHelper.ContainerProcessAlive(containerDetail.State.Pid) {
-					containerDetail.State.Status = ContainerStatusExited
-				}
-				dc.updateContainer(id, dc.CreateInfoDetail(containerDetail, envConfigPrefix, false))
-				logger.Debug(context.Background(), "update sandbox container", id, "detail", containerDetail)
-			}
-		}
-	}
-	return err
+	return nil
 }
 
 // We mark container removed if it is exited or its metadata cannot be accessed
@@ -1568,7 +1592,7 @@ func (dc *ContainerCenter) eventListener() {
 func (dc *ContainerCenter) handleDockerEvent(event events.Message) {
 	switch event.Action {
 	case "start", "restart", "rename":
-		_ = dc.fetchOne(event.Actor.ID, false)
+		_ = dc.fetchOne(event.Actor.ID)
 	case "die":
 		dc.markRemove(event.Actor.ID)
 	default:

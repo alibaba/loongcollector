@@ -23,6 +23,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/alibaba/ilogtail/pkg/helper"
+	"github.com/alibaba/ilogtail/pkg/models"
+
 	"github.com/dlclark/regexp2"
 	"github.com/moby/moby/api/pkg/stdcopy"
 	"github.com/moby/moby/api/types/container"
@@ -85,6 +88,8 @@ type stdoutSyner struct {
 	ExternalEnvTag      map[string]string
 	ExternalK8sLabelTag map[string]string
 
+	usePipelineEventTags bool
+
 	info                 *containercenter.DockerInfoDetail
 	client               *docker.Client
 	startCheckPoint      string
@@ -102,12 +107,36 @@ type stdoutSyner struct {
 	stderr               bool
 }
 
-func (ss *stdoutSyner) newContainerPump(c pipeline.Collector, stdout, stderr *io.PipeReader) {
-	pump := func(source string, tags map[string]string, input io.Reader) {
-		ss.wg.Add(1)
+func (ss *stdoutSyner) newContainerPump(c pipeline.PipelineCollector, stdout, stderr *io.PipeReader) {
+	settings := ss.context.GetPipelineScopeConfig()
+	usingOldContentTag := containercenter.UseOldStdoutContentTags(ss.usePipelineEventTags, settings)
+	tags := ss.info.GetStdoutTags(ss.ExternalEnvTag, ss.ExternalK8sLabelTag, usingOldContentTag)
+	pump := func(source string, input io.Reader) {
 		defer ss.wg.Done()
 		keys := []string{"_time_", "_source_", "content"}
 		values := []string{"", source, ""}
+		emit := func() {
+			log, _ := helper.NewInputLogRow(nil, keys, values)
+			groupTags := models.NewTags()
+			groupTags.AddAll(tags)
+			c.Collect(models.NewGroup(models.NewMetadata(), groupTags), log)
+		}
+		if usingOldContentTag {
+			// Put the container fields before the log fields for ordered consumers.
+			legacyKeys := make([]string, 0, len(tags)+len(keys))
+			legacyValues := make([]string, 0, len(tags)+len(values))
+			for key, value := range tags {
+				legacyKeys = append(legacyKeys, key)
+				legacyValues = append(legacyValues, value)
+			}
+			legacyKeys = append(legacyKeys, keys...)
+			legacyValues = append(legacyValues, values...)
+			emit = func() {
+				copy(legacyValues[len(tags):], values)
+				log, _ := helper.NewInputLogRow(nil, legacyKeys, legacyValues, time.Now().Truncate(time.Second))
+				c.Collect(models.NewGroup(models.NewMetadata(), models.NewTags()), log)
+			}
+		}
 
 		if ss.beginLineReg == nil {
 			buf := bufio.NewReader(input)
@@ -132,7 +161,7 @@ func (ss *stdoutSyner) newContainerPump(c pipeline.Collector, stdout, stderr *io
 					values[0] = ""
 					values[2] = line
 				}
-				c.AddDataArray(tags, keys, values)
+				emit()
 			}
 		} else {
 			buf := bufio.NewReader(util.NewTimeoutReader(input, ss.beginLineTimeout))
@@ -142,7 +171,7 @@ func (ss *stdoutSyner) newContainerPump(c pipeline.Collector, stdout, stderr *io
 					// process timeout
 					if len(values[2]) > 0 {
 						logger.Debug(ss.context.GetRuntimeContext(), "log time out, treat as full log", util.CutString(values[2], 512))
-						c.AddDataArray(tags, keys, values)
+						emit()
 						values[2] = line
 					} else {
 						values[2] += line
@@ -157,7 +186,7 @@ func (ss *stdoutSyner) newContainerPump(c pipeline.Collector, stdout, stderr *io
 					logger.Debug(ss.context.GetRuntimeContext(), "docker source stop", source, "name", ss.info.ContainerInfo.Name, "error", err)
 					if len(values[2]) > 0 {
 						logger.Info(ss.context.GetRuntimeContext(), "flush out last line", util.CutString(values[2], 512))
-						c.AddDataArray(tags, keys, values)
+						emit()
 					}
 					return
 				}
@@ -183,7 +212,7 @@ func (ss *stdoutSyner) newContainerPump(c pipeline.Collector, stdout, stderr *io
 					// match begin line
 					if len(values[2]) > 0 {
 						// new line
-						c.AddDataArray(tags, keys, values)
+						emit()
 					}
 					values[2] = logLine
 				} else {
@@ -193,26 +222,24 @@ func (ss *stdoutSyner) newContainerPump(c pipeline.Collector, stdout, stderr *io
 					// check very big line
 					if len(values[2]) >= ss.maxLogSize {
 						logger.Warning(ss.context.GetRuntimeContext(), selfmonitor.DockerStdoutStopAlarm, "log line is too long, force flush out", len(values[2]), "log prefix", util.CutString(values[2], 4096))
-						c.AddDataArray(tags, keys, values)
+						emit()
 						values[2] = ""
 					}
 				}
 			}
 		}
 	}
-	tags := ss.info.GetExternalTags(ss.ExternalEnvTag, ss.ExternalK8sLabelTag)
-	for k, v := range ss.info.ContainerNameTag {
-		tags[k] = v
-	}
 	if stdout != nil {
-		go pump("stdout", tags, stdout)
+		ss.wg.Add(1)
+		go pump("stdout", stdout)
 	}
 	if stderr != nil {
-		go pump("stderr", tags, stderr)
+		ss.wg.Add(1)
+		go pump("stderr", stderr)
 	}
 }
 
-func (ss *stdoutSyner) Start(c pipeline.Collector) {
+func (ss *stdoutSyner) Start(c pipeline.PipelineCollector) {
 	if ss.beginLineCheckLength <= 0 {
 		ss.beginLineCheckLength = 10 * 1024
 	}
@@ -355,6 +382,10 @@ type ServiceDockerStdout struct {
 	K8sPodRegex           string
 	K8sContainerRegex     string
 
+	// UsePipelineEventTags applies the pipeline's UsingOldContentTag setting.
+	// The default keeps container fields in log contents.
+	UsePipelineEventTags bool
+
 	// export from ilogtail-trace component
 	IncludeLabelRegex map[string]*regexp2.Regexp
 	ExcludeLabelRegex map[string]*regexp2.Regexp
@@ -418,11 +449,7 @@ func (sds *ServiceDockerStdout) Description() string {
 
 // Collect takes in an accumulator and adds the metrics that the Input
 // gathers. This is called every "interval"
-func (sds *ServiceDockerStdout) Collect(pipeline.Collector) error {
-	return nil
-}
-
-func (sds *ServiceDockerStdout) FlushAll(c pipeline.Collector, firstStart bool) error {
+func (sds *ServiceDockerStdout) FlushAll(c pipeline.PipelineCollector, firstStart bool) error {
 	var err error
 	dockerInfos := containercenter.GetContainerByAcceptedInfo(
 		sds.IncludeLabel, sds.ExcludeLabel,
@@ -444,6 +471,8 @@ func (sds *ServiceDockerStdout) FlushAll(c pipeline.Collector, firstStart bool) 
 				}
 			}
 			syner = &stdoutSyner{
+				usePipelineEventTags: sds.UsePipelineEventTags,
+
 				info:                 info,
 				client:               sds.client,
 				stdoutCheckPoint:     sds.stdoutCheckPoint,
@@ -505,7 +534,8 @@ func (sds *ServiceDockerStdout) GetCheckPoint() *StdoutCheckPoint {
 }
 
 // Start starts the ServiceInput's service, whatever that may be
-func (sds *ServiceDockerStdout) Start(c pipeline.Collector) error {
+func (sds *ServiceDockerStdout) StartService(ctx pipeline.PipelineContext) error {
+	c := ctx.Collector()
 	sds.shutdown = make(chan struct{})
 	sds.waitGroup.Add(1)
 	defer sds.waitGroup.Done()

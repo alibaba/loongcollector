@@ -16,18 +16,19 @@ package grpc
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"io"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/credentials"
-	"google.golang.org/grpc/encoding"
 
+	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
-	converter "github.com/alibaba/ilogtail/pkg/protocol/converter"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
@@ -41,16 +42,14 @@ type Flusher struct {
 	InsecureSkipVerify bool   // Controls whether a client verifies the server's certificate chain and host name.
 
 	dialOptions []grpc.DialOption
-	dialSuccess bool
 	conn        *grpc.ClientConn
-	client      protocol.LogReportServiceClient
+	client      protocol.PipelineEventGroupReportServiceClient
 	ctx         pipeline.Context
 }
 
 func (f *Flusher) Init(ctx pipeline.Context) error {
-	encoding.RegisterCodec(new(protocol.Codec))
 	f.ctx = ctx
-	options := make([]grpc.DialOption, 0, 1)
+	options := []grpc.DialOption{grpc.WithDefaultCallOptions(grpc.ForceCodec(protocol.Codec{}))}
 	if f.EnableTLS {
 		cfg, err := util.GetTLSConfig(f.CertFile, f.KeyFile, f.CAFile, f.InsecureSkipVerify)
 		if err != nil {
@@ -68,14 +67,13 @@ func (f *Flusher) Init(ctx pipeline.Context) error {
 		logger.Warningf(f.ctx.GetRuntimeContext(), selfmonitor.GRPCFlusherAlarm, "error in dialing with gRPC server %s, would try again later", f.Address)
 	} else {
 		f.conn = c
-		f.client = protocol.NewLogReportServiceClient(c)
-		f.dialSuccess = true
+		f.client = protocol.NewPipelineEventGroupReportServiceClient(c)
 	}
 	return nil
 }
 
 func (f *Flusher) Description() string {
-	return "flush log group with gRPC transfer channel"
+	return "flush pipeline events with gRPC"
 }
 
 func (f *Flusher) IsReady(projectName string, logstoreName string, logstoreKey int64) bool {
@@ -92,54 +90,46 @@ func (f *Flusher) IsReady(projectName string, logstoreName string, logstoreKey i
 		return false
 	}
 	f.conn = c
-	f.client = protocol.NewLogReportServiceClient(c)
+	f.client = protocol.NewPipelineEventGroupReportServiceClient(c)
 	return f.conn.GetState() == connectivity.Ready
 }
 
-func (f *Flusher) Flush(projectName string, logstoreName string, configName string, logGroupList []*protocol.LogGroup) error {
-	return f.flushLogGroups(logGroupList)
-}
-
-// flushLogGroups sends log groups over the gRPC stream. It is shared by the v1
-// Flush entry point and the v2 Export so that Export does not depend on Flush,
-// which is planned for removal.
-func (f *Flusher) flushLogGroups(logGroupList []*protocol.LogGroup) error {
-	stream, err := f.client.Collect(context.Background())
-	defer f.closeStream(stream)
-	if err != nil {
-		logger.Critical(f.ctx.GetRuntimeContext(), selfmonitor.GRPCFlushAlarm, "err", err)
-		return err
-	}
-	for _, group := range logGroupList {
-		if len(group.Logs) == 0 {
-			continue
-		}
-		if err := stream.Send(group); err != nil {
-			logger.Critical(f.ctx.GetRuntimeContext(), selfmonitor.GRPCFlushAlarm, "err", err)
-			return err
-		}
-	}
-	return nil
-}
-
-// Export sends v2 PipelineGroupEvents over the gRPC stream. Unlike other
-// flushers, protocol.LogGroup is retained here on purpose: it is the on-wire
-// message type of the LogReportService.Collect RPC
-// (pkg/protocol/proto/sls_logs_transfer.proto, stream.Send(*protocol.LogGroup)).
-// There is no v2 report proto, so LogGroup is the serialization format of this
-// channel rather than a v1 pipeline leftover; converting away from it would
-// require a new gRPC service, which is out of the flusher Export scope.
+// Export sends event reports over the event RPC and waits for acknowledgment.
 func (f *Flusher) Export(groups []*models.PipelineGroupEvents, _ pipeline.PipelineContext) error {
-	for _, groupEvents := range groups {
-		logGroups, err := converter.PipelineGroupEventsToLogGroups(groupEvents)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	var stream protocol.PipelineEventGroupReportService_CollectClient
+	for _, group := range groups {
+		err := helper.ForEachPipelineEventReport(group, func(report *protocol.PipelineEventGroupReport) error {
+			if stream == nil {
+				if f.client == nil {
+					return fmt.Errorf("gRPC flusher is not connected")
+				}
+				var err error
+				stream, err = f.client.Collect(ctx)
+				if err != nil {
+					return fmt.Errorf("open gRPC event stream: %w", err)
+				}
+			}
+			if err := stream.Send(report); err != nil {
+				if errors.Is(err, io.EOF) {
+					// Send reports EOF when the server closes the stream.
+					// Read the final status, including unimplemented RPCs.
+					if _, statusErr := stream.CloseAndRecv(); statusErr != nil {
+						err = statusErr
+					}
+				}
+				return fmt.Errorf("send gRPC event report: %w", err)
+			}
+			return nil
+		})
 		if err != nil {
 			return err
 		}
-		if len(logGroups) == 0 {
-			continue
-		}
-		if err := f.flushLogGroups(logGroups); err != nil {
-			return err
+	}
+	if stream != nil {
+		if _, err := stream.CloseAndRecv(); err != nil {
+			return fmt.Errorf("acknowledge gRPC event stream: %w", err)
 		}
 	}
 	return nil
@@ -149,14 +139,10 @@ func (f *Flusher) SetUrgent(flag bool) {
 }
 
 func (f *Flusher) Stop() error {
-	return f.conn.Close()
-}
-
-func (f *Flusher) closeStream(stream protocol.LogReportService_CollectClient) {
-	_, err := stream.CloseAndRecv()
-	if err != nil && err != io.EOF {
-		logger.Info(f.ctx.GetRuntimeContext(), "stage", "close stream", "err", err)
+	if f.conn == nil {
+		return nil
 	}
+	return f.conn.Close()
 }
 
 func init() {

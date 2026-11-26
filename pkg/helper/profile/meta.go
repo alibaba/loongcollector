@@ -21,7 +21,7 @@ import (
 
 	"github.com/gofrs/uuid"
 
-	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/models"
 )
 
 type Input struct {
@@ -224,6 +224,11 @@ func (u Units) DetectValueType() string {
 	return "unknown"
 }
 
+// LogTimestamp preserves the second and nanosecond ranges of profile log rows.
+func LogTimestamp(seconds, nanos int64) uint64 {
+	return uint64(uint32(seconds))*uint64(time.Second) + uint64(uint32(nanos))
+}
+
 type RawProfile interface {
-	Parse(ctx context.Context, meta *Meta, tags map[string]string) (logs []*protocol.Log, err error)
+	Parse(ctx context.Context, meta *Meta, tags map[string]string) ([]models.PipelineEvent, error)
 }

@@ -51,8 +51,6 @@ public:
     void AddLogContentMetricTimeNano(const MetricEvent& e);
 
 private:
-    void AddString(StringView value);
-
     std::string mRes;
 };
 

@@ -35,7 +35,6 @@ import (
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/pipeline/extensions"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	converter "github.com/alibaba/ilogtail/pkg/protocol/converter"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
@@ -100,7 +99,7 @@ type FlusherHTTP struct {
 	client      Client
 	interceptor extensions.FlushInterceptor
 
-	queue   chan interface{}
+	queue   chan *models.PipelineGroupEvents
 	counter sync.WaitGroup
 }
 
@@ -177,7 +176,7 @@ func (f *FlusherHTTP) Init(context pipeline.Context) error {
 	if f.QueueCapacity <= 0 {
 		f.QueueCapacity = 1024
 	}
-	f.queue = make(chan interface{}, f.QueueCapacity)
+	f.queue = make(chan *models.PipelineGroupEvents, f.QueueCapacity)
 	for i := 0; i < f.Concurrency; i++ {
 		go f.runFlushTask()
 	}
@@ -188,13 +187,6 @@ func (f *FlusherHTTP) Init(context pipeline.Context) error {
 	logger.Info(f.context.GetRuntimeContext(), "http flusher init", "initialized",
 		"timeout", f.Timeout,
 		"compression", f.Compression)
-	return nil
-}
-
-func (f *FlusherHTTP) Flush(projectName string, logstoreName string, configName string, logGroupList []*protocol.LogGroup) error {
-	for _, logGroup := range logGroupList {
-		f.addTask(logGroup)
-	}
 	return nil
 }
 
@@ -270,7 +262,7 @@ func (f *FlusherHTTP) initConverter() error {
 }
 
 func (f *FlusherHTTP) getConverter() (*converter.Converter, error) {
-	return converter.NewConverterWithSep(f.Convert.Protocol, f.Convert.Encoding, f.Convert.Separator, f.Convert.IgnoreUnExpectedData, f.Convert.TagFieldsRename, f.Convert.ProtocolFieldsRename, f.context.GetPipelineScopeConfig())
+	return converter.NewConverterWithSep(f.Convert.Protocol, f.Convert.Encoding, f.Convert.Separator, f.Convert.IgnoreUnExpectedData, f.Convert.TagFieldsRename, f.Convert.ProtocolFieldsRename)
 }
 
 func (f *FlusherHTTP) initHTTPClient() error {
@@ -351,18 +343,18 @@ func (f *FlusherHTTP) initRequestInterceptors(transport http.RoundTripper) (http
 	return transport, nil
 }
 
-func (f *FlusherHTTP) addTask(log interface{}) {
+func (f *FlusherHTTP) addTask(group *models.PipelineGroupEvents) {
 	f.counter.Add(1)
 
 	if f.DropEventWhenQueueFull {
 		select {
-		case f.queue <- log:
+		case f.queue <- group:
 		default:
 			f.counter.Done()
 			logger.Warningf(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "http flusher dropped a group event since the queue is full")
 		}
 	} else {
-		f.queue <- log
+		f.queue <- group
 	}
 }
 
@@ -384,19 +376,16 @@ func (f *FlusherHTTP) runFlushTask() {
 	}
 }
 
-func (f *FlusherHTTP) encodeAndFlush(event any) error {
+func (f *FlusherHTTP) encodeAndFlush(group *models.PipelineGroupEvents) error {
 	defer f.countDownTask()
 
-	var data [][]byte
-	var err error
-
-	switch v := event.(type) {
-	case *models.PipelineGroupEvents:
-		data, err = f.encoder.EncodeV2(v)
-
-	default:
-		return errors.New("unsupported event type")
+	if f.AsyncIntercept && f.interceptor != nil {
+		group = f.interceptor.Intercept(group)
+		if group == nil || len(group.Events) == 0 {
+			return nil
+		}
 	}
+	data, err := f.encoder.Encode(group)
 
 	if err != nil {
 		return fmt.Errorf("http flusher encode event data fail, error: %w", err)
@@ -412,25 +401,15 @@ func (f *FlusherHTTP) encodeAndFlush(event any) error {
 	return nil
 }
 
-func (f *FlusherHTTP) convertAndFlush(data interface{}) error {
+func (f *FlusherHTTP) convertAndFlush(group *models.PipelineGroupEvents) error {
 	defer f.countDownTask()
-	var logs interface{}
-	var varValues []map[string]string
-	var err error
-	switch v := data.(type) {
-	case *protocol.LogGroup:
-		logs, varValues, err = f.converter.ToByteStreamWithSelectedFields(v, f.varKeys)
-	case *models.PipelineGroupEvents:
-		if f.AsyncIntercept && f.interceptor != nil {
-			v = f.interceptor.Intercept(v)
-			if v == nil || len(v.Events) == 0 {
-				return nil
-			}
+	if f.AsyncIntercept && f.interceptor != nil {
+		group = f.interceptor.Intercept(group)
+		if group == nil || len(group.Events) == 0 {
+			return nil
 		}
-		logs, varValues, err = f.converter.ToByteStreamWithSelectedFieldsV2(v, f.varKeys)
-	default:
-		return fmt.Errorf("unsupport data type")
 	}
+	logs, varValues, err := f.converter.ToByteStreamWithSelectedFields(group, f.varKeys)
 
 	if err != nil {
 		logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "http flusher converter log fail, error", err)

@@ -28,10 +28,13 @@
 #include "collection_pipeline/queue/SLSSenderQueueItem.h"
 #include "collection_pipeline/queue/SenderQueueManager.h"
 #include "collection_pipeline/serializer/SLSSerializer.h"
+#include "common/HashUtil.h"
 #include "common/JsonUtil.h"
 #include "common/LogtailCommonFlags.h"
+#include "common/StringTools.h"
 #include "common/compression/CompressorFactory.h"
 #include "common/http/Constant.h"
+#include "monitor/Monitor.h"
 #include "plugin/flusher/sls/FlusherSLS.h"
 #include "plugin/flusher/sls/PackIdManager.h"
 #include "plugin/flusher/sls/SLSClientManager.h"
@@ -78,12 +81,12 @@ public:
     void TestSend();
     void TestFlush();
     void TestFlushAll();
-    void TestAddPackId();
     void TestSerializeAndPushAllEmptyGroups();
     void TestSerializeAndPushGroupListSerializeFail();
     void OnGoPipelineSend();
     void TestSendPipelineEventGroup();
     void TestSendPipelineEventGroupProfile();
+    void TestSendPipelineEventGroupSourcePackId();
 
 protected:
     static void SetUpTestCase() {
@@ -1961,18 +1964,6 @@ void FlusherSLSUnittest::TestFlushAll() {
     APSARA_TEST_EQUAL(1U, res.size());
 }
 
-void FlusherSLSUnittest::TestAddPackId() {
-    FlusherSLS flusher;
-    flusher.mProject = "test_project";
-    flusher.mLogstore = "test_logstore";
-
-    BatchedEvents batch;
-    batch.mPackIdPrefix = "source-id";
-    batch.mSourceBuffers.emplace_back(make_shared<SourceBuffer>());
-    flusher.AddPackId(batch);
-    APSARA_TEST_STREQ("34451096883514E2-0", batch.mTags.mInner["__pack_id__"].data());
-}
-
 void FlusherSLSUnittest::TestSerializeAndPushAllEmptyGroups() {
     // package list is enabled when there are more than 1 group in the batch. if all of them fail to be serialized
     // (e.g. logs with empty content only), nothing should be pushed to the sender queue, otherwise a request with
@@ -2082,7 +2073,7 @@ void FlusherSLSUnittest::OnGoPipelineSend() {
         flusher.Init(configJson, optionalGoPipeline);
         flusher.CommitMetricsRecordRef();
         {
-            APSARA_TEST_TRUE(flusher.Send("content", "shardhash_key", "other_logstore"));
+            APSARA_TEST_TRUE(flusher.sendSerializedGroup("content", "shardhash_key", "other_logstore"));
 
             vector<SenderQueueItem*> res;
             SenderQueueManager::GetInstance()->GetAvailableItems(res, 80);
@@ -2104,7 +2095,7 @@ void FlusherSLSUnittest::OnGoPipelineSend() {
             APSARA_TEST_EQUAL("content", output);
         }
         {
-            APSARA_TEST_TRUE(flusher.Send("content", "shardhash_key", ""));
+            APSARA_TEST_TRUE(flusher.sendSerializedGroup("content", "shardhash_key", ""));
 
             vector<SenderQueueItem*> res;
             SenderQueueManager::GetInstance()->GetAvailableItems(res, 80);
@@ -2122,7 +2113,7 @@ void FlusherSLSUnittest::OnGoPipelineSend() {
         flusher.mCompressor = CompressorFactory::GetInstance()->Create(
             Json::Value(), CollectionPipelineContext(), "flusher_sls", "1", CompressType::LZ4);
 
-        APSARA_TEST_TRUE(flusher.Send("content", ""));
+        APSARA_TEST_TRUE(flusher.sendSerializedGroup("content", "", ""));
 
         auto key = QueueKeyManager::GetInstance()->GetKey("test_project-test_logstore");
 
@@ -2151,6 +2142,10 @@ void FlusherSLSUnittest::OnGoPipelineSend() {
 
 
 void FlusherSLSUnittest::TestSendPipelineEventGroup() {
+    Json::Value globals, extendedParams;
+    globals["EnableTimestampNanosecond"] = true;
+    ASSERT_TRUE(ctx.InitGlobalConfig(globals, extendedParams));
+
     Json::Value config, optionalGoPipeline;
     config["Type"] = "flusher_sls";
     config["Project"] = "test_project";
@@ -2163,6 +2158,8 @@ void FlusherSLSUnittest::TestSendPipelineEventGroup() {
     ASSERT_TRUE(flusher.Init(config, optionalGoPipeline));
     flusher.CommitMetricsRecordRef();
     flusher.mShardHashKeys = {"route"};
+    const string replacement(4096, 'x');
+    const string binaryValue("left\0right", 10);
     for (int type = 0; type < 3; ++type) {
         PipelineEventGroup group(make_shared<SourceBuffer>());
         group.SetMetadata(EventGroupMetaKey::SOURCE_ID, string("source-id"));
@@ -2173,7 +2170,8 @@ void FlusherSLSUnittest::TestSendPipelineEventGroup() {
         if (type == 0) {
             auto* log = group.AddLogEvent();
             log->SetTimestamp(1700000000, 123);
-            log->SetContent(string("content"), string("go-log"));
+            log->SetContent(string("content"), string("original"));
+            log->SetContent(string("binary"), binaryValue);
         } else if (type == 1) {
             auto* metric = group.AddMetricEvent();
             metric->SetTimestamp(1700000000);
@@ -2186,11 +2184,18 @@ void FlusherSLSUnittest::TestSendPipelineEventGroup() {
             span->SetTraceId("trace-id");
             span->SetSpanId("span-id");
         }
-        models::PipelineEventGroup pb;
         string error;
-        ASSERT_TRUE(TransferPipelineEventGroupToPB(group, pb, error)) << error;
-        // A per-call override must not leak into the next request.
-        ASSERT_TRUE(flusher.Send(pb, type == 0 ? "explicit-hash" : "", type == 0 ? "override" : ""));
+        {
+            models::PipelineEventGroup pb;
+            ASSERT_TRUE(TransferPipelineEventGroupToPB(group, pb, error)) << error;
+            if (type == 0) {
+                auto* duplicate = pb.mutable_logs()->mutable_events(0)->add_contents();
+                duplicate->set_key("content");
+                duplicate->set_value(replacement);
+            }
+            // A per-call override must not leak into the next request.
+            ASSERT_TRUE(flusher.Send(pb, type == 0 ? "explicit-hash" : "", type == 0 ? "override" : ""));
+        }
         vector<SenderQueueItem*> items;
         SenderQueueManager::GetInstance()->GetAvailableItems(items, 80);
         ASSERT_EQ(1U, items.size());
@@ -2198,7 +2203,7 @@ void FlusherSLSUnittest::TestSendPipelineEventGroup() {
         EXPECT_EQ(type == 0 ? "override" : "test_logstore", item->mLogstore);
         BatchedEvents tags;
         tags.mTags.Insert("route", "configured-route");
-        EXPECT_EQ(type == 0 ? "explicit-hash" : flusher.GetShardHashKey(tags), item->mShardHashKey);
+        EXPECT_EQ(type == 0 ? "explicit-hash" : flusher.GetShardHashKey(tags.mTags.mInner), item->mShardHashKey);
         EXPECT_EQ(RawDataType::EVENT_GROUP, item->mType);
         string data;
         data.resize(item->mRawSize);
@@ -2214,7 +2219,15 @@ void FlusherSLSUnittest::TestSendPipelineEventGroup() {
             contents[content.key()] = content.value();
         }
         if (type == 0) {
-            EXPECT_EQ("go-log", contents["content"]);
+            const auto& log = result.logs(0);
+            EXPECT_EQ(1700000000U, log.time());
+            ASSERT_TRUE(log.has_time_ns());
+            EXPECT_EQ(123U, log.time_ns());
+            ASSERT_EQ(2, log.contents_size());
+            EXPECT_EQ("content", log.contents(0).key());
+            EXPECT_EQ(replacement, log.contents(0).value());
+            EXPECT_EQ("binary", log.contents(1).key());
+            EXPECT_EQ(binaryValue, log.contents(1).value());
         } else if (type == 1) {
             EXPECT_EQ("go_counter", contents["__name__"]);
             EXPECT_EQ("42", contents["__value__"]);
@@ -2234,6 +2247,8 @@ void FlusherSLSUnittest::TestSendPipelineEventGroup() {
     EXPECT_EQ("test_logstore", flusher.mLogstore);
     models::PipelineEventGroup empty;
     EXPECT_FALSE(flusher.Send(empty, ""));
+    empty.mutable_logs();
+    EXPECT_FALSE(flusher.Send(empty, ""));
     empty.mutable_logs()->add_events(); // Empty log serializes to no usable SLS payload.
     EXPECT_FALSE(flusher.Send(empty, ""));
 }
@@ -2248,9 +2263,16 @@ void FlusherSLSUnittest::TestSendPipelineEventGroupProfile() {
     auto* content = log->add_contents();
     content->set_key("container");
     content->set_value("profile-container");
+    (*pb.mutable_metadata())["0" + to_string(static_cast<int>(EventGroupMetaKey::SOURCE_ID))] = "source-id";
+    (*pb.mutable_tags())["route"] = "configured-route";
+    (*pb.mutable_tags())[LOG_RESERVED_KEY_PACKAGE_ID] = "incoming-pack";
     ASSERT_TRUE(flusher.InitForProfile(ctx));
     ASSERT_TRUE(flusher.HasContext());
-    ASSERT_TRUE(flusher.Send(pb, "profile-hash", "profile-override"));
+    const string previousIp = LoongCollectorMonitor::mIpAddr;
+    LoongCollectorMonitor::mIpAddr = "192.0.2.1";
+    const bool sent = flusher.Send(pb, "profile-hash", "profile-override");
+    LoongCollectorMonitor::mIpAddr = previousIp;
+    ASSERT_TRUE(sent);
     vector<SenderQueueItem*> items;
     SenderQueueManager::GetInstance()->GetAvailableItems(items, 80);
     ASSERT_EQ(1U, items.size());
@@ -2261,6 +2283,10 @@ void FlusherSLSUnittest::TestSendPipelineEventGroupProfile() {
     ASSERT_TRUE(result.ParseFromString(item->mData));
     ASSERT_EQ(1, result.logs_size());
     EXPECT_EQ("profile-container", result.logs(0).contents(0).value());
+    EXPECT_EQ("192.0.2.1", result.source());
+    ASSERT_EQ(2, result.logtags_size());
+    EXPECT_EQ(LOG_RESERVED_KEY_PACKAGE_ID, result.logtags(0).key());
+    EXPECT_EQ("34451096883514E2-0", result.logtags(0).value());
     SenderQueueManager::GetInstance()->RemoveItem(item->mQueueKey, item);
     // Without configured keys or an explicit hash, preserve the empty value.
     ASSERT_TRUE(flusher.Send(pb, ""));
@@ -2270,10 +2296,82 @@ void FlusherSLSUnittest::TestSendPipelineEventGroupProfile() {
     item = static_cast<SLSSenderQueueItem*>(items[0]);
     EXPECT_TRUE(item->mShardHashKey.empty());
     EXPECT_EQ("logtail_containers", item->mLogstore);
+    ASSERT_TRUE(result.ParseFromString(item->mData));
+    ASSERT_EQ(2, result.logtags_size());
+    EXPECT_EQ("34451096883514E2-0", result.logtags(0).value());
+    SenderQueueManager::GetInstance()->RemoveItem(item->mQueueKey, item);
+
+    flusher.mShardHashKeys = {"route", "missing", LOG_RESERVED_KEY_PACKAGE_ID};
+    ASSERT_TRUE(flusher.Send(pb, ""));
+    items.clear();
+    SenderQueueManager::GetInstance()->GetAvailableItems(items, 80);
+    ASSERT_EQ(1U, items.size());
+    item = static_cast<SLSSenderQueueItem*>(items[0]);
+    EXPECT_EQ(CalcMD5("configured-route__incoming-pack"), item->mShardHashKey);
+    ASSERT_TRUE(result.ParseFromString(item->mData));
+    ASSERT_EQ(2, result.logtags_size());
+    EXPECT_EQ("34451096883514E2-1", result.logtags(0).value());
     SenderQueueManager::GetInstance()->RemoveItem(item->mQueueKey, item);
 }
 
+void FlusherSLSUnittest::TestSendPipelineEventGroupSourcePackId() {
+    FlusherSLS flusher;
+    flusher.mProject = "test_project";
+    flusher.mLogstore = "test_logstore";
+    ASSERT_TRUE(flusher.InitForProfile(ctx));
+
+    models::PipelineEventGroup pb;
+    auto* log = pb.mutable_logs()->add_events();
+    log->set_timestamp(1700000000000000000ULL);
+    auto* content = log->add_contents();
+    content->set_key("content");
+    content->set_value("container log");
+    const string sourceIdKey = to_string(static_cast<int>(EventGroupMetaKey::SOURCE_ID));
+    const struct {
+        const char* legacySource;
+        const char* sourceId;
+        const char* expectedSource;
+        int sequence;
+    } cases[] = {
+        {"container-a-source", nullptr, "container-a-source", 0},
+        {"container-b-source", nullptr, "container-b-source", 0},
+        {"container-a-source", nullptr, "container-a-source", 1},
+        {"container-b-source", "container-a-source", "container-a-source", 2},
+        {"container-b-source", "", "", 0},
+    };
+
+    for (const auto& test : cases) {
+        SCOPED_TRACE(test.legacySource);
+        pb.clear_metadata();
+        (*pb.mutable_metadata())["source"] = test.legacySource;
+        if (test.sourceId != nullptr) {
+            (*pb.mutable_metadata())[sourceIdKey] = test.sourceId;
+        }
+
+        const string serialized = pb.SerializeAsString();
+        auto wire = SLSLogGroupWireView::Parse(serialized, 1);
+        ASSERT_TRUE(wire.has_value());
+        models::PipelineEventGroup header;
+        ASSERT_TRUE(header.ParseFromArray(wire->mHeader.data(), wire->mHeader.size()));
+        ASSERT_TRUE(flusher.SendPBLogWire(header, *wire, "", "", nullptr));
+
+        vector<SenderQueueItem*> items;
+        SenderQueueManager::GetInstance()->GetAvailableItems(items, 80);
+        ASSERT_EQ(1U, items.size());
+        auto* item = static_cast<SLSSenderQueueItem*>(items[0]);
+        EXPECT_EQ("test_logstore", item->mLogstore);
+        sls_logs::LogGroup result;
+        ASSERT_TRUE(result.ParseFromString(item->mData));
+        ASSERT_EQ(1, result.logtags_size());
+        EXPECT_EQ(LOG_RESERVED_KEY_PACKAGE_ID, result.logtags(0).key());
+        EXPECT_EQ(ToHexString(HashString(test.expectedSource)) + "-" + ToHexString(test.sequence),
+                  result.logtags(0).value());
+        SenderQueueManager::GetInstance()->RemoveItem(item->mQueueKey, item);
+    }
+}
+
 UNIT_TEST_CASE(FlusherSLSUnittest, TestSendPipelineEventGroup)
+UNIT_TEST_CASE(FlusherSLSUnittest, TestSendPipelineEventGroupSourcePackId)
 UNIT_TEST_CASE(FlusherSLSUnittest, TestSendPipelineEventGroupProfile)
 UNIT_TEST_CASE(FlusherSLSUnittest, OnSuccessfulInit)
 UNIT_TEST_CASE(FlusherSLSUnittest, OnFailedInit)
@@ -2282,7 +2380,6 @@ UNIT_TEST_CASE(FlusherSLSUnittest, TestBuildRequest)
 UNIT_TEST_CASE(FlusherSLSUnittest, TestSend)
 UNIT_TEST_CASE(FlusherSLSUnittest, TestFlush)
 UNIT_TEST_CASE(FlusherSLSUnittest, TestFlushAll)
-UNIT_TEST_CASE(FlusherSLSUnittest, TestAddPackId)
 UNIT_TEST_CASE(FlusherSLSUnittest, TestSerializeAndPushAllEmptyGroups)
 UNIT_TEST_CASE(FlusherSLSUnittest, TestSerializeAndPushGroupListSerializeFail)
 UNIT_TEST_CASE(FlusherSLSUnittest, OnGoPipelineSend)

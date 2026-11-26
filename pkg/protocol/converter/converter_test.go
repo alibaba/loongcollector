@@ -19,13 +19,12 @@ import (
 
 	. "github.com/smartystreets/goconvey/convey"
 
-	"github.com/alibaba/ilogtail/pkg/config"
-	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/models"
 )
 
 func TestInvalidProtocol(t *testing.T) {
 	Convey("When constructing converter with invalid protocol", t, func() {
-		_, err := NewConverter("xml", "pb", nil, nil, &config.GlobalConfig{})
+		_, err := NewConverter("xml", "pb", nil, nil)
 
 		Convey("Then error should be returned", func() {
 			So(err, ShouldNotBeNil)
@@ -39,29 +38,7 @@ func TestInvalidProtocol(t *testing.T) {
 		}
 
 		Convey("When performing conversion", func() {
-			logs := []*protocol.Log{
-				{
-					Time: 1662434209,
-					Contents: []*protocol.Log_Content{
-						{Key: "method", Value: "PUT"},
-					},
-				},
-			}
-			tags := []*protocol.LogTag{
-				{Key: "__hostname__", Value: "alje834hgf"},
-				{Key: "__pack_id__", Value: "AEDCFGHNJUIOPLMN-1E"},
-				{Key: "__path__", Value: "/root/test/origin/example.log"},
-				{Key: "__log_topic__", Value: "file"},
-			}
-			logGroup := &protocol.LogGroup{
-				Logs:     logs,
-				Category: "test",
-				Topic:    "topic",
-				Source:   "172.10.0.56",
-				LogTags:  tags,
-			}
-
-			_, err := c.Do(logGroup)
+			_, err := c.ToByteStream(&models.PipelineGroupEvents{})
 
 			Convey("Then error should be returned", func() {
 				So(err, ShouldNotBeNil)

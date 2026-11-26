@@ -250,16 +250,6 @@ TEST_F(GoPipelineBridgeUnittest, SendPipelineEventGroupMissingConfig) {
     EXPECT_EQ(-2, CallSendPipelineEventGroup("no_such_c1_config", serialized));
 }
 
-TEST_F(GoPipelineBridgeUnittest, SendPbCoexistsAndReturnsMissingConfig) {
-    // C1 must not break the existing SendPb/V2 ABI: unknown config is still -2.
-    char dummy[] = "x";
-    EXPECT_EQ(
-        -2, LogtailPlugin::SendPb("no_such_c1_sendpb", 16, "ls", 2, dummy, static_cast<int32_t>(sizeof(dummy) - 1), 1));
-    EXPECT_EQ(-2,
-              LogtailPlugin::SendPbV2(
-                  "no_such_c1_sendpbv2", 18, "ls", 2, dummy, static_cast<int32_t>(sizeof(dummy) - 1), 1, "", 0));
-}
-
 TEST_F(GoPipelineBridgeUnittest, SendPipelineEventGroupAcceptsMetricAndSpanPB) {
     {
         PipelineEventGroup group(mSourceBuffer);
@@ -290,19 +280,25 @@ TEST_F(GoPipelineBridgeUnittest, SendPipelineEventGroupContainerConfigEmptyProje
     ASSERT_FALSE(serialized.empty());
 
     // Matches LogtailPlugin constructor: mPluginContainerConfig.mLogstore = "logtail_containers".
-    // An empty profile project explicitly disables reporting, as with SendPbV2.
+    // An empty profile project disables container profile reporting.
     EXPECT_EQ(0, CallSendPipelineEventGroup("logtail_containers", serialized));
 }
 
 
 TEST_F(GoPipelineBridgeUnittest, SendPipelineEventGroupContainerConfigQueuesPayload) {
-    PipelineEventGroup group(mSourceBuffer);
-    auto* log = group.AddLogEvent();
-    log->SetTimestamp(1700000000);
-    log->SetContent(string("container"), string("real-container"));
-    const string serialized = SerializeGroup(group);
+    const string container = string("real\0container", sizeof("real\0container") - 1) + string(4096, 'x');
     GetProfileSender()->SetDefaultProfileProjectName("bridge-profile-project");
-    EXPECT_EQ(0, CallSendPipelineEventGroup("logtail_containers", serialized, "profile-override"));
+    {
+        PipelineEventGroup group(mSourceBuffer);
+        auto* log = group.AddLogEvent();
+        log->SetTimestamp(1700000000);
+        log->SetContent(string("container"), container);
+        log->SetContent(string("_program_"), string());
+        const string serialized = SerializeGroup(group);
+        ASSERT_FALSE(serialized.empty());
+        EXPECT_EQ(0, CallSendPipelineEventGroup("logtail_containers", serialized, "profile-override"));
+    }
+    // Only the queued SLS payload survives the call and input buffer lifetime.
     vector<SenderQueueItem*> items;
     SenderQueueManager::GetInstance()->GetAvailableItems(items, 80);
     EXPECT_EQ(1U, items.size());
@@ -316,37 +312,20 @@ TEST_F(GoPipelineBridgeUnittest, SendPipelineEventGroupContainerConfigQueuesPayl
         EXPECT_TRUE(result.ParseFromString(data));
         EXPECT_EQ(1, result.logs_size());
         if (result.logs_size() == 1) {
-            EXPECT_EQ("real-container", result.logs(0).contents(0).value());
+            const auto& actual = result.logs(0);
+            EXPECT_EQ(1700000000U, actual.time());
+            EXPECT_EQ(2, actual.contents_size());
+            if (actual.contents_size() == 2) {
+                EXPECT_EQ("container", actual.contents(0).key());
+                EXPECT_EQ(container, actual.contents(0).value());
+                EXPECT_EQ("_program_", actual.contents(1).key());
+                EXPECT_TRUE(actual.contents(1).value().empty());
+            }
         }
         SenderQueueManager::GetInstance()->RemoveItem(item->mQueueKey, item);
     }
 }
 
-
-TEST_F(GoPipelineBridgeUnittest, SendPbContainerConfigSharesProfileContext) {
-    sls_logs::LogGroup group;
-    auto* log = group.add_logs();
-    log->set_time(1700000000);
-    auto* content = log->add_contents();
-    content->set_key("container");
-    content->set_value("legacy-container");
-    string data = group.SerializeAsString();
-    GetProfileSender()->SetDefaultProfileProjectName("bridge-profile-project");
-    EXPECT_EQ(0,
-              LogtailPlugin::SendPbV2(
-                  "logtail_containers", 18, "", 0, const_cast<char*>(data.data()), data.size(), 1, "", 0));
-    vector<SenderQueueItem*> items;
-    SenderQueueManager::GetInstance()->GetAvailableItems(items, 80);
-    EXPECT_EQ(1U, items.size());
-    if (items.size() == 1) {
-        auto* item = static_cast<SLSSenderQueueItem*>(items[0]);
-        string output(item->mRawSize, 0), error;
-        EXPECT_TRUE(UncompressContainer(item->mData, output, error));
-        EXPECT_EQ(data, output);
-        EXPECT_EQ("logtail_containers", item->mLogstore);
-        SenderQueueManager::GetInstance()->RemoveItem(item->mQueueKey, item);
-    }
-}
 
 } // namespace logtail
 

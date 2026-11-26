@@ -36,6 +36,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/helper/profile"
 	"github.com/alibaba/ilogtail/pkg/helper/profile/pyroscope/pprof"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
@@ -61,7 +62,7 @@ func (r *Register) Unregister(collector prometheus.Collector) bool {
 }
 
 type Ingestion struct {
-	collector pipeline.Collector
+	collector pipeline.PipelineCollector
 }
 
 func (i *Ingestion) Ingest(ctx context.Context, input *ingestion.IngestInput) error {
@@ -78,7 +79,7 @@ func (i *Ingestion) Ingest(ctx context.Context, input *ingestion.IngestInput) er
 		}
 
 	}
-	logs, err := p.Parse(ctx, &profile.Meta{
+	events, err := p.Parse(ctx, &profile.Meta{
 		StartTime:       input.Metadata.StartTime,
 		EndTime:         input.Metadata.EndTime,
 		SpyName:         "go",
@@ -91,8 +92,8 @@ func (i *Ingestion) Ingest(ctx context.Context, input *ingestion.IngestInput) er
 		logger.Debug(context.Background(), "parse pprof fail err", err.Error())
 		return err
 	}
-	for _, log := range logs {
-		i.collector.AddRawLog(log)
+	for _, event := range events {
+		i.collector.Collect(models.NewGroup(models.NewMetadata(), models.NewTags()), event)
 	}
 	return nil
 }
@@ -102,7 +103,7 @@ type Manager struct {
 	discoveryManager *discovery.Manager
 }
 
-func NewManager(collector pipeline.Collector) *Manager {
+func NewManager(collector pipeline.PipelineCollector) *Manager {
 	logrusLogger := logrus.New()
 	logrusLogger.SetOutput(os.Stdout)
 	if logger.DebugFlag() {

@@ -28,6 +28,42 @@ void TransferGroupMetadataFromPB(const google::protobuf::Map<std::string, std::s
     }
 }
 
+template <bool BorrowContents>
+void TransferPBLogEvent(const models::LogEvent& src, LogEvent& dst) {
+    chrono::nanoseconds tns(src.timestamp());
+    auto ts = chrono::duration_cast<chrono::seconds>(tns);
+    dst.SetTimestamp(ts.count(), tns.count() - ts.count() * 1000000000);
+    for (const auto& content : src.contents()) {
+        if constexpr (BorrowContents) {
+            dst.SetContentNoCopy(StringView(content.key()), StringView(content.value()));
+        } else {
+            dst.SetContent(content.key(), content.value());
+        }
+    }
+    dst.SetLevel(src.level());
+    dst.SetPosition(src.fileoffset(), src.rawsize());
+}
+
+template <bool BorrowContents>
+bool TransferPBLogEvents(const models::PipelineEventGroup::LogEvents& logs, PipelineEventGroup& dst, string& errMsg) {
+    if (logs.events_size() == 0) {
+        errMsg = "error transfer PB to PipelineEventGroup: no log events";
+        return false;
+    }
+    dst.MutableEvents().reserve(logs.events_size());
+    for (const auto& log : logs.events()) {
+        TransferPBLogEvent<BorrowContents>(log, *dst.AddLogEvent());
+    }
+    return true;
+}
+
+void TransferPBGroupContext(const models::PipelineEventGroup& src, PipelineEventGroup& dst) {
+    for (const auto& tag : src.tags()) {
+        dst.SetTag(tag.first, tag.second);
+    }
+    TransferGroupMetadataFromPB(src.metadata(), dst);
+}
+
 logtail::models::UntypedValueMetricType ToPBMetricType(UntypedValueMetricType type) {
     return type == UntypedValueMetricType::MetricTypeGauge ? logtail::models::METRIC_TYPE_GAUGE
                                                            : logtail::models::METRIC_TYPE_COUNTER;
@@ -46,16 +82,8 @@ bool TransferPBToPipelineEventGroup(const logtail::models::PipelineEventGroup& s
     // events
     switch (src.PipelineEvents_case()) {
         case logtail::models::PipelineEventGroup::PipelineEventsCase::kLogs:
-            if (src.logs().events_size() == 0) {
-                errMsg = "error transfer PB to PipelineEventGroup: no log events";
+            if (!TransferPBLogEvents<false>(src.logs(), dst, errMsg)) {
                 return false;
-            }
-            dst.MutableEvents().reserve(src.logs().events_size());
-            for (auto& logSrc : src.logs().events()) {
-                auto logDst = dst.AddLogEvent();
-                if (!TransferPBToLogEvent(logSrc, *logDst, errMsg)) {
-                    return false;
-                }
             }
             break;
         case logtail::models::PipelineEventGroup::PipelineEventsCase::kMetrics:
@@ -89,29 +117,22 @@ bool TransferPBToPipelineEventGroup(const logtail::models::PipelineEventGroup& s
             return false;
     }
 
-    // tags
-    for (auto& tag : src.tags()) {
-        dst.SetTag(tag.first, tag.second);
+    TransferPBGroupContext(src, dst);
+    return true;
+}
+
+bool TransferPBToPipelineLogGroupBorrowingContents(const models::PipelineEventGroup& src,
+                                                   PipelineEventGroup& dst,
+                                                   string& errMsg) {
+    if (!TransferPBLogEvents<true>(src.logs(), dst, errMsg)) {
+        return false;
     }
-
-    TransferGroupMetadataFromPB(src.metadata(), dst);
-
+    TransferPBGroupContext(src, dst);
     return true;
 }
 
 bool TransferPBToLogEvent(const logtail::models::LogEvent& src, logtail::LogEvent& dst, std::string& errMsg) {
-    // timestamp
-    std::chrono::nanoseconds tns(src.timestamp());
-    std::chrono::seconds ts = std::chrono::duration_cast<std::chrono::seconds>(tns);
-    dst.SetTimestamp(ts.count(), tns.count() - ts.count() * 1000000000);
-    // contents
-    for (auto& contentPair : src.contents()) {
-        dst.SetContent(contentPair.key(), contentPair.value());
-    }
-    // level
-    dst.SetLevel(src.level());
-    // fileoffset and rawsize
-    dst.SetPosition(src.fileoffset(), src.rawsize());
+    TransferPBLogEvent<false>(src, dst);
     return true;
 }
 

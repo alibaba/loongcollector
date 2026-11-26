@@ -51,12 +51,9 @@ func (r *Input) Description() string {
 
 // Collect takes in an accumulator and adds the metrics that the Input
 // gathers. This is called every "interval"
-func (r *Input) Collect(pipeline.Collector) error {
-	return nil
-}
-
 // Start starts the ServiceInput's service, whatever that may be
-func (r *Input) Start(collector pipeline.Collector) error {
+func (r *Input) StartService(ctx pipeline.PipelineContext) error {
+	collector := ctx.Collector()
 	agent.RegisterJVMMetricReportServiceServer(r.grpcServer, &JVMMetricHandler{r.ctx, collector, r.MetricIntervalMs, -1})
 	agent.RegisterCLRMetricReportServiceServer(r.grpcServer, &CLRMetricHandler{r.ctx, collector, r.MetricIntervalMs, -1})
 	agent.RegisterMeterReportServiceServer(r.grpcServer, &MeterHandler{r.ctx, collector})
@@ -66,7 +63,7 @@ func (r *Input) Start(collector pipeline.Collector) error {
 	}
 	resourcePropertiesCache.load(r.ctx)
 	agent.RegisterTraceSegmentReportServiceServer(r.grpcServer, &TracingHandler{r.ctx, collector, resourcePropertiesCache, InitComponentMapping(r.ComponentMapping)})
-	management.RegisterManagementServiceServer(r.grpcServer, &ManagementHandler{r.ctx, collector, resourcePropertiesCache})
+	management.RegisterManagementServiceServer(r.grpcServer, &ManagementHandler{r.ctx, resourcePropertiesCache})
 	profile.RegisterProfileTaskServer(r.grpcServer, &ProfileHandler{})
 	configuration.RegisterConfigurationDiscoveryServiceServer(r.grpcServer, &ConfigurationDiscoveryHandler{})
 	logging.RegisterLogReportServiceServer(r.grpcServer, &loggingHandler{r.ctx, collector})

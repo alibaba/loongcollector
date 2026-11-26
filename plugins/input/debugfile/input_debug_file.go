@@ -31,13 +31,11 @@ type InputDebugFile struct {
 	FieldName     string
 	LineLimit     int
 
-	context pipeline.Context
-	logs    []string
+	logs []string
 }
 
 // Init ...
-func (r *InputDebugFile) Init(context pipeline.Context) (int, error) {
-	r.context = context
+func (r *InputDebugFile) Init(pipeline.Context) (int, error) {
 	file, err := os.Open(r.InputFilePath)
 	if err != nil {
 		return 0, err
@@ -65,25 +63,13 @@ func (r *InputDebugFile) Description() string {
 	return "input plugin for debugging"
 }
 
-// Collect ...
-func (r *InputDebugFile) Collect(collector pipeline.Collector) error {
-	log := map[string]string{}
-	log[r.FieldName] = strings.Join(r.logs, "\n")
-	collector.AddData(nil, log)
-
-	return nil
-}
-
 func (r *InputDebugFile) Read(context pipeline.PipelineContext) error {
 	body := strings.Join(r.logs, "\n")
-	log := models.NewLog("debug_log", util.ZeroCopyStringToBytes(body), "info", "", "", models.NewTags(), uint64(time.Now().Unix()))
+	log := models.NewLog("debug_log", util.ZeroCopyStringToBytes(body), "info", "", "", models.NewTags(), uint64(time.Now().UnixNano()))
 	if r.FieldName != models.BodyKey {
 		log.Contents.Add(r.FieldName, body)
 	}
-	// Emit a group with initialized Tags. A bare &models.GroupInfo{} leaves
-	// Tags nil, which panics ProcessorTag.ProcessV2 (Group.Tags.Add) and kills
-	// the v2 processor goroutine, so no events reach the flusher.
-	context.Collector().Collect(models.NewGroup(nil, models.NewTags()), log)
+	context.Collector().Collect(models.NewGroup(models.NewMetadata(), models.NewTags()), log)
 	return nil
 }
 

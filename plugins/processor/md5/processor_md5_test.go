@@ -21,6 +21,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/alibaba/ilogtail/plugins/processor/internal/processortest"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -28,7 +30,6 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
 )
 
@@ -46,17 +47,6 @@ func newProcessor() (*ProcessorMD5, error) {
 	return processor, err
 }
 
-func TestSourceKey(t *testing.T) {
-	processor, err := newProcessor()
-	require.NoError(t, err)
-	log := &protocol.Log{Time: 0}
-	value := "123"
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "src", Value: value})
-	processor.ProcessLogs([]*protocol.Log{log})
-	assert.Equal(t, "123", log.Contents[0].Value)
-	assert.Equal(t, "202cb962ac59075b964b07152d234b70", log.Contents[1].Value)
-}
-
 func TestNoKeyError(t *testing.T) {
 	logger.ClearMemoryLog()
 	ctx := mock.NewEmptyContext("p", "l", "c")
@@ -67,9 +57,9 @@ func TestNoKeyError(t *testing.T) {
 	}
 	err := processor.Init(ctx)
 	require.NoError(t, err)
-	log := &protocol.Log{Time: 0}
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "test_key", Value: "test_value"})
-	processor.ProcessLogs([]*protocol.Log{log})
+	log := processortest.Log()
+	log.Contents.Add("test_key", "test_value")
+	processortest.Apply(processor, log)
 	memoryLog, ok := logger.ReadMemoryLog(1)
 	assert.True(t, ok)
 	assert.Equal(t, 1, logger.GetMemoryLogCount())
@@ -87,9 +77,7 @@ func TestInit(t *testing.T) {
 	assert.Equal(t, reflect.TypeOf(p).String(), "*md5.ProcessorMD5")
 }
 
-// ---- v2 (PipelineEvent / SendPb) Process path tests ----
-
-func TestProcessorMD5_ProcessV2ComputesMD5(t *testing.T) {
+func TestProcessorMD5_ProcessComputesMD5(t *testing.T) {
 	processor := &ProcessorMD5{SourceKey: "src", MD5Key: "src_md5"}
 	require.NoError(t, processor.Init(mock.NewEmptyContext("p", "l", "c")))
 
@@ -104,7 +92,7 @@ func TestProcessorMD5_ProcessV2ComputesMD5(t *testing.T) {
 	assert.Equal(t, want, log.GetIndices().Get("src_md5"))
 }
 
-func TestProcessorMD5_ProcessV2MissingKeyNoOp(t *testing.T) {
+func TestProcessorMD5_ProcessMissingKeyNoOp(t *testing.T) {
 	processor := &ProcessorMD5{SourceKey: "src", MD5Key: "src_md5"}
 	require.NoError(t, processor.Init(mock.NewEmptyContext("p", "l", "c")))
 
@@ -117,8 +105,8 @@ func TestProcessorMD5_ProcessV2MissingKeyNoOp(t *testing.T) {
 	assert.False(t, log.GetIndices().Contains("src_md5"), "no MD5 key should be added when source key is absent")
 }
 
-// TestProcessorMD5_ProcessV2PassesThroughSpan verifies Span events pass through.
-func TestProcessorMD5_ProcessV2PassesThroughSpan(t *testing.T) {
+// TestProcessorMD5_ProcessPassesThroughSpan verifies Span events pass through.
+func TestProcessorMD5_ProcessPassesThroughSpan(t *testing.T) {
 	processor := &ProcessorMD5{SourceKey: "src", MD5Key: "src_md5"}
 	require.NoError(t, processor.Init(mock.NewEmptyContext("p", "l", "c")))
 

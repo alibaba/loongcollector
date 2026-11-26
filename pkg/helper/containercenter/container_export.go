@@ -15,7 +15,6 @@
 package containercenter
 
 import (
-	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -24,19 +23,7 @@ import (
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/events"
 	docker "github.com/moby/moby/client"
-
-	"github.com/alibaba/ilogtail/pkg/logger"
 )
-
-type ContainerMeta struct {
-	PodName         string
-	K8sNamespace    string
-	ContainerName   string
-	Image           string
-	K8sLabels       map[string]string
-	ContainerLabels map[string]string
-	Env             map[string]string
-}
 
 type DockerInfoDetailWithFilteredEnvAndLabel struct {
 	Detail          *DockerInfoDetail
@@ -47,59 +34,6 @@ type DockerInfoDetailWithFilteredEnvAndLabel struct {
 
 func GetContainersLastUpdateTime() int64 {
 	return getContainerCenterInstance().getLastUpdateMapTime()
-}
-
-// GetContainerMeta get a thread safe container meta struct.
-func GetContainerMeta(containerID string) *ContainerMeta {
-	getFunc := func() *ContainerMeta {
-		instance := getContainerCenterInstance()
-		instance.lock.RLock()
-		defer instance.lock.RUnlock()
-		detail, ok := instance.containerMap[containerID]
-		if !ok {
-			return nil
-		}
-		c := &ContainerMeta{
-			K8sLabels:       make(map[string]string),
-			ContainerLabels: make(map[string]string),
-			Env:             make(map[string]string),
-		}
-		if detail.K8SInfo.ContainerName == "" {
-			c.ContainerName = detail.ContainerNameTag["_container_name_"]
-		} else {
-			c.ContainerName = detail.K8SInfo.ContainerName
-		}
-		c.K8sNamespace = detail.K8SInfo.Namespace
-		c.PodName = detail.K8SInfo.Pod
-		c.Image = detail.ContainerNameTag["_image_name_"]
-		for k, v := range detail.K8SInfo.Labels {
-			c.K8sLabels[k] = v
-		}
-		for k, v := range detail.ContainerInfo.Config.Labels {
-			c.ContainerLabels[k] = v
-		}
-		for _, env := range detail.ContainerInfo.Config.Env {
-			var envKey, envValue string
-			splitArray := strings.SplitN(env, "=", 2)
-			if len(splitArray) < 2 {
-				envKey = splitArray[0]
-			} else {
-				envKey = splitArray[0]
-				envValue = splitArray[1]
-			}
-			c.Env[envKey] = envValue
-		}
-		return c
-	}
-	meta := getFunc()
-	if meta != nil {
-		return meta
-	}
-	if err := containerFindingManager.FetchOne(containerID); err != nil {
-		logger.Debugf(context.Background(), "cannot fetch container for %s, error is %v", containerID, err)
-		return nil
-	}
-	return getFunc()
 }
 
 func ProcessContainerAllInfo(processor func(*DockerInfoDetail)) {

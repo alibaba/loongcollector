@@ -28,7 +28,6 @@ import (
 
 	"github.com/alibaba/ilogtail/pkg/doc"
 	"github.com/alibaba/ilogtail/pkg/logger"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
@@ -54,7 +53,7 @@ func (i *ElasticSearchSubscriber) Description() string {
 	return "this's a elasticsearch subscriber, which will query inserted records from elasticsearch periodically."
 }
 
-func (i *ElasticSearchSubscriber) GetData(sql string, startTime int32) ([]*protocol.LogGroup, error) {
+func (i *ElasticSearchSubscriber) GetData(sql string, startTime int32) ([]*Batch, error) {
 	host, err := TryReplacePhysicalAddress(i.Address)
 	if err != nil {
 		return nil, err
@@ -73,8 +72,8 @@ func (i *ElasticSearchSubscriber) GetData(sql string, startTime int32) ([]*proto
 	}
 	i.client = es
 	i.lastTimestamp = int64(startTime)
-	logGroup, err := i.queryRecords()
-	return []*protocol.LogGroup{logGroup}, err
+	batch, err := i.queryRecords()
+	return []*Batch{batch}, err
 }
 
 func (i *ElasticSearchSubscriber) FlusherConfig() string {
@@ -85,9 +84,9 @@ func (i *ElasticSearchSubscriber) Stop() error {
 	return nil
 }
 
-func (i *ElasticSearchSubscriber) queryRecords() (logGroup *protocol.LogGroup, err error) {
-	logGroup = &protocol.LogGroup{
-		Logs: []*protocol.Log{},
+func (i *ElasticSearchSubscriber) queryRecords() (batch *Batch, err error) {
+	batch = &Batch{
+		Records: []*Record{},
 	}
 	// s := fmt.Sprintf(clickhouseQuerySQL, i.Database, i.Table, i.lastTimestamp)
 	// rows, err := i.client.Query(context.Background(), s)
@@ -127,11 +126,11 @@ func (i *ElasticSearchSubscriber) queryRecords() (logGroup *protocol.LogGroup, e
 			logger.Warning(context.Background(), selfmonitor.ElasticsearchSubscriberAlarm, "err", err)
 		}
 
-		log := &protocol.Log{}
+		log := &Record{}
 		for k, v := range lc.Contents {
-			log.Contents = append(log.Contents, &protocol.Log_Content{Key: k, Value: v})
+			log.Fields = append(log.Fields, Field{Key: k, Value: v})
 		}
-		logGroup.Logs = append(logGroup.Logs, log)
+		batch.Records = append(batch.Records, log)
 	}
 	return
 }

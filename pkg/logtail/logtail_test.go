@@ -35,14 +35,3 @@ func TestSendPipelineEventGroupWithoutCallback(t *testing.T) {
 		t.Fatalf("unregistered callback: got %d, want -1", got)
 	}
 }
-
-func TestSendPbCoexistsWithoutCallback(t *testing.T) {
-	// C1 adds SendPipelineEventGroup without replacing SendPb/V2 symbols.
-	buf := []byte{0x0a, 0x00}
-	if got := SendPb("cfg", "ls", buf, 1); got != -1 {
-		t.Fatalf("SendPb unregistered: got %d, want -1", got)
-	}
-	if got := SendPbV2("cfg", "ls", buf, 1, ""); got != -1 {
-		t.Fatalf("SendPbV2 unregistered: got %d, want -1", got)
-	}
-}

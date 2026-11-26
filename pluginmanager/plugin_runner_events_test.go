@@ -15,6 +15,8 @@
 package pluginmanager
 
 import (
+	"encoding/json"
+	"fmt"
 	"testing"
 	"time"
 
@@ -27,44 +29,9 @@ import (
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
+	"github.com/alibaba/ilogtail/plugins/processor/regex"
+	"github.com/alibaba/ilogtail/plugins/processor/split/logstring"
 )
-
-func TestEventRunner_ReceiveRawLog(t *testing.T) {
-	timeSec := uint32(time.Now().UnixMilli() / 1e3)
-	logCtx := &pipeline.LogWithContext{
-		Log: &protocol.Log{
-			Time: timeSec,
-			Contents: []*protocol.Log_Content{
-				{Key: rawStringKey, Value: "test content"},
-				{Key: fileOffsetKey, Value: "10"},
-				{Key: tagPrefix + "tenant", Value: "default"},
-			},
-		},
-	}
-
-	ctx := &mockContect{}
-
-	p := &pluginRunner{
-		InputPipeContext: ctx,
-	}
-
-	p.ReceiveRawLog(logCtx)
-
-	logContent := models.NewLogContents()
-	logContent.Add(models.BodyKey, []byte("test content"))
-	assert.Len(t, ctx.logs, 1)
-	assert.Equal(t, models.PipelineGroupEvents{
-		Group: models.NewGroup(models.NewMetadata(), models.NewTags()),
-		Events: []models.PipelineEvent{
-			&models.Log{
-				Timestamp: uint64(timeSec) * 1e9,
-				Offset:    10,
-				Tags:      models.NewTagsWithKeyValues("tenant", "default"),
-				Contents:  logContent,
-			},
-		},
-	}, ctx.logs[0])
-}
 
 type mockContect struct {
 	logs []models.PipelineGroupEvents
@@ -83,18 +50,28 @@ func (m *mockPipelineCollector) Collect(groupInfo *models.GroupInfo, eventList .
 	m.ctx.logs = append(m.ctx.logs, models.PipelineGroupEvents{Group: groupInfo, Events: eventList})
 }
 
-func TestEventRunner_ReceivePipelineEventGroup_MetricMultiValue(t *testing.T) {
-	ctx := &mockContect{}
-	p := &pluginRunner{InputPipeContext: ctx}
+func capturePipelineEventGroup(t *testing.T, pbGroup *protocol.PipelineEventGroup, packID string) *mockContect {
+	t.Helper()
+	wire, err := pbGroup.Marshal()
+	require.NoError(t, err)
 
+	ctx := &mockContect{}
+	config := &LogstoreConfig{Context: &ContextImp{}}
+	config.Context.InitContext("", "", "native-test")
+	config.PluginRunner = &pluginRunner{LogstoreConfig: config, InputPipeContext: ctx}
+	require.Equal(t, 0, config.ProcessPipelineEventGroup(wire, packID))
+	return ctx
+}
+
+func TestEventRunner_ProcessPipelineEventGroup_MetricMultiValue(t *testing.T) {
 	multiValue := models.NewMetricMultiValueWithMap(map[string]float64{"cpu": 0.5, "mem": 10})
 	metric := models.NewMultiValuesMetric("agent", models.MetricTypeUntyped, models.NewTags(), 123, multiValue.Values)
 	groupInfo := models.NewGroup(models.NewMetadata(), models.NewTagsWithKeyValues("env", "prod"))
 	pbGroup, err := helper.TransferPipelineEventGroupToPB(groupInfo, []models.PipelineEvent{metric})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
-	p.ReceivePipelineEventGroup(pbGroup, map[string]interface{}{"source": "pack-1"})
-	assert.Len(t, ctx.logs, 1)
+	ctx := capturePipelineEventGroup(t, pbGroup, "pack-1")
+	require.Len(t, ctx.logs, 1)
 	m, ok := ctx.logs[0].Events[0].(*models.Metric)
 	assert.True(t, ok)
 	assert.True(t, m.GetValue().IsMultiValues())
@@ -102,31 +79,25 @@ func TestEventRunner_ReceivePipelineEventGroup_MetricMultiValue(t *testing.T) {
 	assert.Equal(t, "pack-1", ctx.logs[0].Group.Metadata.Get("source"))
 }
 
-func TestEventRunner_ReceivePipelineEventGroup_Span(t *testing.T) {
-	ctx := &mockContect{}
-	p := &pluginRunner{InputPipeContext: ctx}
-
+func TestEventRunner_ProcessPipelineEventGroup_Span(t *testing.T) {
 	span := models.NewSpan("op", "trace", "span", models.SpanKindServer, 1, 2, models.NewTagsWithKeyValues("k", "v"), nil, nil)
 	pbGroup, err := helper.TransferPipelineEventGroupToPB(models.NewGroup(models.NewMetadata(), models.NewTags()), []models.PipelineEvent{span})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
-	p.ReceivePipelineEventGroup(pbGroup, nil)
-	assert.Len(t, ctx.logs, 1)
+	ctx := capturePipelineEventGroup(t, pbGroup, "")
+	require.Len(t, ctx.logs, 1)
 	s, ok := ctx.logs[0].Events[0].(*models.Span)
 	assert.True(t, ok)
 	assert.Equal(t, "op", s.GetName())
 }
 
-func TestEventRunner_ReceivePipelineEventGroup_Log(t *testing.T) {
-	ctx := &mockContect{}
-	p := &pluginRunner{InputPipeContext: ctx}
-
+func TestEventRunner_ProcessPipelineEventGroup_Log(t *testing.T) {
 	log := models.NewLog("", []byte("alarm"), "", "", "", models.NewTags(), 200)
 	pbGroup, err := helper.TransferPipelineEventGroupToPB(models.NewGroup(models.NewMetadata(), models.NewTags()), []models.PipelineEvent{log})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
-	p.ReceivePipelineEventGroup(pbGroup, map[string]interface{}{"source": "alarm-pack"})
-	assert.Len(t, ctx.logs, 1)
+	ctx := capturePipelineEventGroup(t, pbGroup, "alarm-pack")
+	require.Len(t, ctx.logs, 1)
 	_, ok := ctx.logs[0].Events[0].(*models.Log)
 	assert.True(t, ok)
 }
@@ -169,5 +140,143 @@ func TestEventRunner_MetricTimerRecordsSourceCounters(t *testing.T) {
 		require.Contains(t, []string{selfmonitor.MetricLabelValueMetricCategoryPlugin, selfmonitor.MetricLabelValueMetricCategoryPluginSource}, category)
 		assert.Equal(t, "1.0000", counters[selfmonitor.MetricPluginOutEventsTotal])
 		assert.Equal(t, "1.0000", counters[selfmonitor.MetricPluginOutEventGroupsTotal])
+	}
+}
+
+func TestEventRunner_ProcessorMetricsFollowCollectedOutput(t *testing.T) {
+	for _, tt := range []struct {
+		name      string
+		processor pipeline.Processor
+		body      string
+		outGroups string
+		outEvents string
+		outSize   string
+	}{
+		{
+			name:      "regex replaces the body with fields",
+			processor: &regex.ProcessorRegex{Regex: "^([^:]+):(.+)$", SourceKey: models.BodyKey, Keys: []string{"level", "message"}},
+			body:      "info:消息",
+			outGroups: "1.0000",
+			outEvents: "1.0000",
+			outSize:   "29.0000", // level=info (9), message=消息 (13), env=prod (7)
+		},
+		{
+			name:      "split emits replacement events",
+			processor: &logstring.ProcessorSplit{SplitSep: ","},
+			body:      "a,bb",
+			outGroups: "1.0000",
+			outEvents: "2.0000",
+			outSize:   "24.0000", // Two content keys (14), three payload bytes, and one group tag (7).
+		},
+		{
+			name:      "split drops empty events",
+			processor: &logstring.ProcessorSplit{SplitSep: ","},
+			body:      ",",
+			outGroups: "0.0000",
+			outEvents: "0.0000",
+			outSize:   "0.0000",
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := &ContextImp{}
+			ctx.InitContext("project", "store", "processor-pipeline")
+			runner := &pluginRunner{
+				LogstoreConfig:       &LogstoreConfig{Context: ctx, GlobalConfig: &config.GlobalConfig{}},
+				InputPipeContext:     helper.NewObservePipelineContext(1),
+				ProcessPipeContext:   helper.NewGroupedPipelineContext(),
+				AggregatePipeContext: helper.NewObservePipelineContext(1),
+				ProcessControl:       pipeline.NewAsyncControl(),
+			}
+			require.NoError(t, runner.addProcessor(&pipeline.PluginMeta{PluginID: "1", PluginType: "processor_test"}, tt.processor, 0))
+			log := models.NewLogWithOrderedContents(1)
+			models.SetOwnedLogBody(log, []byte(tt.body))
+			runner.InputPipeContext.Collector().Collect(models.NewGroup(nil, models.NewTagsWithKeyValues("env", "prod")), log)
+			runner.runProcessor()
+			runner.ProcessControl.WaitCancel()
+
+			records := ctx.ExportMetricRecords()
+			require.Len(t, records, 1)
+			counters, category := parseExportedRecord(t, records[0])
+			assert.Equal(t, selfmonitor.MetricLabelValueMetricCategoryPlugin, category)
+			assert.Equal(t, "1.0000", counters[selfmonitor.MetricPluginInEventGroupsTotal])
+			assert.Equal(t, "1.0000", counters[selfmonitor.MetricPluginInEventsTotal])
+			assert.Equal(t, fmt.Sprintf("%d.0000", len(models.BodyKey)+len(tt.body)+len("envprod")), counters[selfmonitor.MetricPluginInSizeBytes])
+			assert.Equal(t, tt.outGroups, counters[selfmonitor.MetricPluginOutEventGroupsTotal])
+			assert.Equal(t, tt.outEvents, counters[selfmonitor.MetricPluginOutEventsTotal])
+			assert.Equal(t, tt.outSize, counters[selfmonitor.MetricPluginOutSizeBytes])
+		})
+	}
+}
+
+func TestEventRunner_PipelineIngressCountsBeforeFanOut(t *testing.T) {
+	for _, tt := range []struct {
+		name       string
+		configName string
+		inputs     string
+		hasGoInput bool
+		hasMetrics bool
+	}{
+		{"Go input", "entry/1", `"inputs":[{"type":"service_mock"}],`, true, true},
+		{"native input", "entry/2", "", false, true},
+		{"built-in runner", "entry", `"inputs":[{"type":"service_mock"}],`, true, false},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			lc, err := createLogstoreConfig("project", "logstore", tt.configName, 0, "{"+tt.inputs+`
+				"global":{"EnableProcessorTag":false},
+				"flushers":[{"type":"flusher_checker"},{"type":"flusher_checker"}]
+			}`)
+			require.NoError(t, err)
+			runner := lc.PluginRunner.(*pluginRunner)
+			require.Equal(t, tt.hasGoInput, runner.IsWithInputPlugin())
+			// Send groups directly after processing. The native fixture represents data
+			// that has already passed CollectionPipeline::Process.
+			runner.AggregatorPlugins = nil
+			group := models.NewGroup(nil, models.NewTagsWithKeyValues("env", "test"))
+			log := models.NewSimpleLog([]byte("hello"), nil, 1)
+			runner.InputPipeContext.Collector().Collect(group, log, log)
+			runner.InputPipeContext.Collector().Collect(group, log)
+			runner.runProcessor()
+			runner.ProcessControl.WaitCancel()
+			runner.runFlusher()
+			runner.FlushControl.WaitCancel()
+
+			var pipelineCounters map[string]string
+			var flusherCount int
+			for _, row := range lc.Context.ExportMetricRecords() {
+				counters, category := parseExportedRecord(t, row)
+				switch category {
+				case selfmonitor.MetricLabelValueMetricCategoryPlugin:
+					if counter, ok := counters[selfmonitor.MetricPluginInEventGroupsTotal]; ok {
+						assert.Equal(t, "2.0000", counter)
+						assert.Equal(t, "3.0000", counters[selfmonitor.MetricPluginInEventsTotal])
+						flusherCount++
+					}
+				case selfmonitor.MetricLabelValueMetricCategoryPipeline:
+					require.Nil(t, pipelineCounters)
+					pipelineCounters = counters
+					var labels map[string]string
+					require.NoError(t, json.Unmarshal([]byte(row[selfmonitor.MetricLabelPrefix]), &labels))
+					assert.Equal(t, "entry", labels[selfmonitor.MetricLabelKeyPipelineName])
+					assert.Equal(t, "project", labels[selfmonitor.MetricLabelKeyProject])
+					assert.Equal(t, "logstore", labels[selfmonitor.MetricLabelKeyLogstore])
+				}
+			}
+			require.Equal(t, 2, flusherCount)
+			if !tt.hasMetrics {
+				require.Nil(t, pipelineCounters)
+				return
+			}
+			require.NotNil(t, pipelineCounters)
+			assert.Equal(t, "2.0000", pipelineCounters[selfmonitor.MetricPipelineFlusherInEventGroupsTotal])
+			assert.Equal(t, "3.0000", pipelineCounters[selfmonitor.MetricPipelineFlusherInEventsTotal])
+			assert.Equal(t, "50.0000", pipelineCounters[selfmonitor.MetricPipelineFlusherInSizeBytes])
+			if tt.hasGoInput {
+				assert.Equal(t, "2.0000", pipelineCounters[selfmonitor.MetricPipelineProcessorInEventGroupsTotal])
+				assert.Equal(t, "3.0000", pipelineCounters[selfmonitor.MetricPipelineProcessorInEventsTotal])
+				assert.Equal(t, "50.0000", pipelineCounters[selfmonitor.MetricPipelineProcessorInSizeBytes])
+			} else {
+				assert.NotContains(t, pipelineCounters, selfmonitor.MetricPipelineProcessorInEventsTotal)
+			}
+		})
 	}
 }

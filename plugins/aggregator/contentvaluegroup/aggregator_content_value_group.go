@@ -16,196 +16,94 @@ package contentvaluegroup
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
-	"sync"
-	"time"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
-	"github.com/alibaba/ilogtail/pkg/util"
 	"github.com/alibaba/ilogtail/plugins/aggregator/baseagg"
 )
 
-const groupKeyConnector = "_"
-
-type groupAggregator struct {
-	groupKVs map[string]string
-	agg      *baseagg.AggregatorBase
-}
-
-func (g *groupAggregator) Add(log *protocol.Log, ctx map[string]interface{}) error {
-	return g.agg.Add(log, ctx)
-}
-
-func (g *groupAggregator) Flush() []*protocol.LogGroup {
-	logGroups := g.agg.Flush()
-	for _, logGroup := range logGroups {
-		addGroupTags(logGroup, g.groupKVs)
-	}
-	return logGroups
-}
-
-type groupQueue struct {
-	groupKVs map[string]string
-	queue    pipeline.LogGroupQueue
-}
-
-// Add ...
-func (q *groupQueue) Add(logGroup *protocol.LogGroup) error {
-	addGroupTags(logGroup, q.groupKVs)
-	return q.queue.Add(logGroup)
-}
-
-// AddWithWait ...
-func (q *groupQueue) AddWithWait(logGroup *protocol.LogGroup, duration time.Duration) error {
-	addGroupTags(logGroup, q.groupKVs)
-	return q.queue.AddWithWait(logGroup, duration)
-}
-
 type AggregatorContentValueGroup struct {
-	GroupKeys        []string // The Keys to group by
-	Topic            string   // Topic to attach, if set
-	ErrIfKeyNotFound bool     // If logging when group-key not found
-	EnablePackID     bool     // If attach PackID
+	GroupKeys        []string
+	Topic            string
+	ErrIfKeyNotFound bool
+	EnablePackID     bool
 
-	groupAggs sync.Map
-	lock      *sync.Mutex
-	context   pipeline.Context
-	queue     pipeline.LogGroupQueue
+	context pipeline.Context
+	batches baseagg.Batcher
 }
 
-// Description ...
 func (*AggregatorContentValueGroup) Description() string {
-	return "aggregator that group logs by a set of keys"
+	return "aggregator that groups logs by a set of keys"
 }
 
-func (g *AggregatorContentValueGroup) Init(context pipeline.Context, que pipeline.LogGroupQueue) (int, error) {
-	g.context = context
-	g.queue = que
-
+func (g *AggregatorContentValueGroup) Init(ctx pipeline.Context) (int, error) {
 	if len(g.GroupKeys) == 0 {
 		return 0, fmt.Errorf("must specify GroupKeys")
 	}
-
-	return 0, nil
+	g.context = ctx
+	return 0, g.batches.Init(ctx, baseagg.MaxLogCount, 4, g.EnablePackID)
 }
 
-func (g *AggregatorContentValueGroup) Add(log *protocol.Log, ctx map[string]interface{}) error {
-	agg, err := g.getOrCreateGroupAggs(log)
-	if err != nil {
-		return err
+func (g *AggregatorContentValueGroup) Record(in *models.PipelineGroupEvents, ctx pipeline.PipelineContext) error {
+	if in == nil {
+		return nil
 	}
-	return agg.Add(log, ctx)
+	type partition struct {
+		tags   map[string]string
+		events []models.PipelineEvent
+	}
+	partitions := make(map[string]*partition)
+	var passThrough []models.PipelineEvent
+	for _, event := range in.Events {
+		isLog := event.GetType() == models.EventTypeLogging
+		var key strings.Builder
+		var hasField bool
+		tags := make(map[string]string, len(g.GroupKeys))
+		for _, name := range g.GroupKeys {
+			value, found := baseagg.FindEventField(event, name)
+			hasField = hasField || found
+			if !found && isLog && g.ErrIfKeyNotFound {
+				logger.Warning(g.context.GetRuntimeContext(), selfmonitor.AggGroupAlarm, "aggregator could not find log field", name)
+			}
+			key.WriteString(strconv.Itoa(len(value)))
+			key.WriteByte(':')
+			key.WriteString(value)
+			tags[name] = value
+		}
+		if !isLog && !hasField {
+			passThrough = append(passThrough, event)
+			continue
+		}
+		keyValue := key.String()
+		group := partitions[keyValue]
+		if group == nil {
+			group = &partition{tags: tags}
+			partitions[keyValue] = group
+		}
+		group.events = append(group.events, event)
+	}
+	for key, group := range partitions {
+		g.batches.CollectPartition(ctx, key, baseagg.GroupForRoute(in.Group, "", g.Topic, group.tags), group.events)
+	}
+	ctx.Collector().Collect(in.Group, passThrough...)
+	return nil
 }
 
-func (g *AggregatorContentValueGroup) Flush() []*protocol.LogGroup {
-	var logGroups []*protocol.LogGroup
-	g.groupAggs.Range(func(key, value any) bool {
-		agg := value.(*groupAggregator)
-		logGroups = append(logGroups, agg.Flush()...)
-		return true
-	})
-	return logGroups
+func (g *AggregatorContentValueGroup) GetResult(ctx pipeline.PipelineContext) error {
+	g.batches.CollectPending(ctx)
+	return nil
 }
 
 func (g *AggregatorContentValueGroup) Reset() {
-	g.groupAggs.Range(func(key, value any) bool {
-		agg := value.(*groupAggregator)
-		agg.agg.Reset()
-		return true
-	})
-}
-
-func (g *AggregatorContentValueGroup) getOrCreateGroupAggs(log *protocol.Log) (*groupAggregator, error) {
-	groupKey := g.buildGroupKey(log)
-	groupAgg, ok := g.groupAggs.Load(groupKey)
-	if ok {
-		return groupAgg.(*groupAggregator), nil
-	}
-
-	groupKVs := g.getGroupKVs(log)
-	groupQueue := &groupQueue{groupKVs: groupKVs, queue: g.queue}
-
-	agg := baseagg.NewAggregatorBase()
-	if _, err := agg.Init(g.context, groupQueue); err != nil {
-		logger.Error(g.context.GetRuntimeContext(), selfmonitor.AggGroupAlarm, "aggregator group fail to create agg for group", groupKVs)
-		return nil, err
-	}
-	agg.InitInner(
-		g.EnablePackID,
-		util.NewPackIDPrefix(g.context.GetConfigName()+groupKey),
-		g.lock,
-		"",
-		g.Topic,
-		1024,
-		4)
-
-	groupAgg = &groupAggregator{groupKVs: groupKVs, agg: agg}
-	groupAgg, _ = g.groupAggs.LoadOrStore(groupKey, groupAgg)
-	return groupAgg.(*groupAggregator), nil
-}
-
-func (g *AggregatorContentValueGroup) findLogContent(log *protocol.Log, key string) (value string, ok bool) {
-	for _, cont := range log.Contents {
-		if cont.Key == key {
-			value = cont.Value
-			ok = true
-			break
-		}
-	}
-	return
-}
-
-func (g *AggregatorContentValueGroup) buildGroupKey(log *protocol.Log) string {
-	var groupKey strings.Builder
-	for idx, key := range g.GroupKeys {
-		val, _ := g.findLogContent(log, key)
-		if idx == 0 {
-			groupKey.WriteString(val)
-		} else {
-			groupKey.WriteString(groupKeyConnector)
-			groupKey.WriteString(val)
-		}
-	}
-	return groupKey.String()
-}
-
-func (g *AggregatorContentValueGroup) getGroupKVs(log *protocol.Log) map[string]string {
-	group := make(map[string]string, len(g.GroupKeys))
-	for _, key := range g.GroupKeys {
-		val, found := g.findLogContent(log, key)
-		if !found && g.ErrIfKeyNotFound {
-			logger.Warning(g.context.GetRuntimeContext(), selfmonitor.AggGroupAlarm, "aggregator group fail to find key in log content,key", key)
-		}
-		group[key] = val
-	}
-	return group
-}
-
-func addGroupTags(logGroup *protocol.LogGroup, tagKVs map[string]string) {
-	for k, v := range tagKVs {
-		for _, tag := range logGroup.LogTags {
-			if tag.Key == k {
-				// if any k exists already, just return
-				return
-			}
-		}
-
-		logGroup.LogTags = append(logGroup.LogTags, &protocol.LogTag{
-			Key:   k,
-			Value: v,
-		})
-	}
+	g.batches.Reset()
 }
 
 func init() {
 	pipeline.Aggregators["aggregator_content_value_group"] = func() pipeline.Aggregator {
-		return &AggregatorContentValueGroup{
-			EnablePackID:     true,
-			ErrIfKeyNotFound: false,
-			lock:             &sync.Mutex{},
-		}
+		return &AggregatorContentValueGroup{EnablePackID: true}
 	}
 }

@@ -22,7 +22,6 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
@@ -211,99 +210,14 @@ func (*ProcessorFieldsWithCondition) Description() string {
 	return "Processor to match multiple conditions, and if one of the conditions is met, the corresponding action is performed."
 }
 
-// Match single case
-func (p *ProcessorFieldsWithCondition) isCaseMatch(log *protocol.Log, conditionCase ConditionCase) bool {
-	if conditionCase.fieldConditionFields != nil {
-		matchedCount := 0
-		for _, cont := range log.Contents {
-			if field, ok := conditionCase.fieldConditionFields[cont.Key]; ok {
-				if field.apply(field.reg, field.conditionContent, cont.Value) {
-					matchedCount++
-				}
-			}
-		}
-		if conditionCase.LogicalOperator == LogicalOperatorAnd && matchedCount == len(conditionCase.fieldConditionFields) {
-			return true
-		}
-		if conditionCase.LogicalOperator == LogicalOperatorOr && matchedCount > 0 {
-			return true
-		}
-	}
-	return false
-}
-
-// Process single action
-func (p *ProcessorFieldsWithCondition) processAction(log *protocol.Log, conditionAction ConditionAction) {
-	if conditionAction.Type == ActionAddFieldsType {
-		dict := make(map[string]bool)
-		for idx := range log.Contents {
-			dict[log.Contents[idx].Key] = true
-		}
-		for k, v := range conditionAction.Fields {
-			if _, exists := dict[k]; conditionAction.IgnoreIfExist && exists {
-				continue
-			}
-			newContent := &protocol.Log_Content{
-				Key:   k,
-				Value: v.(string),
-			}
-			log.Contents = append(log.Contents, newContent)
-		}
-	} else if conditionAction.Type == ActionDropType {
-		for idx := len(log.Contents) - 1; idx >= 0; idx-- {
-			if _, exists := conditionAction.dropkeyDictionary[log.Contents[idx].Key]; exists {
-				log.Contents = append(log.Contents[:idx], log.Contents[idx+1:]...)
-			}
-		}
-	}
-}
-
-// Match different cases
-func (p *ProcessorFieldsWithCondition) MatchAndProcess(log *protocol.Log) bool {
-	if p.Switch != nil {
-		for _, condition := range p.Switch {
-			if p.isCaseMatch(log, condition.Case) {
-				if condition.actions != nil {
-					for i := range condition.actions {
-						action := condition.actions[i]
-						p.processAction(log, action)
-					}
-				}
-				return true
-			}
-		}
-	}
-	return false
-}
-
-func (p *ProcessorFieldsWithCondition) ProcessLogs(logArray []*protocol.Log) []*protocol.Log {
-	totalLen := len(logArray)
-	nextIdx := 0
-	for idx := 0; idx < totalLen; idx++ {
-		if p.MatchAndProcess(logArray[idx]) || !p.DropIfNotMatchCondition {
-			if idx != nextIdx {
-				logArray[nextIdx] = logArray[idx]
-			}
-			nextIdx++
-		} else {
-			p.filterMetric.Add(1)
-		}
-	}
-	logArray = logArray[:nextIdx]
-	return logArray
-}
-
 func init() {
 	pipeline.Processors[PluginName] = func() pipeline.Processor {
 		return &ProcessorFieldsWithCondition{}
 	}
 }
 
-// Process implements the v2 ProcessorV2 interface: it evaluates the configured
-// switch-case conditions against each Log event's fields and applies the first
-// matching case's add/drop actions in place (same semantics as the v1 path).
-// When no case matches and DropIfNotMatchCondition is set, the Log is dropped,
-// matching v1 ProcessLogs. Metric/Span events pass through unchanged.
+// Process applies the first matching case's add and drop actions to each log.
+// When DropIfNotMatchCondition is set, logs without a match are dropped.
 func (p *ProcessorFieldsWithCondition) Process(in *models.PipelineGroupEvents, context pipeline.PipelineContext) {
 	if in == nil {
 		return
@@ -315,8 +229,7 @@ func (p *ProcessorFieldsWithCondition) Process(in *models.PipelineGroupEvents, c
 			events = append(events, event)
 			continue
 		}
-		// v1: keep when a case matched OR DropIfNotMatchCondition is disabled;
-		// otherwise drop the non-matching Log.
+		// Keep unmatched logs only when configured.
 		if p.processLogEvent(event.(*models.Log)) || !p.DropIfNotMatchCondition {
 			events = append(events, event)
 		} else {
@@ -326,13 +239,12 @@ func (p *ProcessorFieldsWithCondition) Process(in *models.PipelineGroupEvents, c
 	context.Collector().Collect(in.Group, events...)
 }
 
-// processLogEvent applies the first matching case's actions to the log in place
-// and reports whether any case matched (mirrors v1 MatchAndProcess).
+// processLogEvent applies the first matching case's actions and reports whether a case matched.
 func (p *ProcessorFieldsWithCondition) processLogEvent(log *models.Log) bool {
 	return p.matchAndProcessEvent(log.GetIndices())
 }
 
-// Match single case against v2 log contents.
+// Match single case against log fields.
 func (p *ProcessorFieldsWithCondition) isCaseMatchEvent(contents models.LogContents, conditionCase ConditionCase) bool {
 	if conditionCase.fieldConditionFields != nil {
 		matchedCount := 0
@@ -355,7 +267,7 @@ func (p *ProcessorFieldsWithCondition) isCaseMatchEvent(contents models.LogConte
 	return false
 }
 
-// Process single action against v2 log contents.
+// Process single action against log fields.
 func (p *ProcessorFieldsWithCondition) processActionEvent(contents models.LogContents, conditionAction ConditionAction) {
 	if conditionAction.Type == ActionAddFieldsType {
 		for k, v := range conditionAction.Fields {
@@ -371,7 +283,7 @@ func (p *ProcessorFieldsWithCondition) processActionEvent(contents models.LogCon
 	}
 }
 
-// Match different cases against v2 log contents.
+// Match different cases against log fields.
 func (p *ProcessorFieldsWithCondition) matchAndProcessEvent(contents models.LogContents) bool {
 	if p.Switch != nil {
 		for _, condition := range p.Switch {

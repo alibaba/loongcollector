@@ -4,16 +4,16 @@
 
 [ext_default_encoder](https://github.com/alibaba/loongcollector/blob/main/plugins/extension/default_encoder/default_encoder.go)
 扩展，实现了 [Encoder](https://github.com/alibaba/loongcollector/blob/main/pkg/pipeline/extensions/encoder.go) 接口，可以用在
-`flusher_http` 等插件中用于序列化不同的协议数据。
+`flusher_http` 等插件中用于序列化不同的协议数据。`Encode` 接收一个 `*models.PipelineGroupEvents`，`EncodeBatch` 接收一批事件组。两个方法均返回编码后的 `[][]byte` 和 `error`。
 
 
 ## 事件能力
 
 列含义见 [概览 · 事件能力列说明](../overview.md#事件能力列说明)。
 
-| v1 接口 | v2 接口 | Log | Metric | Span |
-| --- | --- | --- | --- | --- |
-| — | — | 透传未知 | 透传未知 | 透传未知 |
+| Log | Metric | Span |
+| --- | --- | --- |
+| — | ✓ | — |
 
 ## 版本
 
@@ -27,7 +27,7 @@
 
 | 参数          | 类型     | 是否必选 | 说明                                                                                                        |
 |-------------|--------|------|-----------------------------------------------------------------------------------------------------------|
-| Format      | string | 是    | 具体的协议，[查看支持的具体协议列表](https://github.com/alibaba/loongcollector/blob/master/pkg/protocol/encoder/common/comon.go) |
+| Format      | string | 是    | 具体的协议，[查看支持的具体协议列表](https://github.com/alibaba/loongcollector/blob/main/pkg/protocol/encoder/common/common.go) |
 | SeriesLimit | int    | 否    | 触发序列化时序切片的最大长度，默认 1000，仅针对 Format=prometheus 时有效                                                          |
 
 ## 样例
@@ -38,7 +38,7 @@
 enable: true
 flushers:
   - Type: flusher_http
-    Address: http://127.0.0.1:8080/write
+    RemoteURL: http://127.0.0.1:8080/write
     Encoder:
       Type: ext_default_encoder/prometheus
 extensions:

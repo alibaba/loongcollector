@@ -163,7 +163,7 @@ void LogEvent::AppendContentNoCopy(StringView key, StringView val) {
 }
 
 size_t LogEvent::DataSize() const {
-    return PipelineEvent::DataSize() + sizeof(decltype(mContents)) + mAllocatedContentSize;
+    return DataSizeForContents(mAllocatedContentSize);
 }
 
 #ifdef APSARA_UNIT_TEST_MAIN

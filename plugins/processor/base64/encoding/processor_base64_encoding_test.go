@@ -19,6 +19,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/alibaba/ilogtail/plugins/processor/internal/processortest"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -26,7 +28,6 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
 )
 
@@ -44,28 +45,6 @@ func newProcessor() (*ProcessorBase64Encoding, error) {
 	return processor, err
 }
 
-func TestSourceKey(t *testing.T) {
-	processor, err := newProcessor()
-	require.NoError(t, err)
-	log := &protocol.Log{Time: 0}
-	value := "123"
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "src", Value: value})
-	processor.ProcessLogs([]*protocol.Log{log})
-	assert.Equal(t, "123", log.Contents[0].Value)
-	assert.Equal(t, "MTIz", log.Contents[1].Value)
-}
-
-func TestNewKey(t *testing.T) {
-	processor, err := newProcessor()
-	processor.NewKey = ""
-	require.NoError(t, err)
-	log := &protocol.Log{Time: 0}
-	value := "123"
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "src", Value: value})
-	processor.ProcessLogs([]*protocol.Log{log})
-	assert.Equal(t, "MTIz", log.Contents[0].Value)
-}
-
 func TestNoKeyError(t *testing.T) {
 	logger.ClearMemoryLog()
 	ctx := mock.NewEmptyContext("p", "l", "c")
@@ -76,9 +55,9 @@ func TestNoKeyError(t *testing.T) {
 	}
 	err := processor.Init(ctx)
 	require.NoError(t, err)
-	log := &protocol.Log{Time: 0}
-	log.Contents = append(log.Contents, &protocol.Log_Content{Key: "test_key", Value: "test_value"})
-	processor.ProcessLogs([]*protocol.Log{log})
+	log := processortest.Log()
+	log.Contents.Add("test_key", "test_value")
+	processortest.Apply(processor, log)
 	memoryLog, ok := logger.ReadMemoryLog(1)
 	assert.True(t, ok)
 	assert.Equal(t, 1, logger.GetMemoryLogCount())
@@ -96,9 +75,7 @@ func TestInit(t *testing.T) {
 	assert.Equal(t, reflect.TypeOf(p).String(), "*encoding.ProcessorBase64Encoding")
 }
 
-// ---- v2 (PipelineEvent / SendPb) Process path tests ----
-
-func TestProcessorBase64Encoding_ProcessV2ToNewKey(t *testing.T) {
+func TestProcessorBase64Encoding_ProcessToNewKey(t *testing.T) {
 	processor := &ProcessorBase64Encoding{SourceKey: "src", NewKey: "dst"}
 	require.NoError(t, processor.Init(mock.NewEmptyContext("p", "l", "c")))
 
@@ -112,7 +89,7 @@ func TestProcessorBase64Encoding_ProcessV2ToNewKey(t *testing.T) {
 	assert.Equal(t, "MTIz", log.GetIndices().Get("dst"))
 }
 
-func TestProcessorBase64Encoding_ProcessV2InPlace(t *testing.T) {
+func TestProcessorBase64Encoding_ProcessInPlace(t *testing.T) {
 	processor := &ProcessorBase64Encoding{SourceKey: "src"}
 	require.NoError(t, processor.Init(mock.NewEmptyContext("p", "l", "c")))
 
@@ -125,7 +102,7 @@ func TestProcessorBase64Encoding_ProcessV2InPlace(t *testing.T) {
 	assert.Equal(t, "MTIz", log.GetIndices().Get("src"))
 }
 
-func TestProcessorBase64Encoding_ProcessV2PassesThroughMetric(t *testing.T) {
+func TestProcessorBase64Encoding_ProcessPassesThroughMetric(t *testing.T) {
 	processor := &ProcessorBase64Encoding{SourceKey: "src", NewKey: "dst"}
 	require.NoError(t, processor.Init(mock.NewEmptyContext("p", "l", "c")))
 

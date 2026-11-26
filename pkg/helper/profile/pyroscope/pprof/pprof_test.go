@@ -26,7 +26,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/alibaba/ilogtail/pkg/helper/profile"
-	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/models"
 )
 
 func readPprofFixture(path string) (*tree.Profile, error) {
@@ -84,44 +84,60 @@ func TestRawProfile_Parse(t *testing.T) {
 		Units:           profile.NanosecondsUnit,
 		AggregationType: profile.SumAggType,
 	}
-	cb := r.extractProfileV1(meta, map[string]string{"cluster": "cluster2"})
+	var events []models.PipelineEvent
+	cb := r.profileLogCallback(meta, map[string]string{"cluster": "cluster2"}, &events)
 	r.parser = &p
 	err = r.extractLogs(context.Background(), te, meta, cb)
 	require.NoError(t, err)
-	logs := r.logs
-	require.Equal(t, len(logs), 6)
-	picks := PickLogs(logs, "stackID", stackID)
-	require.Equal(t, len(picks), 1)
+	require.Len(t, events, 6)
+	var picks []*models.Log
+	for _, event := range events {
+		log := event.(*models.Log)
+		if log.Contents.Get("stackID") == stackID {
+			picks = append(picks, log)
+		}
+	}
+	require.Len(t, picks, 1)
 	log := picks[0]
-	require.Equal(t, ReadLogVal(log, "name"), name)
-	require.Equal(t, ReadLogVal(log, "stack"), stack)
-	require.Equal(t, ReadLogVal(log, "language"), lanuage)
-	require.Equal(t, ReadLogVal(log, "type"), profileType)
-	require.Equal(t, ReadLogVal(log, "units"), unitType)
-	require.Equal(t, ReadLogVal(log, "valueTypes"), valType)
-	require.Equal(t, ReadLogVal(log, "aggTypes"), aggType)
-	require.Equal(t, ReadLogVal(log, "dataType"), dataType)
-	require.Equal(t, ReadLogVal(log, "durationNs"), strconv.Itoa(endTime-startTime))
-	require.Equal(t, ReadLogVal(log, "labels"), "{\"_app_name_\":\"12\",\"cluster\":\"cluster2\"}")
-	require.Equal(t, ReadLogVal(log, "val"), "250000000.00")
+	require.Equal(t, uint64(startTime), log.GetTimestamp())
+	require.Equal(t, log.Contents.Get("name"), name)
+	require.Equal(t, log.Contents.Get("stack"), stack)
+	require.Equal(t, log.Contents.Get("language"), lanuage)
+	require.Equal(t, log.Contents.Get("type"), profileType)
+	require.Equal(t, log.Contents.Get("units"), unitType)
+	require.Equal(t, log.Contents.Get("valueTypes"), valType)
+	require.Equal(t, log.Contents.Get("aggTypes"), aggType)
+	require.Equal(t, log.Contents.Get("dataType"), dataType)
+	require.Equal(t, log.Contents.Get("durationNs"), strconv.Itoa(endTime-startTime))
+	require.Equal(t, log.Contents.Get("labels"), "{\"_app_name_\":\"12\",\"cluster\":\"cluster2\"}")
+	require.Equal(t, log.Contents.Get("val"), "250000000.00")
 }
 
-// ReadLogVal returns the log content value for the input key, and returns empty string when not found.
-func ReadLogVal(log *protocol.Log, key string) string {
-	for _, content := range log.Contents {
-		if content.Key == key {
-			return content.Value
-		}
+func TestProfileLogTimestampAtEpoch(t *testing.T) {
+	const timestamp = 123
+	push := NewRawProfile(nil, "")
+	pull := NewRawProfileByPull(nil, nil, nil)
+	meta := &profile.Meta{Tags: map[string]string{"profile_id": "test"}}
+	for _, tc := range []struct {
+		name  string
+		input *RawProfile
+	}{
+		{name: "push", input: push},
+		{name: "pull", input: pull},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			before := uint64(time.Now().UnixNano())
+			var events []models.PipelineEvent
+			cb := tc.input.profileLogCallback(meta, nil, &events)
+			cb(1, &profile.Stack{Name: "test"}, []uint64{1}, []string{"cpu"}, []string{"samples"}, []string{"sum"}, timestamp, timestamp+1, nil)
+			require.Len(t, events, 1)
+			got := events[0].GetTimestamp()
+			if tc.input == push {
+				require.Equal(t, uint64(timestamp), got)
+			} else {
+				require.GreaterOrEqual(t, got, before)
+				require.LessOrEqual(t, got, uint64(time.Now().UnixNano()))
+			}
+		})
 	}
-	return ""
-}
-
-// PickLogs select some of original logs to new res logs by the specific pickKey and pickVal.
-func PickLogs(logs []*protocol.Log, pickKey string, pickVal string) (res []*protocol.Log) {
-	for _, log := range logs {
-		if ReadLogVal(log, pickKey) == pickVal {
-			res = append(res, log)
-		}
-	}
-	return res
 }
