@@ -40,6 +40,8 @@ public:
     void TestReplaceEnvVarRef() const;
     void SelfMonitorInputWithGoFlusher() const;
     void NativeInputWithGoPlugin() const;
+    void MultiInputAndFlusherCoexistence() const;
+    void NativeFlusherBehindGoPipeline() const;
 
 protected:
     static void SetUpTestCase() { PluginRegistry::GetInstance()->LoadPlugins(); }
@@ -1496,29 +1498,6 @@ void CollectionConfigUnittest::HandleInvalidInputs() const {
     config.reset(new CollectionConfig(configName, std::move(configJson), filepath));
     APSARA_TEST_TRUE(config->Parse());
 
-    // more than 1 native input
-    configStr = R"(
-        {
-            "inputs": [
-                {
-                    "Type": "input_file"
-                },
-                {
-                    "Type": "input_file"
-                }
-            ],
-            "flushers": [
-                {
-                    "Type": "flusher_sls"
-                }
-            ]
-        }
-    )";
-    configJson.reset(new Json::Value());
-    APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
-    config.reset(new CollectionConfig(configName, std::move(configJson), filepath));
-    APSARA_TEST_FALSE(config->Parse());
-
     // native and extended inputs coexist
     configStr = R"(
         {
@@ -2446,8 +2425,10 @@ void CollectionConfigUnittest::NativeInputWithGoPlugin() const {
     unique_ptr<CollectionConfig> config;
     string errorMsg;
 
-    // Explicit blacklist (all native inputs minus legacy whitelist) must fail Parse with Go plugins.
-    const vector<string> blacklistedInputs = {
+    // The input-type whitelist/blacklist gate is removed. Any registered native input
+    // may coexist with Go processors and/or Go flushers. Disabled native names must fail.
+    // Both classification and Parse are checked; accepting a name as Go is insufficient.
+    const vector<string> nativeInputs = {
         "input_agentsight",
         "input_cpu_profiling",
         "input_forward",
@@ -2457,7 +2438,8 @@ void CollectionConfigUnittest::NativeInputWithGoPlugin() const {
         "input_network_observer",
         "input_prometheus",
     };
-    for (const auto& inputType : blacklistedInputs) {
+    for (const auto& inputType : nativeInputs) {
+        // native input + Go processor + Go flusher
         string configStr = R"(
             {
                 "inputs": [
@@ -2481,8 +2463,12 @@ void CollectionConfigUnittest::NativeInputWithGoPlugin() const {
         configJson.reset(new Json::Value());
         APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
         config.reset(new CollectionConfig(configName, std::move(configJson), filepath));
-        APSARA_TEST_FALSE_DESC(config->Parse(), inputType);
+        const bool available = PluginRegistry::GetInstance()->IsValidNativeInputPlugin(inputType, false);
+        EXPECT_EQ(available, config->Parse()) << inputType;
+        EXPECT_FALSE(config->mHasGoInput) << inputType;
+        EXPECT_EQ(available, config->mHasNativeInput) << inputType;
 
+        // native input + Go flusher only
         configStr = R"(
             {
                 "inputs": [
@@ -2501,13 +2487,171 @@ void CollectionConfigUnittest::NativeInputWithGoPlugin() const {
         configJson.reset(new Json::Value());
         APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
         config.reset(new CollectionConfig(configName, std::move(configJson), filepath));
-        APSARA_TEST_FALSE_DESC(config->Parse(), inputType);
+
+        EXPECT_EQ(available, config->Parse()) << inputType;
+        EXPECT_FALSE(config->mHasGoInput) << inputType;
+        EXPECT_EQ(available, config->mHasNativeInput) << inputType;
     }
+}
+
+void CollectionConfigUnittest::MultiInputAndFlusherCoexistence() const {
+    unique_ptr<Json::Value> configJson;
+    unique_ptr<CollectionConfig> config;
+    string errorMsg;
+
+    // A native file input registers in FileServer keyed by config name only, so multiple native file
+    // inputs in one pipeline would overwrite each other's registration and silently lose data. Parse
+    // must reject a file input coexisting with any other input.
+    string configStr = R"(
+        {
+            "inputs": [
+                {
+                    "Type": "input_file"
+                },
+                {
+                    "Type": "input_file"
+                }
+            ],
+            "flushers": [
+                {
+                    "Type": "flusher_sls"
+                }
+            ]
+        }
+    )";
+    configJson.reset(new Json::Value());
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
+    config.reset(new CollectionConfig(configName, std::move(configJson), filepath));
+    APSARA_TEST_FALSE(config->Parse());
+
+    // A single native file input coexists with a Go flusher.
+    configStr = R"(
+        {
+            "inputs": [
+                {
+                    "Type": "input_file"
+                }
+            ],
+            "flushers": [
+                {
+                    "Type": "flusher_http"
+                }
+            ]
+        }
+    )";
+    configJson.reset(new Json::Value());
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
+    config.reset(new CollectionConfig(configName, std::move(configJson), filepath));
+    APSARA_TEST_TRUE(config->Parse());
+
+    // Native + Go flusher coexistence rule: exactly one native flusher and it must be flusher_sls.
+    // flusher_sls (native) + flusher_http (Go) -> allowed.
+    configStr = R"(
+        {
+            "inputs": [
+                {
+                    "Type": "input_file"
+                }
+            ],
+            "flushers": [
+                {
+                    "Type": "flusher_sls"
+                },
+                {
+                    "Type": "flusher_http"
+                }
+            ]
+        }
+    )";
+    configJson.reset(new Json::Value());
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
+    config.reset(new CollectionConfig(configName, std::move(configJson), filepath));
+    APSARA_TEST_TRUE(config->Parse());
+
+    // more than 1 native flusher coexists with a Go flusher -> rejected.
+    configStr = R"(
+        {
+            "inputs": [
+                {
+                    "Type": "input_file"
+                }
+            ],
+            "flushers": [
+                {
+                    "Type": "flusher_sls"
+                },
+                {
+                    "Type": "flusher_file"
+                },
+                {
+                    "Type": "flusher_http"
+                }
+            ]
+        }
+    )";
+    configJson.reset(new Json::Value());
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
+    config.reset(new CollectionConfig(configName, std::move(configJson), filepath));
+    APSARA_TEST_FALSE(config->Parse());
+
+    // single native flusher other than flusher_sls coexists with a Go flusher -> rejected.
+    configStr = R"(
+        {
+            "inputs": [
+                {
+                    "Type": "input_file"
+                }
+            ],
+            "flushers": [
+                {
+                    "Type": "flusher_file"
+                },
+                {
+                    "Type": "flusher_http"
+                }
+            ]
+        }
+    )";
+    configJson.reset(new Json::Value());
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
+    config.reset(new CollectionConfig(configName, std::move(configJson), filepath));
+    APSARA_TEST_FALSE(config->Parse());
+}
+
+void CollectionConfigUnittest::NativeFlusherBehindGoPipeline() const {
+    Json::Value detail;
+    detail["inputs"][0]["Type"] = "input_file";
+    detail["processors"][0]["Type"] = "processor_add_fields";
+    detail["flushers"][0]["Type"] = "flusher_file";
+
+    CollectionConfig fileFlusher(configName, make_unique<Json::Value>(detail), filepath);
+    APSARA_TEST_FALSE(fileFlusher.Parse());
+
+    detail["flushers"][1]["Type"] = "flusher_sls";
+    CollectionConfig multipleNativeFlushers(configName, make_unique<Json::Value>(detail), filepath);
+    APSARA_TEST_FALSE(multipleNativeFlushers.Parse());
+
+    detail["flushers"].resize(1);
+    detail["flushers"][0]["Type"] = "flusher_sls";
+    CollectionConfig slsFlusher(configName, make_unique<Json::Value>(detail), filepath);
+    APSARA_TEST_TRUE(slsFlusher.Parse());
+
+    detail["flushers"][0]["Type"] = "flusher_http";
+    CollectionConfig goFlusher(configName, make_unique<Json::Value>(detail), filepath);
+    APSARA_TEST_TRUE(goFlusher.Parse());
+
+    detail.removeMember("processors");
+    detail["flushers"][0]["Type"] = "flusher_file";
+    detail["flushers"][1]["Type"] = "flusher_sls";
+    CollectionConfig nativePipeline(configName, make_unique<Json::Value>(detail), filepath);
+    APSARA_TEST_TRUE(nativePipeline.Parse());
 }
 
 UNIT_TEST_CASE(CollectionConfigUnittest, HandleValidConfig)
 UNIT_TEST_CASE(CollectionConfigUnittest, SelfMonitorInputWithGoFlusher)
 UNIT_TEST_CASE(CollectionConfigUnittest, NativeInputWithGoPlugin)
+UNIT_TEST_CASE(CollectionConfigUnittest, MultiInputAndFlusherCoexistence)
+UNIT_TEST_CASE(CollectionConfigUnittest, NativeFlusherBehindGoPipeline)
 UNIT_TEST_CASE(CollectionConfigUnittest, HandleInvalidCreateTime)
 UNIT_TEST_CASE(CollectionConfigUnittest, HandleInvalidGlobal)
 UNIT_TEST_CASE(CollectionConfigUnittest, HandleInvalidInputs)

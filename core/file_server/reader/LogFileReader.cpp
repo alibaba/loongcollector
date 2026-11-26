@@ -802,7 +802,7 @@ void LogFileReader::SetFilePosBackwardToFixedPos(LogFileOperator& op) {
         std::ostringstream oss;
         oss << "File size " << (endOffset / 1024) << "KB > " << mReaderConfig.first->mTailSizeKB
             << "KB when discovered, skipped " << mLastFilePos << " bytes from the beginning of file: " << mHostLogPath
-            << ", potential data loss may occur. Consider increasing mTailSizeKB if complete file reading is required.";
+            << ", potential data loss may occur. Consider increasing TailSizeKB if complete file reading is required.";
         std::string warningMsg = oss.str();
 
         LOG_WARNING(sLogger,

@@ -116,6 +116,13 @@ bool CollectionPipeline::Init(CollectionConfig&& config) {
             if (!input->Init(detail, mContext, mInputs.size(), optionalGoPipeline)) {
                 return false;
             }
+            // Keep a raw pointer to the input just created in this iteration for the special
+            // treatment below. Ownership moves into mInputs, but the pointee address is unchanged,
+            // so currentInput stays valid. Bind to *this* input (the one matching pluginType) rather
+            // than mInputs[0]. CollectionConfig::Parse currently constrains a native file input to be
+            // the sole input of its pipeline, so mInputs[0] would also work today; binding to the
+            // matching input keeps this correct regardless of position and future-proof.
+            InputInstance* currentInput = input.get();
             mInputs.emplace_back(std::move(input));
             {
                 vector<unique_ptr<InputInstance>> extras;
@@ -129,16 +136,31 @@ bool CollectionPipeline::Init(CollectionConfig&& config) {
             if (!optionalGoPipeline.isNull()) {
                 MergeGoPipeline(optionalGoPipeline, mGoPipelineWithInput);
             }
-            // for special treatment below
             if (pluginType == InputFile::sName) {
-                inputFile = static_cast<const InputFile*>(mInputs[0]->GetPlugin());
+                inputFile = static_cast<const InputFile*>(currentInput->GetPlugin());
             } else if (pluginType == InputContainerStdio::sName) {
-                inputContainerStdio = static_cast<const InputContainerStdio*>(mInputs[0]->GetPlugin());
+                inputContainerStdio = static_cast<const InputContainerStdio*>(currentInput->GetPlugin());
             } else if (pluginType == InputStaticFile::sName) {
-                inputStaticFile = static_cast<const InputStaticFile*>(mInputs[0]->GetPlugin());
+                inputStaticFile = static_cast<const InputStaticFile*>(currentInput->GetPlugin());
             }
         } else {
             AddPluginToGoPipeline(pluginType, detail, "inputs", mGoPipelineWithInput);
+        }
+    }
+
+    // Validate all expanded inputs before flusher initialization can update live sender queues.
+    // TODO: support queue-type selection for Go inputs; they currently use count-bounded queues.
+    const QueueType queueType = mInputs.empty() ? QueueType::COUNT_BOUNDED : mInputs.front()->GetProcessQueueType();
+    for (const auto& input : mInputs) {
+        if (input->GetProcessQueueType() != queueType) {
+            PARAM_ERROR_RETURN(mContext.GetLogger(),
+                               mContext.GetAlarm(),
+                               "not all inputs' queue type are the same",
+                               noModule,
+                               mName,
+                               mContext.GetProjectName(),
+                               mContext.GetLogstoreName(),
+                               mContext.GetRegion());
         }
     }
 
@@ -317,21 +339,6 @@ bool CollectionPipeline::Init(CollectionConfig&& config) {
             mContext.SetProcessQueueKey(QueueKeyManager::GetInstance()->GetKey(mName));
         }
 
-        // TODO: for go input, we currently assume count bounded process queue
-        // Determine process queue type based on input plugins
-        QueueType queueType = mInputs.empty() ? QueueType::COUNT_BOUNDED : mInputs[0]->GetProcessQueueType();
-        for (auto& input : mInputs) {
-            if (input->GetProcessQueueType() != queueType) {
-                PARAM_ERROR_RETURN(mContext.GetLogger(),
-                                   mContext.GetAlarm(),
-                                   "not all inputs' queue type are the same",
-                                   noModule,
-                                   mName,
-                                   mContext.GetProjectName(),
-                                   mContext.GetLogstoreName(),
-                                   mContext.GetRegion());
-            }
-        }
         switch (queueType) {
             case QueueType::COUNT_BOUNDED:
                 ProcessQueueManager::GetInstance()->CreateOrUpdateCountBoundedQueue(
