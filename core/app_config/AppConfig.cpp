@@ -14,9 +14,12 @@
 
 #include "AppConfig.h"
 
+#include <cmath>
+
 #include <algorithm>
 #include <filesystem>
 #include <iostream>
+#include <thread>
 #include <unordered_set>
 #include <utility>
 
@@ -25,6 +28,7 @@
 
 #include "RuntimeUtil.h"
 #include "StringTools.h"
+#include "common/CgroupUtil.h"
 #include "common/EnvUtil.h"
 #include "common/FileSystemUtil.h"
 #include "common/JsonUtil.h"
@@ -61,6 +65,12 @@ DEFINE_FLAG_STRING(default_buffer_file_path, "set current execution dir in defau
 DEFINE_FLAG_STRING(buffer_file_path, "set buffer dir", "");
 DEFINE_FLAG_DOUBLE(default_machine_cpu_usage_threshold, "machine level", 0.4);
 DEFINE_FLAG_BOOL(default_resource_auto_scale, "", false);
+DEFINE_FLAG_BOOL(resource_limit_from_cgroup,
+                 "opt-in: derive CPU (cores) and memory (MiB) self-limits from the process cgroup at startup; "
+                 "when readable and finite, cgroup overrides env/json/flag per resource, otherwise the existing "
+                 "config chain is kept",
+                 false);
+DEFINE_FLAG_STRING(cgroup_root_path, "cgroup filesystem root used by resource_limit_from_cgroup", "/sys/fs/cgroup");
 DEFINE_FLAG_BOOL(default_input_flow_control, "", false);
 DEFINE_FLAG_INT32(max_open_files_limit, "max open files ulimit -n", 131072);
 DEFINE_FLAG_INT32(max_multi_config_size, "max multi config size", 20);
@@ -860,6 +870,65 @@ void AppConfig::LoadEnvResourceLimit() {
     LoadSingleValueEnvConfig("send_request_concurrency", mSendRequestConcurrency, (int32_t)10);
 }
 
+namespace {
+// True when the user explicitly configured process_thread_count via json, env or command line,
+// in which case cgroup auto-derivation must not override it.
+bool IsProcessThreadCountExplicit(const Json::Value& confJson) {
+    if (confJson.isMember("process_thread_count")) {
+        return true;
+    }
+    if (getenv("process_thread_count") != nullptr
+        || getenv(GetLoongcollectorEnv("process_thread_count").c_str()) != nullptr) {
+        return true;
+    }
+    GFLAGS_NAMESPACE::CommandLineFlagInfo info;
+    return GFLAGS_NAMESPACE::GetCommandLineFlagInfo("process_thread_count", &info) && !info.is_default;
+}
+} // namespace
+
+void AppConfig::LoadCgroupResourceLimit(const Json::Value& confJson) {
+    if (!BOOL_FLAG(resource_limit_from_cgroup)) {
+        return;
+    }
+    const std::string& root = STRING_FLAG(cgroup_root_path);
+    float cores = 0.0F;
+    if (ReadCgroupCpuLimit(root, cores)) {
+        // The cgroup quota is a hard ceiling; never soft-scale above it (resource_auto_scale reads the scaled limit).
+        mCpuUsageUpLimit = cores;
+        mScaledCpuUsageUpLimit = cores;
+        LOG_INFO(sLogger, ("cpu self-limit from cgroup, cores", cores)("root", root));
+        if (cores < 0.4F) {
+            LOG_WARNING(sLogger, ("cgroup cpu quota below usual minimum, cores", cores));
+        }
+        // Match the production convention process_thread_count = cpu_limit (rounded to whole cores).
+        if (!IsProcessThreadCountExplicit(confJson)) {
+            int32_t derived = std::max(1, static_cast<int32_t>(std::lround(cores)));
+            unsigned hw = std::thread::hardware_concurrency();
+            if (hw > 0) {
+                derived = std::min(derived, static_cast<int32_t>(hw));
+            }
+            mProcessThreadCount = derived;
+            LOG_INFO(sLogger, ("process thread count from cgroup, count", derived)("cores", cores));
+        }
+    } else {
+        LOG_WARNING(
+            sLogger,
+            ("cgroup cpu limit unreadable or unlimited, keep configured value", mCpuUsageUpLimit)("root", root));
+    }
+    int64_t memMiB = 0;
+    if (ReadCgroupMemLimit(root, memMiB)) {
+        mMemUsageUpLimit = memMiB;
+        LOG_INFO(sLogger, ("mem self-limit from cgroup, MiB", memMiB)("root", root));
+        if (memMiB < 384) {
+            LOG_WARNING(sLogger, ("cgroup memory limit below usual minimum, MiB", memMiB));
+        }
+    } else {
+        LOG_WARNING(
+            sLogger,
+            ("cgroup memory limit unreadable or unlimited, keep configured value", mMemUsageUpLimit)("root", root));
+    }
+}
+
 /**
  * @brief 检查是否处于纯容器模式
  *
@@ -1187,6 +1256,7 @@ void AppConfig::LoadResourceConf(const Json::Value& confJson) {
                          "ALIYUN_LOGTAIL_ENABLE_RESPONSE_VERIFICATION");
 
     LoadEnvResourceLimit();
+    LoadCgroupResourceLimit(confJson);
     CheckAndAdjustParameters();
 
     if (confJson.isMember("bind_interface") && confJson["bind_interface"].isString()) {

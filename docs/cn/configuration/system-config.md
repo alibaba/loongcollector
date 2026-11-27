@@ -10,6 +10,8 @@ LoongCollector 启动时会加载**实例级**系统参数配置文件，用于�
 | ----------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `cpu_usage_limit`       | double | <p>CPU使用阈值，以单核计算。取值范围：0.1~当前机器的CPU核心数</p><p><strong></strong></p><p><strong>警告</strong> `cpu_usage_limit`为软限制，实际 **LoongCollector** 进程占用的 CPU 可能超过限制值，超限 5 分钟后将触发熔断保护，**进程会自动重启**。</p><p>例如设置为 0.4，表示将尽可能限制 CPU 使用为单核的 40%，超出后触发上述保护逻辑。</p> |
 | `mem_usage_limit`       | Int    | <p>内存使用阈值。</p><p><strong>警告</strong> `mem_usage_limit`为软限制，实际 **LoongCollector** 进程占用的内存可能超过限制值，超限 5 分钟后将触发熔断保护，**进程会自动重启**。</p>                                                                                      |
+| `resource_limit_from_cgroup` | Bool | <p>默认 `false`。开启后，启动时优先从进程 cgroup（v2 优先，回退 v1）推导 CPU（核）与内存（MiB）自限制：可读且有限时覆盖 `cpu_usage_limit`/`mem_usage_limit`（含环境变量与 JSON 配置）；按资源独立回退——某项读取失败或为无限制（`max`/`-1`）时，保留该项原配置链的值。</p><p>仅启动时读取一次，容器原地扩缩容需重启生效。开启后无需再手工维护 `cpu_usage_limit`/`mem_usage_limit`，直接跟随 Pod `resources.limits`。</p><p>对应环境变量 `resource_limit_from_cgroup` 或 `LOONG_RESOURCE_LIMIT_FROM_CGROUP`。</p> |
+| `cgroup_root_path` | String | <p>默认 `/sys/fs/cgroup`。`resource_limit_from_cgroup` 读取的 cgroup 根路径。私有 cgroup 命名空间（标准 Docker/K8s）下默认值即可；若挂载的是宿主 cgroup，可指向容器子树。对应环境变量 `cgroup_root_path` 或 `LOONG_CGROUP_ROOT_PATH`。</p> |
 | `default_access_key_id` | String | 写入 `SLS` 的 `access_id`，需要具备写入权限。                                                                                                                                                                                                                |
 | `default_access_key`    | String | 写入 `SLS` 的 `access_key`，需要具备写入权限。                                                                                                                                                                                                                 |
 | `config_scan_interval`    | Int | **采集配置**等本地定义文件（`continuous_pipeline_config` / `onetime_pipeline_config` 等）热加载扫描间隔，单位为秒。 |
@@ -20,7 +22,7 @@ LoongCollector 启动时会加载**实例级**系统参数配置文件，用于�
 | `metrics_report_method` | String | <p>自身指标输出方式。默认为空，即不输出指标。</p><p>当前支持的值：</br>`file`：每分钟将指标输出到`ilogtail`运行目录下的`self_metrics`目录，文件格式为`self-metrics-&{time}.json`，最多保留60个指标文件（即1小时的数据）。该方式适合本地调试使用。</p> |
 | `max_bytes_per_sec` | Int | 全局发送字节速率上限相关（与默认 `default_send_byte_per_sec` 等配合，详见代码）。 |
 | `send_request_concurrency` | Int | 异步发送并发度（有上下限裁剪，见代码）。 |
-| `process_thread_count` | Int | 处理线程数。 |
+| `process_thread_count` | Int | <p>处理线程数，默认 1。</p><p>开启 `resource_limit_from_cgroup` 且**未显式配置**本项时，自动取 cgroup CPU 核数（四舍五入取整，下限 1，上限为机器硬件并发数），即与 `cpu_usage_limit` 一致；显式配置（环境变量/JSON/命令行）优先，不会被覆盖。</p> |
 | `ebpf.receive_event_chan_cap` | Int | 用于接收内核事件的队列大小，默认为 4096 |
 | `ebpf.admin_config.debug_mode` | Bool | 是否开启 ebpf debug 模式，默认为 false |
 | `ebpf.admin_config.log_level` | String | ebpf 相关的日志级别，包括 info warn 和 debug，默认为 warn |
@@ -78,6 +80,6 @@ LoongCollector 启动时会加载**实例级**系统参数配置文件，用于�
 | `CONTAINERD_STATE_DIR` | String | 自定义containerd 数据目录，非必选。自定义取值可以通过查看/etc/containerd/config.toml state字段获取。                                             |
 | `LOGTAIL_LOG_LEVEL` | String |  用于控制主进程（日志路径中可能仍包含历史分段名 `ilogtail`）与 Golang 插件的日志等级，支持 trace、debug、info、warning、error、fatal 等通用等级。|
 
-> 因为 Kubernetes 本身自带资源限制能力，若将 **LoongCollector** 部署到集群中并希望主要依赖 Pod 的 CPU/内存配额而不使用本进程的软限制熔断，可将 `cpu_usage_limit` 与 `mem_usage_limit` 设为很大值（例如 `99999999`），以弱化实例级熔断触发。
+> 因为 Kubernetes 本身自带资源限制能力，若将 **LoongCollector** 部署到集群中并希望主要依赖 Pod 的 CPU/内存配额而不使用本进程的软限制熔断，可将 `cpu_usage_limit` 与 `mem_usage_limit` 设为很大值（例如 `99999999`），以弱化实例级熔断触发。更推荐的做法是设置环境变量 `resource_limit_from_cgroup=true`（与 `cpu_usage_limit` 等保持一致的小写命名；亦可用等价的 `LOONG_RESOURCE_LIMIT_FROM_CGROUP`），让自限制自动跟随 Pod `resources.limits`，无需手工维护这两个值。
 
 未列入上表的实例级键仍可能通过配置合并、`ParseJsonToFlags` 映射到 gflags 或由专用加载逻辑解析，完整列表与语义以源码为准，可查阅 [AppConfig.cpp](https://github.com/alibaba/loongcollector/blob/main/core/app_config/AppConfig.cpp) 中的 `LoadResourceConf`、`LoadOtherConf`、`ParseJsonToFlags` 及各处的 `DEFINE_FLAG` 定义。
