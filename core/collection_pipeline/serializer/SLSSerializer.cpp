@@ -39,6 +39,22 @@ namespace logtail {
 // Maximum size threshold for thread_local buffer before reallocation
 constexpr size_t kMaxThreadLocalBufferSize = 1024 * 1024;
 
+// SLS MetricStore requires metric names to match [a-zA-Z_:][a-zA-Z0-9_:]*
+static bool IsValidMetricStoreName(StringView name) {
+    if (name.empty()) {
+        return false;
+    }
+    for (size_t i = 0; i < name.size(); ++i) {
+        const char c = name[i];
+        if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_' || c == ':'
+            || (i > 0 && c >= '0' && c <= '9')) {
+            continue;
+        }
+        return false;
+    }
+    return true;
+}
+
 void SerializeSpanLinksToString(const SpanEvent& event, std::string& result) {
     if (event.GetLinks().empty()) {
         result.clear();
@@ -273,6 +289,8 @@ void SLSEventGroupSerializer::CalculateMetricEventSize(
     size_t& logGroupSZ,
     std::vector<MetricEventContentCacheItem>& metricEventContentCache,
     std::vector<size_t>& logSZ) const {
+    size_t invalidNameCnt = 0;
+    string firstInvalidName;
     for (size_t i = 0; i < group.mEvents.size(); ++i) {
         const auto& e = group.mEvents[i].Cast<MetricEvent>();
         if (e.GetTimestamp() < 1e9) {
@@ -282,6 +300,12 @@ void SLSEventGroupSerializer::CalculateMetricEventSize(
             continue;
         }
         if (e.Is<UntypedSingleValue>()) {
+            if (!IsValidMetricStoreName(e.GetName())) {
+                if (invalidNameCnt++ == 0) {
+                    firstInvalidName = e.GetName().to_string();
+                }
+                continue;
+            }
             metricEventContentCache[i].mMetricEventContentCache.push_back(
                 DoubleToString(e.GetValue<UntypedSingleValue>()->mValue));
             metricEventContentCache[i].mLabelSize = GetMetricLabelSize(e);
@@ -324,6 +348,22 @@ void SLSEventGroupSerializer::CalculateMetricEventSize(
                 ("invalid metric event type", "discard event")("config", mFlusher->GetContext().GetConfigName()));
             continue;
         }
+    }
+    if (invalidNameCnt > 0) {
+        const auto& ctx = mFlusher->GetContext();
+        string msg = "metric name does not match [a-zA-Z_:][a-zA-Z0-9_:]* required by SLS MetricStore\taction: "
+                     "discard event\tcount: "
+            + ToString(invalidNameCnt) + "\tfirst invalid name: \"" + firstInvalidName
+            + "\"\tconfig: " + ctx.GetConfigName();
+        LOG_WARNING(sLogger,
+                    ("invalid metric name for SLS MetricStore", "discard event")("count", invalidNameCnt)(
+                        "first invalid name", firstInvalidName)("config", ctx.GetConfigName()));
+        ctx.GetAlarm().SendAlarmWarning(SERIALIZE_FAIL_ALARM,
+                                        msg,
+                                        ctx.GetRegion(),
+                                        ctx.GetProjectName(),
+                                        ctx.GetConfigName(),
+                                        ctx.GetLogstoreName());
     }
 }
 
@@ -433,6 +473,9 @@ void SLSEventGroupSerializer::SerializeMetricEvent(LogGroupSerializer& serialize
             continue;
         }
         if (e.Is<UntypedSingleValue>()) {
+            if (!IsValidMetricStoreName(e.GetName())) {
+                continue;
+            }
             if (metricEventContentCache[i].mMetricEventContentCache.empty()) {
                 LOG_ERROR(sLogger,
                           ("metric event single value size mismatch", "should never happen")(

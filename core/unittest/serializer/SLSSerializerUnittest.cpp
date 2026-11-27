@@ -17,6 +17,7 @@
 #include "collection_pipeline/serializer/SLSSerializer.h"
 #include "common/JsonUtil.h"
 #include "plugin/flusher/sls/FlusherSLS.h"
+#include "prometheus/labels/Relabel.h"
 #include "unittest/Unittest.h"
 
 DECLARE_FLAG_INT32(max_send_log_group_size);
@@ -40,6 +41,7 @@ public:
     void TestSerializeMetricEventSingleValue();
     void TestSerializeMetricEventMultiValue();
     void TestSerializeMetricEventWithMetadata();
+    void TestSerializeMetricEventInvalidName();
 
 protected:
     static void SetUpTestCase() { sFlusher = make_unique<FlusherSLS>(); }
@@ -1566,6 +1568,77 @@ void SLSSerializerUnittest::TestSerializeMetricEventWithMetadata() {
     }
 }
 
+void SLSSerializerUnittest::TestSerializeMetricEventInvalidName() {
+    SLSEventGroupSerializer serializer(sFlusher.get());
+    {
+        Json::Value config;
+        string res, errorMsg;
+        APSARA_TEST_TRUE(ParseJsonTable(R"JSON([{
+            "action": "replace",
+            "source_labels": ["__name__"],
+            "regex": "koordlet_lrn_(.*)",
+            "target_label": "__name__",
+            "replacement": "${1}"
+        }])JSON", config, errorMsg));
+        RelabelConfigList rules;
+        APSARA_TEST_TRUE(rules.Init(config));
+        PipelineEventGroup group(make_shared<SourceBuffer>());
+        auto* metric = group.AddMetricEvent();
+        metric->SetName("koordlet_lrn_123");
+        metric->SetTimestamp(1234567890);
+        metric->SetValue<UntypedSingleValue>(1.0);
+        APSARA_TEST_TRUE(rules.Process(*metric));
+        APSARA_TEST_EQUAL("123", metric->GetName().to_string());
+        BatchedEvents batch(std::move(group.MutableEvents()),
+                            std::move(group.GetSizedTags()),
+                            std::move(group.GetSourceBuffer()),
+                            group.GetMetadata(EventGroupMetaKey::SOURCE_ID),
+                            std::move(group.GetExactlyOnceCheckpoint()));
+        APSARA_TEST_FALSE(serializer.DoSerialize(std::move(batch), res, errorMsg));
+        auto& alarms = *mCtx.GetAlarm().MakesureLogtailAlarmMapVecUnlocked(mCtx.GetRegion());
+        const auto alarm = alarms[SERIALIZE_FAIL_ALARM].find(mCtx.GetProjectName() + "_" + mCtx.GetLogstoreName()
+                                                            + "_" + mCtx.GetConfigName() + "_1");
+        APSARA_TEST_TRUE_FATAL(alarm != alarms[SERIALIZE_FAIL_ALARM].end());
+        APSARA_TEST_NOT_EQUAL(string::npos, alarm->second->mMessage.find("[a-zA-Z_:][a-zA-Z0-9_:]*"));
+        APSARA_TEST_NOT_EQUAL(string::npos, alarm->second->mMessage.find("123"));
+    }
+    for (const char* name : {"123", "", "cpu.usage", "cpu-usage", "中cpu"}) {
+        auto batch = CreateBatchedMetricEvents(false, 0, false, false);
+        batch.mEvents[0].Cast<MetricEvent>().SetNameNoCopy(name);
+        string res, errorMsg;
+        APSARA_TEST_FALSE(serializer.DoSerialize(std::move(batch), res, errorMsg));
+    }
+    for (const char* name : {"cpu123", "_cpu", ":cpu", "cpu:usage"}) {
+        auto batch = CreateBatchedMetricEvents(false, 0, false, false);
+        batch.mEvents[0].Cast<MetricEvent>().SetNameNoCopy(name);
+        string res, errorMsg;
+        APSARA_TEST_TRUE(serializer.DoSerialize(std::move(batch), res, errorMsg));
+        sls_logs::LogGroup logGroup;
+        APSARA_TEST_TRUE(logGroup.ParseFromString(res));
+        APSARA_TEST_EQUAL(1, logGroup.logs_size());
+        APSARA_TEST_EQUAL(name, logGroup.logs(0).contents(3).value());
+    }
+    // An invalid name must not cause valid siblings to be discarded or a size mismatch.
+    PipelineEventGroup group(make_shared<SourceBuffer>());
+    for (const char* name : {"123", "cpu_usage", "456"}) {
+        auto* e = group.AddMetricEvent();
+        e->SetName(name);
+        e->SetTimestamp(1234567890);
+        e->SetValue<UntypedSingleValue>(1.0);
+    }
+    BatchedEvents batch(std::move(group.MutableEvents()),
+                        std::move(group.GetSizedTags()),
+                        std::move(group.GetSourceBuffer()),
+                        group.GetMetadata(EventGroupMetaKey::SOURCE_ID),
+                        std::move(group.GetExactlyOnceCheckpoint()));
+    string res, errorMsg;
+    APSARA_TEST_TRUE(serializer.DoSerialize(std::move(batch), res, errorMsg));
+    sls_logs::LogGroup logGroup;
+    APSARA_TEST_TRUE(logGroup.ParseFromString(res));
+    APSARA_TEST_EQUAL(1, logGroup.logs_size());
+    APSARA_TEST_EQUAL("cpu_usage", logGroup.logs(0).contents(3).value());
+}
+
 UNIT_TEST_CASE(SLSSerializerUnittest, TestSerializeEventGroup)
 UNIT_TEST_CASE(SLSSerializerUnittest, TestSerializeEventGroupList)
 UNIT_TEST_CASE(SLSSerializerUnittest, TestSerializeSpanLinksToString)
@@ -1574,6 +1647,7 @@ UNIT_TEST_CASE(SLSSerializerUnittest, TestSerializeSpanAttributesToString)
 UNIT_TEST_CASE(SLSSerializerUnittest, TestSerializeMetricEventSingleValue)
 UNIT_TEST_CASE(SLSSerializerUnittest, TestSerializeMetricEventMultiValue)
 UNIT_TEST_CASE(SLSSerializerUnittest, TestSerializeMetricEventWithMetadata)
+UNIT_TEST_CASE(SLSSerializerUnittest, TestSerializeMetricEventInvalidName)
 
 } // namespace logtail
 
