@@ -22,7 +22,7 @@ LoongCollector 启动时会加载**实例级**系统参数配置文件，用于�
 | `metrics_report_method` | String | <p>自身指标输出方式。默认为空，即不输出指标。</p><p>当前支持的值：</br>`file`：每分钟将指标输出到`ilogtail`运行目录下的`self_metrics`目录，文件格式为`self-metrics-&{time}.json`，最多保留60个指标文件（即1小时的数据）。该方式适合本地调试使用。</p> |
 | `max_bytes_per_sec` | Int | 全局发送字节速率上限相关（与默认 `default_send_byte_per_sec` 等配合，详见代码）。 |
 | `send_request_concurrency` | Int | 异步发送并发度（有上下限裁剪，见代码）。 |
-| `process_thread_count` | Int | 处理线程数。 |
+| `process_thread_count` | Int | <p>处理线程数，默认 1。</p><p>开启 `resource_limit_from_cgroup` 且**未显式配置**本项时，自动取 cgroup CPU 核数（四舍五入取整，下限 1，上限为机器硬件并发数），即与 `cpu_usage_limit` 一致；显式配置（环境变量/JSON/命令行）优先，不会被覆盖。</p> |
 | `ebpf.receive_event_chan_cap` | Int | 用于接收内核事件的队列大小，默认为 4096 |
 | `ebpf.admin_config.debug_mode` | Bool | 是否开启 ebpf debug 模式，默认为 false |
 | `ebpf.admin_config.log_level` | String | ebpf 相关的日志级别，包括 info warn 和 debug，默认为 warn |

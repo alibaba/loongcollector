@@ -15,8 +15,10 @@
 #include "AppConfig.h"
 
 #include <algorithm>
+#include <cmath>
 #include <filesystem>
 #include <iostream>
+#include <thread>
 #include <unordered_set>
 #include <utility>
 
@@ -867,7 +869,23 @@ void AppConfig::LoadEnvResourceLimit() {
     LoadSingleValueEnvConfig("send_request_concurrency", mSendRequestConcurrency, (int32_t)10);
 }
 
-void AppConfig::LoadCgroupResourceLimit() {
+namespace {
+// True when the user explicitly configured process_thread_count via json, env or command line,
+// in which case cgroup auto-derivation must not override it.
+bool IsProcessThreadCountExplicit(const Json::Value& confJson) {
+    if (confJson.isMember("process_thread_count")) {
+        return true;
+    }
+    if (getenv("process_thread_count") != nullptr
+        || getenv(GetLoongcollectorEnv("process_thread_count").c_str()) != nullptr) {
+        return true;
+    }
+    GFLAGS_NAMESPACE::CommandLineFlagInfo info;
+    return GFLAGS_NAMESPACE::GetCommandLineFlagInfo("process_thread_count", &info) && !info.is_default;
+}
+} // namespace
+
+void AppConfig::LoadCgroupResourceLimit(const Json::Value& confJson) {
     if (!BOOL_FLAG(resource_limit_from_cgroup)) {
         return;
     }
@@ -880,6 +898,16 @@ void AppConfig::LoadCgroupResourceLimit() {
         LOG_INFO(sLogger, ("cpu self-limit from cgroup, cores", cores)("root", root));
         if (cores < 0.4F) {
             LOG_WARNING(sLogger, ("cgroup cpu quota below usual minimum, cores", cores));
+        }
+        // Match the production convention process_thread_count = cpu_limit (rounded to whole cores).
+        if (!IsProcessThreadCountExplicit(confJson)) {
+            int32_t derived = std::max(1, static_cast<int32_t>(std::lround(cores)));
+            unsigned hw = std::thread::hardware_concurrency();
+            if (hw > 0) {
+                derived = std::min(derived, static_cast<int32_t>(hw));
+            }
+            mProcessThreadCount = derived;
+            LOG_INFO(sLogger, ("process thread count from cgroup, count", derived)("cores", cores));
         }
     } else {
         LOG_WARNING(sLogger,
@@ -1225,7 +1253,7 @@ void AppConfig::LoadResourceConf(const Json::Value& confJson) {
                          "ALIYUN_LOGTAIL_ENABLE_RESPONSE_VERIFICATION");
 
     LoadEnvResourceLimit();
-    LoadCgroupResourceLimit();
+    LoadCgroupResourceLimit(confJson);
     CheckAndAdjustParameters();
 
     if (confJson.isMember("bind_interface") && confJson["bind_interface"].isString()) {

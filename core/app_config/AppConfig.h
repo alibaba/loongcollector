@@ -317,8 +317,9 @@ private:
     // LoadCgroupResourceLimit derives CPU/memory self-limits from the process cgroup when the opt-in flag
     // resource_limit_from_cgroup is enabled. Called after LoadEnvResourceLimit, so a readable, finite cgroup
     // limit takes precedence over env/json/flag; per resource, an unreadable or unlimited limit keeps the
-    // value already loaded from the existing config chain.
-    void LoadCgroupResourceLimit();
+    // value already loaded from the existing config chain. When the CPU limit is readable and
+    // process_thread_count is not explicitly configured, it is also derived as the rounded core count.
+    void LoadCgroupResourceLimit(const Json::Value& confJson);
 
     // logtail is in purage container mode when STRING_FLAG(ilogtail_user_defined_id_env_name) or
     // "ALIYUN_LOGTAIL_USER_DEFINED_ID" exist and /logtail_host exist

@@ -25,6 +25,7 @@
 #if defined(__linux__)
 #include <filesystem>
 #include <fstream>
+#include <thread>
 #endif
 
 DECLARE_FLAG_INT32(checkpoint_find_max_file_count);
@@ -45,6 +46,7 @@ DECLARE_FLAG_INT32(modify_cache_max);
 DECLARE_FLAG_INT32(max_watch_dir_count);
 DECLARE_FLAG_INT32(max_open_files_limit);
 DECLARE_FLAG_INT32(max_reader_open_files);
+DECLARE_FLAG_INT32(process_thread_count);
 DEFINE_FLAG_INT32(test_receive_event_chan_cap, "test receive kernel event queue size", 4096);
 DEFINE_FLAG_BOOL(test_admin_config_debug_mode, "test admin config debug mode", false);
 DEFINE_FLAG_STRING(test_admin_config_log_level, "test admin config log level", "warn");
@@ -81,6 +83,14 @@ public:
     void TestCgroupResourceLimitAutoScale();
     void TestCgroupResourceLimitEnvOptIn();
     void TestCgroupResourceLimitFeedsAdjustParameters();
+    void TestCgroupProcessThreadCountAutoDerive();
+    void TestCgroupProcessThreadCountSubCore();
+    void TestCgroupProcessThreadCountFractionalRound();
+    void TestCgroupProcessThreadCountExplicitEnv();
+    void TestCgroupProcessThreadCountExplicitJson();
+    void TestCgroupProcessThreadCountCpuUnreadable();
+    void TestCgroupProcessThreadCountFlagOff();
+    void TestCgroupProcessThreadCountCap();
 #endif
 
 private:
@@ -162,12 +172,16 @@ struct ResourceLimitGuard {
     int32_t watchDir = INT32_FLAG(max_watch_dir_count);
     int32_t openFiles = INT32_FLAG(max_open_files_limit);
     int32_t readerOpenFiles = INT32_FLAG(max_reader_open_files);
+    int32_t threadCount = cfg->mProcessThreadCount;
+    int32_t threadFlag = INT32_FLAG(process_thread_count);
 
     ResourceLimitGuard() {
         UnsetEnv("cpu_usage_limit");
         UnsetEnv("LOONG_CPU_USAGE_LIMIT");
         UnsetEnv("mem_usage_limit");
         UnsetEnv("LOONG_MEM_USAGE_LIMIT");
+        UnsetEnv("process_thread_count");
+        UnsetEnv("LOONG_PROCESS_THREAD_COUNT");
     }
     ~ResourceLimitGuard() {
         cfg->mCpuUsageUpLimit = cpu;
@@ -186,10 +200,14 @@ struct ResourceLimitGuard {
         INT32_FLAG(max_watch_dir_count) = watchDir;
         INT32_FLAG(max_open_files_limit) = openFiles;
         INT32_FLAG(max_reader_open_files) = readerOpenFiles;
+        cfg->mProcessThreadCount = threadCount;
+        INT32_FLAG(process_thread_count) = threadFlag;
         UnsetEnv("cpu_usage_limit");
         UnsetEnv("LOONG_CPU_USAGE_LIMIT");
         UnsetEnv("mem_usage_limit");
         UnsetEnv("LOONG_MEM_USAGE_LIMIT");
+        UnsetEnv("process_thread_count");
+        UnsetEnv("LOONG_PROCESS_THREAD_COUNT");
     }
 };
 } // namespace
@@ -497,7 +515,7 @@ void AppConfigUnittest::TestCgroupResourceLimitV2() {
     WriteCgroupFile(tmp.root / "memory.max", "536870912\n");
     BOOL_FLAG(resource_limit_from_cgroup) = true;
     STRING_FLAG(cgroup_root_path) = tmp.root.string();
-    AppConfig::GetInstance()->LoadCgroupResourceLimit();
+    AppConfig::GetInstance()->LoadCgroupResourceLimit(Json::Value());
     APSARA_TEST_EQUAL(AppConfig::GetInstance()->GetCpuUsageUpLimit(), float(0.4));
     APSARA_TEST_EQUAL(AppConfig::GetInstance()->GetScaledCpuUsageUpLimit(), float(0.4));
     APSARA_TEST_EQUAL(AppConfig::GetInstance()->GetMemUsageUpLimit(), int64_t(512));
@@ -559,7 +577,7 @@ void AppConfigUnittest::TestCgroupResourceLimitUnlimited() {
     STRING_FLAG(cgroup_root_path) = tmp.root.string();
     AppConfig::GetInstance()->mCpuUsageUpLimit = 1.0F;
     AppConfig::GetInstance()->mMemUsageUpLimit = 1024;
-    AppConfig::GetInstance()->LoadCgroupResourceLimit();
+    AppConfig::GetInstance()->LoadCgroupResourceLimit(Json::Value());
     APSARA_TEST_EQUAL(AppConfig::GetInstance()->GetCpuUsageUpLimit(), float(1.0));
     APSARA_TEST_EQUAL(AppConfig::GetInstance()->GetMemUsageUpLimit(), int64_t(1024));
 }
@@ -574,7 +592,7 @@ void AppConfigUnittest::TestCgroupResourceLimitPerResourceIndependence() {
     WriteCgroupFile(tmp.root / "memory.max", "max\n");
     AppConfig::GetInstance()->mCpuUsageUpLimit = 1.0F;
     AppConfig::GetInstance()->mMemUsageUpLimit = 1024;
-    AppConfig::GetInstance()->LoadCgroupResourceLimit();
+    AppConfig::GetInstance()->LoadCgroupResourceLimit(Json::Value());
     APSARA_TEST_EQUAL(AppConfig::GetInstance()->GetCpuUsageUpLimit(), float(0.4));
     APSARA_TEST_EQUAL(AppConfig::GetInstance()->GetMemUsageUpLimit(), int64_t(1024));
     // mirror: cpu unlimited, mem finite -> cpu kept, mem applied
@@ -582,7 +600,7 @@ void AppConfigUnittest::TestCgroupResourceLimitPerResourceIndependence() {
     WriteCgroupFile(tmp.root / "memory.max", "536870912\n");
     AppConfig::GetInstance()->mCpuUsageUpLimit = 1.0F;
     AppConfig::GetInstance()->mMemUsageUpLimit = 1024;
-    AppConfig::GetInstance()->LoadCgroupResourceLimit();
+    AppConfig::GetInstance()->LoadCgroupResourceLimit(Json::Value());
     APSARA_TEST_EQUAL(AppConfig::GetInstance()->GetCpuUsageUpLimit(), float(1.0));
     APSARA_TEST_EQUAL(AppConfig::GetInstance()->GetMemUsageUpLimit(), int64_t(512));
 }
@@ -595,7 +613,7 @@ void AppConfigUnittest::TestCgroupResourceLimitV1() {
     WriteCgroupFile(tmp.root / "memory" / "memory.limit_in_bytes", "536870912\n");
     BOOL_FLAG(resource_limit_from_cgroup) = true;
     STRING_FLAG(cgroup_root_path) = tmp.root.string();
-    AppConfig::GetInstance()->LoadCgroupResourceLimit();
+    AppConfig::GetInstance()->LoadCgroupResourceLimit(Json::Value());
     APSARA_TEST_EQUAL(AppConfig::GetInstance()->GetCpuUsageUpLimit(), float(0.4));
     APSARA_TEST_EQUAL(AppConfig::GetInstance()->GetMemUsageUpLimit(), int64_t(512));
 }
@@ -608,7 +626,7 @@ void AppConfigUnittest::TestCgroupResourceLimitV1CpuAcct() {
     WriteCgroupFile(tmp.root / "memory" / "memory.limit_in_bytes", "536870912\n");
     BOOL_FLAG(resource_limit_from_cgroup) = true;
     STRING_FLAG(cgroup_root_path) = tmp.root.string();
-    AppConfig::GetInstance()->LoadCgroupResourceLimit();
+    AppConfig::GetInstance()->LoadCgroupResourceLimit(Json::Value());
     APSARA_TEST_EQUAL(AppConfig::GetInstance()->GetCpuUsageUpLimit(), float(0.4));
     APSARA_TEST_EQUAL(AppConfig::GetInstance()->GetMemUsageUpLimit(), int64_t(512));
 }
@@ -623,12 +641,12 @@ void AppConfigUnittest::TestCgroupResourceLimitV1UnlimitedSentinels() {
     WriteCgroupFile(tmp.root / "memory" / "memory.limit_in_bytes", "9223372036854771712\n");
     AppConfig::GetInstance()->mCpuUsageUpLimit = 1.0F;
     AppConfig::GetInstance()->mMemUsageUpLimit = 1024;
-    AppConfig::GetInstance()->LoadCgroupResourceLimit();
+    AppConfig::GetInstance()->LoadCgroupResourceLimit(Json::Value());
     APSARA_TEST_EQUAL(AppConfig::GetInstance()->GetCpuUsageUpLimit(), float(1.0));
     APSARA_TEST_EQUAL(AppConfig::GetInstance()->GetMemUsageUpLimit(), int64_t(1024));
     // old-kernel LONG_MAX sentinel
     WriteCgroupFile(tmp.root / "memory" / "memory.limit_in_bytes", "9223372036854775807\n");
-    AppConfig::GetInstance()->LoadCgroupResourceLimit();
+    AppConfig::GetInstance()->LoadCgroupResourceLimit(Json::Value());
     APSARA_TEST_EQUAL(AppConfig::GetInstance()->GetMemUsageUpLimit(), int64_t(1024));
 }
 
@@ -641,19 +659,19 @@ void AppConfigUnittest::TestCgroupResourceLimitMalformed() {
     for (const auto& content : badCpu) {
         WriteCgroupFile(tmp.root / "cpu.max", content);
         AppConfig::GetInstance()->mCpuUsageUpLimit = 1.0F;
-        AppConfig::GetInstance()->LoadCgroupResourceLimit();
+        AppConfig::GetInstance()->LoadCgroupResourceLimit(Json::Value());
         APSARA_TEST_EQUAL(AppConfig::GetInstance()->GetCpuUsageUpLimit(), float(1.0));
     }
     // double space is valid
     WriteCgroupFile(tmp.root / "cpu.max", "40000  100000");
-    AppConfig::GetInstance()->LoadCgroupResourceLimit();
+    AppConfig::GetInstance()->LoadCgroupResourceLimit(Json::Value());
     APSARA_TEST_EQUAL(AppConfig::GetInstance()->GetCpuUsageUpLimit(), float(0.4));
     // malformed memory
     const std::vector<std::string> badMem = {"abc", "", "inf", "-5"};
     for (const auto& content : badMem) {
         WriteCgroupFile(tmp.root / "memory.max", content);
         AppConfig::GetInstance()->mMemUsageUpLimit = 1024;
-        AppConfig::GetInstance()->LoadCgroupResourceLimit();
+        AppConfig::GetInstance()->LoadCgroupResourceLimit(Json::Value());
         APSARA_TEST_EQUAL(AppConfig::GetInstance()->GetMemUsageUpLimit(), int64_t(1024));
     }
 }
@@ -666,12 +684,12 @@ void AppConfigUnittest::TestCgroupResourceLimitTinyValues() {
     WriteCgroupFile(tmp.root / "cpu.max", "1000 100000\n"); // 0.01 core, below 0.4 floor but accepted
     WriteCgroupFile(tmp.root / "memory.max", "524288\n"); // 0.5 MiB -> 0 MiB, rejected
     AppConfig::GetInstance()->mMemUsageUpLimit = 1024;
-    AppConfig::GetInstance()->LoadCgroupResourceLimit();
+    AppConfig::GetInstance()->LoadCgroupResourceLimit(Json::Value());
     APSARA_TEST_EQUAL(AppConfig::GetInstance()->GetCpuUsageUpLimit(), float(0.01));
     APSARA_TEST_EQUAL(AppConfig::GetInstance()->GetMemUsageUpLimit(), int64_t(1024));
     // 128 MiB accepted below the 384 floor
     WriteCgroupFile(tmp.root / "memory.max", "134217728\n");
-    AppConfig::GetInstance()->LoadCgroupResourceLimit();
+    AppConfig::GetInstance()->LoadCgroupResourceLimit(Json::Value());
     APSARA_TEST_EQUAL(AppConfig::GetInstance()->GetMemUsageUpLimit(), int64_t(128));
 }
 
@@ -725,6 +743,112 @@ void AppConfigUnittest::TestCgroupResourceLimitFeedsAdjustParameters() {
     APSARA_TEST_EQUAL(AppConfig::GetInstance()->GetMemUsageUpLimit(), int64_t(512));
     APSARA_TEST_EQUAL(INT32_FLAG(polling_max_stat_count), 50000);
 }
+
+void AppConfigUnittest::TestCgroupProcessThreadCountAutoDerive() {
+    ResourceLimitGuard guard;
+    CgroupTempRoot tmp;
+    BOOL_FLAG(resource_limit_from_cgroup) = true;
+    STRING_FLAG(cgroup_root_path) = tmp.root.string();
+    WriteCgroupFile(tmp.root / "memory.max", "536870912\n");
+    Json::Value conf;
+    WriteCgroupFile(tmp.root / "cpu.max", "40000 100000\n"); // 0.4 core -> 1
+    AppConfig::GetInstance()->LoadResourceConf(conf);
+    APSARA_TEST_EQUAL(AppConfig::GetInstance()->GetProcessThreadCount(), 1);
+    WriteCgroupFile(tmp.root / "cpu.max", "400000 100000\n"); // 4 cores -> 4
+    AppConfig::GetInstance()->LoadResourceConf(conf);
+    APSARA_TEST_EQUAL(AppConfig::GetInstance()->GetProcessThreadCount(), 4);
+    WriteCgroupFile(tmp.root / "cpu.max", "1000000 100000\n"); // 10 cores -> 10
+    AppConfig::GetInstance()->LoadResourceConf(conf);
+    APSARA_TEST_EQUAL(AppConfig::GetInstance()->GetProcessThreadCount(), 10);
+}
+
+void AppConfigUnittest::TestCgroupProcessThreadCountSubCore() {
+    ResourceLimitGuard guard;
+    CgroupTempRoot tmp;
+    BOOL_FLAG(resource_limit_from_cgroup) = true;
+    STRING_FLAG(cgroup_root_path) = tmp.root.string();
+    WriteCgroupFile(tmp.root / "cpu.max", "40000 100000\n"); // 0.4 core
+    Json::Value conf;
+    AppConfig::GetInstance()->LoadResourceConf(conf);
+    APSARA_TEST_EQUAL(AppConfig::GetInstance()->GetProcessThreadCount(), 1);
+}
+
+void AppConfigUnittest::TestCgroupProcessThreadCountFractionalRound() {
+    ResourceLimitGuard guard;
+    CgroupTempRoot tmp;
+    BOOL_FLAG(resource_limit_from_cgroup) = true;
+    STRING_FLAG(cgroup_root_path) = tmp.root.string();
+    WriteCgroupFile(tmp.root / "cpu.max", "250000 100000\n"); // 2.5 cores -> round to 3
+    Json::Value conf;
+    AppConfig::GetInstance()->LoadResourceConf(conf);
+    APSARA_TEST_EQUAL(AppConfig::GetInstance()->GetProcessThreadCount(), 3);
+}
+
+void AppConfigUnittest::TestCgroupProcessThreadCountExplicitEnv() {
+    ResourceLimitGuard guard;
+    CgroupTempRoot tmp;
+    BOOL_FLAG(resource_limit_from_cgroup) = true;
+    STRING_FLAG(cgroup_root_path) = tmp.root.string();
+    WriteCgroupFile(tmp.root / "cpu.max", "400000 100000\n"); // 4 cores
+    Json::Value conf;
+    SetEnv("process_thread_count", "5");
+    AppConfig::GetInstance()->LoadResourceConf(conf);
+    APSARA_TEST_EQUAL(AppConfig::GetInstance()->GetProcessThreadCount(), 5);
+    UnsetEnv("process_thread_count");
+    SetEnv("LOONG_PROCESS_THREAD_COUNT", "6");
+    AppConfig::GetInstance()->LoadResourceConf(conf);
+    APSARA_TEST_EQUAL(AppConfig::GetInstance()->GetProcessThreadCount(), 6);
+    UnsetEnv("LOONG_PROCESS_THREAD_COUNT");
+}
+
+void AppConfigUnittest::TestCgroupProcessThreadCountExplicitJson() {
+    ResourceLimitGuard guard;
+    CgroupTempRoot tmp;
+    BOOL_FLAG(resource_limit_from_cgroup) = true;
+    STRING_FLAG(cgroup_root_path) = tmp.root.string();
+    WriteCgroupFile(tmp.root / "cpu.max", "400000 100000\n"); // 4 cores
+    Json::Value conf;
+    conf["process_thread_count"] = 5;
+    AppConfig::GetInstance()->LoadResourceConf(conf);
+    APSARA_TEST_EQUAL(AppConfig::GetInstance()->GetProcessThreadCount(), 5);
+}
+
+void AppConfigUnittest::TestCgroupProcessThreadCountCpuUnreadable() {
+    ResourceLimitGuard guard;
+    CgroupTempRoot tmp; // empty root: no cpu limit file
+    BOOL_FLAG(resource_limit_from_cgroup) = true;
+    STRING_FLAG(cgroup_root_path) = tmp.root.string();
+    Json::Value conf;
+    AppConfig::GetInstance()->LoadResourceConf(conf);
+    APSARA_TEST_EQUAL(AppConfig::GetInstance()->GetProcessThreadCount(), INT32_FLAG(process_thread_count));
+}
+
+void AppConfigUnittest::TestCgroupProcessThreadCountFlagOff() {
+    ResourceLimitGuard guard;
+    CgroupTempRoot tmp;
+    WriteCgroupFile(tmp.root / "cpu.max", "400000 100000\n"); // 4 cores
+    BOOL_FLAG(resource_limit_from_cgroup) = false;
+    STRING_FLAG(cgroup_root_path) = tmp.root.string();
+    Json::Value conf;
+    AppConfig::GetInstance()->LoadResourceConf(conf);
+    APSARA_TEST_EQUAL(AppConfig::GetInstance()->GetProcessThreadCount(), INT32_FLAG(process_thread_count));
+}
+
+void AppConfigUnittest::TestCgroupProcessThreadCountCap() {
+    ResourceLimitGuard guard;
+    CgroupTempRoot tmp;
+    BOOL_FLAG(resource_limit_from_cgroup) = true;
+    STRING_FLAG(cgroup_root_path) = tmp.root.string();
+    WriteCgroupFile(tmp.root / "cpu.max", "100000000 100000\n"); // 1000 cores
+    Json::Value conf;
+    AppConfig::GetInstance()->LoadResourceConf(conf);
+    int32_t count = AppConfig::GetInstance()->GetProcessThreadCount();
+    unsigned hw = std::thread::hardware_concurrency();
+    APSARA_TEST_TRUE(count >= 1);
+    if (hw > 0) {
+        APSARA_TEST_TRUE(count <= static_cast<int32_t>(hw));
+    }
+}
 #endif
 
 UNIT_TEST_CASE(AppConfigUnittest, TestRecurseParseJsonToFlags);
@@ -750,6 +874,14 @@ UNIT_TEST_CASE(AppConfigUnittest, TestCgroupResourceLimitTinyValues);
 UNIT_TEST_CASE(AppConfigUnittest, TestCgroupResourceLimitAutoScale);
 UNIT_TEST_CASE(AppConfigUnittest, TestCgroupResourceLimitEnvOptIn);
 UNIT_TEST_CASE(AppConfigUnittest, TestCgroupResourceLimitFeedsAdjustParameters);
+UNIT_TEST_CASE(AppConfigUnittest, TestCgroupProcessThreadCountAutoDerive);
+UNIT_TEST_CASE(AppConfigUnittest, TestCgroupProcessThreadCountSubCore);
+UNIT_TEST_CASE(AppConfigUnittest, TestCgroupProcessThreadCountFractionalRound);
+UNIT_TEST_CASE(AppConfigUnittest, TestCgroupProcessThreadCountExplicitEnv);
+UNIT_TEST_CASE(AppConfigUnittest, TestCgroupProcessThreadCountExplicitJson);
+UNIT_TEST_CASE(AppConfigUnittest, TestCgroupProcessThreadCountCpuUnreadable);
+UNIT_TEST_CASE(AppConfigUnittest, TestCgroupProcessThreadCountFlagOff);
+UNIT_TEST_CASE(AppConfigUnittest, TestCgroupProcessThreadCountCap);
 #endif
 
 } // namespace logtail
