@@ -114,6 +114,19 @@ ScrapeConfig 兼容绝大部分 [Prometheus 官方配置中的 `scrape_config`](
     3. 与其他 `__` 前缀标签相同，`__unix_socket__` 不会出现在最终指标标签中。
     4. 采集器进程需要具备该 Socket 文件的访问权限。与 Prometheus（Go 运行时）一致，在 Linux 和 Windows 上以 `@` 开头的值（如 `@exporter`）表示抽象 Socket 地址，其他平台按普通文件路径处理；Windows 能否连接抽象地址取决于系统支持。路径无效或 libcurl 不支持 Unix Socket 时抓取会失败，不会回退到 TCP。
 
+5. **`metric_relabel_configs` 清空 `__name__`**：如果规则把某条样本的 `__name__` 改为空值（例如 `replacement` 为空、`target_label` 为 `__name__`），LoongCollector 只丢弃这一条样本，同一次抓取的其他样本照常上报，`up` 不受影响。这与 Prometheus 不同：Prometheus 在样本仍有其他标签时会让整次抓取失败并报告 `up=0`。原因是 LoongCollector 流式处理抓取结果，已发送的部分无法回滚。
+
+    ```yaml
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: 'debug_.*'
+        target_label: __name__
+        replacement: ''
+        action: replace
+    ```
+
+    以上配置在 LoongCollector 中只丢弃 `debug_` 开头的样本；如需在 Prometheus 中达到同样效果，请改用 `action: drop`。
+
 ## 样例
 
 ### 基础配置

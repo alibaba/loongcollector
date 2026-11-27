@@ -279,7 +279,19 @@ bool RelabelConfigList::Process(Labels& l) const {
 bool RelabelConfigList::Process(MetricEvent& event) const {
     Labels labels;
     labels.Reset(&event);
-    return Process(labels);
+    if (!Process(labels)) {
+        return false;
+    }
+    // relabel only mutates the __name__ tag, which is stripped later, so sync it back to the event name
+    auto name = event.GetTag(prometheus::NAME);
+    if (name.empty()) {
+        // Prometheus fails the whole scrape here; streamed batches cannot be rolled back, so drop only this sample
+        return false;
+    }
+    if (name != event.GetName()) {
+        event.SetName(name.to_string());
+    }
+    return true;
 }
 
 bool RelabelConfigList::Empty() const {
