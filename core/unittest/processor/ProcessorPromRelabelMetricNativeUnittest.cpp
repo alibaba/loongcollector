@@ -385,7 +385,6 @@ UNIT_TEST_CASE(ProcessorPromRelabelMetricNativeUnittest, TestHonorLabels)
 UNIT_TEST_CASE(ProcessorPromRelabelMetricNativeUnittest, TestRenameMetricName)
 
 
-
 } // namespace logtail
 
 UNIT_TEST_MAIN

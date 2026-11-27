@@ -1579,7 +1579,9 @@ void SLSSerializerUnittest::TestSerializeMetricEventInvalidName() {
             "regex": "koordlet_lrn_(.*)",
             "target_label": "__name__",
             "replacement": "${1}"
-        }])JSON", config, errorMsg));
+        }])JSON",
+                                        config,
+                                        errorMsg));
         RelabelConfigList rules;
         APSARA_TEST_TRUE(rules.Init(config));
         PipelineEventGroup group(make_shared<SourceBuffer>());
@@ -1596,8 +1598,8 @@ void SLSSerializerUnittest::TestSerializeMetricEventInvalidName() {
                             std::move(group.GetExactlyOnceCheckpoint()));
         APSARA_TEST_FALSE(serializer.DoSerialize(std::move(batch), res, errorMsg));
         auto& alarms = *mCtx.GetAlarm().MakesureLogtailAlarmMapVecUnlocked(mCtx.GetRegion());
-        const auto alarm = alarms[SERIALIZE_FAIL_ALARM].find(mCtx.GetProjectName() + "_" + mCtx.GetLogstoreName()
-                                                            + "_" + mCtx.GetConfigName() + "_1");
+        const auto alarm = alarms[SERIALIZE_FAIL_ALARM].find(mCtx.GetProjectName() + "_" + mCtx.GetLogstoreName() + "_"
+                                                             + mCtx.GetConfigName() + "_1");
         APSARA_TEST_TRUE_FATAL(alarm != alarms[SERIALIZE_FAIL_ALARM].end());
         APSARA_TEST_NOT_EQUAL(string::npos, alarm->second->mMessage.find("[a-zA-Z_:][a-zA-Z0-9_:]*"));
         APSARA_TEST_NOT_EQUAL(string::npos, alarm->second->mMessage.find("123"));
