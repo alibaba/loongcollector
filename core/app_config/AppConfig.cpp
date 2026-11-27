@@ -14,8 +14,9 @@
 
 #include "AppConfig.h"
 
-#include <algorithm>
 #include <cmath>
+
+#include <algorithm>
 #include <filesystem>
 #include <iostream>
 #include <thread>
@@ -910,8 +911,9 @@ void AppConfig::LoadCgroupResourceLimit(const Json::Value& confJson) {
             LOG_INFO(sLogger, ("process thread count from cgroup, count", derived)("cores", cores));
         }
     } else {
-        LOG_WARNING(sLogger,
-                    ("cgroup cpu limit unreadable or unlimited, keep configured value", mCpuUsageUpLimit)("root", root));
+        LOG_WARNING(
+            sLogger,
+            ("cgroup cpu limit unreadable or unlimited, keep configured value", mCpuUsageUpLimit)("root", root));
     }
     int64_t memMiB = 0;
     if (ReadCgroupMemLimit(root, memMiB)) {
@@ -921,8 +923,9 @@ void AppConfig::LoadCgroupResourceLimit(const Json::Value& confJson) {
             LOG_WARNING(sLogger, ("cgroup memory limit below usual minimum, MiB", memMiB));
         }
     } else {
-        LOG_WARNING(sLogger,
-                    ("cgroup memory limit unreadable or unlimited, keep configured value", mMemUsageUpLimit)("root", root));
+        LOG_WARNING(
+            sLogger,
+            ("cgroup memory limit unreadable or unlimited, keep configured value", mMemUsageUpLimit)("root", root));
     }
 }
 
